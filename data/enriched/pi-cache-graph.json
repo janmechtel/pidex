@@ -1,0 +1,38 @@
+{
+  "name": "pi-cache-graph",
+  "latest_version": "1.0.2",
+  "description": "Pi extension for visualizing context cache distribution and statistics",
+  "readme": "# pi-cache-graph\n\nA project-local [pi](https://github.com/mariozechner/pi) extension that adds cache inspection commands for monitoring LLM context cache usage.\n\nThis extension was built primarily to add **observability to the [pi-context-prune](https://github.com/championswimmer/pi-context-prune) extension** \u2014 which compacts the session context to keep token usage down. `pi-cache-graph` lets you see in real time how effectively the cache is being used and how pruning affects cache hit rates over a session.\n\n![pi-cache-graph screenshot](docs/screenshot.png)\n\nAdds cache inspection commands:\n\n- `/cache graph` \u2014 shows cache hit % over time for assistant turns across the current session timeline\n- `/cache stats` \u2014 shows per-message token/cache breakdown for assistant messages across the whole session tree, plus cumulative totals\n- `/cache export` \u2014 writes the same stats data to `session-name.csv` at the project root\n\n## Commands\n\n### `/cache graph`\nOpens a TUI overlay with **three switchable views**:\n\n| Key | View | Description |\n|-----|------|-------------|\n| `1` | Per-turn (%) | Cache hit % per individual turn (default) |\n| `2` | Cumulative (%) | Running cache hit % across all turns so far |\n| `3` | Cumulative (total) | Running cumulative token volumes (input / cacheWrite / cacheRead) |\n\n**Keyboard shortcuts inside the dialog:**\n- `1` / `2` / `3` \u2014 jump directly to that view\n- `v` \u2014 cycle view forward\n- `V` (Shift+v) \u2014 cycle view backward\n- `\u2191/\u2193`, `PgUp/PgDn`, `Home/End` \u2014 scroll\n- `q` / `Esc` \u2014 close\n\nAll views show active-branch totals and whole-tree totals at the top.\n\nCache hit % is computed as:\n\n```text\ncacheRead / (input + cacheRead + cacheWrite)\n```\n\nThe denominator is the full prompt size that was sent in the turn:\n- `input` \u2014 fresh, non-cached prompt tokens\n- `cacheRead` \u2014 prompt tokens served from cache\n- `cacheWrite` \u2014 prompt tokens that were freshly written to cache this turn (Anthropic-style providers report this separately from `input`; OpenAI-style providers report `cacheWrite = 0`, so the formula behaves identically there)\n\nThe **cumulative-total** chart uses distinct glyphs per series (`\u2587` input, `\u2591` cacheWrite, `\u2592` cacheRead) with a dynamic scale shown in the legend (default: 1 row = 5,000 tokens).\n\n### `/cache stats`\nOpens a TUI overlay table that shows:\n- one row per assistant message with usage data\n- whether the message is on the current active branch\n- prompt / received / cache-hit / cache-write tokens\n- per-message cache hit %\n- cumulative totals for the active branch and the whole tree\n\n### `/cache export`\nWrites a CSV to the project root:\n- filename: `session-name.csv`\n- uses the current pi session name when available\n- falls back to the session file basename if the session has no explicit name\n- contains summary rows plus the per-message rows shown in `/cache stats`\n- can be opened in Excel to build graphs from the exported columns\n\n## Install from npm\n\nInstall globally via pi:\n\n```bash\npi install pi-cache-graph\n```\n\nOr add it to your pi settings manually in `.pi/settings.json`:\n\n```json\n{\n  \"packages\": [\n    \"pi-cache-graph\"\n  ]\n}\n```\n\nOnce installed, the `/cache` commands are available in any pi session.\n\n## Install from local source (development)\n\nClone the repo and run pi with this extension directly:\n\n```bash\ngit clone https://github.com/championswimmer/pi-cache-graph.git\ncd pi-cache-graph\nnpm install\npi -e .\n```\n\nOr install the local path into pi:\n\n```bash\npi install /path/to/pi-cache-graph\n```\n\nOr add it to `.pi/settings.json`:\n\n```json\n{\n  \"packages\": [\n    \"/path/to/pi-cache-graph\"\n  ]\n}\n```\n\n## Development\n\n```bash\nnpm install\nnpm run check\n```\n\n## Maintainer release workflow\n\nThis repo includes a project-local Pi release workflow for maintainers:\n\n- prompt template: `/release <major|minor|patch>`\n- skill: `.agents/skills/release/SKILL.md`\n- helper script: `scripts/release.mjs`\n- detailed notes: `docs/releasing.md`\n\nThe release flow bumps the version, creates the release tag, pushes `main` plus the tag, and then relies on `.github/workflows/publish.yml` to publish to npm.\n\n## Files\n\n- `index.ts` \u2014 extension entrypoint\n- `src/index.ts` \u2014 command registration\n- `src/session-data.ts` \u2014 session traversal and metric computation\n- `src/cumulative.ts` \u2014 cumulative series computation (pure, no UI dependency)\n- `src/cache-math.ts` \u2014 cache hit % and totals calculations\n- `src/format-utils.ts` \u2014 number/percent formatting helpers\n- `src/graph-view.ts` \u2014 graph rendering\n- `src/stats-view.ts` \u2014 stats table rendering\n- `src/scroll-dialog.ts` \u2014 scrollable TUI overlay component\n- `src/render-utils.ts` \u2014 shared rendering helpers\n- `src/export.ts` \u2014 CSV export logic\n- `src/types.ts` \u2014 shared TypeScript interfaces\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "cache",
+    "tui"
+  ],
+  "author": {
+    "name": "Arnav Gupta",
+    "email": "arnav@championswimmer.in"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/championswimmer/pi-cache-graph#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/championswimmer/pi-cache-graph.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-29T00:53:36.970Z",
+    "modified": "2026-06-10T02:30:08.593Z",
+    "0.1.0": "2026-04-29T00:53:37.230Z",
+    "0.1.1": "2026-04-29T23:46:33.482Z",
+    "0.2.0": "2026-05-02T17:10:13.849Z",
+    "1.0.2": "2026-06-10T02:30:08.316Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": null,
+  "download_trend": []
+}

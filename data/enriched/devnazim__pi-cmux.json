@@ -1,0 +1,41 @@
+{
+  "name": "@devnazim/pi-cmux",
+  "latest_version": "0.1.6",
+  "description": "cmux notifications and status integration for pi.",
+  "readme": "# pi-cmux\n\ncmux notifications and status integration for [pi](https://pi.dev).\n\n`pi-cmux` is a standalone pi extension/package. It sends generic pi lifecycle updates to cmux and exposes an optional in-process notifier API that other pi extensions can use for semantic notifications.\n\nPackage name: `@devnazim/pi-cmux`.\n\nCompatibility: `pi-cmux` uses Pi's extension API via a peer dependency and is intended to work across current Pi releases.\n\n## Install\n\nAfter publishing to npm:\n\n```bash\npi install npm:@devnazim/pi-cmux\n```\n\nFrom a local checkout:\n\n```bash\npi install /path/to/pi-cmux\n```\n\nOr try without installing:\n\n```bash\npi -e /path/to/pi-cmux\n```\n\n## What it does\n\n| pi event | cmux action |\n| --- | --- |\n| Agent starts | mark the active cmux surface as running (`surface.report_shell_state`) |\n| Agent ends with no queued messages | desktop notification (including session name when set) + mark surface as prompt/idle |\n| Agent ends with queued messages | keep/report the active surface as running |\n| Session shuts down/reloads | mark surface as prompt/idle |\n| Optional extension notification | popup/status/log best-effort, controlled by the caller |\n\nAll cmux calls are best-effort. If cmux is unavailable or a command fails, pi continues normally.\n\n## cmux, SSH, and tmux behavior\n\n`pi-cmux` detects cmux with:\n\n- `CMUX_WORKSPACE_ID`\n- `CMUX_TAB_ID`\n- any non-empty `CMUX_SOCKET_PATH` (including remote relay values like `127.0.0.1:<port>`)\n- `/tmp/cmux.sock` as a final fallback\n\nIt resolves the cmux CLI with `CMUX_BUNDLED_CLI_PATH`, falling back to `cmux` on `PATH`.\n\nFor SSH/tmux/surface-aware notifications, it targets the active cmux surface by preferring explicit env vars:\n\n- `CMUX_SURFACE_ID`\n- `CMUX_PANEL_ID`\n\nIf neither is present but `CMUX_WORKSPACE_ID` or `CMUX_TAB_ID` exists, `pi-cmux` asks cmux for that workspace's surfaces with `surface.list` and chooses the focused surface, then the selected surface, then the first surface.\n\nWhen a surface is available, notifications use:\n\n```text\ncmux rpc notification.create_for_surface '{\"surface_id\":\"...\",\"title\":\"...\"}'\n```\n\nOtherwise they fall back to:\n\n```text\ncmux rpc notification.create '{\"title\":\"...\"}'\n```\n\nIf `TMUX_PANE` is set, `pi-cmux` asks tmux for a readable pane label and prefixes notification bodies with it, e.g. `[dev:1 %2] Ready for input`. If tmux lookup fails, it falls back to the raw pane id.\n\nWhen running inside tmux, `pi-cmux` also refreshes `CMUX_*` values from `tmux show-environment` before each cmux call. This helps after SSH relay reconnects, such as when a laptop sleeps and wakes with a new `CMUX_SOCKET_PATH` port. Existing processes cannot recover if tmux itself still has stale cmux environment values; in that case, start a new cmux/tmux pane or restart pi from a shell with fresh `CMUX_*` variables.\n\nThis avoids terminal OSC notifications and works through SSH/tmux when the cmux shell integration exposes the needed env/socket/CLI access in the remote environment. Without that cmux environment, the extension silently no-ops.\n\nCurrent cmux builds expose notifications and surface shell-state RPCs, but may not expose older `set-status`, `clear-status`, or `log` CLI commands. `pi-cmux` uses the shell-state RPC for surface activity, probes `cmux --help` before calling optional legacy status/log commands, and keeps legacy status calls off the critical agent lifecycle path.\n\n## Configuration\n\nCreate `~/.config/pi-cmux/config.json` or set `PI_CMUX_CONFIG` to another path.\n\n```json\n{\n  \"notifications\": {\n    \"done\": true,\n    \"error\": true,\n    \"xplan\": true\n  },\n  \"status\": true,\n  \"logs\": true\n}\n```\n\n| Option | Default | Description |\n| --- | --- | --- |\n| `notifications.done` | `true` | Show generic \u201cPi done\u201d notifications. |\n| `notifications.error` | `true` | Allow error-level popup notifications from optional callers. |\n| `notifications.xplan` | `true` | Allow popup notifications from `source: \"xplan\"`. |\n| `status` | `true` | Report active cmux surface activity, or use supported legacy status commands when available. |\n| `logs` | `true` | Write cmux log entries when the installed cmux CLI exposes `cmux log`; otherwise no-op. |\n\nMalformed or omitted values fall back to defaults.\n\n## Optional notifier API\n\nOther extensions can request cmux notifications without importing or depending on `pi-cmux`:\n\n```ts\nconst notify = (globalThis as any)[Symbol.for(\"pi.cmux.notify.v1\")];\n\nif (typeof notify === \"function\") {\n  await notify({\n    source: \"xplan\",\n    type: \"step_ready\",\n    title: \"xplan step ready\",\n    body: \"S2 is ready for review\",\n    level: \"success\",\n    status: { key: \"xplan\", text: \"review\", icon: \"check\", color: \"#22c55e\" },\n  });\n}\n```\n\nIf `pi-cmux` is not installed, the symbol is absent. Callers should treat notifications as optional and never require them for workflow state.\n\nSupported payload fields:\n\n- `title` \u2014 required notification title\n- `subtitle`, `body` \u2014 optional body parts, joined with ` \u2014 `\n- `source` \u2014 log/status source, e.g. `xplan`\n- `type` \u2014 caller-defined event type\n- `level` \u2014 `info`, `success`, `warning`, `error`, or `warn`\n- `notify: false` \u2014 skip popup notification\n- `log: false` \u2014 skip cmux log entry\n- `status` \u2014 optional keyed status set/clear request; used only when the installed cmux CLI supports legacy status commands\n\n## Development\n\n```bash\nnpm install\nnpm test\nnpm run check\n```\n\nThe implementation no-ops outside cmux, targets notifications and shell-state reports to the active surface when possible, infers SSH/tmux surfaces with `surface.list`, adds tmux pane labels and pi session names for disambiguation, probes optional legacy commands before using them, keeps legacy status calls best-effort in the background, and executes commands without shell interpolation.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "cmux",
+    "notifications",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "devnazim"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/devnazim/pi-cmux#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devnazim/pi-cmux.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-21T10:49:43.847Z",
+    "modified": "2026-06-08T10:14:35.935Z",
+    "0.1.0": "2026-05-21T10:49:44.153Z",
+    "0.1.1": "2026-05-25T14:44:45.706Z",
+    "0.1.2": "2026-05-27T16:39:17.695Z",
+    "0.1.3": "2026-05-28T15:45:39.329Z",
+    "0.1.4": "2026-05-29T15:43:20.514Z",
+    "0.1.5": "2026-05-31T13:57:06.553Z",
+    "0.1.6": "2026-06-08T10:14:35.840Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 37,
+  "download_trend": []
+}

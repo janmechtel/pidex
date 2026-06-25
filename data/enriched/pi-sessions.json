@@ -1,0 +1,43 @@
+{
+  "name": "pi-sessions",
+  "latest_version": "0.5.0",
+  "description": "Pi session search, ask, handoff, auto-titling, and indexing tools",
+  "readme": "# pi-sessions\n\n`pi-sessions` turns your old Pi sessions into something you can actually reuse. It gives you search, follow-up Q&A, deliberate handoffs into new child sessions, automatic session titles, and a local index that keeps future sessions searchable.\n\n## Screenshots\n\n### Session lookup\n\n![session picker](images/session_picker.png)\n\n### Handoffs\n\n![handoff preview](images/handoff.png)\n\n### Ask about old sessions\n\n![session_search tool](images/session_search.png)\n\n![session_ask tool](images/session_ask.png)\n\n## Install\n\nRequires Pi `0.78.1` or newer.\n\n**From npm** (recommended):\n\n```bash\npi install npm:pi-sessions\n```\n\nIf you want to run directly from a local clone while developing:\n\n```bash\npi -e /absolute/path/to/pi-sessions\n```\n\n## Quick start\n\n1. Install the package.\n2. Open Pi and run `/session-index`.\n3. Press `r` to build the index for all your prior sessions.\n4. Try the main flows:\n\n```text\nWhat session did I implement the db layer?\n```\n\n```text\n/handoff i want to implement the frontend component now\n```\n\n## Features\n\n| Extension          | Surface                               | What it does                                            |\n| ------------------ | ------------------------------------- | ------------------------------------------------------- |\n| Session Search     | `session_search` pi tool              | Search through old sessions                             |\n| Session Ask        | `session_ask` pi tool                 | Ask questions about old sessions                        |\n| Session Handoff    | `/handoff`, `session_handoff` pi tool | Start a focused new session; alternative to compaction  |\n| Session Picker     | `Alt+O`                               | Reference old sessions in your prompt                   |\n| Session Index      | `/session-index` slash command        | Shows index status and rebuilds the local session index |\n| Session Auto Title | in background, `/title` slash command | Give sessions titles                                    |\n\n## Session Handoff\n\n`/handoff <goal>` starts a focused new session. Give pi a goal, and it will generate a prompt for you to review before kicking it off.\n\nYou can either start a new session directly in your current one, or if you have Ghostty on macOS, you can spawn a new one in a split-pane and continue in your current:\n\n- `/handoff --left <goal>`\n- `/handoff --right <goal>`\n- `/handoff --up <goal>`\n- `/handoff --down <goal>`\n\nThe flag indicates the Ghostty split direction.\n\nFlow:\n\n- run `/handoff [--<direction>] <goal>`\n- review the generated prompt preview\n- optionally edit the prompt\n- start the new session\n\nIf you do nothing, the preview autostarts after a short countdown.\n\nWhen running in Ghostty on macOS, pi-sessions also exposes a `session_handoff` tool. This lets the agent start a background handoff after you choose a split direction. The current session keeps running, while the child session opens in the requested split, gathers context, and shows the same review countdown before starting.\n\nIf background handoffs ever target the wrong pane, run `/handoff --identify` from the intended source pane to refresh the in-memory Ghostty terminal binding.\n\n## Session picker\n\nDirectly reference prior sessions by looking them up by contents.\n\n- shortcut: `Alt+O`\n- press `Tab` to switch between current folder and all sessions\n- type to filter results\n- press `Enter` to insert a session id into your prompt\n\n### Handoff setting\n\nIf you want to override the shortcut, put this in your `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"sessions\": {\n    \"handoff\": {\n      \"pickerShortcut\": \"alt+p\"\n    }\n  }\n}\n```\n\n## Session Index\n\nBy default, `pi-sessions` will start indexing all conversations moving forward. If you want to backfill all prior conversations:\n\n- run `/session-index`\n- hit `r` to (re)index everything\n\nthis is idempotent, so if you run into any issues, or disable pi-sessions for a while, feel free to re-index to see if that resolves anything.\n\nBy default the index lives at:\n\n```text\n~/.pi/agent/pi-sessions/index.sqlite\n```\n\nbut you can change the location in `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"sessions\": {\n    \"index\": {\n      \"dir\": \"~/.pi/agent/pi-sessions\"\n    }\n  }\n}\n```\n\n## Session Auto Title\n\nThe auto-title extension keeps your session list readable by:\n\n- Setting a title based on initial prompt\n- Reevaluating the title every 4 turns to see if it should be updated\n\nTo manage existing titles, run `/title`, where you can:\n\n- Regenerate a title for the current session\n- Generate titles for all sessions in the folder\n- Generate titles for all sessions across pi\n\n![session title window](images/session-title.png)\n\nNote that generating titles for all sessions can take some time, and will hit your configured model with the full contents of all sessions.\n\n- automatic retitles run every few turns\n- if you manually rename a session with `/name`, automatic retitling pauses for that session\n- Regenerate the title for the current session to resume automatic retitling\n- if unconfigured, it will attempt to use these models in order, first one that is available:\n  - `google/gemini-flash-lite-latest`\n  - `anthropic/claude-haiku-4-5`\n  - `openai/gpt-5.4-mini`\n  - your currently configured model\n\nTo change auto-titling settings, edit `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"sessions\": {\n    \"autoTitle\": {\n      \"refreshTurns\": 4,\n      \"model\": \"anthropic/claude-haiku-4-5\",\n      \"prompt\": \"Custom prompt that overrides the default.\"\n    }\n  }\n}\n```\n\n## Development\n\n```bash\nnpm install\nnpm run check\nnpm test\n```\n\nFor an end-to-end manual flow, see [SMOKE.md](./SMOKE.md).\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/thurstonsand/pi-sessions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thurstonsand/pi-sessions.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/session-ask.ts",
+      "./extensions/session-auto-title.ts",
+      "./extensions/session-handoff.ts",
+      "./extensions/session-hooks.ts",
+      "./extensions/session-index.ts",
+      "./extensions/session-search.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-12T04:17:22.063Z",
+    "modified": "2026-06-19T01:02:12.657Z",
+    "0.1.0": "2026-04-12T04:17:22.241Z",
+    "0.2.0": "2026-04-19T01:40:22.588Z",
+    "0.2.1": "2026-04-26T05:44:42.546Z",
+    "0.2.2": "2026-05-10T03:02:23.428Z",
+    "0.3.0": "2026-06-01T02:24:52.135Z",
+    "0.3.1": "2026-06-05T02:20:15.728Z",
+    "0.3.2": "2026-06-09T15:00:48.089Z",
+    "0.4.0": "2026-06-12T05:43:27.456Z",
+    "0.4.1": "2026-06-12T07:13:43.667Z",
+    "0.5.0": "2026-06-19T01:02:12.554Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": null,
+  "download_trend": []
+}

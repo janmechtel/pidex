@@ -1,0 +1,41 @@
+{
+  "name": "pi-codey",
+  "latest_version": "0.1.5",
+  "description": "Pi extension and onboard blueprint controller for Makeblock Codey Rocky reactions.",
+  "readme": "# pi-codey\n\nPi extension + onboard controller for **Makeblock Codey Rocky** reactions.\n\n`pi-codey` lets Pi trigger expressive Codey Rocky reactions over USB serial. Codey runs a small onboard Python program; Pi only sends tiny trigger messages such as `think`, `success`, or `error`. Synthetic beep notes are avoided; built-in Codey wave/melody files are used where configured.\n\n## Install\n\nInstall from npm as a Pi package:\n\n```bash\npi install npm:pi-codey\n```\n\nRestart Pi, then detect and set the Codey serial port:\n\n```text\n/codey detect --use\n```\n\nFlash the onboard Codey program:\n\n```text\n/codey install\n```\n\nRun a quick check:\n\n```text\n/codey test\n```\n\nUpdate later with:\n\n```bash\npi update npm:pi-codey\n```\n\n## Basic commands\n\n```text\n/codey status              # show current settings\n/codey detect              # show likely Codey serial port\n/codey detect --use        # detect and set active port\n/codey port COM3           # set port manually\n/codey install             # flash onboard program\n/codey test                # hello \u2192 think \u2192 success \u2192 idle\n\n/codey success             # trigger a blueprint\n/codey bored\n/codey idle\n\n/codey play ready          # play a built-in Codey sound\n/codey play prompt tone\n```\n\n## Auto reaction profiles\n\n```text\n/codey silent  # manual reactions only\n/codey min     # startup, thinking, errors, success, shutdown\n/codey mid     # min + tool start/success reactions\n/codey max     # broader expression palette across tool events\n```\n\nLong form also works:\n\n```text\n/codey profile min\n```\n\nWhen automatic reactions are enabled, Codey also triggers `bored` once if an agent turn runs longer than 30 seconds.\n\n## Blueprints\n\n```text\nack, hello, ready, think, curious, notify, success,\ncelebrate, wow, laugh, warn, error, angry, sad,\nsleepy, bored, dizzy, screaming, fear, thank_you, bye, idle\n```\n\nManual trigger:\n\n```text\n/codey <blueprint>\n```\n\n## Sensor reactions\n\nThe onboard program can react locally, even when Pi is not sending a command:\n\n```text\nshake          \u2192 dizzy\nloud sound     \u2192 screaming\nlift/airborne  \u2192 fear\nput down again \u2192 thank_you\n```\n\nThese thresholds are configurable; see [Configuration](#configuration). If sensor behavior needs tuning, run diagnostics:\n\n```text\n/codey sensors      # record 15 seconds\n/codey sensors 30   # record 30 seconds\n```\n\nThis temporarily uploads a diagnostic program and writes readings to:\n\n```text\n.pi/codey-sensors-last.txt\n```\n\nRestore pi-codey afterwards:\n\n```text\n/codey install\n```\n\n## Configuration\n\nCreate a project-local config:\n\n```bash\nmkdir -p .pi\ncp codey.config.example.json .pi/codey.config.json\n```\n\nEdit `.pi/codey.config.json`, then re-flash:\n\n```text\n/codey install\n```\n\nCommon options:\n\n```json\n{\n  \"movement\": false,\n  \"movementSpeed\": 0.55,\n  \"sounds\": true,\n  \"blueprints\": {\n    \"success\": { \"sound\": \"yummy\", \"movement\": false },\n    \"bored\": { \"sound\": \"sigh\", \"movement\": false }\n  },\n  \"sensors\": {\n    \"enabled\": true,\n    \"sound\": { \"enabled\": true, \"threshold\": 15 },\n    \"lift\": {\n      \"enabled\": true,\n      \"useFloorIr\": true,\n      \"floorIrThreshold\": 20,\n      \"floorIrStableThreshold\": 60\n    }\n  }\n}\n```\n\nConfig lookup order:\n\n1. `.pi/codey.config.json` in the current Pi project\n2. `codey.config.json` in the current project/repo\n3. `codey.config.json` in the package root, mainly for local development\n\nUseful config keys:\n\n- `movement`: enable/disable Rocky wheel/body movement\n- `movementSpeed`: movement speed multiplier from `0` to `1`\n- `sounds`: enable/disable built-in wave playback\n- `blueprints.<name>.sound`: replace a blueprint sound, e.g. `\"score\"`, `\"level up\"`, or `null`\n- `blueprints.<name>.movement`: override movement per blueprint\n- `sensors.*.threshold` / cooldown keys: tune sensor reactions\n\n## Built-in sounds\n\nPlay directly with `/codey play <name>`.\n\n```text\nhello, hi, bye, yeah, wow, laugh,\nhum, sad, sigh, annoyed, angry,\nsurprised, yummy, curious, embarrassed,\nready, sprint, sleepy, meow, start,\nswitch, beeps, buzzing, exhaust, explosion,\ngotcha, hurt, jump, laser, level up,\nlow energy, metal clash, prompt tone, right,\nwrong, ring, score, shot, step_1,\nstep_2, wake, warning\n```\n\n## Shell tools\n\nAfter installing from npm, the package also provides:\n\n```bash\npi-codey detect\npi-codey-flash --port COM3\n```\n\nFrom a checkout you can run helpers directly:\n\n```bash\npython tools/trigger_codey.py success --port COM3\npython tools/trigger_codey.py sound --value \"ready\" --port COM3\npython tools/flash_codey.py generated/codey_blueprints.py --port COM3\n```\n\n## Development\n\nUse a local package install while developing:\n\n```bash\npi install /path/to/pi-codey\n```\n\nDo not also copy the extension into `.pi/extensions/`; that loads a second copy and causes duplicate tool/command conflicts.\n\nUseful commands:\n\n```bash\nnpm run packcheck\nnpm publish\n```\n\n## Environment\n\n```bash\nPI_CODEY_PORT=COM3       # default serial port\nPI_CODEY_AUTO=0          # start with automatic reactions disabled\nPI_CODEY_ENABLED=0       # disable extension on startup\nPI_CODEY_ROOT=/path      # package root override for development\n```\n\n## Notes\n\n- Codey must be connected over USB and visible as a serial port.\n- Normal operation does not require the mBlock app.\n- `/codey sensors` temporarily overwrites the onboard program; run `/codey install` afterwards.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "makeblock",
+    "codey",
+    "rocky",
+    "robot"
+  ],
+  "author": {
+    "name": "Daniel"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/d-trattner/pi-codey#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/d-trattner/pi-codey.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/pi-codey.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-17T19:49:06.785Z",
+    "modified": "2026-06-18T14:08:04.136Z",
+    "0.1.0": "2026-06-17T19:49:07.140Z",
+    "0.1.1": "2026-06-18T07:46:20.703Z",
+    "0.1.2": "2026-06-18T11:41:32.062Z",
+    "0.1.3": "2026-06-18T12:56:23.145Z",
+    "0.1.4": "2026-06-18T14:00:23.737Z",
+    "0.1.5": "2026-06-18T14:08:04.027Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 688,
+  "download_trend": []
+}

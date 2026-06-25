@@ -1,0 +1,347 @@
+{
+  "name": "@davidorex/pi-jit-agents",
+  "latest_version": "0.31.0",
+  "description": "Agent spec compilation and in-process dispatch runtime \u2014 the package that owns everything between 'I have a spec' and 'I have a typed result'",
+  "readme": "# @davidorex/pi-jit-agents\n\nAgent spec compilation and in-process dispatch runtime. Owns everything between \"I have a spec\" and \"I have a typed result.\"\n\n## Purpose\n\nJIT agents are named callable units with typed input contracts, typed output contracts, and context-parametric implementations materialized at runtime from project state. This package provides:\n\n- Spec loading with full path resolution and tier-aware discovery\n- Template compilation with project block context injection\n- In-process LLM dispatch with phantom-tool structured output enforcement\n- Agent contract introspection for SDK queries\n\nThere is one concept of \"agent\" regardless of whether a workflow step or a monitor classify call invokes it. Classification is agent execution with a verdict-shaped output schema; it is not a separate primitive.\n\n## Boundary\n\nThe package owns four public surfaces:\n\n- `loadAgent(name, ctx) \u2192 AgentSpec` \u2014 resolves spec from discovery tiers, fully resolves all path fields to absolute\n- `compileAgent(spec, ctx) \u2192 CompiledAgent` \u2014 renders templates, injects `contextBlocks` from the substrate directory, composes final prompts\n- `executeAgent(compiled, dispatch) \u2192 JitAgentResult` \u2014 in-process LLM dispatch with phantom tool enforcement; clamps the compiled agent's tool grant to a subset of the caller-supplied parent grant at the dispatch boundary\n- `agentContract(spec) \u2192 AgentContract` \u2014 projection for introspection, no execution\n\nSubprocess dispatch stays in pi-workflows. The package never reads from `.pi/` \u2014 that directory is Pi platform territory.\n\n## Tool-grant clamping\n\n`AgentSpec.tools` (operation-granular tool names) threads through `compileAgent` into `CompiledAgent.tools`. At dispatch, `executeAgent` clamps `compiled.tools` to a subset of `DispatchContext.parentGrant` (the caller's own grant; undefined parent grant means the empty set). A child requesting a tool outside the parent grant raises `GrantViolationError`, naming the agent and the violating tools.\n\n## Discovery tiers\n\nAgent specs are searched in this order:\n\n1. `{cwd}/<substrate-dir>/agents/{name}.agent.yaml` \u2014 project-level overrides\n2. `{userDir ?? ~/.pi/agent/agents/}/{name}.agent.yaml` \u2014 user-global overrides\n3. `{builtinDir}/{name}.agent.yaml` \u2014 consumer-supplied builtins\n\nThe framework package itself ships no bundled agent specs. Consumer packages supply their own builtin directory at loader construction time.\n\n## Bundled templates\n\nThe agent-template tree ships in this package under `templates/` (relocated here from pi-workflows). `bundledTemplateDir()` returns its absolute path so consumers can discover the bundled templates from either source or built (`dist`) layouts. `templates/shared/macros.md` provides one per-item rendering macro per block kind plus six whole-block delegator macros (`render_decisions`, `render_features`, `render_framework_gaps`, `render_layer_plans`, `render_research`, `render_spec_reviews`) that wrap the per-item macros.\n\n`CANONICAL_MACRO_NAMES` is the registry mapping each block kind to its `{ macro_name, array_key }`, surfacing the cases where the block kind differs from the data key the items live under (e.g. `framework-gaps`\u2192`gaps`, `layer-plans`\u2192`plans`, `spec-reviews`\u2192`reviews`). `createRendererRegistry` builds the kind\u2192macro-ref map consumed during compilation.\n\n## Exports\n\n- `.` \u2014 main barrel\n- `./types` \u2014 type definitions\n- `./agent-spec` \u2014 `parseAgentYaml`, `createAgentLoader`\n- `./template` \u2014 `createTemplateEnv`, `renderTemplate`, `renderTemplateFile`\n- `./compile` \u2014 `compileAgent`, `registerCompositionGlobals`\n- `./runtime` \u2014 `executeAgent`, `buildPhantomTool`, `normalizeToolChoice`, `GrantViolationError`\n- `./introspect` \u2014 `agentContract`\n\nThe main barrel additionally re-exports the bundled-template entry point (`bundledTemplateDir`), the renderer registry (`CANONICAL_MACRO_NAMES`, `createRendererRegistry`), and `GrantViolationError`.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "David Ryan"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/davidorex/pi-project-workflows/tree/main/packages/pi-jit-agents",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/davidorex/pi-project-workflows.git",
+    "directory": "packages/pi-jit-agents"
+  },
+  "pi": {},
+  "time": {
+    "created": "2026-04-27T22:39:33.737Z",
+    "modified": "2026-06-13T23:55:52.050Z",
+    "0.14.6": "2026-04-27T22:39:33.924Z",
+    "0.26.0": "2026-05-24T22:48:23.715Z",
+    "0.28.0": "2026-06-03T10:27:19.953Z",
+    "0.28.1": "2026-06-03T11:06:51.686Z",
+    "0.29.0": "2026-06-04T02:40:31.054Z",
+    "0.30.0": "2026-06-04T21:30:04.760Z",
+    "0.31.0": "2026-06-13T23:55:51.846Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 59,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 145
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 44
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 54
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 193
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 50
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 201
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 388
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 80
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 7
+    }
+  ]
+}

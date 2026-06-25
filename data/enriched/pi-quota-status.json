@@ -1,0 +1,37 @@
+{
+  "name": "pi-quota-status",
+  "latest_version": "0.3.0",
+  "description": "Pi extension package that adds compact provider quota/reset status to the footer.",
+  "readme": "# pi-quota-status\n\n[![npm version](https://img.shields.io/npm/v/pi-quota-status.svg)](https://www.npmjs.com/package/pi-quota-status)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)\n\n`pi-quota-status` is a Pi extension package that adds a compact subscription quota/reset indicator beside Pi's default footer statusline.\n\n```text\n5h 78% 1:57PM \u00b7 Wk 30% 8:57AM (28/06)\n```\n\nIt uses its own `ctx.ui.setStatus(\"pi-quota-status\", ...)` slot, so Pi's default footer stays intact.\n\nThe extension is intentionally scoped to `/login` subscription models. API-key, environment-key, runtime-key, and custom-key providers are hidden.\n\n## Supported quota sources\n\n- Anthropic `/login` models (`anthropic/claude-*`): subscription polling, response-header parsing, and optional fixed-window fallback.\n- OpenAI Codex `/login` models (`openai-codex/*`): subscription polling from the ChatGPT Codex usage endpoint, with local Codex CLI RPC reconciliation when the endpoint reports a healthy-but-stale 5h zero.\n- Generic OpenAI-compatible headers: optional named header mappings for OpenAI-compatible providers or proxies.\n\nThe extension only displays quota for models Pi reports as using `/login` OAuth. If the same provider/model is configured with an API key, it is ignored.\n\n## Requirements\n\n- Pi coding agent with extension package support.\n- Node.js `>=22.19.0`.\n- A provider/model authenticated through Pi's `/login` OAuth flow for subscription quota display.\n- Optional: the `codex` CLI on `PATH` for OpenAI Codex stale-zero reconciliation. If unavailable, the extension keeps the last trusted value and retries instead of failing.\n\nThis package is a Pi extension package, not a standalone CLI.\n\n## Install\n\n```bash\npi install npm:pi-quota-status\n```\n\nTry it for one run:\n\n```bash\npi -e npm:pi-quota-status\n```\n\nFrom GitHub:\n\n```bash\npi install git:github.com/hafiezul/pi-quota-status\n```\n\n## Quick start\n\n1. Install the package with one of the commands above.\n2. Start Pi with a `/login` subscription model.\n3. Run `/quota` to view tracked quota rows.\n4. Run `/quota config` if you want to create or edit adapter settings.\n5. After editing config, run `/quota reload` in Pi.\n\nSee [docs/configuration.md](docs/configuration.md) for config schema, adapter examples, fallback quotas, polling details, and UI behavior.\n\n## Commands\n\n- `/quota` - table for tracked `/login` subscription models: provider/model, remaining %, reset, source, dimension, freshness.\n- `/quota config` - shows config/state paths and creates a static template config if missing.\n- `/quota reload` - reloads config and state from disk.\n- `/quota debug` - shows adapter/debug status without raw headers.\n\n## Storage and privacy\n\nGlobal files are kept separate:\n\n```text\n~/.pi/agent/pi-quota-status/config.json\n~/.pi/agent/pi-quota-status/state.json\n```\n\n`config.json` is user-editable. `state.json` contains parsed quota observations only. Raw provider headers, prompts, responses, and tokens are never persisted.\n\nState writes use a small lock plus atomic rename so concurrent Pi sessions merge state instead of overwriting the whole file blindly. `/quota debug` reports sanitized status fields only, not raw provider payloads.\n\n## Configuration\n\nIf `config.json` is absent, the extension uses built-in defaults at runtime. Running `/quota config` creates an editable template with enabled Anthropic and generic OpenAI header adapters.\n\nAnthropic and OpenAI Codex subscription polling do not require config adapter entries; they run whenever the active supported provider/model is using `/login` OAuth and Pi can provide the OAuth token.\n\nRead the [configuration reference](docs/configuration.md) for:\n\n- Top-level config and adapter fields.\n- Anthropic and generic header adapter examples.\n- Manual fixed-window fallback quotas.\n- Subscription polling behavior, Codex CLI reconciliation, and suspicious OpenAI Codex observation handling.\n\n## UI behavior\n\n- Footer status shows only the active model.\n- API-key, environment-key, runtime-key, and custom-key providers are hidden.\n- Subscription models with no quota data show `quota n/a (sub)` plus context usage when available.\n- Colors are used only below thresholds: warning below 25%, critical below 10% by default. Multi-window status uses the lowest displayed remaining percentage.\n- Quota polling and countdown refresh run once per minute by default.\n- On HTTP 429 with retry/reset data, the footer shows a compact zero-remaining segment such as `Req 0% 1:57PM`.\n\n## Known limitations\n\n- Providers and transports vary in whether they expose rate-limit headers to Pi extensions.\n- Header naming differs across providers and proxies; use a generic adapter mapping for custom headers.\n- Token/cost fallback units are reserved for later expansion; v1's automatic fallback deduction is turn-based.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "quota",
+    "statusline"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/hafiezul/pi-quota-status#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hafiezul/pi-quota-status.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-17T14:20:31.337Z",
+    "modified": "2026-06-23T13:11:46.218Z",
+    "0.1.0": "2026-06-17T14:20:31.540Z",
+    "0.1.1": "2026-06-18T01:24:30.432Z",
+    "0.2.0": "2026-06-18T02:59:00.753Z",
+    "0.2.1": "2026-06-18T06:36:43.096Z",
+    "0.2.2": "2026-06-18T08:15:31.645Z",
+    "0.3.0": "2026-06-23T13:11:46.107Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 731,
+  "download_trend": []
+}

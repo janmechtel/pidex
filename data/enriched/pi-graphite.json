@@ -1,0 +1,55 @@
+{
+  "name": "pi-graphite",
+  "latest_version": "0.6.1",
+  "description": "Opinionated pi tools + skill for stacked PR workflows with the Graphite (gt) CLI.",
+  "readme": "# pi-graphite\n\nOpinionated pi tools + skill that wrap the [Graphite](https://graphite.com)\n`gt` CLI for stacked PR workflows. A small set of tools, one correct path.\n\n```\ngraphite_status \u2192 (graphite_setup if needed) \u2192 graphite_sync \u2192 graphite_navigate\n       \u2192 graphite_change \u2192 graphite_submit (dry-run) \u2192 graphite_submit (apply)\n```\n\nThe extension wraps `gt` for stack operations. Submit also uses explicit,\nnon-interactive `gh pr view/edit --body-file` calls to enforce PR descriptions.\nIt deliberately does **not** edit PR titles, fetch review comments, or expose\ninteractive stack surgery (split / fold / squash / reorder). Reparenting a\ntracked branch IS supported via `graphite_move` (`gt move --source --onto`,\nnon-interactive). For the remaining surgery flows, run the underlying `gt` or\n`gh` command yourself in your own terminal; the agent should not invoke them\nfrom bash, as their defaults open interactive prompts, hunk pickers, or editors\nthat will hang non-interactive sessions.\n\n## Requirements\n\n- `gt` CLI installed and authenticated (`gt auth`).\n- `gh` CLI installed and authenticated for PR body inspection/editing.\n- A pi runtime that loads npm or local pi packages.\n\n## Install\n\n```bash\n# global\npi install npm:pi-graphite\n\n# project-local\npi install -l npm:pi-graphite\n\n# from a local checkout\npi install /path/to/pi-graphite\n# or, for one session\npi -e /path/to/pi-graphite\n```\n\nThe package also ships a `graphite` skill (`skills/graphite/SKILL.md`) that pi\nauto-discovers. It describes the golden path and per-recipe tool calls; the\nagent loads it on demand.\n\n## Registered tools\n\n| Tool                     | Purpose                                                                 | Wraps                                          |\n| ------------------------ | ----------------------------------------------------------------------- | ---------------------------------------------- |\n| `graphite_status`        | Read-only snapshot: current stack, or targeted branches + bounded topology snippets | `gt log --stack`, `gt info`, `gt info <branch>`, filtered `gt log` |\n| `graphite_setup`         | Initialize Graphite or track an existing Git branch with explicit parent | `gt init --trunk`, `gt track --parent`         |\n| `graphite_sync`          | Start-of-day / after-merge cleanup + restack                            | `gt sync`                                      |\n| `graphite_get`           | Pull a branch / stack from the remote                                   | `gt get <branch>`                              |\n| `graphite_navigate`      | Move around the stack                                                   | `gt checkout`, `gt up`/`down`/`top`/`bottom`   |\n| `graphite_move`          | Reparent a tracked branch + restack descendants (dry-run by default)    | `gt move --source --onto`                      |\n| `graphite_change`        | Create / amend a stacked branch                                         | `gt create -am`, `gt modify -am`, `gt modify --into`, `gt absorb` |\n| `graphite_submit`  | Push the entire stack, open/update PRs, and enforce descriptions (dry-run by default) | `gt submit --stack --no-edit --no-ai` + `gh pr edit --body-file` |\n| `graphite_recover`       | Continue / abort / undo / restack                                       | `gt continue`, `gt abort`, `gt undo`, `gt restack` |\n\n## Targeted status\n\nDefault status shows the current stack only:\n\n```text\ngraphite_status cwd=/repo\n```\n\nFor cross-stack checks, pass explicit branches. This runs `gt info <branch>`\nfor each branch and, with `includeTopology:true`, returns bounded snippets\nfrom `gt log` around those names instead of dumping every tracked branch.\n\n```text\ngraphite_status cwd=/repo branches=[feature-a,feature-b] includeTopology=true\n```\n\n## Golden path\n\n```text\ngraphite_status\ngraphite_setup                               # only if repo not initialized or branch untracked\ngraphite_sync                                # at session start, or after merges\ngraphite_navigate action=checkout branch=\u2026   # move to the target PR / parent\n# user edits files\ngraphite_change action=create message=\"\u2026\"     # or action=amend\ngraphite_submit apply=false             # review plan + required descriptions\ngraphite_submit apply=true confirmRemote=true descriptions=[{branch:\"feature\", body:\"...\"}]\n```\n\nConflict path:\n\n```text\n# resolve files, then: git add -- <paths>\ngraphite_recover action=continue\n```\n\nNever run `git rebase --continue` after a gt command \u2014 use\n`graphite_recover action=continue` so Graphite propagates the resolution to\ndependent branches.\n\n## Conventions and guardrails\n\n- Every tool requires absolute `cwd`.\n- `gt` is invoked with `--cwd <cwd> --no-interactive`, no shell strings. Tools that support AI metadata pass `--no-ai`.\n- Editor / pager / browser env is forced safe (`GT_EDITOR=true`, `GT_PAGER=`,\n  `BROWSER=true`, \u2026). Commands have a hard timeout. `GRAPHITE_INTERACTIVE` is\n  deliberately **not** set \u2014 some `gt` builds treat it as \"running inside\n  Graphite Interactive\" and silently return empty output for read commands.\n- Interactive editor / hunk / browser / reorder paths are not exposed.\n- Commands echoed in tool output are safe to copy-paste back into a shell.\n- `graphite_setup action=track_branch` requires explicit `branch`, explicit\n  `parent`, and `confirmParent:true`; do not guess parent if unclear.\n- `graphite_setup action=init_repo reset:true` needs `confirmDestructive:true`.\n- `graphite_submit` defaults to `--dry-run`; `apply:true` also needs\n  `confirmRemote:true`. `--force` push also requires `confirmRemote:true`.\n  Before remote mutation, apply mode inspects the current stack with `gh pr view`\n  and refuses if any new PR branch (or existing empty PR body) lacks a\n  non-empty `descriptions:[{branch, body}]` entry. After `gt submit`, it writes\n  supplied bodies with `gh pr edit --body-file` and verifies the body is non-empty.\n- `graphite_sync` with `force` or `deleteAll` needs `confirmDestructive:true`.\n- `graphite_recover action=continue` refuses to proceed if tracked files\n  still contain `<<<<<<<` markers, unless `allowConflictMarkers:true`.\n- Output is ANSI-stripped, branded (\"Graphite\" not \"Charcoal\"), and truncated\n  to ~50 KB / 2000 lines.\n- Failure output is parsed into structured `hints`\n  (`notInitialized`, `conflictHalted`, `restackNeeded`, `trunkOutOfSync`,\n  `branchNotTracked`, `noChangesStaged`, `checkedOutElsewhere`,\n  `operatingOnTrunk`, `emptyOutput`, \u2026).\n- Read commands that must produce output (`graphite_status`) treat an\n  exit-0 **empty stdout** as a failure (`emptyOutput` hint) instead of a\n  misleading \"ok\".\n- Output is also scanned (on success **and** failure) for non-fatal\n  `warnings` (`skippedBranches`, `remoteChanged`, `alreadyMerged`,\n  `needsRestack`). `skippedBranches` only detects skipped branch work; prompt\n  skip messages from non-interactive submit are ignored. A result with\n  warnings is reported as `ok (with warnings)` so a `gt sync` / `gt submit`\n  that silently skipped work is not mistaken for a clean success.\n- A **mutating** command that fails appends a \"partial side effects possible\"\n  note, prompting a follow-up `graphite_status`.\n\n### Git hooks\n\nGit hooks in the target repository run as normal; this extension does not\nbypass them. Treat them as part of your repo's trust boundary.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "graphite",
+    "gt",
+    "stacked-prs"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/tianrendong/pi-graphite#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tianrendong/pi-graphite.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-15T03:22:53.114Z",
+    "modified": "2026-06-22T22:29:45.559Z",
+    "0.0.1": "2026-05-15T03:22:53.338Z",
+    "0.1.0": "2026-05-15T04:58:38.436Z",
+    "0.1.1": "2026-05-15T05:07:00.244Z",
+    "0.2.0": "2026-05-15T05:33:35.919Z",
+    "0.2.1": "2026-05-15T05:36:46.285Z",
+    "0.2.2": "2026-05-15T14:58:46.817Z",
+    "0.2.3": "2026-05-16T02:25:41.924Z",
+    "0.3.0": "2026-05-16T03:09:24.973Z",
+    "0.3.1": "2026-05-16T03:26:02.577Z",
+    "0.3.2": "2026-05-16T12:19:40.551Z",
+    "0.3.3": "2026-05-16T12:22:31.601Z",
+    "0.3.4": "2026-05-16T13:07:45.230Z",
+    "0.3.5": "2026-05-16T13:08:34.347Z",
+    "0.4.0": "2026-05-16T16:24:48.888Z",
+    "0.4.1": "2026-05-18T03:13:11.201Z",
+    "0.4.2": "2026-05-18T03:25:34.781Z",
+    "0.5.0": "2026-05-31T20:35:31.066Z",
+    "0.5.1": "2026-06-02T00:55:31.288Z",
+    "0.6.0": "2026-06-04T00:49:29.541Z",
+    "0.6.1": "2026-06-22T22:29:45.448Z"
+  },
+  "versions_count": 20,
+  "downloads_last_week": null,
+  "download_trend": []
+}

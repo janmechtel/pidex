@@ -1,0 +1,53 @@
+{
+  "name": "@agnishc/edb-todo",
+  "latest_version": "0.16.0",
+  "description": "Pi extension: structured task list with live widget and system-prompt injection to prevent goal drift",
+  "readme": "# @agnishc/edb-todo\n\nA Pi CLI extension that gives the agent a structured task list to prevent **goal drift** \u2014 the tendency for agents to lose track of the original plan as context grows and tool calls accumulate.\n\n## Features\n\n- **6 LLM tools** \u2014 `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`, `TaskOutput`, `TaskStop` \u2014 matching pi-tasks behavior\n- **Persistent widget** \u2014 live task list above the editor with animated spinner (\u2733\u273d), elapsed time, and blocked-by hints\n- **File-backed storage** \u2014 memory / session / project scope with file locking and atomic writes\n- **Dependency management** \u2014 bidirectional `blocks` / `blockedBy` edges with cycle detection\n- **Auto-clear completed tasks** \u2014 configurable: never / on_list_complete / on_task_complete\n- **System-reminder injection** \u2014 periodic nudges when task tools haven't been used recently\n- **Settings panel** \u2014 `/todos \u2192 \u2699 Settings` (task storage + auto-clear, saved to `tasks-config.json`)\n- **Priority system** \u2014 high / medium / low with color coding (Red / Yellow / Dim)\n\n## How it works\n\n1. The agent uses `TaskCreate` to plan multi-step work as a structured task list\n2. Before every agent turn, active tasks are injected into the system prompt\n3. A live widget above the editor shows tasks with status icons and elapsed time for active tasks\n4. Tasks persist to disk per-session (or project-wide) and survive session resume\n5. Completed tasks remain visible until auto-cleared or manually removed\n\n## Tools\n\n### `TaskCreate`\n\nCreate a structured task. Used proactively for complex multi-step work.\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `content` | string | \u2713 | Brief actionable title in imperative form |\n| `description` | string | | Detailed context and acceptance criteria |\n| `priority` | `high` \\| `medium` \\| `low` | | Default: `medium` |\n| `activeForm` | string | | Spinner text when in_progress (e.g., \"Running tests\") |\n| `metadata` | object | | Arbitrary key-value pairs |\n\n### `TaskList`\n\nList all tasks sorted by status (pending first, then in_progress, then completed) and ID.\n\nReturns each task's id, content, status, priority, and open blockedBy entries.\n\n### `TaskGet`\n\nGet full details for a specific task by ID \u2014 including description, dependencies, and metadata.\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `id` | string | The task ID |\n\n### `TaskUpdate`\n\nUpdate task fields, status, and dependencies.\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `id` | string | Task ID (required) |\n| `status` | `pending` \\| `in_progress` \\| `completed` \\| `deleted` | New status (`deleted` permanently removes) |\n| `content` | string | New title |\n| `description` | string | New description |\n| `priority` | `high` \\| `medium` \\| `low` | New priority |\n| `activeForm` | string | Spinner text |\n| `owner` | string | Agent/owner name |\n| `metadata` | object | Shallow merge (set key to `null` to delete) |\n| `addBlocks` | string[] | Task IDs this task blocks |\n| `addBlockedBy` | string[] | Task IDs that block this task |\n\nSetting `status: \"deleted\"` permanently removes the task and cleans up all dependency edges.\n\nDependencies are bidirectional \u2014 `addBlocks: [\"t2\"]` on task `t1` also adds `blockedBy: [\"t1\"]` to task `t2`.\n\n### `TaskOutput`\n\nRetrieve output from a running or completed background task process.\n\n| Parameter | Type | Default | Description |\n|-----------|------|---------|-------------|\n| `task_id` | string | \u2014 | Task ID (required) |\n| `block` | boolean | `true` | Wait for completion |\n| `timeout` | number | `30000` | Max wait time in ms (max 600000) |\n\n### `TaskStop`\n\nStop a running background task process. Sends SIGTERM, waits 5 seconds, then SIGKILL. Marks the task as completed.\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `task_id` | string | Task ID to stop |\n\n## Task lifecycle\n\n```\npending \u2192 in_progress \u2192 completed\n                      \u2192 deleted  (permanently removed)\n```\n\n## Dependency management\n\n```bash\n# Task t2 cannot start until t1 is completed\nTaskUpdate { id: \"t2\", addBlockedBy: [\"t1\"] }\n```\n\nEdges are bidirectional. The widget and `TaskList` show open blockers inline (`\u203a blocked by #t1`). Cycles and self-dependencies produce warnings but are stored.\n\n## Task storage\n\nConfigured via `/todos \u2192 \u2699 Settings` or the `PI_TODO` environment variable:\n\n| Mode | File | Behaviour |\n|------|------|-----------|\n| `memory` | *(none)* | In-memory only \u2014 tasks lost when session ends |\n| `session` *(default)* | `<cwd>/.pi/tasks/tasks-<sessionId>.json` | Per-session, survives resume |\n| `project` | `<cwd>/.pi/tasks/tasks.json` | Shared across all sessions in the project |\n\nSettings are saved to `<cwd>/.pi/tasks-config.json`.\n\n### Environment variable override\n\n| Variable | Value | Behaviour |\n|----------|-------|-----------|\n| `PI_TODO` | `off` | In-memory only (CI/automation) |\n| `PI_TODO` | `sprint-1` | Named shared list at `~/.pi/tasks/sprint-1.json` |\n| `PI_TODO` | `/abs/path.json` | Explicit absolute file path |\n\n## Auto-clear completed tasks\n\n| Mode | Behaviour |\n|------|-----------|\n| `never` | Completed tasks stay visible until manually cleared |\n| `on_list_complete` *(default)* | Cleared after all tasks complete and a few idle turns pass |\n| `on_task_complete` | Each task cleared individually a few turns after completion |\n\n## Widget\n\nPersistent task list rendered above the editor:\n\n```\n\u25cf 4 tasks (1 done, 1 in progress, 2 open)\n  \u2714 Design the API\n  \u2733 Implementing auth\u2026  (42s)\n  \u25fb Write tests  \u203a blocked by #t2\n  \u25fb Update docs\n```\n\n| Icon | Meaning |\n|------|---------|\n| `\u2714` | Completed (strikethrough + dim) |\n| `\u25fc` | In-progress |\n| `\u2733`/`\u273d` | Animated spinner \u2014 actively executing (shows elapsed time) |\n| `\u25fb` | Pending |\n\n## `/todos` command\n\n```\n/todos  \u2014 open the interactive task manager\n```\n\nMenu options:\n- **View all tasks** \u2014 select a task to start / complete / delete it\n- **Clear completed** \u2014 remove all completed tasks\n- **Clear all** \u2014 remove all tasks\n- **\u2699 Settings** \u2014 configure task storage and auto-clear\n\n## Install\n\n```bash\npi install npm:@agnishc/edb-todo\n```\n\n## License\n\n[MIT](LICENSE) \u00a9 Agnish Chakraborty\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "edb"
+  ],
+  "author": {
+    "name": "Agnish Chakraborty"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/agnishcc/pi-extention-monorepo/tree/main/packages/edb-todo#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agnishcc/pi-extention-monorepo.git",
+    "directory": "packages/edb-todo"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-28T20:58:36.905Z",
+    "modified": "2026-06-22T09:06:34.322Z",
+    "0.1.0": "2026-04-28T20:58:37.165Z",
+    "0.4.0": "2026-04-29T08:23:23.887Z",
+    "0.5.0": "2026-05-05T08:29:22.698Z",
+    "0.5.1": "2026-05-05T17:39:35.663Z",
+    "0.6.1": "2026-05-11T05:29:20.483Z",
+    "0.8.1": "2026-05-11T06:59:35.554Z",
+    "0.8.2": "2026-05-11T10:47:35.834Z",
+    "0.10.3": "2026-05-15T20:39:24.029Z",
+    "0.10.4": "2026-05-15T20:55:41.936Z",
+    "0.10.5": "2026-05-15T22:28:11.159Z",
+    "0.10.6": "2026-05-15T23:39:53.214Z",
+    "0.10.8": "2026-05-18T14:16:25.217Z",
+    "0.10.9": "2026-05-18T15:09:11.561Z",
+    "0.12.0": "2026-05-22T13:52:12.824Z",
+    "0.13.0": "2026-05-22T14:10:57.665Z",
+    "0.14.0": "2026-05-22T14:27:26.894Z",
+    "0.14.2": "2026-05-23T10:34:51.210Z",
+    "0.14.3": "2026-05-23T11:25:42.861Z",
+    "0.15.1": "2026-06-09T10:22:14.013Z",
+    "0.16.0": "2026-06-22T09:06:34.210Z"
+  },
+  "versions_count": 20,
+  "downloads_last_week": 202,
+  "download_trend": []
+}

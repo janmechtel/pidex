@@ -1,0 +1,62 @@
+{
+  "name": "visual-explainer",
+  "latest_version": "0.8.1",
+  "description": "Agent skill that generates beautiful HTML pages for diagrams, diff reviews, plan reviews, slide decks, and data tables",
+  "readme": "<p>\n  <img src=\"banner.png\" alt=\"visual-explainer\" width=\"1100\">\n</p>\n\n# visual-explainer\n\n**An agent skill that turns complex terminal output into styled HTML pages you actually want to read.**\n\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)\n\nAsk your agent to explain a system architecture, review a diff, or compare requirements against a plan. Instead of ASCII art and box-drawing tables, it generates a self-contained HTML page and opens it in your browser.\n\n```\n> draw a diagram of our authentication flow\n> /diff-review\n> /plan-review ~/docs/refactor-plan.md\n```\n\nhttps://github.com/user-attachments/assets/55ebc81b-8732-40f6-a4b1-7c3781aa96ec\n\n## Why\n\nEvery coding agent defaults to ASCII art when you ask for a diagram. Box-drawing characters, monospace alignment hacks, text arrows. It works for trivial cases, but anything beyond a 3-box flowchart turns into an unreadable mess.\n\nTables are worse. Ask the agent to compare 15 requirements against a plan and you get a wall of pipes and dashes that wraps and breaks in the terminal. The data is there but it's painful to read.\n\nThis skill fixes that. Real typography, dark/light themes, interactive Mermaid diagrams with zoom and pan. No build step, no dependencies beyond a browser.\n\n## Install\n\n| Harness | Support | Install path / behavior |\n|---|---|---|\n| Claude Code | Marketplace plugin | Preserved marketplace shape with source at `plugins/visual-explainer/` |\n| Pi | Package metadata plus installer | `package.json` advertises the skill, prompts, and native `visual_explainer` tool with `prepare` and `render` actions; `install-pi.sh` installs copied skill/prompt resources for legacy manual installs |\n| Codex CLI | Native skill path plus optional prompts | Copy to `~/.codex/skills/visual-explainer`; optional prompts go in `~/.codex/prompts/` if your Codex build supports them |\n| OpenCode/opencode | Observed skill/command paths | Copy to `~/.config/opencode/skill/visual-explainer`; optional commands go in `~/.config/opencode/command/` |\n| Cursor | Rules-based guidance | Add the supplied `.mdc` rule; Cursor is not treated as native Agent Skills support |\n| OpenClaw | Lightweight AGENTS/rules guidance | Use the supplied AGENTS guidance with the canonical skill directory |\n\n**Claude Code (marketplace):**\n```shell\n/plugin marketplace add nicobailon/visual-explainer\n/plugin install visual-explainer@visual-explainer-marketplace\n```\n\nNote: Claude Code plugins namespace commands as `/visual-explainer:command-name`.\n\n**Pi:**\n```bash\npi install git:github.com/nicobailon/visual-explainer\n```\n\nOr from a local checkout:\n```bash\ngit clone --depth 1 https://github.com/nicobailon/visual-explainer.git\npi install ./visual-explainer\n```\n\nThe package manifest advertises the canonical skill, command templates, and Pi tool:\n\n```json\n\"pi\": {\n  \"extensions\": [\"./plugins/visual-explainer/extension.ts\"],\n  \"skills\": [\"./plugins/visual-explainer\"],\n  \"prompts\": [\"./plugins/visual-explainer/commands\"]\n}\n```\n\nThe Pi extension registers one native `visual_explainer` tool. Use `action: \"prepare\"` to plan a visual explanation after generating or reviewing a substantial plan, architecture, diff, or implementation, and `action: \"render\"` to write complete HTML pages to `~/.agent/diagrams/`. `/generate-web-diagram` remains the bundled prompt template command.\n\nIf you previously used the old curl/manual installer, remove those copied files before using `pi install`; otherwise Pi will report skill and prompt conflicts because the user-level copies shadow the package resources:\n\n```bash\nrm -rf ~/.pi/agent/skills/visual-explainer\nrm -f ~/.pi/agent/prompts/{diff-review,fact-check,generate-slides,generate-visual-plan,generate-web-diagram,plan-review,project-recap}.md\nrm -f ~/.pi/agent/prompts/s[h]are*.md\n```\n\nThe legacy installer still works if you prefer copied skill and prompt files over package management, but it does not install the native Pi tool:\n\n```bash\ncurl -fsSL https://raw.githubusercontent.com/nicobailon/visual-explainer/main/install-pi.sh | bash\n```\n\n**Codex CLI:**\n```bash\ngit clone --depth 1 https://github.com/nicobailon/visual-explainer.git /tmp/visual-explainer\n\nmkdir -p ~/.codex/skills ~/.codex/prompts\ncp -R /tmp/visual-explainer/plugins/visual-explainer ~/.codex/skills/visual-explainer\n\n# Optional, only if your Codex build supports prompt templates:\ncp /tmp/visual-explainer/plugins/visual-explainer/commands/*.md ~/.codex/prompts/\n\nrm -rf /tmp/visual-explainer\n```\n\nInvoke with `$visual-explainer` or ask Codex to use the `visual-explainer` skill. If prompts are installed and supported, use `/prompts:diff-review`, `/prompts:plan-review`, etc.\n\n**OpenCode/opencode:**\n```bash\ngit clone --depth 1 https://github.com/nicobailon/visual-explainer.git /tmp/visual-explainer\n\nmkdir -p ~/.config/opencode/skill ~/.config/opencode/command\ncp -R /tmp/visual-explainer/plugins/visual-explainer ~/.config/opencode/skill/visual-explainer\n\n# Optional command templates:\ncp /tmp/visual-explainer/plugins/visual-explainer/commands/*.md ~/.config/opencode/command/\n\nrm -rf /tmp/visual-explainer\n```\n\nActivate it by asking OpenCode to use the `visual-explainer` skill. Command-template behavior depends on the installed OpenCode/opencode build.\n\n**Cursor:**\n\nAdd `configs/cursor/visual-explainer.mdc` to your Cursor rules, or copy its contents into the project rules UI. This is rules-based guidance that points Cursor at the canonical skill; it does not claim native Agent Skills support.\n\n**OpenClaw:**\n\nUse `configs/openclaw/AGENTS.md` as lightweight project guidance and copy or reference `plugins/visual-explainer/` as the canonical skill source. No native OpenClaw plugin adapter is included.\n\n## Commands\n\n| Command | What it does |\n|---------|-------------|\n| `/generate-web-diagram` | Generate an HTML diagram for any topic |\n| `/generate-visual-plan` | Generate a visual implementation plan for a feature or extension |\n| `/generate-slides` | Generate a magazine-quality slide deck |\n| `/diff-review` | Visual diff review with architecture comparison and code review |\n| `/plan-review` | Compare a plan against the codebase with risk assessment |\n| `/project-recap` | Mental model snapshot for context-switching back to a project |\n| `/fact-check` | Verify accuracy of a document against actual code |\n\nThe agent also kicks in automatically when it's about to dump a complex table in the terminal (4+ rows or 3+ columns) \u2014 it renders HTML instead.\n\n## Slide Deck Mode\n\nAny command that produces a scrollable page supports `--slides` to generate a slide deck instead:\n\n```\n/diff-review --slides\n/project-recap --slides 2w\n```\n\nhttps://github.com/user-attachments/assets/342d3558-5fcf-4fb2-bc03-f0dd5b9e35dc\n\n## How It Works\n\n```\n.claude-plugin/\n\u251c\u2500\u2500 plugin.json           \u2190 marketplace identity\n\u2514\u2500\u2500 marketplace.json      \u2190 plugin catalog\nplugins/\n\u2514\u2500\u2500 visual-explainer/\n    \u251c\u2500\u2500 .claude-plugin/\n    \u2502   \u2514\u2500\u2500 plugin.json   \u2190 plugin manifest\n    \u251c\u2500\u2500 SKILL.md           \u2190 workflow + design principles\n    \u251c\u2500\u2500 extension.ts       \u2190 Pi native tool\n    \u251c\u2500\u2500 commands/          \u2190 slash commands\n    \u251c\u2500\u2500 references/        \u2190 agent reads before generating\n    \u2502   \u251c\u2500\u2500 css-patterns.md   (layouts, animations, theming)\n    \u2502   \u251c\u2500\u2500 libraries.md      (Mermaid, Chart.js, fonts)\n    \u2502   \u251c\u2500\u2500 responsive-nav.md (sticky TOC for multi-section pages)\n    \u2502   \u2514\u2500\u2500 slide-patterns.md (slide engine, transitions, presets)\n    \u2514\u2500\u2500 templates/         \u2190 reference templates with different palettes\n        \u251c\u2500\u2500 architecture.html\n        \u251c\u2500\u2500 mermaid-flowchart.html\n        \u251c\u2500\u2500 data-table.html\n        \u2514\u2500\u2500 slide-deck.html\n```\n\n**Output:** `~/.agent/diagrams/filename.html` \u2192 opens in browser. In Pi package installs, agents can offer `visual_explainer` with `action: \"prepare\"` after generating or reviewing a substantial plan, architecture, diff, or implementation when a visual explanation would help, then call it with `action: \"render\"` as the final write/open step.\n\nThe skill routes to the right approach automatically: Mermaid for flowcharts and diagrams, CSS Grid for architecture overviews, HTML tables for data, Chart.js for dashboards.\n\n## Limitations\n\n- Generated HTML is portable and self-contained, but auto-opening depends on the harness, browser access, and sandbox rules.\n- All harnesses write visual output to `~/.agent/diagrams/` unless the user asks for a different path.\n- Switching OS theme requires a page refresh for Mermaid SVGs.\n- Results vary by model capability.\n\n## Credits\n\nBorrows ideas from [Anthropic's frontend-design skill](https://github.com/anthropics/skills) and [interface-design](https://github.com/Dammyjay93/interface-design).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "agent-skill",
+    "pi-package",
+    "claude-code-plugin",
+    "claude-marketplace",
+    "codex",
+    "opencode",
+    "openclaw",
+    "cursor",
+    "diagrams",
+    "html",
+    "visualization",
+    "diff-review",
+    "plan-review",
+    "slides",
+    "mermaid"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/nicobailon/visual-explainer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicobailon/visual-explainer.git"
+  },
+  "pi": {
+    "extensions": [
+      "./plugins/visual-explainer/extension.ts"
+    ],
+    "skills": [
+      "./plugins/visual-explainer"
+    ],
+    "prompts": [
+      "./plugins/visual-explainer/commands"
+    ]
+  },
+  "time": {
+    "created": "2026-02-26T08:13:35.684Z",
+    "modified": "2026-06-25T07:47:11.854Z",
+    "0.2.0": "2026-02-26T08:13:35.894Z",
+    "0.3.0": "2026-02-26T18:46:07.420Z",
+    "0.4.0": "2026-03-01T06:13:35.613Z",
+    "0.4.1": "2026-03-01T14:27:37.568Z",
+    "0.4.2": "2026-03-01T14:58:56.181Z",
+    "0.4.3": "2026-03-01T15:41:24.249Z",
+    "0.4.4": "2026-03-03T06:10:53.098Z",
+    "0.6.0": "2026-03-08T22:38:35.032Z",
+    "0.6.1": "2026-03-08T22:42:08.007Z",
+    "0.6.2": "2026-03-08T22:50:28.443Z",
+    "0.6.3": "2026-03-09T18:07:12.023Z",
+    "0.7.1": "2026-04-27T17:15:45.427Z",
+    "0.8.0": "2026-06-24T19:06:42.534Z",
+    "0.8.1": "2026-06-25T07:47:11.740Z"
+  },
+  "versions_count": 14,
+  "downloads_last_week": 261,
+  "download_trend": []
+}

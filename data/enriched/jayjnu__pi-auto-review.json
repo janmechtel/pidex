@@ -1,0 +1,361 @@
+{
+  "name": "@jayjnu/pi-auto-review",
+  "latest_version": "0.5.1",
+  "description": "Pi package that automatically queues a read-only code review after agent code changes.",
+  "readme": "# pi-auto-review\n\nA Pi package that automatically queues a subagent-backed code review and fix loop after a Pi agent finishes a user prompt that changed code.\n\n## Install\n\n```bash\npi install npm:@jayjnu/pi-auto-review\n```\n\nFor GitHub install without npm publishing:\n\n```bash\npi install git:https://github.com/jayjnu/pi-auto-review.git\n```\n\nFor local development:\n\n```bash\npi -e /path/to/pi-auto-review\n```\n\n## Behavior\n\n`pi-auto-review` runs once after an agent prompt changes code. It does not run after every individual edit. If the agent commits its changes and leaves a clean worktree, auto-review asks the main agent to review the committed range from the turn's starting `HEAD` to the ending `HEAD`.\n\nThe package bundles `pi-subagents` and an `auto-review` skill. After Pi becomes idle, it queues a short `/skill:auto-review` main-agent orchestration turn. For normal dirty-worktree reviews this prompt stays minimal; for clean-worktree committed changes it appends only the compact `before..after` commit range and changed-file names so the skill can inspect the committed diff.\n\nThat skill tells the main agent to first decide whether the current context contains a meaningful review target, then orchestrate a flat parallel reviewer fanout. Three baseline reviewers are included by default (correctness/regressions, tests/validation, and simplicity/maintainability), each configured `reviewerProfiles` entry becomes an isolated role/model-specific reviewer task, and each configured `reviewerSkills` entry becomes its own isolated additional reviewer task. The main agent synthesizes those read-only reviewer results. When auto-fix is enabled and Critical or Warning findings are accepted, the main agent dispatches exactly one configured fixer subagent as the single writer. That means:\n\n- review context is isolated in child Pi sessions via `pi-subagents`;\n- skill-specific review perspectives can run in parallel without nested fanout;\n- fixes are applied by one configured fixer subagent, not by parallel reviewers;\n- the main chat flow remains the orchestrator/synthesizer;\n- the extension can briefly block new user input while a review turn is queued;\n- no custom background reviewer process is spawned by `pi-auto-review`.\n\nThe extension dispatches the `/skill:auto-review` skill command, with compact committed-range context only for clean-worktree committed changes, and relies on the bundled skill plus `pi-subagents` for review/fix workflow discipline. If the configured fixer subagent changes files, `pi-auto-review` treats that fixer run as a mutation source and can queue another review turn.\n\nThe package assumes Pi skill commands are enabled. Pi defaults `enableSkillCommands` to `true`; if your effective settings disable it, `pi-auto-review` shows a session-start warning asking you to set `\"enableSkillCommands\": true` in `~/.pi/agent/settings.json` or `.pi/settings.json`.\n\nThe package inherits Pi's default model unless a subagent or reviewer profile overrides it. Configure global defaults with Pi's official `defaultProvider`, `defaultModel`, and `defaultThinkingLevel` settings, or set `reviewerProfiles[].model` for a specific auto-review reviewer role.\n\n## Disable\n\nStart Pi with:\n\n```bash\npi --no-auto-review\n```\n\nAt runtime:\n\n```text\n/auto-review off\n/auto-review on\n/auto-review status\n/auto-review config [--global|--project|--scope global|--scope project]\n/auto-review config [--global|--project|--scope global|--scope project] get <key>\n/auto-review config [--global|--project|--scope global|--scope project] set <key> <value>\n/auto-review config [--global|--project|--scope global|--scope project] init\n```\n\n## Runtime Control\n\n`/auto-review status` shows whether automatic review is enabled, whether a review is idle or queued, and the completed/queued review pass count.\n\n`/auto-review off` disables review for the current Pi session.\n\n`/auto-review on` enables review for the current Pi session unless Pi was started with `--no-auto-review` and you want to keep it disabled.\n\n## Configuration\n\n`pi-auto-review` supports global and project-level config files.\n\nGlobal config path:\n\n```text\n~/.pi/agent/extensions/auto-review/config.json\n```\n\nProject config path:\n\n```text\n.pi/extensions/auto-review/config.json\n```\n\nProject config overrides global config. Use `--global` or `--scope global` to read/write the global config file, and `--project`, `--scope project`, or no scope for `set`/`init` to read/write the project config file. Unscoped `config` display/get reads effective merged settings; explicit `--scope effective` is not supported. `reviewerProfiles` normalization and merge behavior is implemented in `extensions/auto-review/reviewer-profiles.ts`; the docs below summarize that executable contract. Profiles are merged by `id` so project config can override fields, add fields, inherit omitted fields, or disable global reviewer profiles with `enabled: false`. Because profiles merge by `id`, a project override may omit `task` to inherit the global profile's task text. A new enabled profile needs a non-empty `task` to create a standalone reviewer task. There is no supported null/empty-string clearing mechanism for inherited optional profile fields; do not expect `null` or `\"\"` to unset inherited `agent`, `model`, `label`, `task`, `taskExtra`, or `skills`. Note that `/auto-review config set reviewerProfiles [...]` replaces the project-level `reviewerProfiles` array in `.pi/extensions/auto-review/config.json`; `/auto-review config --global set reviewerProfiles [...]` replaces the global `reviewerProfiles` array in `~/.pi/agent/extensions/auto-review/config.json`. Neither command appends/patches the existing list. Effective config still merges global and project profiles by `id`. You can create and edit config through Pi commands:\n\n```text\n/auto-review config init\n/auto-review config --global init\n/auto-review config\n/auto-review config --global\n/auto-review config set autoFix false\n/auto-review config --global set includeBaselineReview false\n/auto-review config set autoFixSuggestions false\n/auto-review config set maxReviewPasses 2\n/auto-review config set maxReviewPasses unlimited\n```\n\nExample config file:\n\n```json\n{\n  \"reviewerAgent\": \"reviewer\",\n  \"reviewerSkills\": [\"frontend-review\", \"effect-ts-reviewer\"],\n  \"reviewerTaskExtra\": \"\",\n  \"reviewerProfiles\": [\n    {\n      \"id\": \"frontend-performance\",\n      \"agent\": \"reviewer\",\n      \"model\": \"openai-codex/gpt-5.5\",\n      \"skills\": [\"frontend-review\"],\n      \"task\": \"Focus on frontend performance, rendering cost, unnecessary re-renders, and expensive effects.\"\n    }\n  ],\n  \"reviewConcurrency\": 4,\n  \"includeBaselineReview\": true,\n  \"fixerAgent\": \"worker\",\n  \"fixerSkills\": [],\n  \"fixerTaskExtra\": \"\",\n  \"autoFix\": true,\n  \"autoFixSuggestions\": false,\n  \"blockInputDuringReview\": true,\n  \"reviewStartWatchdogMs\": 30000,\n  \"maxReviewPasses\": null\n}\n```\n\n- `enabled` \u2014 enable or disable automatic review (default: `true`).\n- `reviewerAgent` \u2014 the subagent name used for review (default: `reviewer`).\n- `reviewerSkills` \u2014 extra review skills; each skill becomes its own flat parallel reviewer task (default: `[]`).\n- `reviewerTaskExtra` \u2014 extra instructions appended to every reviewer task (default: `\"\"`).\n- `reviewerProfiles` \u2014 additional flat reviewer profiles (default: `[]`). Each enabled profile can set `id`, `agent`, `model`, `skills`, `task`, `taskExtra`, and `label`; project profiles merge by `id` and can override fields, add fields, omit fields to inherit them, or disable a global profile with `enabled: false`. A new enabled profile needs a non-empty `task` to create a standalone reviewer task. There is no supported null/empty-string clearing mechanism for inherited optional profile fields such as `agent`, `model`, `label`, `task`, `taskExtra`, or `skills`.\n- `reviewConcurrency` \u2014 max concurrent flat reviewer tasks (default: `4`, capped at `8`). If baseline, profile, and skill reviewers produce more than 8 total tasks, the auto-review skill splits them into sequential subagent batches of at most 8 tasks.\n- `includeBaselineReview` \u2014 include the default baseline reviewer set: correctness/regressions, tests/validation, and simplicity/maintainability (default: `true`).\n- `fixerAgent` \u2014 the single writer subagent used for accepted auto-fixes (default: `worker`).\n- `fixerSkills` \u2014 extra skills injected into the fixer subagent (default: `[]`).\n- `fixerTaskExtra` \u2014 extra instructions appended to the fixer task (default: `\"\"`).\n- `autoFix` \u2014 allow the configured fixer subagent to apply Critical/Warning fixes after reviewers return (default: `true`).\n- `autoFixSuggestions` \u2014 allow automatic fixing of Suggestions when safe and local (default: `false`). By default, Suggestions are report-only.\n- `blockInputDuringReview` \u2014 block new user messages while a review turn is queued but not yet dispatched (default: `true`).\n- `reviewStartWatchdogMs` \u2014 timeout in ms before a stuck queued review is dropped (default: `30000`).\n- `maxReviewPasses` \u2014 optional review/fix pass limit for one review loop. Use `null`/`none`/`unlimited` for no limit (default: `null`).\n\nPriority: `--no-auto-review` flag > runtime `/auto-review on/off` > project config > global config > defaults.\n\n## Customizing Reviews\n\nDefine review expectations with normal Pi mechanisms: `AGENTS.md`, project skills, global skills, package skills, and `pi-subagents` reviewer/fixer configuration. The bundled `auto-review` skill prompts the main agent to use the conversation, recent tool results, known edits/fixes, and optional read-only checks as context before deciding whether to call subagents. If there is no meaningful review target, the skill should stop without dispatching reviewers.\n\nFor skill-specific fanout, configure `reviewerSkills`:\n\n```text\n/auto-review config set reviewerSkills frontend-review effect-ts-reviewer\n```\n\nFor role/model-specific fanout, configure `reviewerProfiles` with JSON. New enabled profiles need a non-empty `task`; project overrides may omit `task` when they are only changing fields such as `model`, `skills`, or `taskExtra` for a global profile with the same `id`. Project overrides cannot currently unset inherited optional fields with `null` or empty strings; use explicit replacement values where supported or disable the profile with `enabled: false`. The `config set reviewerProfiles` command writes the whole scoped profile array, so include every profile you want to keep in that scope; a single-item command leaves that config file with only that one profile, although effective config still merges global/project profiles by `id`:\n\n```text\n/auto-review config set reviewerProfiles [{\"id\":\"frontend-performance\",\"agent\":\"reviewer\",\"model\":\"openai-codex/gpt-5.5\",\"skills\":[\"frontend-review\"],\"task\":\"Focus on frontend performance, rendering cost, unnecessary re-renders, and expensive effects.\"}]\n```\n\nThis runs a flat parallel review pass with the three default baseline reviewers plus configured profile and skill reviewers. Auto-fixes are delegated to `fixerAgent` as a single writer.\n\n## Safety\n\nThe queued `/skill:auto-review` turn instructs reviewer subagents to keep inspection read-only and instructs the main agent not to edit directly. The extension itself does not enforce per-tool mutation blocking inside child reviewer sessions; workflow discipline is handled by the skill instructions and `pi-subagents`. After reviewers return, the main agent may dispatch the configured single fixer subagent for accepted Critical/Warning findings.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "code-review",
+    "agent"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/jayjnu/pi-auto-review#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jayjnu/pi-auto-review.git"
+  },
+  "pi": {
+    "extensions": [
+      "./node_modules/pi-subagents/src/extension/index.ts",
+      "./extensions/auto-review/index.ts"
+    ],
+    "skills": [
+      "./skills",
+      "./node_modules/pi-subagents/skills"
+    ],
+    "prompts": [
+      "./node_modules/pi-subagents/prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-27T07:08:42.924Z",
+    "modified": "2026-06-04T09:49:49.930Z",
+    "0.1.0": "2026-05-27T07:08:43.251Z",
+    "0.2.0": "2026-05-28T10:07:34.824Z",
+    "0.2.1": "2026-05-29T04:34:48.372Z",
+    "0.2.2": "2026-05-29T04:47:23.661Z",
+    "0.2.3": "2026-05-29T06:23:36.698Z",
+    "0.3.0": "2026-06-04T02:49:52.102Z",
+    "0.4.0": "2026-06-04T08:37:49.902Z",
+    "0.5.0": "2026-06-04T09:15:15.132Z",
+    "0.5.1": "2026-06-04T09:49:49.681Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": 63,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 615
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 81
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 39
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 57
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 11
+    }
+  ]
+}

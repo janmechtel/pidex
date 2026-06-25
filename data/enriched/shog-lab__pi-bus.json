@@ -1,0 +1,42 @@
+{
+  "name": "@shog-lab/pi-bus",
+  "latest_version": "0.2.0",
+  "description": "Atomic inter-pi messaging primitive: any pi window on the same host (and git repo) auto-joins. 3 tools (agent_list / agent_send / agent_inbox). Incoming messages auto-trigger the recipient's agent via pi.sendUserMessage.",
+  "readme": "# @shog-lab/pi-bus\n\n**Atomic inter-pi messaging primitive.** Any pi window in the same git repo auto-joins. 3 tools. Incoming messages auto-trigger the recipient's agent \u2014 even when it's idle.\n\n## What it gives you\n\n- **Zero-config join.** Open pi, you're on the bus. Close pi, you leave. No flags, no env vars.\n- **Per-repo scope.** Auto-discovers the main repo via `git rev-parse --git-common-dir`, so sessions in different repos don't see each other.\n- **Push delivery.** When another agent sends you a message, your pi receives it as a user turn (via `pi.sendUserMessage(..., { deliverAs: \"followUp\" })`) \u2014 your agent starts working without you typing anything.\n- **Fire-and-forget.** No request/response protocol, no hops counter, no routing. If you want a reply, ask the recipient to call `agent_send` back.\n\n## Install\n\nPi-native install (recommended for pi users):\n\n```bash\npi install npm:@shog-lab/pi-bus\n```\n\nNode/npm install (works well inside existing Node repos):\n\n```bash\nnpm i -D @shog-lab/pi-bus\n```\n\n`postinstall` symlinks `dist/extensions/bus/` into the host repo's `.pi/extensions/` and packaged skills into `.pi/skills/`, so pi auto-discovers them on next launch.\n\n### pnpm projects\n\npnpm may skip dependency lifecycle scripts unless the package is approved for builds (for example via `pnpm approve-builds` / `onlyBuiltDependencies`). If `.pi/extensions/bus` was not created after install, run the init command manually from your repo root:\n\n```bash\nINIT_CWD=\"$PWD\" pnpm exec pi-bus-init\n```\n\nFallback if `pnpm exec` cannot resolve the bin:\n\n```bash\nINIT_CWD=\"$PWD\" node node_modules/@shog-lab/pi-bus/bin/init.js\n```\n\n## Use\n\nThree tools the LLM can call:\n\n| Tool | Purpose |\n|---|---|\n| `agent_list` | Who else is live on this repo's bus right now |\n| `agent_send <to> <body>` | Drop a message into another session's inbox |\n| `agent_inbox [--consume]` | Read your own inbox (mostly unnecessary \u2014 see below) |\n\nOpen two terminals in the same git repo:\n\n```bash\n# Terminal 1\n$ pi\n[pi-bus] joined as \"calm-fox-abc\" (id=1234-7e1f\u2026)\n> ...\n\n# Terminal 2\n$ pi\n[pi-bus] joined as \"swift-owl-x2k\" (id=5678-q3wa\u2026)\n> hey, ask calm-fox to write tests for src/auth.ts\n[agent calls agent_list \u2192 sees calm-fox-abc]\n[agent calls agent_send to=calm-fox-abc body=\"please write tests for src/auth.ts\"]\nSent msg-1234-abc to calm-fox-abc (40 chars)\n```\n\nThen in Terminal 1, your agent (which was idle) will receive a message that appears as if you typed:\n\n```\n> [from swift-owl-x2k] please write tests for src/auth.ts\n[agent starts reading src/auth.ts, writes tests, commits]\n```\n\nThat's it. No coordination layer, no PM agent, no orchestration. Just: any pi can hand work off to any other live pi.\n\n## Identity\n\nEach session gets an auto-generated friendly name like `calm-fox-abc`. Override with the `PI_AGENT_NAME` env var:\n\n```bash\nPI_AGENT_NAME=developer pi\n```\n\nSame `PI_AGENT_NAME` from two terminals is technically allowed but `agent_send` to that name will fail ambiguously \u2014 assign unique names if you set them manually.\n\n## Scoping\n\nAll sessions in the same git repo share one bus. Resolved via `git rev-parse --git-common-dir` (see `@shog-lab/pi-utils`), so worktrees of the same repo share a bus too.\n\nOutside a git repo, falls back to `<cwd>/.pi-mind/bus/`. Two unrelated dirs = two independent buses.\n\nOverride with `PI_MIND_DIR` env if you want bus state somewhere specific.\n\n## Delivery semantics\n\nIncoming messages are injected via `pi.sendUserMessage(text, { deliverAs: \"followUp\" })`:\n\n- **If pi is idle:** triggers a turn immediately\n- **If pi is mid-stream:** queues until current tool calls finish, then injects\n- **If real user is mid-conversation:** waits until agent fully idle before injecting (does NOT interrupt typing)\n\nThe recipient agent sees the message prefixed `[from <sender>]`. It can:\n- Respond by calling `agent_send` back\n- Take action (read code, run tests, etc.)\n- Ignore it (just continue with its own work \u2014 the message is in chat history but no obligation)\n\n## What's NOT included (deliberate)\n\n- \u274c Request/response protocol \u2014 fire-and-forget only; reply = sender does another `agent_send`\n- \u274c Broadcast tool \u2014 use `agent_list` + loop yourself\n- \u274c Channels / topics / namespaces \u2014 one bus per repo, that's it\n- \u274c Permissions / ACL \u2014 any agent on the bus can message any other\n- \u274c Message persistence \u2014 inbox messages are deleted after delivery\n- \u274c Cross-host messaging \u2014 bus is per-machine. If you need this, look at [disler/pi-vs-claude-code](https://github.com/disler/pi-vs-claude-code)'s `coms-net.ts`\n- \u274c Roles / orchestration / PM agent \u2014 those are patterns you build ON TOP using these 3 atoms\n\n## Composing with roles\n\nThe package includes a `build-personas` skill for scaffolding repo-local personas that coordinate through pi-bus. Use it when you want a planner / implementer / reviewer setup with prompts, launchers, permission policy, and a verification flow:\n\n```text\n/skill:build-personas\n```\n\nOr ask your agent: \"Build repo-local personas for this project using pi-bus.\"\n\nFor a minimal manual setup, combine with pi's `--append-system-prompt <file>` (which accepts a file path) to spin up role-specific terminals:\n\n```bash\n# ~/.zshrc\nalias pi-dev='pi --append-system-prompt ~/.pi/roles/developer.md'\nalias pi-test='pi --append-system-prompt ~/.pi/roles/tester.md'\nalias pi-growth='pi --append-system-prompt ~/.pi/roles/growth.md'\n```\n\nThen:\n- Terminal 1: `pi-dev` \u2192 joins bus as e.g. `quiet-deer-xyz`, developer persona\n- Terminal 2: `pi-test` \u2192 joins bus as e.g. `swift-owl-q3w`, tester persona\n- They can `agent_send` each other for handoffs\n\nThe bus doesn't know about \"roles\" \u2014 they're just system prompts. Bus only sees opaque agent names.\n\n## Avoiding ping-pong loops\n\nIf two agents auto-reply to each other on every incoming message, you get an infinite loop. Mitigations:\n\n1. **System prompt discipline** \u2014 instruct agents \"only respond to other-agent messages when a reply is genuinely needed; don't acknowledge for politeness\"\n2. **Don't auto-call agent_send in response to a `[from X]` message** unless the recipient explicitly asked a question\n3. **Watch for it manually** \u2014 bus has no hops counter; you're trusted not to spam\n\n## File layout\n\n```\n<repo>/.pi-mind/bus/sessions/<session-id>/\n\u251c\u2500\u2500 meta.json                    name, pid, cwd, joinedAt, heartbeatAt\n\u2514\u2500\u2500 inbox/\n    \u2514\u2500\u2500 <msg-id>.json            from, body, sentAt\n```\n\nHeartbeat updates every 30s. Sessions whose `heartbeatAt` is older than 90s are filtered out of `agent_list` and `agent_send` lookups (stale-detect for crashed pis).\n\nOn clean shutdown (SIGINT / SIGTERM / exit), pi-bus removes its session directory. Stale dirs from crashed pis are filtered (not actively cleaned \u2014 they sit in the registry until manually removed or the registry is wiped).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "agent-bus",
+    "multi-agent",
+    "persona",
+    "messaging"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/shog-lab/pi-mind/tree/main/packages/bus",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shog-lab/pi-mind.git",
+    "directory": "packages/bus"
+  },
+  "pi": {
+    "extensions": [
+      "dist/extensions/bus/index.js"
+    ],
+    "skills": [
+      "skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-26T03:15:24.394Z",
+    "modified": "2026-06-17T07:02:56.122Z",
+    "0.1.0": "2026-05-26T03:15:24.775Z",
+    "0.1.1": "2026-06-01T08:26:09.008Z",
+    "0.1.2": "2026-06-10T02:08:34.012Z",
+    "0.2.0": "2026-06-17T07:02:56.019Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 56,
+  "download_trend": []
+}

@@ -1,0 +1,53 @@
+{
+  "name": "pi-better-openai",
+  "latest_version": "0.1.19",
+  "description": "Personal pi extension that improves OpenAI with fast mode, usage stats, and footer polish.",
+  "readme": "# pi-better-openai\n\nA pi extension for OpenAI subscription workflows: fast mode, usage visibility, footer polish, custom Codex pets, and image generation through `openai-codex` auth.\n\n## Install\n\nInstall from GitHub:\n\n```bash\npi install git:github.com/mattleong/pi-better-openai\n```\n\nOr install from npm:\n\n```bash\npi install npm:pi-better-openai\n```\n\n## Authentication\n\nUsage display and image generation require pi's `openai-codex` OAuth credentials.\n\n1. In pi, run `/login openai-codex`.\n2. Verify subscription usage with `/openai-usage`, or open `/openai-settings` and check **Diagnostics**.\n3. The extension reads auth from pi's agent auth store, normally `~/.pi/agent/auth.json`. Do not copy, paste, or commit values from this file.\n4. If `PI_CODING_AGENT_DIR` is set, the auth store and global generated-image directory use that agent directory instead of `~/.pi/agent`.\n\n## Features\n\n- Fast mode for supported OpenAI models, toggled with `/fast` or in `/openai-settings`.\n- OpenAI subscription usage display via `/openai-usage` and the footer.\n- Interactive settings picker via `/openai-settings`.\n- Footer customization for model, thinking, fast mode, usage, and token/cost context.\n- OpenAI image generation/editing through the `openai_image` tool and `/openai-image` command.\n- Animated Codex custom pets rendered in the Better OpenAI footer.\n- Commands:\n  - `/fast` toggles fast mode.\n  - `/openai-image <prompt>` generates an image directly.\n  - `/pets [help|list|wake [slug]|tuck|select <slug>]` renders or manages custom pets from `${CODEX_HOME:-~/.codex}/pets`.\n  - `/openai-usage` shows current OpenAI subscription usage.\n  - `/openai-settings` opens settings, diagnostics, and config details.\n\n## Configuration\n\nThe extension reads JSON config from two locations:\n\n- Project config: `.pi/extensions/pi-better-openai.json`\n- Global config: `~/.pi/agent/extensions/pi-better-openai.json`\n\nProject overrides global. Global values fill fields omitted by the project file. Invalid enum values are ignored, and numeric settings are clamped to safe ranges.\n\nDefault supported models:\n\n```json\n[\"openai/gpt-5.4\", \"openai/gpt-5.5\", \"openai-codex/gpt-5.4\", \"openai-codex/gpt-5.5\"]\n```\n\nExample config:\n\n```json\n{\n  \"persistState\": true,\n  \"desiredActive\": false,\n  \"supportedModels\": [\"openai/gpt-5.5\", \"openai-codex/gpt-5.5\"],\n  \"usage\": {\n    \"enabled\": true,\n    \"refreshIntervalMs\": 60000,\n    \"showOnlyOnSubscriptionModels\": true,\n    \"showResetTimes\": true\n  },\n  \"footer\": {\n    \"mode\": \"status\"\n  },\n  \"image\": {\n    \"enabled\": true,\n    \"defaultModel\": \"gpt-5.5\",\n    \"defaultSave\": \"project\",\n    \"outputFormat\": \"png\",\n    \"timeoutMs\": 180000\n  },\n  \"pets\": {\n    \"enabled\": false,\n    \"slug\": \"\",\n    \"placement\": \"inline-right\",\n    \"state\": \"idle\",\n    \"thinkingState\": \"review\",\n    \"toolState\": \"running\",\n    \"failedToolState\": \"failed\",\n    \"idleEmotes\": true,\n    \"idleEmoteIntervalMs\": 30000,\n    \"sizeCells\": 10\n  }\n}\n```\n\n## Image generation\n\nUse the command for quick generation:\n\n```text\n/openai-image draw an otter reading a terminal\n```\n\nAgents can call the `openai_image` tool directly. Supported parameters:\n\n- `prompt` (required): pass the user's image wording verbatim.\n- `action`: `auto`, `generate`, or `edit`.\n- `images`: project-local reference/edit image paths. Paths must stay inside the current workspace and point to readable PNG, JPEG, WebP, or GIF files.\n- `model`: Codex image model override, for example `openai-codex/gpt-5.5`.\n- `outputFormat`: `png`, `jpeg`, or `webp`.\n- `save`: `project`, `global`, `custom`, or `none`.\n- `saveDir`: required for `save: \"custom\"` unless `PI_IMAGE_SAVE_DIR` is set.\n\nSave modes:\n\n- `project` writes to `.pi/generated-images/` in the current project.\n- `global` writes to the agent `generated-images` directory, normally `~/.pi/agent/generated-images/` or `$PI_CODING_AGENT_DIR/generated-images/`.\n- `custom` writes to `saveDir` or `PI_IMAGE_SAVE_DIR`.\n- `none` returns the image without saving it.\n\nThe repository ignores `.pi/`, so generated images and local config should not be committed.\n\n## Codex pets\n\nCodex pets are an OpenAI Codex app feature, so the floating overlay and pet picker are still controlled by Codex (`Settings \u2192 Appearance \u2192 Pets` or `/pet`). This extension can also render compatible custom pet spritesheets directly in pi's Better OpenAI footer.\n\n```bash\n/pets wake          # render the selected pet, or pick one if none is selected\n/pets wake <slug>   # render a specific ready pet\n/pets select <slug> # select a ready pet without changing visibility\n/pets tuck          # hide it\n/pets list          # list local custom pets and readiness diagnostics\n```\n\nYou can also enable **Footer pet** in `/openai-settings`, cycle installed pets with the **Pet** row, preview the selected pet in the footer, and tune placement (`inline-right` by default), idle, thinking/streaming, tool-execution, and any failed-tool animation states, plus random idle emotes and size.\n\nTo create a custom pet for the Codex app:\n\n```bash\n$skill-installer hatch-pet\n```\n\nThen reload Codex skills (`Cmd/Ctrl+K \u2192 Force Reload Skills`) and ask:\n\n```text\n$hatch-pet create a new pet inspired by pi-better-openai\n```\n\nCustom pets should end up in `${CODEX_HOME:-~/.codex}/pets/<pet-name>/` with `pet.json` and `spritesheet.webp`. Refresh custom pets in Codex settings and toggle the overlay with `/pet`.\n\n## Screenshots\n\n<!-- Add screenshots here. -->\n\n<img width=\"983\" height=\"851\" alt=\"Screenshot 2026-04-29 at 11 53 23\u202fPM\" src=\"https://github.com/user-attachments/assets/07a2fb87-ef48-4396-8b12-124825c8d360\" />\n<img width=\"1327\" height=\"102\" alt=\"Screenshot 2026-04-29 at 11 34 49\u202fPM\" src=\"https://github.com/user-attachments/assets/22042782-c94e-491d-b5af-095f7f0810f9\" />\n",
+  "keywords": [
+    "fast",
+    "gpt",
+    "image",
+    "openai",
+    "pi",
+    "pi-extension",
+    "pi-package",
+    "priority",
+    "service-tier"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/mattleong/pi-better-openai#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mattleong/pi-better-openai.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-30T06:22:09.312Z",
+    "modified": "2026-06-13T07:42:21.968Z",
+    "0.1.2": "2026-04-30T06:22:09.621Z",
+    "0.1.3": "2026-04-30T06:32:12.143Z",
+    "0.1.4": "2026-04-30T06:38:05.789Z",
+    "0.1.6": "2026-04-30T07:05:25.745Z",
+    "0.1.7": "2026-04-30T07:28:41.218Z",
+    "0.1.8": "2026-04-30T07:37:51.808Z",
+    "0.1.9": "2026-05-01T07:20:25.985Z",
+    "0.1.10": "2026-05-01T07:52:48.376Z",
+    "0.1.11": "2026-05-03T03:16:40.545Z",
+    "0.1.12": "2026-05-05T19:54:58.801Z",
+    "0.1.13": "2026-05-05T20:13:53.415Z",
+    "0.1.14": "2026-05-07T17:52:18.541Z",
+    "0.1.15": "2026-05-08T05:56:35.014Z",
+    "0.1.16": "2026-05-08T06:11:39.878Z",
+    "0.1.17": "2026-05-09T07:30:13.804Z",
+    "0.1.18": "2026-05-11T06:50:09.776Z",
+    "0.1.19": "2026-06-13T07:42:21.729Z"
+  },
+  "versions_count": 17,
+  "downloads_last_week": 104,
+  "download_trend": []
+}

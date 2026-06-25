@@ -1,0 +1,59 @@
+{
+  "name": "pi-odoo-workflow",
+  "latest_version": "1.12.1",
+  "description": "Odoo 18/19 module development for pi and Claude Code \u2014 auto-detects your modules, finds XML IDs, and scaffolds models, views, wizards, reports, controllers, OWL components, tests and migrations with 15 /odoo-* slash commands. Includes TypeScript extension",
+  "readme": "# pi-odoo-workflow\n\n> Odoo 18/19 development workflow for [pi coding agent](https://pi.dev) \u2014 stops you from repeating the same Odoo context on every message. The skill tells Claude how to behave automatically: what to check, what to generate, and what to never skip.\n\n![pi-odoo-workflow preview](https://raw.githubusercontent.com/EdgarNaranjo/agent-skills/main/assets/preview.png)\n\n## Works with\n\n| Feature | pi | Claude Code |\n|---|---|---|\n| Skill automatic behaviors | \u2705 | \u2705 |\n| Reference guides (`v18-changes.md`, etc.) | \u2705 | \u2705 |\n| `/odoo-*` prompt templates | \u2705 Native slash commands | \u26a0\ufe0f Paste content manually |\n| `odoo_scan` tool (auto-detects modules) | \u2705 Auto-injected | \u274c Not available |\n| `odoo_find_xmlid` tool | \u2705 Auto-injected | \u274c Not available |\n| Module context in system prompt | \u2705 Automatic | \u274c Not available |\n\n**pi:** full experience. **Claude Code:** skill + reference guides only (via `npx skills add`).\n\n---\n\n## Quickstart\n\n```bash\n# 1. Install\npi install npm:pi-odoo-workflow\n\n# 2. Open pi inside your Odoo project\ncd my-odoo-addons/\npi\n\n# 3. Start planning a feature\n/odoo-plan \"add priority field to hospital appointments\"\n\n# Or scaffold a new module from scratch\n/odoo-module my_module\n```\n\nThe skill activates automatically. On your first message, Claude will ask for the Odoo version (18 or 19) and the UI language \u2014 then remembers both for the session.\n\n---\n\n## What it does\n\n### \ud83e\udde0 Skill: `workflow-odoo`\n\nLoaded automatically when working on Odoo code. Claude will \u2014 without being asked:\n\n- **Ask for version once** (18 or 19) and remember it for the session\n- **Check module structure** before and after every change\n- **Write tests** for every new method or feature\n- **Update tests** when modifying existing code\n- **Check translations** \u2014 all user-visible strings use `_()`\n- **Explain decisions** before writing code, naming alternatives\n- **Suggest better patterns** when they exist\n\nReference guides included:\n| File | Content |\n|------|---------|\n| `module-structure.md` | OCA-compatible directory layout, naming conventions |\n| `v18-changes.md` | v17 \u2192 v18 breaking changes with before/after code |\n| `v19-changes.md` | v18 \u2192 v19 breaking changes with before/after code |\n| `testing-patterns.md` | `@tagged`, `setUpClass`, wizard tests, exception tests |\n| `translations.md` | `_()` usage, `.pot` generation, common mistakes |\n| `owl-patterns.md` | `patch()`, custom field widgets, services, asset declaration |\n\n### \u26a1 Prompt Templates\n\nType `/command` in pi to expand into full instructions:\n\n| Command | What it generates |\n|---------|------------------|\n| `/odoo-module <name>` | Complete module scaffold: dirs, manifest, `__init__.py`, security CSV, i18n, tests |\n| `/odoo-model <model.name>` | Full model: Python + form/list views + security + tests + manifest update |\n| `/odoo-wizard <name>` | TransientModel wizard: Python + dialog view + trigger button + tests |\n| `/odoo-report <name>` | QWeb PDF report: action + template + paper format + Print menu binding |\n| `/odoo-inherit <view_xml_id>` | View inheritance with correct XPath for 9 change types (form, list columns, attributes, header, notebook, hide, group, replace) |\n| `/odoo-cron <name>` | Scheduled action: Python method + ir.cron XML + manifest update |\n| `/odoo-test` | Scans existing code and generates/updates tests for uncovered methods |\n| `/odoo-review` | **Pre-commit audit** \u2014 static analysis: structure, APIs, translations, tests, security \u2014 use before every commit \u2705/\u26a0\ufe0f/\u274c |\n| `/odoo-migrate` | Migrates module between versions (v17\u2192v18 or v18\u2192v19) |\n| `/odoo-db-migrate <change>` | Generates `migrations/pre-migration.py` and `post-migration.py` for schema changes (field rename, type change, model merge, XML ID rename) |\n| `/odoo-plan <feature>` | Plans a complex feature through structured phases: explore \u2192 propose \u2192 spec \u2192 design \u2192 tasks. Use before `/odoo-model` or `/odoo-wizard` for large work |\n| `/odoo-qa` | **Post-spec validation** \u2014 validates implementation against a spec or plan, requires test evidence, issues APPROVED/REJECTED/PENDING verdict \u2014 use when a feature is \"done\" |\n| `/odoo-debug [error]` | Diagnoses tracebacks, access errors, view failures, cron issues, missing XML IDs \u2014 guides to root cause with concrete fix steps |\n| `/odoo-controller <name>` | HTTP controller with `@route` endpoints \u2014 backend, portal, JSON-RPC, or external API \u2014 with security checklist and `HttpCase` tests |\n| `/odoo-owl <name>` | OWL 2 component \u2014 field widget, standalone component, or service \u2014 with asset declaration and optional tour test |\n\n### \ud83d\udd0c Extensions (pi only)\n\nTwo TypeScript extensions that run automatically when you open pi in a directory with Odoo modules \u2014 no commands needed:\n\n#### \ud83d\udc0d Odoo Context Injector (`odoo-context.ts`)\n\n1. Detects all `__manifest__.py` files\n2. Extracts module name, version, dependencies, models, inherited models, and view XML IDs\n3. Notifies you: *\"\ud83d\udc0d Odoo: my_module (v19.0.1.0.0)\"*\n4. Injects that context into Claude's system prompt automatically\n\nClaude then knows exactly which models exist, which views can be inherited, and which XML IDs are available \u2014 without you having to explain anything.\n\nTool available to Claude: **`odoo_scan`** \u2014 returns the full module structure on demand.\n\n#### \ud83d\udd0d Odoo XML-ID Finder (`odoo-xmlid.ts`)\n\nTool available to Claude: **`odoo_find_xmlid`** \u2014 finds the exact XML ID for any view, action, or record.\n\nSearches in order:\n1. **Local Odoo source** (if found at `~/odoo`, `~/src/odoo`, etc.) \u2014 instant grep\n2. **GitHub API** (`odoo/odoo` repository) \u2014 fallback with direct raw file links\n\n---\n\n## Install\n\n### pi (full experience)\n\nAll features: skill + prompt templates + extensions + auto-injected context.\n\n```bash\n# From npm\npi install npm:pi-odoo-workflow\n\n# From GitHub\npi install git:github.com/EdgarNaranjo/agent-skills\n\n# Try without installing (-e loads the package for this session only, no persistent install)\npi -e git:github.com/EdgarNaranjo/agent-skills\n```\n\n### Claude Code (skill only)\n\nThe skill works in Claude Code via the [Agent Skills](https://agentskills.io) standard. You get the automatic behaviors and all reference guides. You do **not** get the `/odoo-*` slash commands (pi-specific syntax) or the `odoo_scan` / `odoo_find_xmlid` tools (pi extensions).\n\n```bash\nnpx skills add EdgarNaranjo/agent-skills -g -y\n```\n\n---\n\n## What makes this different\n\nEvery other Odoo skill for AI agents is a **reference** \u2014 it tells Claude how Odoo works. This skill tells Claude **how to behave**: what to do automatically, what to check, what to generate, and why.\n\nThe prompt templates are unique \u2014 no other Odoo skill package has `/slash` commands.\n\n---\n\n## Works well alongside\n\n- [`unclecatvn/agent-skills@odoo-19.0`](https://github.com/unclecatvn/agent-skills) \u2014 deep API reference for Odoo 19\n- [`alessandrorlm/agent-skills@odoo-17.0`](https://github.com/alessandrorlm/agent-skills) \u2014 reference for v17 patterns\n\n---\n\n## FAQ\n\n**Q: When do I use `/odoo-review` vs `/odoo-qa`?**\n`/odoo-review` is a pre-commit static audit \u2014 run it any time to catch code issues (wrong patterns, missing tests, security gaps). `/odoo-qa` is a post-feature gate \u2014 run it when you think a feature is complete, provide your test output, and get a formal APPROVED/REJECTED verdict against a spec.\n\n**Q: Does this work without Odoo source code installed locally?**\nYes. The `odoo_find_xmlid` tool falls back to the GitHub API when local source isn't found. Only the `odoo_scan` extension requires a local Odoo module directory.\n\n**Q: Can I use this with Claude Code instead of pi?**\nYes, but only the skill and reference guides work. The `/odoo-*` slash commands and the auto-context injection (`odoo_scan`, `odoo_find_xmlid`) are pi-only. See the \"Works with\" table at the top.\n\n**Q: The skill keeps asking me the Odoo version. How do I stop it?**\nAnswer once at the start of the session. The skill remembers it. If using prompts like `/odoo-model` directly, include the version in your first message: \"v19, add model hospital.appointment\".\n\n**Q: How do I migrate an existing module from v18 to v19?**\n1. Run `/odoo-migrate` \u2014 migrates the code (APIs, XML tags, Python patterns)\n2. Run `/odoo-db-migrate` for each schema change (renamed fields, model renames)\n3. Run `/odoo-test` to check test coverage\n4. Run `/odoo-qa` with your migration plan as the spec\n\n---\n\n## License\n\nLGPL-3.0-or-later \u2014 same license as Odoo Community modules.\n\n---\n\n## Links\n\n- **npm**: [pi-odoo-workflow](https://www.npmjs.com/package/pi-odoo-workflow)\n- **GitHub**: [EdgarNaranjo/agent-skills](https://github.com/EdgarNaranjo/agent-skills)\n- **pi.dev**: [pi-odoo-workflow](https://pi.dev/packages/pi-odoo-workflow)\n- **Changelog**: [CHANGELOG.md](CHANGELOG.md)\n",
+  "keywords": [
+    "pi-package",
+    "odoo",
+    "odoo-18",
+    "odoo-19",
+    "odoo-development",
+    "workflow",
+    "pi-coding-agent",
+    "skills",
+    "ai"
+  ],
+  "author": {
+    "name": "Edgar Naranjo",
+    "url": "https://github.com/EdgarNaranjo"
+  },
+  "license": "LGPL-3.0-or-later",
+  "homepage": "https://github.com/EdgarNaranjo/agent-skills#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EdgarNaranjo/agent-skills.git"
+  },
+  "pi": {
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ],
+    "extensions": [
+      "./extensions"
+    ],
+    "image": "https://raw.githubusercontent.com/EdgarNaranjo/agent-skills/main/assets/preview.png",
+    "changelog": "https://github.com/EdgarNaranjo/agent-skills/blob/HEAD/CHANGELOG.md"
+  },
+  "time": {
+    "created": "2026-05-18T19:54:07.749Z",
+    "modified": "2026-05-28T12:40:08.655Z",
+    "1.0.0": "2026-05-18T19:54:08.023Z",
+    "1.0.1": "2026-05-18T20:05:24.852Z",
+    "1.1.0": "2026-05-18T20:07:04.047Z",
+    "1.1.1": "2026-05-18T20:13:04.775Z",
+    "1.1.5": "2026-05-18T20:30:34.042Z",
+    "1.1.6": "2026-05-20T11:45:22.092Z",
+    "1.2.0": "2026-05-20T12:22:26.772Z",
+    "1.3.0": "2026-05-20T16:20:20.248Z",
+    "1.3.2": "2026-05-20T16:30:27.444Z",
+    "1.4.1": "2026-05-25T21:22:06.135Z",
+    "1.12.0": "2026-05-28T11:19:37.514Z",
+    "1.12.1": "2026-05-28T12:40:08.549Z"
+  },
+  "versions_count": 12,
+  "downloads_last_week": null,
+  "download_trend": []
+}

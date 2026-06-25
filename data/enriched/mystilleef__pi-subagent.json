@@ -1,0 +1,50 @@
+{
+  "name": "@mystilleef/pi-subagent",
+  "latest_version": "0.11.0",
+  "description": "Pi subagent for the SPAE Framework",
+  "readme": "# Subagents for pi\n\nDesigned to orchestrate agents for the\n[SPAE framework](https://github.com/mystilleef/spae-framework). Agents\nin\n[action](https://raw.githubusercontent.com/mystilleef/pi-subagent/main/assets/parallel-agents-demo.mp4).\n\n---\n\n## Installation\n\n**Install from `npm`:**\n\n```sh\npi install npm:@mystilleef/pi-subagent\n```\n\n**Try temporarily without installing:**\n\n```sh\npi -e npm:@mystilleef/pi-subagent\n```\n\n---\n\n## Features\n\n- **Asynchronous:** Agents run in the background.\n- **Parallel:** Run many agents simultaneously.\n- **Isolated:** Each delegated task receives a separate context window.\n- **Nested:** `Subagents` can spawn other `subagents`.\n- **Simple:** No complex orchestration syntax.\n- **Bloat-free:** No bundled agents. Write your own. Or use those from\n  the [SPAE Framework](https://github.com/mystilleef/spae-framework).\n\n---\n\n## Usage\n\n**Run an agent with an optional task:**\n\n```text\n/run agent [optional task]\n```\n\n**Examples:**\n\n```text\n/run spec implement google login screen\n/run plan\n/run inspect\n/run build\n/run verify\n```\n\n**Use natural language to launch agents in parallel:**\n\n```text\nuse the work agent to write a poem about linux; use the commit agent to make\ncommits; use the query agent to summarize the project.\n```\n\n**Show active and completed jobs:**\n\n```text\n/jobs\n```\n\n**Cancel running `subagents`:**\n\n```text\n/cancel-subagent\n```\n\n---\n\n## _SPAE_ Workflow\n\nThe official extension for the\n[SPAE Framework](https://github.com/mystilleef/spae-framework). The\nframework provides pre-built agents and skills for a structured, or\norchestrated, workflow.\n\n### Structured\n\n| Phase | Agent                     | Purpose                                       |\n| ----- | ------------------------- | --------------------------------------------- |\n| 1     | `/run spec <requirement>` | Distill requirements into `SPEC.md`           |\n| 2     | `/run plan`               | Decompose `SPEC.md` into an atomic task graph |\n| 3     | `/run inspect`            | Perform gap analysis and optimize `PLAN.md`   |\n| 4     | `/run build`              | Carry out tasks from `PLAN.md`                |\n| 5     | `/run verify`             | Verify implementation against `SPEC.md`       |\n\n### Orchestrated\n\n| Agent                            | Purpose                                       |\n| -------------------------------- | --------------------------------------------- |\n| `/run orchestrate <requirement>` | Run all phases of the `SPAE` workflow         |\n| `/run prepare <requirement>`     | Run preparatory phases of the `SPAE` workflow |\n| `/run spawn`                     | Spawn build agents for each task in a plan    |\n\n---\n\n## Agent definitions\n\nThis extension ships no agents. Define agents as Markdown files with\nYAML `frontmatter` and a Markdown system prompt body.\n\n### Discovery locations\n\n- User-global agents: `~/.pi/agents/*.md`\n- Project-local agents: nearest `.pi/agents/*.md`\n\n### Required front matter\n\n```yaml\nname: review\ndescription: Review code for correctness and maintainability.\n```\n\n### Optional front matter\n\n```yaml\ntools: read, bash, edit\nskills: code-review\nthinking: medium\nprovider: deepseek\nmodel: deepseek-v4-flash\ntemperature: 0.7\ntop_p: 0.9\n```\n\n### Accepted thinking values\n\n- `off`\n- `minimal`\n- `low`\n- `medium`\n- `high`\n- `xhigh`\n\n---\n\n## Tool\n\nThe extension also registers a `subagent` tool for model-driven\ndelegation.\n\n**Inputs:**\n\n- `agent`: agent name.\n- `task`: task prompt for the child agent.\n- `agentScope`: optional lookup scope, one of `user`, `project`, or\n  `both`.\n- `debug`: optional flag that requests child diagnostic details. Full\n  child messages and raw internals require `PI_SUBAGENT_DEBUG_ENABLED=1`\n  in the host environment.\n\n---\n\n## Security\n\n`Subagents` launch child `pi --json` processes. Agents, tools, and\nextensions run with user permissions, so treat agent definitions like\nexecutable automation.\n\n**Trust guidance:**\n\n- Review project-local agents before running them.\n- Avoid delegating secrets unless the agent and tools need them.\n- Treat child-agent prompts, tool arguments, `stderr`, and debug\n  transcripts as potentially sensitive.\n- Enable debug details only for trusted investigations. `debug: true` or\n  `/run --debug` can expose child conversation transcripts, termination\n  internals, and `stderr` only when the host explicitly sets\n  `PI_SUBAGENT_DEBUG_ENABLED=1`.\n- Prefer trusted repositories for shared agent definitions.\n- Remember that child agents can call their configured tools.\n\n---\n\n## Configuration and limits\n\n**Environment variables:**\n\n- `PI_SUBAGENT_DEPTH`: current nested subagent depth counter set\n  internally for child processes.\n- `PI_SUBAGENT_MAX_DEPTH`: max nested subagent depth. Default: `3`.\n  Values above `10` clamp to the internal ceiling `10`; deeper nesting\n  increases cost, latency, and runaway delegation risk.\n- `PI_SUBAGENT_AGENT_END_GRACE_MS`: child process grace period after\n  `agent_end` before forced termination. Default: `250`.\n- `PI_SUBAGENT_MAX_STDERR_BYTES`: max captured child `stderr` bytes.\n  Default: `10000`.\n- `PI_SUBAGENT_MAX_OUTPUT_BYTES`: max returned output bytes. Default:\n  `50000`.\n- `PI_SUBAGENT_MAX_OUTPUT_LINES`: max returned output lines. Default:\n  `500`.\n- `PI_SUBAGENT_DEBUG_ENABLED`: debug detail authorization. Set to `1` to\n  allow `debug: true` or `/run --debug` to include sanitized child\n  messages, termination internals, and `stderr`; unset values keep\n  non-debug detail behavior.\n\nLimit variables parse as positive integers. Empty, zero, negative,\ndecimal, `Infinity`, and non-numeric values fall back to defaults.\n\n---\n\n## Troubleshooting\n\n**Missing agent:**\n\n- Confirm the file lives under `~/.pi/agents/` or the nearest\n  `.pi/agents/`.\n- Confirm `frontmatter` includes `name` and `description`.\n- Confirm `/run` uses the `name` value, not the filename.\n\n**Project-local agent prompt:**\n\n- Pi may request confirmation before loading project-local agents when\n  UI context exists.\n\n**Nested subagent blocked:**\n\n- Nested delegation hits the `PI_SUBAGENT_MAX_DEPTH` safety limit.\n- Run the child task directly from the parent session instead.\n\n**Truncated output:**\n\n- Raise `PI_SUBAGENT_MAX_OUTPUT_BYTES` or\n  `PI_SUBAGENT_MAX_OUTPUT_LINES`.\n- Ask the child agent for a shorter summary.\n\n---\n\n## Development\n\n**Install dependencies:**\n\n```sh\nbun install\n```\n\n**Run full verification:**\n\n```sh\nbun verify\n```\n\n**Check npm package contents:**\n\n```sh\nbun pack:smoke\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "agent",
+    "subagent",
+    "orchestration",
+    "ai",
+    "llm"
+  ],
+  "author": {
+    "name": "Lateef Alabi-Oki",
+    "email": "mystilleef@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/mystilleef/pi-subagent#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mystilleef/pi-subagent.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "video": "https://raw.githubusercontent.com/mystilleef/pi-subagent/main/assets/parallel-agents-demo.mp4"
+  },
+  "time": {
+    "created": "2026-05-15T01:04:38.247Z",
+    "modified": "2026-06-24T20:45:55.111Z",
+    "0.3.0": "2026-05-15T01:04:38.540Z",
+    "0.3.1": "2026-05-15T01:48:03.528Z",
+    "0.4.0": "2026-05-17T07:11:34.443Z",
+    "0.5.0": "2026-05-21T13:38:00.643Z",
+    "0.6.0": "2026-05-31T00:41:18.248Z",
+    "0.7.0": "2026-06-03T12:56:00.449Z",
+    "0.8.0": "2026-06-05T18:01:39.952Z",
+    "0.9.0": "2026-06-07T18:05:47.977Z",
+    "0.10.1": "2026-06-14T01:16:11.554Z",
+    "0.10.2": "2026-06-16T03:20:34.409Z",
+    "0.11.0": "2026-06-24T20:45:54.780Z"
+  },
+  "versions_count": 11,
+  "downloads_last_week": 171,
+  "download_trend": []
+}

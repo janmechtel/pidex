@@ -1,0 +1,47 @@
+{
+  "name": "pi-voice-stt",
+  "latest_version": "0.3.2",
+  "description": "Provider-agnostic speech-to-text dictation extension for the Pi TUI.",
+  "readme": "# Pi Voice STT\n\n![Pi Voice STT preview](https://raw.githubusercontent.com/cgarrot/pi-voice-stt/main/assets/preview.gif)\n\nProvider-agnostic speech-to-text dictation for the [Pi coding agent](https://github.com/earendil-works/pi-coding-agent) TUI.\n\nPress `Ctrl+R` to record your microphone, press it again to transcribe and insert the transcript into the active prompt, press `Enter` while recording to transcribe and send it directly to chat, or press `Esc` to cancel recording/transcription.\n\nThis project is intentionally small and hackable: a Pi extension, an `ffmpeg` recorder, and OpenAI-compatible/Mistral transcription providers.\n\n## Features\n\n- Pi TUI extension with `/stt` command and `Ctrl+R` shortcut.\n- `Enter`-to-send and `Esc`-to-cancel while recording.\n- Pi-native animated input indicator, right-aligned in the prompt border (`voice ctrl+r`, `\u25cf recording`, `\u2022 transcribing`).\n- `ffmpeg` microphone capture to temporary WAV files.\n- Mistral Voxtral provider.\n- OpenAI / Groq / generic OpenAI-compatible provider for hosted and local Whisper-style endpoints.\n- Native provider integrations for Deepgram, ElevenLabs Scribe, Gladia, and AssemblyAI.\n- Environment variable and macOS Keychain secret lookup.\n- HTTPS-by-default endpoint policy; plain HTTP is allowed only for loopback hosts.\n- TypeScript source loaded directly by Pi; no build step required for runtime.\n\n## Requirements\n\n- Pi `>= 0.75`.\n- Node.js `>= 20` when developing locally.\n- `ffmpeg` available in `PATH` or configured with `capture.ffmpegPath`.\n- Microphone permission for the terminal app running Pi.\n- A transcription backend (Mistral, OpenAI/Groq, Deepgram, ElevenLabs, Gladia, AssemblyAI, or a local OpenAI-compatible server).\n\n## Installation\n\n### From GitHub\n\n```bash\npi install npm:pi-voice-stt\n```\n\nRestart Pi or run `/reload`.\n\nGitHub install also works:\n\n```bash\npi install git:github.com/cgarrot/pi-voice-stt\n```\n\n### Local development install\n\n```bash\ngit clone https://github.com/cgarrot/pi-voice-stt.git\ncd pi-voice-stt\nnpm install\nnpm run ci\npi -e .\n```\n\nYou can also add the local path to Pi settings:\n\n```bash\npi install /absolute/path/to/pi-voice-stt\n```\n\n## Configuration\n\nPi Voice STT reads configuration from the first available source:\n\n1. `PI_STT_CONFIG=/path/to/config.json`\n2. `~/.pi/agent/stt.json`\n3. built-in defaults\n\nThe shortcut defaults to `Ctrl+R`. Override it with either:\n\n```bash\nPI_STT_KEYBIND=ctrl+shift+r pi\n```\n\nor a top-level `keybind` in the config file. Environment wins at startup.\n\n> Note: the keybinding is registered when the extension loads. After changing `PI_STT_KEYBIND` or `keybind`, restart Pi or run `/reload` from a Pi process launched with the new environment.\n\n### Mistral Voxtral\n\n```json\n{\n  \"keybind\": \"ctrl+r\",\n  \"capture\": {\n    \"type\": \"ffmpeg\",\n    \"inputFormat\": \"avfoundation\",\n    \"input\": \":0\",\n    \"sampleRate\": 16000,\n    \"channels\": 1,\n    \"maxSeconds\": 120,\n    \"minBytes\": 4096\n  },\n  \"provider\": {\n    \"type\": \"mistral\",\n    \"model\": \"voxtral-mini-2602\",\n    \"apiKeyEnv\": \"MISTRAL_API_KEY\",\n    \"language\": \"fr\"\n  },\n  \"output\": {\n    \"appendTrailingSpace\": true\n  }\n}\n```\n\n### OpenAI\n\n```json\n{\n  \"provider\": {\n    \"type\": \"openai\",\n    \"model\": \"gpt-4o-mini-transcribe\",\n    \"apiKeyEnv\": \"OPENAI_API_KEY\",\n    \"language\": \"en\"\n  }\n}\n```\n\nYou can also use `model: \"whisper-1\"` or any OpenAI transcription model supported by your account.\n\n### Groq / Whisper\n\n```json\n{\n  \"provider\": {\n    \"type\": \"groq\",\n    \"model\": \"whisper-large-v3-turbo\",\n    \"apiKeyEnv\": \"GROQ_API_KEY\",\n    \"language\": \"en\"\n  }\n}\n```\n\n### Generic OpenAI-compatible endpoint\n\n```json\n{\n  \"provider\": {\n    \"type\": \"openai-compatible\",\n    \"endpoint\": \"https://api.openai.com/v1/audio/transcriptions\",\n    \"model\": \"whisper-1\",\n    \"apiKeyEnv\": \"OPENAI_API_KEY\",\n    \"language\": \"en\"\n  }\n}\n```\n\n### Deepgram\n\n```json\n{\n  \"provider\": {\n    \"type\": \"deepgram\",\n    \"model\": \"nova-3\",\n    \"apiKeyEnv\": \"DEEPGRAM_API_KEY\",\n    \"language\": \"en\",\n    \"smartFormat\": true\n  }\n}\n```\n\n### ElevenLabs Scribe\n\n```json\n{\n  \"provider\": {\n    \"type\": \"elevenlabs\",\n    \"model\": \"scribe_v1\",\n    \"apiKeyEnv\": \"ELEVENLABS_API_KEY\",\n    \"language\": \"en\"\n  }\n}\n```\n\n### Gladia\n\n```json\n{\n  \"provider\": {\n    \"type\": \"gladia\",\n    \"apiKeyEnv\": \"GLADIA_API_KEY\",\n    \"language\": \"en\",\n    \"pollIntervalMs\": 1000\n  }\n}\n```\n\n`\"gradium\"` is accepted as a compatibility alias for `\"gladia\"` in case you remember the provider by that name.\n\n### AssemblyAI\n\n```json\n{\n  \"provider\": {\n    \"type\": \"assemblyai\",\n    \"model\": \"universal\",\n    \"apiKeyEnv\": \"ASSEMBLYAI_API_KEY\",\n    \"language\": \"en\",\n    \"pollIntervalMs\": 1000\n  }\n}\n```\n\n### Local STT server\n\n```json\n{\n  \"provider\": {\n    \"type\": \"openai-compatible\",\n    \"endpoint\": \"http://localhost:10301/v1/audio/transcriptions\",\n    \"model\": \"whisper-1\",\n    \"apiKeyEnv\": \"\",\n    \"language\": \"en\"\n  }\n}\n```\n\nPlain HTTP is accepted only for `localhost`, `127.0.0.1`, or `::1`.\n\n## Audio capture notes\n\nThe extension records through `ffmpeg`. Platform defaults are:\n\n| OS | `inputFormat` | `input` |\n| --- | --- | --- |\n| macOS | `avfoundation` | `:0` |\n| Linux | `pulse` | `default` |\n| Windows | `dshow` | `audio=Microphone` |\n\nOn macOS, list devices with:\n\n```bash\nffmpeg -f avfoundation -list_devices true -i \"\"\n```\n\nThen set `capture.input`, for example `\":0\"` or `\":1\"`.\n\nOn Linux, you may prefer PulseAudio/PipeWire (`pulse`) or ALSA (`alsa`) depending on your system.\n\n## Usage\n\nThe voice state is displayed inside the input area, right-aligned on the prompt border, so it stays close to where you are typing without taking over the footer/token line. Recording uses a subtle blinking dot; transcription uses a small horizontal moving dot.\n\n| Action | Behavior |\n| --- | --- |\n| `Ctrl+R` while idle | Start recording |\n| `Ctrl+R` while recording | Stop, transcribe, insert transcript into the prompt |\n| `Enter` while recording | Stop, transcribe, insert transcript, send prompt to chat |\n| `Esc` while recording/processing | Cancel recording or transcription |\n| `/stt status` | Show current mode and config source |\n| `/stt doctor` | Check config, provider readiness, and `ffmpeg -version` |\n| `/stt start` | Start recording |\n| `/stt stop` | Stop and insert transcript |\n| `/stt send` | Stop and send to chat |\n| `/stt cancel` | Cancel active recording/transcription |\n\n## Secret handling\n\nPrefer environment variables:\n\n```bash\nexport MISTRAL_API_KEY=...\nexport OPENAI_API_KEY=...\nexport GROQ_API_KEY=...\nexport DEEPGRAM_API_KEY=...\nexport ELEVENLABS_API_KEY=...\nexport GLADIA_API_KEY=...\nexport ASSEMBLYAI_API_KEY=...\n```\n\nOn macOS, you can also use Keychain:\n\n```json\n{\n  \"provider\": {\n    \"type\": \"mistral\",\n    \"keychainService\": \"pi-voice-stt\",\n    \"keychainAccount\": \"your-account\"\n  }\n}\n```\n\nThe extension calls:\n\n```bash\nsecurity find-generic-password -w -s <service> -a <account>\n```\n\n## Development\n\n```bash\nnpm install\nnpm run check\nnpm test\nnpm run smoke\nnpm run ci\n```\n\nProject layout:\n\n```text\nsrc/index.ts                 Pi extension entry point\nsrc/core/                    dictation state machine\nsrc/audio/                   ffmpeg recorder\nsrc/providers/               STT provider abstraction\nsrc/config/                  config loading and validation\nsrc/ui/                      Pi TUI input indicator and editor wrapper\nexamples/                    ready-to-copy config files\n```\n\n## Design goals\n\n- Keep provider code independent from Pi so new backends are easy to add.\n- Keep the Pi integration thin and readable.\n- Match Pi's TUI style by default: compact input-border status instead of a separate footer widget.\n- Avoid storing secrets in sessions or config examples.\n- Use only Node built-ins at runtime.\n- Fail safely: clean up temporary files and stop `ffmpeg` on cancel, reload, or exit.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-coding-agent",
+    "speech-to-text",
+    "stt",
+    "dictation",
+    "voice",
+    "tui",
+    "mistral",
+    "voxtral",
+    "whisper",
+    "openai",
+    "deepgram",
+    "elevenlabs",
+    "gladia",
+    "assemblyai",
+    "groq"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/cgarrot/pi-voice-stt#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cgarrot/pi-voice-stt.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/cgarrot/pi-voice-stt/main/assets/preview.gif"
+  },
+  "time": {
+    "created": "2026-05-23T18:55:41.246Z",
+    "modified": "2026-06-01T08:39:51.386Z",
+    "0.3.0": "2026-05-23T18:55:41.518Z",
+    "0.3.1": "2026-05-23T19:55:32.550Z",
+    "0.3.2": "2026-06-01T08:39:51.278Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

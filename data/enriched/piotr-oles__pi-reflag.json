@@ -1,0 +1,34 @@
+{
+  "name": "@piotr-oles/pi-reflag",
+  "latest_version": "1.1.0",
+  "description": "Pi Agent extension: transparently rewrite grep commands to rg (ripgrep) for faster searches",
+  "readme": "# pi-reflag\n\nA [pi coding agent](https://github.com/earendil-works/pi) extension that transparently rewrites `grep` commands to [`rg`](https://github.com/BurntSushi/ripgrep) (ripgrep) and `find` commands to [`fd`](https://github.com/sharkdp/fd) before they execute \u2014 faster searches with zero agent behavior change.\n\n## Install\n\n```bash\npi install npm:@piotr-oles/pi-reflag\n```\n\nRequires `rg` and `fd` on `$PATH`:\n\n```bash\nbrew install ripgrep fd      # macOS\napt install ripgrep fd-find  # Debian/Ubuntu\n```\n\n## How it works\n\nIntercepts `bash` tool calls in the `tool_call` event. When a command segment starts with `grep`, `find`, or `xargs grep`/`xargs find` (including piped commands), it translates the arguments to their `rg`/`fd` equivalents and rewrites the command in place before execution. The agent never sees the rewrite.\n\nSubshell constructs (`$(\u2026)`, `(\u2026)`) and commands with variable assignments are left untouched to avoid misinterpreting nested or complex commands.\n\n## grep \u2192 rg\n\n**What gets translated:**\n\n| grep flag | rg equivalent |\n|---|---|\n| `-r`, `-R`, `--recursive` | dropped (rg is recursive by default) |\n| `-i`, `--ignore-case` | `-i` |\n| `-n`, `--line-number` | `-n` |\n| `-v`, `--invert-match` | `-v` |\n| `-w`, `--word-regexp` | `-w` |\n| `-l`, `--files-with-matches` | `-l` |\n| `-c`, `--count` | `-c` |\n| `-o`, `--only-matching` | `-o` |\n| `-E`, `--extended-regexp` | dropped (rg uses ERE by default) |\n| `-G`, `--basic-regexp` | dropped, pattern converted from BRE to ERE |\n| `-F`, `--fixed-strings` | `-F` |\n| `-P`, `--perl-regexp` | `-P` |\n| `-A`, `-B`, `-C` | passed through |\n| `--include=<glob>` | `-g <glob>` |\n| `--exclude=<glob>` | `-g !<glob>` |\n| `--exclude-dir=<dir>` | `-g !<dir>/` |\n| `-s` | `--no-messages` |\n| `-N` (numeric context) | `-C N` |\n\n## find \u2192 fd\n\n**What gets translated:**\n\n| find expression | fd equivalent |\n|---|---|\n| (always) | `-H` added \u2014 fd excludes hidden files by default, find doesn't |\n| `-name <glob>` | `-g <glob>` |\n| `-iname <glob>` | `-i -g <glob>` |\n| `-name a -o -name b` | `-g {a,b}` (brace expansion) |\n| `! -name <glob>` / `-not -name <glob>` | `-E <glob>` |\n| `-type f/d/l` | `-t f/d/l` |\n| `-maxdepth N` | `-d N` |\n| `-mindepth N` | `--min-depth N` |\n| `-exec cmd {} \\;` | `-x cmd {}` |\n| `-exec cmd {} +` | `-X cmd {}` |\n| `-print0` | `-0` |\n| `-print` | dropped (fd default) |\n| `-L` / `-follow` | `-L` |\n| `-path <pat> -prune` | `-E <pat>` (exclude directory) |\n| `-path <pat>` | `-p <pat>` (full-path match) |\n| `-regex <pat>` | `<pat>` (fd regex) |\n| `-iregex <pat>` | `-i <pat>` |\n| `-size <spec>` | `-S <spec>` |\n| `-newer <file>` | `--newer <file>` |\n| `-mtime`/`-atime`/`-ctime -N` | `--changed-within Nd` |\n| `-mtime`/`-atime`/`-ctime +N` | `--changed-before Nd` |\n| `-mmin`/`-amin`/`-cmin -N` | `--changed-within Nmin` |\n| `-mmin`/`-amin`/`-cmin +N` | `--changed-before Nmin` |\n| `-user <name>` | `--owner <name>` |\n| `-group <name>` | `--owner :<name>` |\n| `-empty` | `-t e` |\n| `-executable` | `-t x` |\n| `-xdev` / `-mount` | `--one-file-system` |\n| `-quit` | `-1` |\n\n## Verbose mode\n\nSee exactly how each command was rewritten in the UI:\n\n```bash\npi --pi-reflag-verbose\n\nPI_REFLAG_VERBOSE=true pi\n```\n\n## Thanks\n\n- [ripgrep](https://github.com/BurntSushi/ripgrep) by Andrew Gallant\n- [fd](https://github.com/sharkdp/fd) by David Peter\n- [greprip-rs](https://github.com/kaofelix/greprip-rs) by kaofelix \u2014 grep\u2192rg and find\u2192fd translation logic ported from this project (MIT)\n- [reflag](https://github.com/kluzzebass/reflag) by kluzzebass \u2014 additional find\u2192fd flag mappings referenced from this project (MIT)\n\n## Development\n\n```bash\npnpm install\npnpm test\npnpm typecheck\npnpm check\n```\n\nTo test changes manually:\n\n```bash\npi -e packages/pi-reflag/src/index.ts\n```\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/piotr-oles/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/piotr-oles/pi-extensions.git",
+    "directory": "packages/pi-reflag"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-05T12:30:02.440Z",
+    "modified": "2026-06-25T15:29:25.444Z",
+    "0.1.0": "2026-06-05T12:30:02.809Z",
+    "0.2.0": "2026-06-09T09:48:21.876Z",
+    "0.3.0": "2026-06-09T10:17:30.986Z",
+    "1.0.0": "2026-06-23T16:54:54.862Z",
+    "1.1.0": "2026-06-25T15:29:25.299Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": null,
+  "download_trend": []
+}

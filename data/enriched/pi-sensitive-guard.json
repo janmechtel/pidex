@@ -1,0 +1,47 @@
+{
+  "name": "pi-sensitive-guard",
+  "latest_version": "0.4.3",
+  "description": "Pi extension that protects sensitive files, blocks secret writes, and optionally redacts protected read output.",
+  "readme": "# pi-sensitive-guard\r\n\r\n[![npm version](https://img.shields.io/npm/v/pi-sensitive-guard?style=flat-square)](https://www.npmjs.com/package/pi-sensitive-guard) [![License](https://img.shields.io/github/license/MasuRii/pi-sensitive-guard?style=flat-square)](LICENSE)\r\n\r\nSensitive-file protection extension for the [Pi coding agent](https://github.com/mariozechner/pi).\r\n\r\n<img width=\"1389\" height=\"768\" alt=\"image\" src=\"https://github.com/user-attachments/assets/46e73cce-2be9-4669-b0ec-6422b68acc31\" />\r\n\r\n`pi-sensitive-guard` blocks unsafe access to secret-bearing files, scans writes and Git diffs for common credential patterns, and can optionally return redacted protected reads for trusted workflows.\r\n\r\n## Features\r\n\r\n- Protects `.env`, credential, private-key, secret, Docker auth, Git credentials, shell startup, keychain, and system credential files from reads, writes, deletes, shell commands, commits, and pushes.\r\n- Scans write/edit content and Git commit/push diffs for common high-severity secret patterns including HashiCorp Vault, Doppler, 1Password, GitHub, Slack, AWS session, Stripe, SendGrid, and npm tokens.\r\n- Detects copy/move shell commands (`cp`, `copy`, `mv`, `move`, `install`) that read protected files, applying write-threshold protection to prevent credential exfiltration via file copy.\r\n- Keeps runtime configuration simple with top-level enable/disable, debug logging, read-redaction controls, protected-edit controls, and the `/sensitive-guard` menu.\r\n- Allows optional non-sensitive edits to protected files when `protectedFileEdits.enabled` is explicitly enabled.\r\n- Supports both legacy text replacements and structured `edit` line operations for protected-file safe-edit checks.\r\n- Redacts structured JSON values, key/value assignments, embedded assignments, private keys, and known secret patterns while preserving safe output shape.\r\n- Writes debug output only to the extension-local `debug/` directory when `debug` is enabled.\r\n- Emits/logs blocked-event metadata after redacting sensitive values.\r\n\r\n## Installation\r\n\r\n### Local extension folder\r\n\r\nPlace this folder in one of Pi's auto-discovery locations:\r\n\r\n```text\r\n# Global default (when PI_CODING_AGENT_DIR is unset)\r\n~/.pi/agent/extensions/pi-sensitive-guard\r\n\r\n# Project-specific\r\n.pi/extensions/pi-sensitive-guard\r\n```\r\n\r\n### npm package\r\n\r\n```bash\r\npi install npm:pi-sensitive-guard\r\n```\r\n\r\n### Git repository\r\n\r\n```bash\r\npi install git:github.com/MasuRii/pi-sensitive-guard\r\n```\r\n\r\n## Usage\r\n\r\n`pi-sensitive-guard` runs automatically after Pi loads the extension. It inspects tool calls before execution and blocks protected file access or detected secret writes with a clear TUI notification.\r\n\r\nTypical protected flows include:\r\n\r\n- reading `.env`, key, token, credential, and private-key files;\r\n- writing or editing content that matches high-confidence secret patterns;\r\n- shell commands that read, copy, move, write, delete, commit, or push protected secret-bearing files;\r\n- optional protected reads with redacted output when `readRedaction.enabled` is set to `true`.\r\n\r\n### `/sensitive-guard` command\r\n\r\nUse `/sensitive-guard` inside Pi to open the interactive configuration menu. The menu can toggle the guard, read redaction, shell-output redaction, blocked-event logging, debug logging, content scanning, protected-file safe edits, and redaction limits without editing JSON by hand.\r\n\r\nAdditional command forms:\r\n\r\n- `/sensitive-guard status` shows the resolved runtime configuration summary.\r\n- `/sensitive-guard edit` opens the raw `config.json` editor.\r\n\r\nAfter changing configuration, run `/reload` or restart Pi so the guard reloads its rules.\r\n\r\n## Configuration\r\n\r\nRuntime configuration is stored at:\r\n\r\n```text\r\nDefault global path: ~/.pi/agent/extensions/pi-sensitive-guard/config.json\r\nActual global path: $PI_CODING_AGENT_DIR/extensions/pi-sensitive-guard/config.json when PI_CODING_AGENT_DIR is set\r\n```\r\n\r\n`config.json` is a user-local runtime file. It is gitignored and excluded from npm package contents. A starter template is included at `config/config.example.json`.\r\n\r\n### Configuration options\r\n\r\n| Option | Type | Default | Description |\r\n|--------|------|---------|-------------|\r\n| `enabled` | boolean | `true` | Enable or disable all sensitive-file protection. |\r\n| `debug` | boolean | `false` | Enable file-only debug logging under `debug/debug.log`. |\r\n| `readRedaction.enabled` | boolean | `false` | Allow redacted read output instead of hard-blocking eligible protected reads. |\r\n| `readRedaction.includeShellOutput` | boolean | `false` | Also redact shell-command output when protected files are read through shell commands. |\r\n| `readRedaction.scope` | `protectedOnly` \\| `allOutput` | `protectedOnly` | Choose whether redaction applies only to protected read flows or to every read/shell output path covered by the redaction settings. |\r\n| `protectedFileEdits.enabled` | boolean | `false` | Allow safe non-sensitive write/edit changes to protected files; sensitive key/value, structure, or secret-bearing edits remain blocked. |\r\n\r\nWhen protected-file edits are enabled, the guard recognizes exact `oldText`/`newText` replacements, `replace_text`, and structured line-edit operations. The proposed result is still blocked if it changes sensitive keys or structure, introduces detected secret patterns, or cannot be evaluated safely.\r\n\r\n### Example config\r\n\r\n```json\r\n{\r\n  \"enabled\": true,\r\n  \"debug\": false,\r\n  \"readRedaction\": {\r\n    \"enabled\": false,\r\n    \"includeShellOutput\": false,\r\n    \"scope\": \"protectedOnly\"\r\n  },\r\n  \"blockedEvents\": {\r\n    \"emit\": true,\r\n    \"log\": true,\r\n    \"logPath\": \"logs/blocked-events.jsonl\"\r\n  },\r\n  \"protectedFileEdits\": {\r\n    \"enabled\": false\r\n  }\r\n}\r\n```\r\n\r\n> Changes take effect after `/reload`.\r\n\r\n## Validation\r\n\r\n```bash\r\nnpm run build\r\nnpm run lint\r\nnpm run test\r\nnpm run check\r\nnpm run package:dry-run\r\n```\r\n\r\n## Publishing\r\n\r\nThe package metadata follows the same publish-ready shape used by established Pi extensions:\r\n\r\n- entrypoint: `index.ts`\r\n- package exports: `.` \u2192 `./index.ts`\r\n- Pi extension manifest: `pi.extensions`\r\n- published files: source, README, changelog, license, and config template\r\n- runtime `config.json`, `debug/`, `logs/`, and test artifacts excluded from npm publication\r\n\r\n> [!NOTE]\r\n> The package requires Node.js `>=22` because its shell parser dependency declares the same minimum engine.\r\n\r\n## Related Pi Extensions\r\n\r\n- [pi-permission-system](https://github.com/MasuRii/pi-permission-system) \u2014 Permission enforcement for tool and command access\r\n- [pi-multi-auth](https://github.com/MasuRii/pi-multi-auth) \u2014 Multi-provider credential management, OAuth login, and account rotation\r\n- [pi-tool-display](https://github.com/MasuRii/pi-tool-display) \u2014 Compact tool rendering and diff visualization\r\n- [pi-rtk-optimizer](https://github.com/MasuRii/pi-rtk-optimizer) \u2014 RTK command rewriting and output compaction\r\n\r\n## License\r\n\r\n[MIT](LICENSE)\r\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "pi-coding-agent",
+    "pi-tui",
+    "coding-agent",
+    "secret-scanning",
+    "sensitive-files",
+    "redaction",
+    "security",
+    "git-protection"
+  ],
+  "author": {
+    "name": "MasuRii"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/MasuRii/pi-sensitive-guard#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MasuRii/pi-sensitive-guard.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-28T11:05:36.548Z",
+    "modified": "2026-06-16T15:50:29.973Z",
+    "0.1.0": "2026-04-28T11:05:36.791Z",
+    "0.2.0": "2026-04-30T13:30:05.927Z",
+    "0.3.0": "2026-05-04T01:54:39.435Z",
+    "0.4.0": "2026-05-22T15:20:55.564Z",
+    "0.4.1": "2026-05-27T01:30:46.921Z",
+    "0.4.2": "2026-06-01T12:45:44.467Z",
+    "0.4.3": "2026-06-16T15:50:29.869Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": null,
+  "download_trend": []
+}

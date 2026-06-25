@@ -1,0 +1,46 @@
+{
+  "name": "pi-canary",
+  "latest_version": "1.1.2",
+  "description": "Pi extension: silently verifies agent context awareness every turn using hidden canary tokens. KV-cache friendly.",
+  "readme": "# pi-canary\n\nA [pi](https://pi.dev) extension that silently verifies the agent's context awareness on every turn using hidden canary tokens.\n\nBefore answering your message, the agent must locate and return N canary tokens distributed across the conversation history. The entire verification exchange is invisible: no tokens in the thinking block, no tokens in the visible response, nothing in the history the agent uses to answer you.\n\n## Install\n\n```bash\npi install git:github.com/sebaxzero/pi-canary.git\n```\n\nOr install project-locally (adds to `.pi/settings.json` only):\n\n```bash\npi install git:github.com/sebaxzero/pi-canary.git -l\n```\n\n## How it works\n\nEvery time you send a message, the extension runs a hidden two-phase exchange before your question is answered:\n\n**Phase 1 \u2014 Verify**\n\n- N random 24-character canary tokens are generated (or reused if `VARIANT=fixed`).\n- They are injected at the configured positions across the conversation history. The last token also carries a verification instruction.\n- Your original question is temporarily suppressed.\n- The agent is asked only to return the N tokens by name.\n- The response is captured and checked. The exchange is hidden from the TUI.\n\n**Phase 2 \u2014 Respond**\n\n- The tokens and the verification exchange are stripped from context entirely.\n- Your original question is restored.\n- The agent answers normally, with no canary tokens anywhere in its view.\n\nIf verification fails, a warning notification appears in the TUI.\n\n## Configuration\n\nPersistent configuration lives in `extensions/canary.json`. You can ask the agent to edit it directly:\n\n```json\n{\n  \"COUNT\": 3,\n  \"POSITION\": \"end\",\n  \"VARIANT\": \"fixed\",\n  \"FAIL_COMPACT\": 0\n}\n```\n\n| Key | Default | Description |\n|-----|---------|-------------|\n| `COUNT` | `3` | Number of canary tokens injected per turn (`0` disables the canary check entirely) |\n| `POSITION` | `end` | Where tokens are injected: `start`, `equidistant`, or `end` |\n| `VARIANT` | `fixed` | `fixed` = same tokens every turn (preserves KV cache); `variant` = new tokens each turn |\n| `FAIL_COMPACT` | `0` | Compact context after N consecutive failures (`0` = disabled) |\n\n**`POSITION=end` + `VARIANT=fixed`** (the defaults) is the cache-friendly mode for local model servers: the message prefix never changes and the injected suffix is always the same tokens, so the KV cache stays warm after the first turn. Use `POSITION=equidistant` + `VARIANT=variant` for maximum coverage at the cost of cache invalidation every turn.\n\nChanges to the JSON take effect on the next session. For live tuning within a session, use the command below.\n\n## Command\n\n```\n/canary                    \u2014 show current phase, failure count, and config\n/canary set KEY=VAL        \u2014 override config for the current session only\n/canary set KEY=VAL KEY=VAL ...\n```\n\nExample: `/canary set COUNT=5 POSITION=equidistant VARIANT=variant`\n\n## Compatibility\n\nWorks alongside [pi-loop-police](https://github.com/sebaxzero/pi-loop-police). When loop-police aborts a turn, the canary check yields gracefully and does not fire its own recovery.\n\n## License\n\nMIT\n\n---\n\nBuilt with [Claude](https://claude.ai).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "context-awareness",
+    "canary",
+    "safety",
+    "verification",
+    "local-llm"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/sebaxzero/pi-canary",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sebaxzero/pi-canary.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-24T06:21:36.763Z",
+    "modified": "2026-06-25T19:47:38.140Z",
+    "1.0.0": "2026-06-24T06:21:37.061Z",
+    "1.0.1": "2026-06-24T06:53:29.278Z",
+    "1.0.2": "2026-06-24T07:32:15.368Z",
+    "1.0.3": "2026-06-24T18:57:54.163Z",
+    "1.1.0": "2026-06-25T17:54:55.049Z",
+    "1.1.1": "2026-06-25T18:03:00.750Z",
+    "1.1.2": "2026-06-25T19:47:38.027Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 514,
+  "download_trend": []
+}

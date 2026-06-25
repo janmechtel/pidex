@@ -1,0 +1,368 @@
+{
+  "name": "pi-xai-oauth",
+  "latest_version": "1.2.5",
+  "description": "One-command installer for xAI OAuth provider + Grok, Grok Build, and Composer models in pi",
+  "readme": "# pi-xai-oauth\n\n[![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/BlockedPath/pi-xai-oauth?utm_source=oss&utm_medium=github&utm_campaign=BlockedPath%2Fpi-xai-oauth&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)](https://coderabbit.ai)\n[![npm version](https://img.shields.io/npm/v/pi-xai-oauth)](https://www.npmjs.com/package/pi-xai-oauth)\n[![npm downloads](https://img.shields.io/npm/dm/pi-xai-oauth)](https://www.npmjs.com/package/pi-xai-oauth)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)\n[![GitHub stars](https://img.shields.io/github/stars/BlockedPath/pi-xai-oauth?style=social)](https://github.com/BlockedPath/pi-xai-oauth/stargazers)\n[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/BlockedPath/pi-xai-oauth/pulls)\n[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)\n[![pi compatible](https://img.shields.io/badge/pi-Compatible-blueviolet)](https://pi.dev)\n\n**xAI (Grok) OAuth provider for pi** \u2014 1M context, reasoning, and custom xAI tools.\n```bash\nnpx pi-xai-oauth\n```\n\nThis package adds **Grok 4.3**, **Grok Build**, and **Composer 2.5** as fully-integrated xAI OAuth models in pi, with proper OAuth login, automatic token refresh, and a suite of custom tools (`xai_generate_text`, `xai_web_search`, `xai_x_search`, etc.).\n\n> **Latest compatibility note:** `pi-xai-oauth` 1.2.4+ supports pi 0.79.8+'s OpenAI Responses API guard for Grok/xAI streaming. Existing npm installs should run `pi update npm:pi-xai-oauth`; local checkout installs should keep only one copy installed with `pi remove npm:pi-xai-oauth && pi install .`.\n\n---\n\n## Table of Contents\n\n- [Features](#features)\n- [How It Works](#how-it-works)\n- [Installation](#installation)\n- [Authentication](#authentication)\n- [Usage](#usage)\n  - [Switching Models](#switching-models)\n  - [Reasoning / Thinking Levels](#reasoning--thinking-levels)\n- [Custom Tools](#custom-tools)\n- [Quick Reference](#quick-reference)\n- [Troubleshooting](#troubleshooting)\n- [Updating](#updating)\n- [Uninstalling](#uninstalling)\n- [Agent Scaffolding](#agent-scaffolding)\n- [Development](#development)\n- [Contributing](#contributing)\n\n---\n\n## Features\n\n- **Real OAuth login** \u2014 authenticates through xAI's official OAuth endpoint (same flow as the Grok CLI)\n- **Automatic browser open** \u2014 pi opens your default browser automatically; fall back to manual paste if needed\n- **Token refresh** \u2014 refresh tokens are stored and rotated automatically before expiry\n- **Reuses existing credentials** \u2014 auto-detects `~/.grok/auth.json` from the official Grok CLI\n- **1M context window** \u2014 Grok 4.3's full context, no truncation\n- **Coding models** \u2014 Grok Build and Composer 2.5 Fast are available from the same `xai-auth` provider\n- **Reasoning support** \u2014 configurable thinking levels: `low` / `medium` / `high`\n- **Custom xAI tools** \u2014 generate text, web search, X/Twitter search, multi-agent research, code analysis\n- **Modern API** \u2014 uses OpenAI's `responses` API format via `https://api.x.ai/v1`, with Grok CLI endpoint routing for CLI-only models\n\n> **\u2705 Verified (May 2026)**: All custom xAI tools (`xai_generate_text`, `xai_x_search`, `xai_web_search`, `xai_code_execution`, `xai_critique`, `xai_multi_agent`, `xai_deep_research`, image tools, etc.) have been tested end-to-end after the OAuth + payload repair. The provider now correctly handles mixed-model requests and native xAI tool shapes.\n\n---\n\n## How It Works\n\n`pi-xai-oauth` registers an OAuth provider called `xai-auth` in pi's provider registry. When you run `pi /login xai-auth`:\n\n1. pi starts a local HTTP callback server on `127.0.0.1`\n2. It builds an xAI OAuth authorize URL with PKCE challenge\n3. **Your default browser opens automatically** to the xAI login page\n4. After you approve, xAI redirects to the local callback server\n5. The authorization code is exchanged for access + refresh tokens\n6. Tokens are persisted and refreshed automatically\n\nIf localhost callbacks are blocked (VPN, Docker, remote dev), the TUI shows a text field where you can paste the redirect URL manually.\n\n---\n\n## Installation\n\n### One-command install (recommended)\n\n```bash\nnpx pi-xai-oauth\n```\n\nThis runs the setup script which:\n1. Installs `npm:pi-xai-oauth` into pi\n2. Sets `xai-auth` as your default provider\n3. Sets `grok-4.3` as your default model\n4. Enables `high` thinking level by default\n\n### Manual install\n\n```bash\npi install npm:pi-xai-oauth\n```\n\nThen optionally configure it as default:\n\n```bash\n# In ~/.pi/agent/settings.json:\n{\n  \"defaultProvider\": \"xai-auth\",\n  \"defaultModel\": \"grok-4.3\",\n  \"defaultThinkingLevel\": \"high\"\n}\n```\n\n> **\u26a0\ufe0f Important: install only one copy**\n>\n> `pi-xai-oauth` registers fixed tool names such as `xai_generate_text`, `xai_web_search`, and `xai_x_search`. If you install more than one copy \u2014 for example `npm:pi-xai-oauth` plus a local checkout, or two different local checkouts \u2014 pi will fail to start with `Tool \"xai_generate_text\" conflicts with ...` errors.\n>\n> Check with:\n> ```bash\n> pi list\n> ```\n>\n> For local development, keep only this checkout:\n> ```bash\n> pi remove npm:pi-xai-oauth\n> pi remove /path/to/other/pi-xai-oauth-copy\n> pi install .\n> ```\n>\n> For the published npm package, remove local checkouts:\n> ```bash\n> pi remove /path/to/local/pi-xai-oauth-copy\n> pi install npm:pi-xai-oauth\n> ```\n>\n> Use the exact package spec/path shown by `pi list` when removing duplicates.\n\n---\n\n## Authentication\n\n```bash\npi /login xai-auth\n```\n\n**What happens:**\n\n1. pi checks for existing Grok CLI credentials (`~/.grok/auth.json`). If found, it asks if you want to skip re-authentication.\n2. The xAI OAuth page opens in your **default browser**.\n3. Sign in with your xAI / Grok account and approve the authorization.\n4. The browser redirects back to pi's local server \u2014 you can close the browser tab.\n5. Tokens are stored and refreshed automatically.\n\n> **Choosing a different browser/profile?** The instructions in the TUI explain how. You can copy the shown URL, open your preferred browser manually, and paste it there.\n\n### Re-authenticating\n\nTokens are refreshed automatically, but if you want to force a fresh login:\n\n```bash\npi /login xai-auth\n```\n\nThe existing `~/.grok/auth.json` prompt lets you either reuse or re-authenticate.\n\n---\n\n## Usage\n\nOnce authenticated, start using Grok:\n\n```bash\npi \"Explain quantum computing like I'm 5\"\n```\n\nOr use a specific model:\n\n```bash\npi --model grok-4.3 \"Write a poem about Rust\"\n```\n\n### Switching Models\n\n| Model ID | Description |\n|----------|-------------|\n| `grok-4.3` | **Default.** Full reasoning, 1M context. |\n| `grok-build` | Grok Build coding model via the Grok CLI OAuth endpoint, 512K context. |\n| `grok-composer-2.5-fast` | Composer 2.5 Fast coding model via the Grok CLI OAuth endpoint, 200K context. |\n| `grok-4.20-0309-reasoning` | Grok 4.20 with automatic reasoning, 2M context. |\n| `grok-4.20-0309-non-reasoning` | Grok 4.20 fast responses, 2M context. |\n| `grok-4.20-multi-agent-0309` | Grok 4.20 multi-agent research model, 2M context. |\n\nFrom the pi TUI:\n\n```\n/model grok-4.3\n/model grok-build\n/model grok-composer-2.5-fast\n/model grok-4.20-0309-reasoning\n/model grok-4.20-multi-agent-0309\n```\n\nFrom the command line:\n\n```bash\npi --model grok-4.3 \"Your prompt here\"\npi --model grok-build \"Implement this feature\"\npi --model grok-composer-2.5-fast \"Refactor this module\"\npi --model grok-4.20-0309-non-reasoning \"Quick answer\"\n```\n\n### Reasoning / Thinking Levels\n\nGrok 4.3 supports configurable thinking levels:\n\n```\n/think high\n/think medium\n/think low\n```\n\nOr via CLI:\n\n```bash\npi --model grok-4.3:high \"Solve a complex math problem\"\npi --model grok-4.3:low \"What's the weather?\"\n```\n\n- **`high`** \u2014 Deep reasoning, longer deliberation. Best for complex code, math, analysis.\n- **`medium`** \u2014 Balanced speed and depth.\n- **`low`** \u2014 Fast responses, minimal reasoning. Good for simple Q&A.\n\n`grok-build` and `grok-composer-2.5-fast` are routed through xAI's Grok CLI OAuth endpoint using the same X account OAuth token. `grok-composer-2.5-fast` does not accept configurable reasoning effort. `grok-4.20-0309-reasoning` reasons automatically and does not accept a configurable effort parameter. `grok-4.20-multi-agent-0309` uses `medium` for 4 agents and `high` for 16 agents.\n\n### Composer / Grok Build Tool Compatibility\n\nComposer 2.5 and Grok Build are trained against Cursor/Grok CLI-style tool names. When either `grok-composer-2.5-fast` or `grok-build` is selected, this package automatically enables compatibility shims that map those tool calls onto pi's built-in tools:\n\n| Cursor/Grok CLI tool | pi tool used underneath |\n|----------------------|-------------------------|\n| `Read` | `read` |\n| `Write` | `write` |\n| `StrReplace` / `Edit` | `edit` |\n| `Delete` | workspace-safe file delete |\n| `LS` | `ls` |\n| `Grep` | `grep` |\n| `Glob` | `find` |\n| `Shell` | `bash` |\n| `WebSearch` | xAI native web search |\n\nThe shims also normalize common Cursor argument names, such as `file_path`, `contents`, `old_string` / `new_string`, `query`, `include`, `glob_filter`, and `cmd`. They are disabled again when you switch back to non-Grok-CLI models such as `grok-4.3`.\n\n---\n\n## Custom Tools\n\nThis package registers OAuth-backed custom tools that use the xAI API directly. They appear alongside your other agent tools in the pi TUI and are available to any agent running with the `xai-auth` provider.\n\n**How to use them:** Simply call the tool by name in your prompts or agent workflows (e.g. \"use xai_web_search to find the latest Rust news\"). The tools automatically use your authenticated xAI session.\n\n> **Tip:** See the \u26a0\ufe0f warning above about local vs published package conflicts.\n\n### `xai_generate_text`\nGenerate text with full reasoning and stateful conversations.\n\n```json\n{\n  \"prompt\": \"Explain neural networks\",\n  \"model\": \"grok-4.3\",\n  \"reasoning_effort\": \"high\"\n}\n```\n\n### `xai_multi_agent`\nDeep multi-agent research using Grok's multi-agent model plus native web and X search tools.\n\n```json\n{\n  \"query\": \"Latest advances in LLM quantization\",\n  \"num_agents\": 16,\n  \"reasoning_effort\": \"high\"\n}\n```\n\n### `xai_web_search`\nSearch the web using xAI's native `web_search` tool.\n\n```json\n{\n  \"query\": \"Rust vs Go performance 2026\"\n}\n```\n\n### `xai_x_search`\nSearch X (Twitter) using xAI's native `x_search` tool.\n\n```json\n{\n  \"query\": \"grok 4.3\"\n}\n```\n\n### `xai_code_execution`\nRun Python-oriented analysis using xAI's native `code_interpreter` tool.\n\n```json\n{\n  \"code\": \"print(sum(range(100)))\"\n}\n```\n\n### `xai_generate_image`\nGenerate images with xAI's current image generation model.\n\n```json\n{\n  \"prompt\": \"A clean product diagram of an OAuth flow\",\n  \"model\": \"grok-imagine-image-quality\"\n}\n```\n\n### `xai_analyze_image`\nAnalyze an image URL, data URL, or local `.png` / `.jpg` path with Grok vision.\n\n```json\n{\n  \"image\": \"/Users/me/Desktop/screenshot.png\",\n  \"question\": \"What error is visible?\"\n}\n```\n\n### `xai_critique`\nGet structured critique for code, designs, writing, or ideas.\n\n```json\n{\n  \"content\": \"function add(a,b){ return a-b }\",\n  \"aspect\": \"code correctness\"\n}\n```\n\n### `xai_deep_research`\nResearch a topic with Grok reasoning plus native web and X search tools.\n\n```json\n{\n  \"topic\": \"Recent xAI Responses API tool changes\",\n  \"depth\": \"high\"\n}\n```\n\n> **Note:** These tools use the xAI API under the hood \u2014 they count toward your SuperGrok rate limits.\n\n---\n\n## Quick Reference\n\n| Action | Command |\n|--------|---------|\n| Install | `pi install npm:pi-xai-oauth` |\n| One-command setup | `npx pi-xai-oauth` |\n| Try ephemeral | `pi -e npm:pi-xai-oauth` |\n| Authenticate | `pi /login xai-auth` |\n| Update | `pi update npm:pi-xai-oauth` |\n| Remove | `pi remove npm:pi-xai-oauth` |\n| List packages | `pi list` |\n| Set default model | `/model grok-4.3` (in TUI) |\n| Set thinking level | `/think high` (in TUI) |\n\n---\n\n## Troubleshooting\n\n### \"Browser didn't open automatically\"\n\npi runs `open <url>` on macOS / `xdg-open` on Linux to launch your default browser. If nothing happens:\n\n- **Copy the URL** shown in the TUI and paste it into your preferred browser manually.\n- The local callback server is still listening \u2014 once you authorize, the redirect will be caught even if the browser doesn't match.\n\n### \"Callback server didn't receive the redirect\"\n\nIf localhost is blocked (VPN, Docker, remote SSH, WSL):\n\n1. After authorizing in the browser, the page will show an error (can't reach localhost).\n2. **Copy the full URL** from the browser's address bar.\n3. **Paste it into the TUI's input field** that says \"Paste redirect URL below.\"\n4. pi parses the authorization code from the URL and completes the login.\n\n### \"Cannot find provider xai-auth\"\n\nRun `pi list` to verify the package is installed. If not:\n\n```bash\npi install npm:pi-xai-oauth\n```\n\nThen run `pi /list-providers` \u2014 you should see `xai-auth` listed.\n\n### `422 \"Failed to deserialize ... ModelInput\"` with images\n\nThis means xAI rejected a multimodal Responses `input` shape. Use the latest package version and restart pi or run `/reload`. The provider normalizes local `.png`/`.jpg` paths into `data:image/...;base64,...` URLs, adds image `detail`, moves system/developer text to top-level `instructions`, and rewrites image-bearing tool results so `function_call_output.output` stays text-only (xAI rejects arrays there).\n\n> **Fixed in repair**: Requests from other providers (DeepSeek, OpenAI Codex, etc.) no longer get mutated by the xAI sanitation hook.\n\nIf you call `xai_generate_text` directly, `image_url` may be either:\n\n- an `http(s)://...` URL\n- a `data:image/...;base64,...` URL\n- a local `.png`, `.jpg`, or `.jpeg` path, including shell-escaped paths like `/Users/me/My\\\\ Image.png`\n\n### \"Token expired / auth failed\"\n\nTokens refresh automatically, but if something goes wrong:\n\n```bash\npi /login xai-auth\n```\n\nThis re-runs the full OAuth flow and replaces your stored tokens.\n\n### \"Does this need an xAI API key?\"\n\n**No.** This uses OAuth \u2014 the same authentication as the official Grok CLI and chat interface. You sign in with your xAI / Grok account credentials. No API key required.\n\nIf you have the official Grok CLI installed and authenticated (`~/.grok/auth.json`), this package detects and reuses those credentials automatically.\n\n### \"What model am I using?\"\n\nIn the pi TUI, the current model is shown in the status bar. You can also check with:\n\n```\n/model\n```\n\n### `Tool \"xai_generate_text\" conflicts with ...` or `pi list` shows duplicate copies\n\nYou have more than one copy of this extension installed. This commonly happens when updating from npm to a local checkout, or when switching between two local worktrees. pi refuses to load duplicate tool names.\n\nFirst inspect installed packages:\n\n```bash\npi list\n```\n\nThen remove every duplicate `pi-xai-oauth` entry except the one you want to use.\n\nFor local development from this checkout:\n\n```bash\npi remove npm:pi-xai-oauth\npi remove /path/to/old/pi-xai-oauth-copy\npi install .\n```\n\nFor normal npm usage:\n\n```bash\npi remove /path/to/local/pi-xai-oauth-copy\npi install npm:pi-xai-oauth\n```\n\nRestart pi after cleanup. `pi list` should show only one `pi-xai-oauth` entry.\n\n---\n\n## Updating\n\n```bash\npi update npm:pi-xai-oauth\n```\n\nThis pulls the latest version from npm and updates your installed extension.\n\npi 0.79.8+ enforces an OpenAI Responses API guard. `pi-xai-oauth` 1.2.4 handles that guard for Grok/xAI streaming. If you installed the published npm package, update with the command above. If you are testing a local checkout instead, reinstall the checkout:\n\n```bash\npi remove npm:pi-xai-oauth && pi install .\n```\n\nIf you previously installed a local checkout with `pi install .`, `pi update npm:pi-xai-oauth` will not replace that local copy. Run `pi list` and make sure only one `pi-xai-oauth` entry is installed. Remove duplicate npm/local/worktree copies before restarting pi.\n\n---\n\n## Uninstalling\n\n```bash\npi remove npm:pi-xai-oauth\n```\n\nThis removes the extension from pi's package list. Your stored OAuth tokens remain in pi's credential store.\n\n---\n\n## Agent Scaffolding\n\nThis package ships with a modern scaffolding system designed for AI coding agents (2026 best practices).\n\n### Bootstrap Scaffolding\n\n```bash\nnpx pi-xai-oauth --scaffold\n# or\nnpm run scaffold\n```\n\nGenerates a full agent harness:\n- `AGENTS.md` \u2014 Dedicated operations manual for AI agents\n- `.scaffold/` with persistent state:\n  - `plan.md` \u2014 Phased implementation roadmap\n  - `constraints.md` \u2014 Hard rules and safety gates\n  - `progress.md` \u2014 Live execution tracking\n  - `context.md` \u2014 Shared context for multi-agent workflows\n\n### Benefits\n- Dramatically reduces exploratory turns and token waste\n- Enables reliable long-running agentic tasks\n- External state files allow agents to resume across sessions\n- Built-in support for PARALLEL subagent delegation\n\nUse this in any new project to get the same professional harness.\n\n---\n\n## Development\n\n```bash\n# Clone\ngit clone https://github.com/BlockedPath/pi-xai-oauth.git\ncd pi-xai-oauth\n\n# Install deps\nnpm install\n\n# Type-check\nnpm run typecheck\n\n# Run verification tests\nnpm test\n\n# Install local version in pi\npi install .\n\n# Always work on a feature branch (per AGENTS.md)\ngit checkout -b feature/your-task\n```\n\n### Project Structure\n\n```\npi-xai-oauth/\n\u251c\u2500\u2500 extensions/\n\u2502   \u251c\u2500\u2500 xai-oauth.ts          # Thin provider/tools entrypoint\n\u2502   \u2514\u2500\u2500 xai/                  # Domain modules: OAuth, auth, models, payloads, tools\n\u2502       \u251c\u2500\u2500 auth.ts           # Grok CLI credential reuse + token resolution\n\u2502       \u251c\u2500\u2500 constants.ts      # URLs, OAuth constants, defaults\n\u2502       \u251c\u2500\u2500 models.ts         # Model catalog + routing helpers\n\u2502       \u251c\u2500\u2500 oauth.ts          # OAuth discovery/login/refresh/callback helpers\n\u2502       \u251c\u2500\u2500 payload.ts        # xAI Responses payload normalization\n\u2502       \u251c\u2500\u2500 responses.ts      # xAI request + streaming helpers\n\u2502       \u2514\u2500\u2500 tools/            # Custom xAI tools + Cursor/Grok CLI shims\n\u251c\u2500\u2500 bin/\n\u2502   \u2514\u2500\u2500 setup.js              # One-command setup (npx pi-xai-oauth)\n\u251c\u2500\u2500 scripts/\n\u2502   \u2514\u2500\u2500 verify-extension.js   # npm test\n\u251c\u2500\u2500 .scaffold/                # Persistent agent state (plan, progress, etc.)\n\u251c\u2500\u2500 AGENTS.md                 # AI agent operations manual\n\u251c\u2500\u2500 package.json\n\u251c\u2500\u2500 tsconfig.json\n\u2514\u2500\u2500 README.md\n```\n\n### Publishing\n\n```bash\n# Bump version in package.json\n# Then:\nnpm publish\n\n# Users update with:\n# pi update npm:pi-xai-oauth\n```\n\n---\n\n## Contributing\n\nPRs welcome! If you find issues or want to improve the OAuth flow, feel free to open an issue or pull request on [GitHub](https://github.com/BlockedPath/pi-xai-oauth).\n\n---\n\n## Star History\n\n[![Star History Chart](https://api.star-history.com/svg?repos=BlockedPath/pi-xai-oauth&type=Date)](https://star-history.com/#BlockedPath/pi-xai-oauth&Date)\n\n---\n\n*Powered by Grok 4.3 \u2014 1M context, reasoning, and the full xAI API.*\n",
+  "keywords": [
+    "pi-package",
+    "xai",
+    "grok",
+    "oauth"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/BlockedPath/pi-xai-oauth#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BlockedPath/pi-xai-oauth.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "image": "https://raw.githubusercontent.com/BlockedPath/pi-xai-oauth/main/preview.jpeg"
+  },
+  "time": {
+    "created": "2026-05-16T23:06:09.235Z",
+    "modified": "2026-06-20T05:41:28.738Z",
+    "0.1.0": "2026-05-16T23:06:09.383Z",
+    "1.0.1": "2026-05-16T23:13:38.933Z",
+    "1.0.2": "2026-05-16T23:18:51.594Z",
+    "1.0.3": "2026-05-16T23:21:03.075Z",
+    "1.0.7": "2026-05-16T23:28:39.080Z",
+    "1.0.9": "2026-05-16T23:32:04.650Z",
+    "1.0.12": "2026-05-17T00:03:03.001Z",
+    "1.0.13": "2026-05-17T01:28:31.789Z",
+    "1.0.14": "2026-05-17T03:48:19.613Z",
+    "1.0.15": "2026-05-17T03:49:21.378Z",
+    "1.0.17": "2026-05-17T04:15:40.058Z",
+    "1.0.19": "2026-05-17T04:27:08.459Z",
+    "1.0.20": "2026-05-17T04:31:47.720Z",
+    "1.0.21": "2026-05-17T05:00:32.406Z",
+    "1.0.22": "2026-05-17T05:24:12.686Z",
+    "1.0.25": "2026-05-17T14:01:02.630Z",
+    "1.0.26": "2026-05-17T15:30:15.363Z",
+    "1.2.0": "2026-05-17T20:09:04.900Z",
+    "1.2.1": "2026-05-17T20:13:08.410Z",
+    "1.2.2": "2026-06-04T10:36:58.735Z",
+    "1.2.3": "2026-06-04T16:46:39.289Z",
+    "1.2.4": "2026-06-20T02:07:40.678Z",
+    "1.2.5": "2026-06-20T05:41:28.608Z"
+  },
+  "versions_count": 23,
+  "downloads_last_week": 658,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 2944
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 157
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 101
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 482
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 150
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 649
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 21
+    }
+  ]
+}

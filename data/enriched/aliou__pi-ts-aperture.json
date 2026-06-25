@@ -1,0 +1,49 @@
+{
+  "name": "@aliou/pi-ts-aperture",
+  "latest_version": "0.6.3",
+  "description": "Route Pi LLM providers through Tailscale Aperture",
+  "readme": "![banner](https://assets.aliou.me/github/aliou/pi-ts-aperture/banner.png)\n\n# pi-ts-aperture\n\nRoute Pi LLM providers through [Tailscale Aperture](https://tailscale.com/docs/features/aperture), a managed AI gateway on your tailnet.\n\nAperture handles API key injection and request routing server-side. This extension integrates Pi with Aperture using two independent capabilities: **dedicated** (a standalone `aperture` provider) and **proxy** (reroute existing Pi providers). Dedicated is enabled by default, and you can enable proxy at the same time.\n\n## Install\n\n```bash\npi install npm:@aliou/pi-ts-aperture\n```\n\n## First run\n\nAfter installing, run the onboarding wizard:\n\n```\n/aperture:onboarding\n```\n\n[![Onboarding walkthrough](https://assets.aliou.me/pi-extensions/demos/aperture/v0.6.0/onboarding-both-modes.gif)](https://assets.aliou.me/pi-extensions/demos/aperture/v0.6.0/onboarding-both-modes.mp4)\n\nThe wizard walks you through:\n\n1. Aperture base URL, with a `/v1/models` health check (e.g. `ai.your-tailnet.ts.net`).\n2. Capability selection: dedicated, proxy, or both.\n3. Provider selection:\n   - Dedicated: choose which Aperture gateway providers to include.\n   - Proxy: choose matching local Pi providers to route through Aperture, with optional gateway model verification.\n4. Recap, save, and reload Pi so the selected capabilities are registered cleanly.\n\nYou can change everything later with:\n\n```\n/aperture:settings\n```\n\n## Capabilities\n\n### Dedicated provider (default)\n\nRegisters a standalone `aperture` provider whose model list comes from the Aperture gateway. You can include all gateway providers or filter to specific gateway providers during onboarding or in settings.\n\nDedicated model IDs are the model IDs reported by Aperture. They are not prefixed with the upstream provider ID. The extension keeps an internal route map so each model uses the Pi API that matches its Aperture provider compatibility.\n\nBecause Aperture does not expose every Pi model capability yet, models use safe defaults on first load: 128k context, 8k max output, text input, and no reasoning. Gateway pricing is mapped to Pi costs when Aperture returns pricing data.\n\n#### Sync model capabilities\n\nIn dedicated mode, the onboarding extension can stay enabled until model metadata is synced and validated. It exposes:\n\n- `sync-aperture-models` skill: looks up real capabilities such as context window, max tokens, reasoning, and input modalities, then updates `~/.pi/agent/models.json`.\n- `aperture_validate_models_json` tool: validates Pi's `models.json` schema and checks that Aperture models include capability fields.\n- `aperture_complete_onboarding` tool: marks onboarding complete and disables the temporary onboarding tools and skill after validation passes.\n\nUser-defined model entries in `models.json` take precedence over gateway defaults and persist across restarts. The extension still owns routing details and cost data from Aperture gateway pricing.\n\n### Proxy existing providers\n\nReroutes existing Pi providers (anthropic, openai, openai-codex, etc.) through Aperture. Each provider keeps its own model definitions and settings. Only the base URL, API key, and headers are overridden.\n\nProxy provider selection maps Aperture providers to local Pi registry providers by base URL. It supports child path matching, so an Aperture provider under `https://chatgpt.com/backend-api/codex` can match Pi's local `https://chatgpt.com/backend-api` provider. If base URLs are unavailable, matching also falls back to provider IDs.\n\nProxy mode is useful when you want Pi's native per-provider model configuration but want requests to go through Aperture for server-side credentials and routing.\n\n## Commands\n\n| Command | Description |\n|---|---|\n| `/aperture:onboarding` | Onboarding wizard. Only available while onboarding is enabled. |\n| `/aperture:settings` | Settings UI to update connection, capabilities, proxy providers, dedicated provider filters, onboarding status, and the onboarding extension toggle. |\n\n## How it works\n\n### Aperture API usage\n\nThe extension reads provider data from Aperture using:\n\n- `GET /api/providers` for gateway providers and models.\n- `GET /aperture/config` for provider compatibility, names, and base URLs.\n\n### Request routing\n\nRequests sent through Aperture include provenance headers:\n\n- `Referer: https://pi.dev`\n- `X-Title: npm:@aliou/pi-ts-aperture`\n- `x-session-id` for grouping requests in the Aperture dashboard\n\n### Proxy routing\n\nFor each configured upstream provider, the extension calls `registerProvider` with:\n\n- `baseUrl` set to your Aperture URL + `/v1` for most Pi APIs.\n- `baseUrl` set to the Aperture root for APIs where Pi appends its own path, such as `openai-codex-responses`.\n- `apiKey` set to `\"-\"` because Aperture injects upstream credentials server-side. OAuth credentials still take precedence when Pi has them.\n\nOptional gateway model verification can warn when configured Pi models are missing from the Aperture gateway.\n\n### Dedicated routing\n\nDedicated mode fetches models from Aperture, maps provider compatibility to Pi APIs, merges gateway defaults with user-defined `providers.aperture.models` from `~/.pi/agent/models.json`, and registers an `aperture` provider.\n\nCompatibility controls the Pi API and base URL used for each upstream provider at runtime. For example, OpenAI-compatible providers use `/v1`, Anthropic-compatible providers use the gateway root, Gemini-compatible providers use `/v1beta`, and Vertex-compatible providers use `/v1`.\n\nUser-defined models from `models.json` take precedence over gateway defaults, so custom capabilities such as reasoning, context window, max output, and input modalities are preserved across restarts. If a user model does not define cost, the extension keeps the cost derived from Aperture gateway pricing.\n\n## Configuration\n\nConfiguration is saved globally to `~/.pi/agent/extensions/aperture.json`.\n\n```json\n{\n  \"baseUrl\": \"http://ai.your-tailnet.ts.net\",\n  \"onboardingDone\": true,\n  \"onboarding\": {\n    \"enabled\": false\n  },\n  \"proxy\": {\n    \"enabled\": true,\n    \"upstreamProviders\": [\n      { \"id\": \"anthropic\", \"shouldCheckGatewayModels\": true }\n    ]\n  },\n  \"dedicated\": {\n    \"enabled\": true,\n    \"providers\": [\n      { \"id\": \"anthropic\", \"name\": \"Anthropic\", \"enabled\": true },\n      { \"id\": \"openai\", \"name\": \"OpenAI\", \"enabled\": true },\n      { \"id\": \"google\", \"name\": \"Google\", \"enabled\": false }\n    ]\n  }\n}\n```\n\nNotes:\n\n- There is no `mode` setting. Use `proxy.enabled` and `dedicated.enabled` independently.\n- An empty `dedicated.providers` list means all Aperture gateway providers are included.\n- Model metadata belongs in `~/.pi/agent/models.json`, not in the extension config.\n\n## Requirements\n\n- A Tailscale tailnet with Aperture configured.\n- The device running Pi must be on the tailnet, or otherwise able to reach your Aperture endpoint.\n- Use the URL/scheme that matches your deployment (`http://` or `https://`).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/aliou/pi-ts-aperture#readme",
+  "repository": {
+    "url": "git+https://github.com/aliou/pi-ts-aperture.git",
+    "type": "git"
+  },
+  "pi": {
+    "video": "https://assets.aliou.me/github/aliou/pi-ts-aperture/demo.mp4",
+    "extensions": [
+      "./extensions/aperture/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-17T17:16:57.971Z",
+    "modified": "2026-06-23T14:29:07.988Z",
+    "0.0.1": "2026-02-17T17:16:58.232Z",
+    "0.1.0": "2026-02-17T18:08:27.426Z",
+    "0.2.0": "2026-02-19T21:23:28.753Z",
+    "0.2.1": "2026-02-21T16:54:27.241Z",
+    "0.2.2": "2026-02-25T12:17:03.889Z",
+    "0.2.3": "2026-03-01T09:51:25.048Z",
+    "0.2.4": "2026-03-01T09:57:57.473Z",
+    "0.2.5": "2026-03-01T23:29:30.814Z",
+    "0.3.0": "2026-03-04T19:36:52.666Z",
+    "0.3.1": "2026-03-06T17:11:09.881Z",
+    "0.3.2": "2026-04-03T09:53:50.622Z",
+    "0.4.0": "2026-04-03T11:15:32.524Z",
+    "0.5.0": "2026-04-23T12:33:36.617Z",
+    "0.5.1": "2026-04-27T21:59:02.380Z",
+    "0.6.0": "2026-06-19T20:24:00.844Z",
+    "0.6.1": "2026-06-19T22:09:58.741Z",
+    "0.6.2": "2026-06-20T18:35:07.271Z",
+    "0.6.3": "2026-06-23T14:29:07.715Z"
+  },
+  "versions_count": 18,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,47 @@
+{
+  "name": "@shog-lab/pi-toolkit",
+  "latest_version": "0.5.0",
+  "description": "Common pi-coding-agent extensions: web search (mmx), MCP server bridge, cron scheduling, browser automation (agent-browser). NOTE: 0.3.0 removed spawn_subagent (\u2192 @shog-lab/pi-subagent); 0.4.0 removed understand_image (models have native vision now).",
+  "readme": "# @shog-lab/pi-toolkit\n\n**Common [pi](https://github.com/earendil-works/pi) extensions \u2014 web search, MCP bridge, and OS-scheduled bus triggers.**\n\nA drop-in package adding several commonly-used external tool integrations to any pi setup. Composes naturally with [`pi-mind`](https://github.com/shog-lab/pi-mind/tree/main/packages/memory) (memory) and [`pi-bus`](https://github.com/shog-lab/pi-mind/tree/main/packages/bus) (multi-agent messaging).\n\n## Extensions\n\n| Extension (dir) | Tool name(s) | Backend | Required env |\n|---|---|---|---|\n| `web-search` | `web_search` | mmx CLI | (mmx config) |\n| `mcp-bridge` | `<server>_<tool>` per MCP server | Any MCP server | `mcp-servers.json` config |\n| `cron` | `schedule_cron`, `list_cron`, `remove_cron` | macOS launchd + pi-bus inbox | live bus target agent |\n\n> **0.4.0 removed `understand-image`.** Modern models increasingly support native\n> vision (e.g. MiniMax-M3), so a separate mmx-backed image-understanding tool is no\n> longer worth the dependency. If your model has native vision, pass images directly;\n> otherwise add a vision tool yourself.\n>\n> **0.3.0 removed `subagent`.** It lived here for historical reasons but is conceptually\n> infrastructure (child-process spawning), not a tool. Extracted to its own package:\n> `npm i -D @shog-lab/pi-subagent`. The tool name (`spawn_subagent`) is unchanged.\n\nDir names are kebab-case (matching the convention used by `pi-mind`'s extensions and skills). Tool names stay `snake_case` so the LLM-facing surface is stable across this rename.\n\n`mcp-bridge` silently skips registration when no `mcp-servers.json` exists, so install pi-toolkit even if you only use some extensions.\n\nPlus `agent-browser` CLI is shipped as a dependency. Its SKILL.md is symlinked from upstream so the agent knows how to use it via Bash.\n\n## Install\n\nPi-native install (recommended for pi users):\n\n```bash\npi install npm:@shog-lab/pi-toolkit\n```\n\nNode/npm install (works well inside existing Node repos):\n\n```bash\nnpm i -D @shog-lab/pi-toolkit\n```\n\n`postinstall` symlinks `extensions/*/` into the host repo's `.pi/extensions/`, so pi auto-discovers them on next launch.\n\n## Configure\n\n### Cron scheduling\n\nThe `cron` extension registers OS-scheduled tasks that deliver messages to the current `PI_AGENT_NAME` through `pi-bus`. The first `schedule_cron` call only asks for confirmation; call again with `confirm=true` after the user approves.\n\nExample use in pi:\n\n```text\nSchedule a weekday 9am reminder to Alice to run the memory audit.\n```\n\nThe extension stores job metadata under `.pi-mind/cron/jobs.json` and creates macOS launchd plists under `~/Library/LaunchAgents/`. If the target agent is offline when the schedule fires, the trigger exits successfully and drops the message.\n\n### MCP servers (figma, filesystem, etc.)\n\nCreate `mcp-servers.json` (or `.pi/mcp-servers.json`) at the host repo root:\n\n```json\n{\n  \"figma\": {\n    \"command\": \"npx\",\n    \"args\": [\"-y\", \"figma-developer-mcp\", \"--stdio\"],\n    \"env\": { \"FIGMA_API_KEY\": \"your-key\" }\n  },\n  \"filesystem\": {\n    \"command\": \"npx\",\n    \"args\": [\"-y\", \"@modelcontextprotocol/server-filesystem\", \"/path/to/expose\"]\n  }\n}\n```\n\nOn next `pi` launch, `mcp-bridge`:\n1. Spawns each declared server as a child process\n2. Runs the MCP `initialize` handshake\n3. Calls `tools/list` to discover tools\n4. Registers each as a pi tool, prefixed with the server name: `figma_get_node`, `filesystem_read_file`, etc.\n\nFailures (server not installed, bad config, missing env) log a warning and skip that server \u2014 they don't crash pi or other tools.\n\nFind more MCP servers at <https://github.com/modelcontextprotocol/servers>.\n\n## Use\n\n```bash\ncd ~/my-repo\npi   # all configured extensions/tools auto-loaded\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "web-search",
+    "mcp",
+    "cron",
+    "agent-tools"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/shog-lab/pi-mind/tree/main/packages/toolkit",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shog-lab/pi-mind.git",
+    "directory": "packages/toolkit"
+  },
+  "pi": {
+    "extensions": [
+      "dist/extensions/web-search/index.js",
+      "dist/extensions/mcp-bridge/index.js",
+      "dist/extensions/cron/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-05-15T02:37:32.581Z",
+    "modified": "2026-06-17T07:03:17.091Z",
+    "0.1.0": "2026-05-15T02:37:32.868Z",
+    "0.1.1": "2026-05-15T03:20:26.838Z",
+    "0.1.2": "2026-05-18T01:58:07.070Z",
+    "0.2.0": "2026-05-20T07:46:32.336Z",
+    "0.2.1": "2026-05-22T03:36:36.379Z",
+    "0.2.2": "2026-05-22T07:57:52.460Z",
+    "0.2.3": "2026-05-25T08:12:26.614Z",
+    "0.3.0": "2026-05-27T03:25:22.989Z",
+    "0.4.0": "2026-06-03T03:12:33.688Z",
+    "0.5.0": "2026-06-17T07:03:16.973Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": 64,
+  "download_trend": []
+}

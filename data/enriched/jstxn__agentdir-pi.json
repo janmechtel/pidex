@@ -1,0 +1,350 @@
+{
+  "name": "@jstxn/agentdir-pi",
+  "latest_version": "0.7.6",
+  "description": "Pi package for AgentDir local-first coding-agent memory and evidence capture.",
+  "readme": "# AgentDir\n\n<p align=\"center\">\n  <img src=\"https://raw.githubusercontent.com/jstxn/agentdir/main/docs/assets/agentdir-overview.png\" alt=\"AgentDir turns agent work into a saved trail, searchable memory, and proof for engineers.\" />\n</p>\n\n<p align=\"center\">\n  <strong>Local-first memory and evidence for agentic engineering.</strong>\n</p>\n\nAgentDir is a flight recorder for coding agents. It lets agents record what\nhappened during a software task, then gives engineers a clean way to inspect,\nreplay, search, and audit that work later.\n\nThe goal is simple: AgentDir should be nearly invisible while you work.\n\nEngineers should not have to manually start sessions, wrap commands, collect\nevidence, or maintain agent memory by hand. Once a repository is adopted, the\nagent operates AgentDir in the background and leaves behind a useful trail.\n\n## Why AgentDir Exists\n\nAgentic engineering has a trust gap.\n\nAgents can edit code, run tools, and summarize results, but their work often\nends up scattered across chat history, terminal scrollback, temporary files, and\nunverified final claims. That makes it hard to answer basic questions:\n\n- What did the agent actually do?\n- Which commands support the final answer?\n- Were tests, builds, lint, or release checks really run?\n- What context did the agent retrieve and rely on?\n- Can a future agent learn from this session?\n- Can the index or memory layer be rebuilt if it breaks?\n\nAgentDir gives those answers a local, durable home.\n\n## What You Get\n\n| Capability | What it means |\n| --- | --- |\n| Invisible agent workflow | Agents run AgentDir commands during normal work, so engineers keep using their coding assistant normally. |\n| Evidence-backed claims | Test, build, lint, typecheck, doctor, and release claims can be checked against recorded tool results. |\n| Replayable sessions | Inspect the task, decisions, commands, outputs, blockers, summaries, and handoffs after the fact. |\n| Local-first storage | Records live in the repo-local `.agentdir` directory by default. No hosted service is required. |\n| Rebuildable memory | Raw event files are the source of truth. SQLite search and memory indexes can be rebuilt. |\n| Context lineage | Agents can emit context packs, then record which retrieved sources were consumed or cited. |\n| Cross-repo memory | Explicitly registered AgentDir roots can be searched together without moving canonical records. |\n| Secret-aware persistence | Common secret-like patterns are redacted before storage, with scan and cleanup commands for older records. |\n\n## The Invisible Workflow\n\nAgentDir is designed around a small separation of responsibility.\n\n| Human does | Agent does |\n| --- | --- |\n| Install AgentDir once. | Start and finish AgentDir sessions. |\n| Run `agentdir adopt` once per repo. | Capture evidence-bearing commands with `agentdir run`. |\n| Ask the coding agent to do work. | Record decisions, blockers, context, and handoffs. |\n| Inspect evidence only when needed. | Audit session quality and final claims before reporting. |\n\nIn day-to-day use, the human workflow stays the same:\n\n```text\nAsk the agent to do the task.\nReview the result.\nUse AgentDir only when you want the trail.\n```\n\nThe agent handles the recording surface:\n\n```bash\nagentdir work start \"fix checkout failure\" --emit-context\nagentdir run -- pytest -q\nagentdir audit session\nagentdir work finish --json\n```\n\n## Install\n\nInstall from PyPI (the package is `agentdir-cli`; the command it installs is\n`agentdir`):\n\n```bash\nuv tool install agentdir-cli\n# or\npipx install agentdir-cli\n```\n\nOr use the GitHub Release installer:\n\n```bash\ncurl -fsSL https://raw.githubusercontent.com/jstxn/agentdir/main/scripts/install.sh | bash\n```\n\nThe installer uses `pipx` when available. Otherwise it creates a self-contained\nvirtual environment under `~/.local/share/agentdir` and links the CLI into\n`~/.local/bin`.\n\nVerify:\n\n```bash\nagentdir --version\nagentdir --help\n```\n\n## Pi Package\n\nPi users can install this repository as a Pi package so the AgentDir skill is\navailable automatically during coding tasks:\n\nPackage page: [@jstxn/agentdir-pi](https://pi.dev/packages/@jstxn/agentdir-pi)\n\n```bash\npi install npm:@jstxn/agentdir-pi@0.7.6\n# or install directly from a local checkout / release tag:\npi install /absolute/path/to/agentdir\npi install git:github.com/jstxn/agentdir@<tag-or-commit>\n```\n\nThe package exposes `skills/agentdir/SKILL.md`; it teaches Pi to start AgentDir\nsessions, wrap evidence-bearing commands, use local memory/context packs, and\nproduce evidence-aware handoffs. See [AgentDir Pi Package](docs/PI_PACKAGE.md)\nfor details.\n\n## Adopt A Repository\n\nRun once from a git repository:\n\n```bash\nagentdir adopt\n```\n\nThis is intentionally boring setup. It prepares the repository once, then agents\noperate AgentDir during normal coding work:\n\n- creates the repo-local `.agentdir` store\n- installs AgentDir-managed git hook shims\n- installs the Codex skill into the user skill directory\n- writes managed project guidance for common agent tools\n- asks interactive users whether `.agentdir/` should be added to the project or\n  user-level Git ignore file\n- runs `doctor` to confirm the store is healthy\n\nAfter that, agents have the guidance they need to use AgentDir without the\nengineer manually operating it during normal work.\n\nPreview setup without writing anything:\n\n```bash\nagentdir adopt --dry-run --json\n```\n\nIf you want generated integration files to stay inside the AgentDir store\ninstead of project instruction files:\n\n```bash\nagentdir adopt --install-skill store --install-generic store --integration-target store\n```\n\nFor non-interactive installs, choose the ignore destination explicitly:\n\n```bash\nagentdir adopt --gitignore project  # write <repo>/.gitignore\nagentdir adopt --gitignore user     # write the user-level Git excludes file\nagentdir adopt --gitignore none     # leave ignore files unchanged\n```\n\nUndo managed setup while keeping the `.agentdir` evidence store:\n\n```bash\nagentdir unadopt          # dry-run\nagentdir unadopt --apply  # remove managed hooks and guidance\n```\n\n## What Gets Written\n\nDefault adoption writes only local files:\n\n```text\n<repo>/.agentdir/                         # evidence, artifacts, indexes, state\n<repo>/.git/hooks/*                       # managed hook shims with backups\n<repo>/AGENTS.md                          # generic / Codex-readable guidance\n<repo>/CLAUDE.md                          # Claude Code guidance\n<repo>/.github/copilot-instructions.md    # Copilot guidance\n<repo>/.cursor/rules/agentdir.mdc         # Cursor guidance\n<repo>/.windsurf/rules/agentdir.md        # Windsurf guidance\n~/.codex/skills/agentdir/SKILL.md         # Codex skill, by default\n```\n\nManaged guidance is wrapped in AgentDir markers. Existing unmanaged content is\npreserved where the target format supports managed blocks.\n\n## Inspect A Session\n\nMost users will not need these commands every day, but they are the reason\nAgentDir exists.\n\n```bash\nagentdir status\nagentdir evidence --brief\nagentdir timeline\nagentdir report final --format json\nagentdir replay\nagentdir memory search \"checkout failure\"\n```\n\nFor final-answer support:\n\n```bash\nagentdir audit session\nagentdir audit claims --text final-response.md\n```\n\nAudits are advisory by default. Use `--strict` when unsupported or contradicted\nclaims should fail a check.\n\n## How AgentDir Works\n\nAgentDir has one source of truth and several rebuildable views:\n\n```text\nraw envelopes -> SQLite index -> memory/search/audit/report\n                    ^\n                    |\n             rebuilt from envelopes\n```\n\n1. **Raw envelopes**\n   Each meaningful event is stored as an immutable file in a Maildir-inspired\n   directory layout. These files are the source of truth.\n2. **Derived indexes**\n   SQLite indexes, search tables, memory passages, context packs, and audit\n   views are derived from the raw event files and can be rebuilt.\n\nDefault project layout:\n\n```text\n<repo>/.agentdir/\n  sessions/\n  actors/\n  artifacts/\n  archives/\n  indexes/agentdir.sqlite3\n  state/\n  integrations/\n```\n\nThe important property is recoverability: deleting the derived index does not\ndestroy the session. AgentDir can rebuild from the envelope store.\n\nThe agent-facing report surface is JSON. `agentdir report final --format json`\nand `agentdir work finish --json` include an `agent_handoff` object with\nverification evidence, failed evidence, claim support, context lineage, known\ngaps, and recommended next agent actions.\n\n## Unique Capabilities\n\n### Claims-To-Evidence Checks\n\nAgentDir can compare final-response claims such as \"tests passed\" or \"build\npassed\" against the latest recorded tool results. It does this with\ndeterministic heuristics, not an LLM.\n\nSupported claim families:\n\n- test\n- lint\n- typecheck\n- build\n- doctor\n- release\n\n### Context Packs\n\nAgents can package retrieved context into auditable source manifests:\n\n```bash\nagentdir context build \"checkout failure\" --emit\nagentdir context consume --pack <pack-id> --source <source-id> --purpose plan\nagentdir context cite --pack <pack-id>\nagentdir audit context --pack <pack-id>\n```\n\nThis does not prove a model paid attention, but it does make cooperative agent\nbehavior visible.\n\n### Local Agent Memory\n\nAgentDir builds searchable local memory from prior sessions. Agents can search\nsimilar work, explain why a memory hit matched, and include relevant history in\nnew context packs.\n\n```bash\nagentdir memory search \"release evidence\"\nagentdir memory explain \"release evidence\"\nagentdir context build \"release evidence\" --emit\n```\n\nOptional semantic extras exist, but the default path does not require a vector\ndatabase or external embedding service.\n\n### Federated Memory\n\nFor multi-repo work, AgentDir can search explicitly registered roots:\n\n```bash\nagentdir roots register ../other-repo --name other-repo\nagentdir memory search --federated \"release evidence\"\n```\n\nEach repository remains the canonical owner of its own `.agentdir` store.\n\n## Safety Model\n\nAgentDir is local-first and advisory by design.\n\n- It records what agents choose to record.\n- It does not replace code review or CI.\n- It does not send data to a hosted AgentDir service.\n- It treats raw envelopes as the source of truth.\n- It redacts common secret-like patterns before persistence.\n- It provides `secrets scan` and `secrets redact --apply` for cleanup.\n\nUseful commands:\n\n```bash\nagentdir doctor\nagentdir secrets scan\nagentdir secrets redact\nagentdir secrets redact --apply\n```\n\n## Upgrade And Rollback\n\nUpgrade an existing install and refresh current repo adoption:\n\n```bash\nagentdir --upgrade\n```\n\nRollback to the previous stable release:\n\n```bash\ncurl -fsSL https://raw.githubusercontent.com/jstxn/agentdir/main/scripts/rollback.sh | bash\n```\n\n## Learn More\n\n- [Install Guide](docs/INSTALL.md)\n- [Agentic Coding Guide](docs/AGENTIC_CODING.md)\n- [Technical Brief](docs/TECH_BRIEF.md)\n- [Release Guide](docs/RELEASING.md)\n- [PRD](docs/PRD.md)\n\n## Project Status\n\nAgentDir is beta software for local-first agentic engineering workflows. The\ncore model is stable: agents operate the recorder, engineers get the evidence,\nand raw local envelopes remain the recoverable source of truth.\n",
+  "keywords": [
+    "pi-package",
+    "agentdir",
+    "agent-skills",
+    "coding-agent",
+    "evidence",
+    "local-first"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/jstxn/agentdir#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jstxn/agentdir.git"
+  },
+  "pi": {
+    "skills": [
+      "./skills"
+    ],
+    "image": "https://raw.githubusercontent.com/jstxn/agentdir/v0.7.6/docs/assets/agentdir-overview.png"
+  },
+  "time": {
+    "created": "2026-05-25T22:30:07.299Z",
+    "modified": "2026-06-09T19:43:45.410Z",
+    "0.7.3": "2026-05-25T22:30:07.644Z",
+    "0.7.4": "2026-06-09T18:20:46.430Z",
+    "0.7.6": "2026-06-09T19:43:45.269Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 34,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 103
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 25
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 303
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 57
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 36
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 8
+    }
+  ]
+}

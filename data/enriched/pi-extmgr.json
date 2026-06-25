@@ -1,0 +1,77 @@
+{
+  "name": "pi-extmgr",
+  "latest_version": "0.3.0",
+  "description": "Enhanced UX for managing local Pi extensions and community packages",
+  "readme": "# pi-extmgr\n\n![pi-extmgr banner](https://i.imgur.com/Ce513Br.png)\n\n[![CI](https://github.com/ayagmar/pi-extmgr/actions/workflows/ci.yml/badge.svg)](https://github.com/ayagmar/pi-extmgr/actions/workflows/ci.yml)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)\n\nA better way to manage Pi extensions. Browse, install, enable/disable, and remove extensions from one place.\nBuilt on top of Pi's native package install, update, and config flows, so extmgr stays aligned with current upstream behavior.\n\n**\ud83c\udf10 [pi-extmgr landing page](https://ayagmar.github.io/pi-extmgr)**\n\n## Install\n\n```bash\npi install npm:pi-extmgr\n```\n\nIf Pi is already running, use `/reload`.\n\nRequires Node.js `>=22.20.0`.\n\n### npm prefix permissions\n\nPi global package installs use `npm install -g`. If `npm_config_prefix` points at an\nunwritable prefix such as `/usr/local`, install or reload can fail with `EACCES`.\nUse a writable npm prefix, configure Pi's `npmCommand` setting for your Node\nversion manager, or install project-local with `pi install npm:pi-extmgr -l`.\n\n`npmCommand` examples for `~/.pi/agent/settings.json`:\n\n```jsonc\n{\n  // mise: run npm through Node 22\n  // \"npmCommand\": [\"mise\", \"exec\", \"node@22\", \"--\", \"npm\"]\n\n  // bun: use Bun as Pi's package-manager command\n  // \"npmCommand\": [\"bun\"]\n\n  // nvm: start Pi from an nvm-enabled shell and use npm on PATH\n  // \"npmCommand\": [\"npm\"]\n}\n```\n\n## Features\n\n- **Unified manager UI**\n  - Local extensions (`~/.pi/agent/extensions`, `.pi/extensions`) and installed packages in one list\n  - Grouped sections for local extensions vs installed packages\n  - Compact rows with selected-item details below the list, so large extension sets stay scannable\n  - Built-in search and filter shortcuts for large extension sets\n  - Scope indicators (global/project), status indicators, update badges, and package sizes when known\n- **Package extension configuration panel**\n  - Configure individual extension entrypoints inside an installed package (`c` on package row)\n  - Works with manifest-declared entrypoints and conventional `extensions/` package layouts\n  - Persists to package filters in `settings.json` (no manual JSON editing)\n- **Safe staged local extension toggles**\n  - Toggle with `Space`, apply with `S`\n  - Unsaved-change guard when leaving (save/discard/stay)\n- **Package management**\n  - Install, update, remove from UI and command line\n  - Quick actions (`A`, `u`, `X`) and bulk update (`U`)\n- **Remote discovery and install**\n  - npm search/browse with pagination, inline browse search, and keyboard page navigation\n  - Path- and git-like queries are handled explicitly instead of surfacing unrelated npm results\n  - Install by source (`npm:`, `git:`, `https://`, `ssh://`, `git@...`, local path)\n  - Supports direct GitHub `.ts` installs and standalone local install for self-contained packages\n  - Long-running discovery/detail screens now show dedicated loading UI, and cancellable reads can be aborted with `Esc`\n- **Auto-update**\n  - Interactive wizard (`t` in manager, or `/extensions auto-update`)\n  - Persistent schedule restored on startup and session switch\n  - Background checks + status bar updates for installed npm + git packages\n- **Operational visibility**\n  - Session history (`/extensions history`)\n  - Cache controls (`/extensions clear-cache` clears persistent + runtime extmgr caches)\n  - Status line summary (`pkg count \u2022 auto-update \u2022 known updates`)\n  - History now records local extension deletions and auto-update configuration changes\n- **Interactive + non-interactive support**\n  - Works in TUI and non-UI modes\n  - Non-interactive commands for list/install/remove/update/auto-update\n\n## Usage\n\nOpen the manager:\n\n```\n/extensions\n```\n\n### In the manager\n\n| Key           | Action                                                |\n| ------------- | ----------------------------------------------------- |\n| `\u2191\u2193`          | Navigate                                              |\n| `PageUp/Down` | Jump through longer lists                             |\n| `Home/End`    | Jump to top or bottom                                 |\n| `Space`       | Toggle selected local extension on/off                |\n| `S`           | Save local extension changes                          |\n| `Enter` / `A` | Actions on selected item                              |\n| `/` / `Ctrl+F`| Search visible items                                  |\n| `Tab` / `Shift+Tab` | Cycle filters                                  |\n| `1-5`         | Filters: All / Local / Packages / Updates / Disabled  |\n| `c`           | Configure selected package extensions                 |\n| `u`           | Update selected package directly                      |\n| `V`           | View full details for selected item                   |\n| `X`           | Remove selected item (package/local extension)        |\n| `i`           | Quick install by source                               |\n| `f`           | Remote package search                                 |\n| `U`           | Update all packages                                   |\n| `t`           | Auto-update wizard                                    |\n| `P` / `M`     | Quick actions palette                                 |\n| `R`           | Browse remote packages                                |\n| `?` / `H`     | Help                                                  |\n| `Esc`         | Clear search or exit                                  |\n\n### Commands\n\n```bash\n/extensions                      # Open interactive manager (default)\n/extensions local                # Alias: open interactive manager\n/extensions list                 # List local extensions\n/extensions remote               # Open remote package browser\n/extensions packages             # Alias: remote browser\n/extensions installed            # Installed packages view (legacy alias to unified flow)\n/extensions search <query>       # Search npm packages\n/extensions install <source> [--project|--global]  # Install package\n/extensions remove [source]      # Remove package\n/extensions uninstall [source]   # Alias: remove\n/extensions update [source]      # Update one package (or all when omitted)\n/extensions auto-update [every]  # No arg opens wizard in UI; accepts 1d, 1w, 1mo, never, etc.\n/extensions history [options]    # View change history (supports filters)\n/extensions clear-cache          # Clear persistent + runtime extmgr caches\n```\n\n### Non-interactive mode\n\nWhen Pi is running without UI, extmgr still supports command-driven workflows:\n\n- `/extensions list`\n- `/extensions installed`\n- `/extensions install <source> [--project|--global]`\n- `/extensions remove <source>`\n- `/extensions update [source]`\n- `/extensions history [options]`\n- `/extensions auto-update <duration>`\n  - Use `1mo` for monthly schedules (`/extensions history --since <duration>` also accepts `1mo`; `30m`/`24h` are just lookback examples)\n\nRemote browsing/search menus require the full interactive TUI.\n\n### RPC / limited-UI mode\n\nIn RPC mode, dialog-based commands still work, but the custom TUI panels do not:\n\n- `/extensions` falls back to read-only local/package lists\n- `/extensions installed` lists packages directly\n- remote browsing/search panels require the full interactive TUI\n- package extension configuration requires the full interactive TUI\n\nHistory options (works in non-interactive mode too):\n\n- `--limit <n>`\n- `--action <extension_toggle|extension_delete|package_install|package_update|package_remove|cache_clear|auto_update_config>`\n- `--success` / `--failed`\n- `--package <query>`\n- `--since <duration>` (e.g. `30m`, `24h`, `7d`, `1mo`; `1mo` is supported for monthly lookbacks)\n- `--global` (non-interactive mode only; reads all persisted sessions under `~/.pi/agent/sessions`)\n\nExamples:\n\n- `/extensions history --failed --limit 50`\n- `/extensions history --action package_update --since 7d`\n- `/extensions history --global --package extmgr --since 1mo`\n\n### Install sources\n\n```bash\n/extensions install npm:package-name\n/extensions install @scope/package\n/extensions install git:https://github.com/user/repo.git\n/extensions install git:git@github.com:user/repo.git\n/extensions install ssh://git@github.com/user/repo.git\n/extensions install https://github.com/user/repo/blob/main/extension.ts\n/extensions install /path/to/extension.ts\n/extensions install ./local-folder/\n```\n\n## Tips\n\n- **Staged local changes**: Toggle local extensions on/off, then press `S` to apply all at once.\n- **Package extension config**: Select a package and press `c` (or Enter/A \u2192 Configure) to enable/disable individual package entrypoints.\n  - After saving package extension config, run /reload to apply changes.\n- **Two install modes**:\n  - **Managed** (npm): Auto-updates with `pi update`, stored in pi's package cache, supports Pi package manifest/convention loading\n  - **Local** (standalone): Copies to `~/.pi/agent/extensions/{package}/`, so it only accepts runnable standalone layouts (manifest-declared/root entrypoints), requires `tar` on `PATH`, and rejects packages whose runtime `dependencies` are not already bundled with the package contents\n- **Auto-update schedule is persistent**: `/extensions auto-update 1d` stays active across future Pi sessions and is restored when switching sessions.\n- **Auto-update/update badges cover npm + git packages**: extmgr now uses pi's package manager APIs for structured update detection instead of parsing `pi list` output.\n- **Settings/cache writes are hardened**: extmgr serializes writes and uses safe file replacement to reduce JSON corruption issues.\n- **Invalid JSON is handled safely**: malformed `auto-update.json` / metadata cache files are backed up and reset; invalid `.pi/settings.json` is not overwritten during package-extension toggles.\n- **Reload is built-in**: When extmgr asks to reload, it calls `ctx.reload()` directly.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "extensions",
+    "pi-extension-manager",
+    "pi-extmgr",
+    "pi-extension-management",
+    "ai",
+    "agent"
+  ],
+  "author": {
+    "name": "ayagmar"
+  },
+  "license": "MIT",
+  "homepage": "https://ayagmar.github.io/pi-extmgr",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ayagmar/pi-extmgr.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "video": "https://github.com/ayagmar/pi-extmgr/releases/download/demo/demo.mp4",
+    "image": "https://i.imgur.com/Ce513Br.png"
+  },
+  "time": {
+    "created": "2026-02-07T00:04:51.794Z",
+    "modified": "2026-05-11T10:55:54.066Z",
+    "0.0.1": "2026-02-07T00:04:52.056Z",
+    "0.0.2": "2026-02-07T00:27:09.410Z",
+    "0.0.3": "2026-02-07T00:44:32.367Z",
+    "0.0.4": "2026-02-07T10:46:42.194Z",
+    "0.0.5": "2026-02-07T10:52:10.432Z",
+    "0.0.6": "2026-02-07T11:40:30.121Z",
+    "0.1.1": "2026-02-07T13:11:11.171Z",
+    "0.1.2": "2026-02-07T13:13:53.680Z",
+    "0.1.3": "2026-02-07T13:15:15.971Z",
+    "0.1.4": "2026-02-07T15:47:40.118Z",
+    "0.1.5": "2026-02-07T16:50:08.704Z",
+    "0.1.6": "2026-02-07T17:13:02.818Z",
+    "0.1.7": "2026-02-09T10:37:33.495Z",
+    "0.1.8": "2026-02-09T10:57:52.841Z",
+    "0.1.9": "2026-02-10T13:07:14.621Z",
+    "0.1.10": "2026-02-10T14:43:45.996Z",
+    "0.1.11": "2026-02-10T21:30:52.526Z",
+    "0.1.12": "2026-02-10T22:59:51.722Z",
+    "0.1.13": "2026-02-10T23:11:08.986Z",
+    "0.1.14": "2026-02-15T14:18:28.752Z",
+    "0.1.15": "2026-02-15T14:37:08.374Z",
+    "0.1.16": "2026-02-15T17:26:01.479Z",
+    "0.1.17": "2026-02-15T20:06:29.581Z",
+    "0.1.18": "2026-02-15T21:13:36.309Z",
+    "0.1.19": "2026-02-16T00:36:41.349Z",
+    "0.1.20": "2026-02-16T09:51:44.074Z",
+    "0.1.21": "2026-02-23T18:26:11.482Z",
+    "0.1.22": "2026-02-23T21:29:12.273Z",
+    "0.1.23": "2026-02-24T17:34:01.046Z",
+    "0.1.24": "2026-03-11T15:40:53.272Z",
+    "0.1.25": "2026-03-11T22:04:22.603Z",
+    "0.1.26": "2026-03-14T12:53:36.820Z",
+    "0.1.27": "2026-03-24T21:24:54.151Z",
+    "0.1.28": "2026-03-28T18:08:34.385Z",
+    "0.2.0": "2026-04-20T10:39:14.879Z",
+    "0.2.1": "2026-04-29T21:15:55.154Z",
+    "0.2.2": "2026-05-07T16:19:04.594Z",
+    "0.3.0": "2026-05-11T10:55:53.943Z"
+  },
+  "versions_count": 38,
+  "downloads_last_week": null,
+  "download_trend": []
+}

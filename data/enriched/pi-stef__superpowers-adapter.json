@@ -1,0 +1,39 @@
+{
+  "name": "@pi-stef/superpowers-adapter",
+  "latest_version": "0.3.7",
+  "description": "Bridges the superpowers skill system to pi's extension API with TodoWrite, Task, and Skill tools.",
+  "readme": "# @pi-stef/superpowers-adapter\n\nA [pi](https://pi.dev) extension that bridges the [superpowers](https://github.com/obra/superpowers) skill system to pi's extension API.\n\n## Why This Extension Exists\n\nPi ships with 4 built-in tools: `read`, `bash`, `edit`, `write`. The superpowers skill system expects additional tools that pi doesn't provide natively:\n\n| Tool | Pi Built-in | Superpowers Needs | Provided By |\n|------|-------------|-------------------|-------------|\n| TodoWrite | No | Yes | This extension |\n| Skill | No | Yes | This extension |\n| Agent | No | Yes | `@tintinweb/pi-subagents` |\n\nThe superpowers `using-superpowers` skill explicitly requires:\n1. **\"Use the `Skill` tool\"** to load skill instructions\n2. **\"Never use the Read tool on skill files\"** \u2014 the Skill tool must be used instead\n\nWhile pi natively supports skill discovery (listing them in the system prompt), superpowers workflows depend on calling the `Skill` tool directly.\n\n## Installation\n\n```bash\n# 1. Install superpowers (official skill pack)\npi install https://github.com/obra/superpowers\n\n# 2. Install this extension\npi install npm:@pi-stef/superpowers-adapter\n```\n\n## Tools\n\n### TodoWrite\n\nTrack implementation tasks with status progression.\n\n**Parameters:**\n- `todos` (array, required) \u2014 Array of todo items, each with:\n  - `id` (string) \u2014 Unique identifier\n  - `content` (string) \u2014 Task description\n  - `status` (string) \u2014 One of: `pending`, `in_progress`, `completed`\n  - `priority` (string, optional) \u2014 One of: `high`, `medium`, `low`\n\n**Example:**\n```\nTodoWrite({\n  todos: [\n    { id: \"1\", content: \"Design API\", status: \"completed\" },\n    { id: \"2\", content: \"Implement\", status: \"in_progress\", priority: \"high\" },\n    { id: \"3\", content: \"Write tests\", status: \"pending\" }\n  ]\n})\n```\n\n### Skill\n\nLoad skill instructions by name. Discovers skills from standard pi skill directories.\n\n**Parameters:**\n- `skill` (string, required) \u2014 Skill name (e.g., `brainstorming`, `test-driven-development`)\n\n**Discovery paths** (searched in order):\n- `<cwd>/.pi/skills/`\n- `<cwd>/.agents/skills/`\n- `~/.pi/agent/skills/`\n- `~/.agents/skills/`\n- Workspace packages: `<cwd>/packages/<pkg>/skills/`\n- Locally installed packages: `<cwd>/node_modules/<pkg>/skills/` (any scope)\n- Globally installed packages: `~/.pi/agent/npm/node_modules/<pkg>/skills/` (any scope)\n- Recursively under `~/.pi/agent/git/` (depth 10)\n\n**Limitation:** The YAML frontmatter parser handles simple `key: value` pairs only. Nested values, multi-line values, and quoted strings with complex escaping are not supported.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/todos` | Display current todo list with progress |\n| `/todo-clear` | Reset all todos |\n\n## Architecture\n\n```\nsrc/\n  types.ts           \u2014 Shared type definitions\n  tools/\n    todo-write.ts    \u2014 TodoWrite tool + state management\n    skill.ts         \u2014 Skill discovery, parsing, loading\n  commands.ts        \u2014 /todos and /todo-clear\n  index.ts           \u2014 Extension entry point + lifecycle hooks\n```\n\nThe extension auto-injects the `using-superpowers` skill content into the system prompt via the `before_agent_start` lifecycle hook. This ensures the LLM receives superpowers instructions without manual configuration.\n\n## Troubleshooting\n\n**\"using-superpowers skill not found\"**\n\u2192 Install superpowers: `pi install https://github.com/obra/superpowers`\n\n**Skills not discovered**\n\u2192 Check that skill directories contain `SKILL.md` files with valid YAML frontmatter.\n\n## Security\n\nThis extension has read-only filesystem access. It reads `SKILL.md` files from standard pi directories. No network calls, no process execution, no file writes.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "superpowers"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://sfiorini.github.io/pi-stef/packages/superpowers-adapter.html",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sfiorini/pi-stef.git",
+    "directory": "packages/superpowers-adapter"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-11T23:37:52.476Z",
+    "modified": "2026-06-19T02:37:00.257Z",
+    "0.2.2": "2026-06-11T23:37:52.755Z",
+    "0.3.0": "2026-06-12T00:03:42.615Z",
+    "0.3.1": "2026-06-12T01:04:29.474Z",
+    "0.3.2": "2026-06-14T22:09:55.467Z",
+    "0.3.3": "2026-06-15T21:24:31.697Z",
+    "0.3.4": "2026-06-17T03:34:31.105Z",
+    "0.3.5": "2026-06-19T01:50:36.618Z",
+    "0.3.7": "2026-06-19T02:37:00.122Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 404,
+  "download_trend": []
+}

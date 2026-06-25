@@ -1,0 +1,45 @@
+{
+  "name": "pi-hide-providers",
+  "latest_version": "0.1.5",
+  "description": "Hide providers and models from pi's model selector \u2014 filter the /model list and Ctrl+P cycling via a configurable blocklist",
+  "readme": "<div align=\"center\">\n\n# \ud83d\udd07 pi-hide-providers\n\n**Hide providers and models from the selector in [pi](https://github.com/earendil-works/pi-coding-agent)**\n\n_Filter the model picker so you only see the models you care about._\n\n[![pi extension](https://img.shields.io/badge/pi-extension-blueviolet)](https://github.com/earendil-works/pi-coding-agent)\n[![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)\n\n<img src=\"assets/demo.jpg\" alt=\"pi-hide-providers interactive model selector\" width=\"800\">\n\n</div>\n\n---\n\n## The Problem\n\nPi's model selector shows **every** available model from every configured provider. If you have Ollama running with 20 local models, or an OpenRouter account with hundreds of options, the model list becomes noisy and slow to navigate. There's no built-in way to say *\"I never want to see these providers/models in the selector.\"*\n\nPi has `enabledModels` in `settings.json` as an allowlist, but maintaining it manually is tedious \u2014 you have to list every model you *do* want, and clobber `settings.json` with hundreds of entries. What you really want is a **blocklist**: *\"hide everything from these providers, except the ones I explicitly use.\"*\n\n## The Solution\n\n`pi-hide-providers` gives you a blocklist that **completely removes** models from all lists \u2014 not an allowlist, not a scoped subset:\n\n- Define hide rules in a config file (`~/.pi/agent/hide-providers.json` or `.pi/hide-providers.json`)\n- On session start, the extension monkey-patches `modelRegistry.getAvailable()`, `getAll()`, and `find()` to filter out hidden models\n- The `/model` selector, `Ctrl+P` cycling, `--list-models`, and session restoration all see only visible models\n- `/hide-models reset` unpatches the registry \u2014 all models return immediately\n- Changes via `/hide-models add` and `/hide-models remove` take effect immediately (no reload needed)\n- Interactive `/hide-models` TUI lists visible models first in user-toggle order, then hidden models in their original registry order, and keeps the cursor at the same index after each toggle \u2014 matching pi core's `/scoped-models` UX\n- `/hide-models` subcommands for adding, removing, and inspecting rules\n\nNo `settings.json` is modified. No 250+ entry explosion. No allowlist semantics.\n\n## Usage\n\n### Interactive Commands\n\n| Command | What it does |\n|---------|-------------|\n| `/hide-models` | Open interactive TUI to select providers/models to hide |\n| `/hide-models add ollama` | Hide the entire `ollama` provider |\n| `/hide-models add openrouter/cheap-model` | Hide a specific model from `openrouter` |\n| `/hide-models add openrouter/*` | Hide the entire `openrouter` provider (explicit) |\n| `/hide-models remove ollama` | Remove the hide rule for `ollama` |\n| `/hide-models status` | Show current rules, patch status, and hidden model count |\n| `/hide-models apply` | Show current hide state (changes are already active) |\n| `/hide-models reset` | Unpatch registry \u2014 all models return immediately |\n| `/hide-models help` | Show usage reference |\n\n### Config File\n\nCreate `~/.pi/agent/hide-providers.json` (global) or `.pi/hide-providers.json` (project-local):\n\n```json\n{\n  \"hide\": [\n    { \"provider\": \"ollama\" },\n    { \"provider\": \"openrouter\", \"model\": \"cheap-model\" },\n    { \"provider\": \"github-copilot\", \"model\": \"gpt-3.5-turbo\" }\n  ]\n}\n```\n\n**Rule formats:**\n\n| Rule | Effect |\n|------|--------|\n| `{ \"provider\": \"ollama\" }` | Hide all models from the `ollama` provider |\n| `{ \"provider\": \"ollama\", \"model\": \"*\" }` | Same \u2014 explicit wildcard |\n| `{ \"provider\": \"openrouter\", \"model\": \"cheap-model\" }` | Hide only `openrouter/cheap-model` |\n\nProject config (`.pi/hide-providers.json`) takes priority over global config (`~/.pi/agent/hide-providers.json`).\n\n## Installation\n\n**With `pi install`** (recommended):\n\n```bash\npi install npm:pi-hide-providers\n```\n\nOr install from GitHub:\n\n```bash\npi install https://github.com/monotykamary/pi-hide-providers\n```\n\n**With npm**:\n\n```bash\nnpm install pi-hide-providers\n```\n\nOr in `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\n    \"https://github.com/monotykamary/pi-hide-providers\"\n  ]\n}\n```\n\nThen `/reload` or restart pi.\n\nFor quick one-off tests:\n\n```bash\npi -e ./hide-providers.ts\n```\n\n## How It Works\n\n```\nSession starts\n  \u2192 Extension reads hide-providers.json\n  \u2192 Monkey-patches modelRegistry:\n      getAvailable() \u2192 original result filtered by isHidden()\n      getAll()       \u2192 original result filtered by isHidden()\n      find(p, m)    \u2192 returns undefined if isHidden(p, m)\n  \u2192 All downstream consumers see only visible models:\n      /model selector, Ctrl+P, --list-models, session restoration\n\n/hide-models add or /hide-models remove:\n  \u2192 Config updated on disk\n  \u2192 currentRules updated in memory\n  \u2192 Patched methods read latest rules via closure\n  \u2192 Changes take effect immediately (no reload)\n\n/hide-models reset:\n  \u2192 Unpatches registry (restores original methods)\n  \u2192 All models return immediately\n```\n\nThe SDK doesn't provide a mechanism to remove models from the registry \u2014 `registerProvider({ models: [] })` is treated as \"no models to register\" (override-only), not \"remove all models.\" Monkey-patching the accessor methods is the only way to completely remove models from all lists without touching `settings.json`.\n\nThe patches survive `modelRegistry.refresh()` because they wrap the original methods. On reload, the extension detects the registry is already patched and just updates the rules source.\n\n## Comparison with Alternatives\n\n| Approach | Pros | Cons |\n|----------|------|------|\n| **pi-hide-providers** (this) | Blocklist \u2014 completely removes models from all lists; no `settings.json` writes; changes take effect immediately; survives `refresh()` | Monkey-patches `modelRegistry` methods (not an official SDK mechanism) |\n| `enabledModels` in `settings.json` (manual) | Built-in, no extension needed | Allowlist \u2014 must list every model you want individually; no blocklist support; clobbers settings with hundreds of entries |\n| `--models` CLI flag | Per-session scoping | Must pass every time; no persistence |\n| `pi.unregisterProvider()` | Restores built-in models after override | Only works for providers registered via `pi.registerProvider()`; can't hide entire providers (empty models array is a no-op) |\n| `pi-model-router` scope shim | Dynamic scoping with routing | Heavyweight \u2014 full routing system just to filter the model list |\n\n## Development\n\n```bash\nnpm install\nnpm test          # Vitest unit tests\nnpm run typecheck # TypeScript validation\nnpm run lint:dead # Dead code detection (knip)\n```\n\n### Structure\n\n```\n.\n\u251c\u2500\u2500 hide-providers.ts   # Main extension\n\u251c\u2500\u2500 src/\n\u2502   \u2514\u2500\u2500 index.ts        # Constants, types, and utilities\n\u251c\u2500\u2500 __tests__/\n\u2502   \u2514\u2500\u2500 unit/\n\u2502       \u2514\u2500\u2500 hide-providers.test.ts\n\u251c\u2500\u2500 package.json\n\u251c\u2500\u2500 tsconfig.json\n\u251c\u2500\u2500 vitest.config.ts\n\u2514\u2500\u2500 knip.json\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "hide",
+    "provider",
+    "model",
+    "filter",
+    "blocklist",
+    "model-selector"
+  ],
+  "author": {
+    "name": "Tom X Nguyen"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/monotykamary/pi-hide-providers#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/monotykamary/pi-hide-providers.git"
+  },
+  "pi": {
+    "extensions": [
+      "./hide-providers.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-04T13:27:18.170Z",
+    "modified": "2026-06-18T07:28:50.590Z",
+    "0.1.0": "2026-06-04T13:27:18.496Z",
+    "0.1.1": "2026-06-04T14:41:55.534Z",
+    "0.1.2": "2026-06-10T02:59:58.504Z",
+    "0.1.3": "2026-06-15T19:56:22.465Z",
+    "0.1.4": "2026-06-16T07:38:42.669Z",
+    "0.1.5": "2026-06-18T07:28:50.493Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": null,
+  "download_trend": []
+}

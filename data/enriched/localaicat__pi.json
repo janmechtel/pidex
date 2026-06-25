@@ -1,0 +1,42 @@
+{
+  "name": "@localaicat/pi",
+  "latest_version": "0.1.3",
+  "description": "pi extension that warms/cools the Local AI Cat resident model over the Local API",
+  "readme": "# @localaicat/pi\n\nA [pi](https://pi.dev) extension that keeps the **Local AI Cat** resident model\nwarm for the duration of a coding session and publishes local generation stats\nto pi's status line. It also exposes resource-control slash commands so you can\nload, unload, or stop the local server without a custom pi binary.\n\nThe Local API loads a model lazily on the first chat request, so the first turn\nof a session is slow (weights load + KV warm-up). This extension proactively\n**loads** the model when pi selects one from the `localaicat` provider, and\n**unloads** it on session shutdown to return the RAM to the budget.\n\n## Install\n\n```bash\n# from npm (recommended)\npi install npm:@localaicat/pi\n\n# or install a local checkout persistently\npi install ./tools/pi\n\n# or one-off for a single run\npi -e ./tools/pi/index.ts\n```\n\n## Quick start\n\n```bash\npi install npm:@localaicat/pi\nexport LOCALAICAT_BASE_URL=http://127.0.0.1:11434\nexport LOCALAICAT_API_KEY=local                 # if the Local API requires a token\nexport LOCALAICAT_MODEL=mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit\npi --provider localaicat\n```\n\nThe extension **self-configures** the `localaicat` provider on first load by\nwriting `~/.pi/agent/models.json` from the `LOCALAICAT_*` environment above\n(see \"Provider self-configuration\"), so the install + four lines is all you need.\n\n## Provider self-configuration\n\nOn load the extension ensures pi knows about the `localaicat` provider. If\n`~/.pi/agent/models.json` has no `localaicat` entry, it writes one:\n\n```json\n{\n  \"providers\": {\n    \"localaicat\": {\n      \"baseUrl\": \"http://127.0.0.1:11434/v1\",\n      \"api\": \"openai-completions\",\n      \"apiKey\": \"local\",\n      \"models\": [{ \"id\": \"mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit\" }]\n    }\n  }\n}\n```\n\n`baseUrl` comes from `LOCALAICAT_BASE_URL` (with `/v1` appended), `apiKey` from\n`LOCALAICAT_API_KEY` (default `local`), and the seeded model from\n`LOCALAICAT_MODEL` (default `Qwen3-Coder-30B-A3B-Instruct-4bit`). An **existing**\n`localaicat` entry is never overwritten \u2014 hand-edit it freely. If the write\nfails for any reason, paste the block above manually.\n\n## Environment\n\n| Variable | Default | Purpose |\n|---|---|---|\n| `LOCALAICAT_BASE_URL` | `http://127.0.0.1:11434` | Base of the Local API |\n| `LOCALAICAT_API_KEY` | \u2013 | Local API token when the app requires one |\n| `LOCALAICAT_PROVIDER` | `localaicat` | Comma-separated pi provider names to match on `model_select` |\n| `LOCALAICAT_MODEL` | \u2013 | Model to warm on `session_start` if none selected yet |\n| `LOCALAICAT_LOG` | \u2013 | Append one line per load/unload action (used by tests) |\n\n## Commands\n\nAll under a single `/localaicat` command:\n\n- `/localaicat` (or `/localaicat status`) \u2014 show loaded state + the local RAM budget / headroom (`/v1/local/resources`).\n- `/localaicat load [model-id]` \u2014 load a specific model, the selected pi model, or `LOCALAICAT_MODEL`.\n- `/localaicat unload [model-id]` \u2014 unload a specific model, the selected pi model, or `LOCALAICAT_MODEL`.\n- `/localaicat stop` \u2014 stop the Local API server.\n\n## Status line\n\nThe extension updates pi's footer with the last assistant turn when pi exposes\nusage data:\n\n```text\nlocalaicat: loaded Qwen3-Coder-30B-A3B-Instruct-4bit \u00b7 28.4 tok/s \u00b7 1240/310/1550 tok \u00b7 12.8% ctx\n```\n\nIt reads loaded/unloaded state from `/v1/local/resources`, OpenAI-style usage\nfields (`prompt_tokens`, `completion_tokens`, `total_tokens`,\n`tokens_per_second`), and pi's built-in context estimate via\n`ctx.getContextUsage()`. If a value is missing, it is omitted rather than\nblocking the session.\n\n## How it works\n\n| pi event | action |\n|---|---|\n| `model_select` (provider = `localaicat`) | `POST /v1/local/models/{id}/load` |\n| `message_update` / `message_end` | update pi footer resource + stats via `setStatus` |\n| `session_start` (with `LOCALAICAT_MODEL`) | warm fallback `load` |\n| `session_shutdown` | `POST /v1/local/models/{id}/unload` |\n| `/localaicat stop` | `POST /v1/local/server/stop` |\n\nIf the app isn't running, actions degrade quietly \u2014 the next chat request still\nloads the model lazily.\n",
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "pi-package",
+    "local-ai-cat",
+    "localaicat",
+    "mlx",
+    "llm",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "Local AI Cat"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/local-ai-cat/pi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/local-ai-cat/Local-AI-Chat.git",
+    "directory": "tools/pi"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-04T23:05:10.303Z",
+    "modified": "2026-06-16T19:54:33.442Z",
+    "0.1.0": "2026-06-04T23:05:10.630Z",
+    "0.1.1": "2026-06-15T05:25:48.466Z",
+    "0.1.2": "2026-06-15T15:58:11.296Z",
+    "0.1.3": "2026-06-16T19:54:33.317Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": null,
+  "download_trend": []
+}

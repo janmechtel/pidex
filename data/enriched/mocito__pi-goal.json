@@ -1,0 +1,42 @@
+{
+  "name": "@mocito/pi-goal",
+  "latest_version": "0.1.9",
+  "description": "Persistent long-running goals for Pi.",
+  "readme": "# @mocito/pi-goal\n\nPersistent long-running goals for Pi, modeled after Codex `/goal`.\n\n## Install\n\n```bash\npi install npm:@mocito/pi-goal\n```\n\nFor local development:\n\n```bash\npi -e ./packages/pi-goal\n# or\npi -e ./packages/pi-goal/extensions/index.ts\n```\n\n## Commands\n\n- `/goal` or `/goal status` \u2014 show current goal and usage.\n- `/goal <objective>` \u2014 create or replace the branch goal.\n- `/goal --budget 50000 <objective>` \u2014 create a budgeted goal.\n- `/goal edit` \u2014 edit the objective in a multiline editor.\n- `/goal pause` \u2014 pause automatic continuation.\n- `/goal resume` \u2014 resume automatic continuation.\n- `/goal clear` \u2014 clear the current branch goal.\n- `/goal budget 50000` \u2014 set/update token budget.\n- `/goal budget clear` \u2014 remove token budget.\n\nReplacing a non-complete goal asks for confirmation when UI is available.\n\n## Model tools\n\n- `get_goal` returns current goal state and remaining budget.\n- `create_goal` creates a goal only when explicitly requested and fails if one already exists.\n- `update_goal` lets the model mark a goal `complete` or `blocked` only. It should mark complete only after requirement-by-requirement verification, and blocked only after the same blocker repeats for at least three goal turns.\n\n## Behavior\n\nGoal state is stored as immutable `pi-goal` custom session entries and reconstructed from `ctx.sessionManager.getBranch()`, so state follows Pi session branches, tree navigation, forks, and reloads.\n\nWhen an active goal is idle, the extension injects a hidden `pi-goal-context` message and triggers another turn. A context filter keeps only the latest goal context message for the current goal to avoid linear context growth.\n\nThe footer and optional editor widget show status, elapsed active time, token usage, and budget.\n\nProvider usage-limit handling pauses active goals when Pi exposes HTTP 429 responses or assistant error messages that indicate subscription, quota, billing, balance, or repeated provider failures. This prevents automatic continuation from retrying indefinitely after provider limits such as 5-hour subscription caps. When the budget is exhausted or a provider limit is detected, a visible `pi-goal-event` message is also delivered to the model so it can stop work and call `update_goal` to finalize the goal instead of continuing to spend tokens on a turn that has effectively been cut off.\n\n## Examples\n\nSimple goal:\n\n```text\n/goal update the README with installation instructions\n```\n\nBudgeted goal:\n\n```text\n/goal --budget 50000 refactor the parser and run the test suite\n```\n\nPause and resume:\n\n```text\n/goal pause\n/goal resume\n```\n\nBranch behavior: goal mutations are stored on the current session branch. If you use `/tree`, `/fork`, or `/clone`, Pi Goal reconstructs the goal from that branch only, so divergent branches can have different goal state.\n\n## Configuration\n\nv1 has no user-facing goal configuration. Automatic continuation is enabled for active goals and stops when the goal is paused, blocked, complete, usage-limited, budget-limited, cleared, or when pending user messages exist.\n\nEnvironment flags:\n\n| Flag | Description |\n| --- | --- |\n| `PI_OFFLINE=1` | Disables install/update telemetry. |\n| `PI_TELEMETRY=0` | Disables install/update telemetry. |\n\n## Troubleshooting\n\n- If continuation does not start, run `/goal status` and confirm the goal is `active`.\n- If a goal stops unexpectedly, check whether it reached its token budget or the provider returned a rate/usage limit. Usage-limit pauses may include a provider reset hint when one is available. A budget-exhausted or rate-limited goal is also surfaced to the model as a `pi-goal-event` in the conversation so it can call `update_goal`; if the model never receives that, the goal stays in `budget_limited` until you run `/goal resume` or `/goal clear`.\n- If context appears stale after tree navigation or reload, run `/goal status`; branch state is reconstructed from the active branch.\n- In print/JSON modes, commands and tools work, but interactive confirmations/editors are unavailable.\n\n## Limitations\n\n- Token budget is enforced after finalized assistant usage is visible; v1 cannot hard-stop mid-turn, but the model is notified as soon as the overrun is detected so it can stop further work in the same or next turn.\n- Usage-limit handling is best-effort via HTTP responses and assistant error messages; provider transports vary in how much structured limit information they expose.\n- Automatic continuation is session-local, not a background daemon.\n\n## Development and validation\n\nFrom the monorepo root:\n\n```bash\nnpm install\nnpm run check --workspace packages/pi-goal\nnpm test --workspace packages/pi-goal\nnpm run pack:dry-run --workspace packages/pi-goal\nnpm audit --omit=dev\n```\n\nBefore publishing, also run the root validation loop:\n\n```bash\nnpm run validate\n```\n\n## Publishing\n\n`@mocito/pi-goal` is published independently from this workspace. Release tags use the monorepo package format:\n\n```text\n@mocito/pi-goal@0.1.0\n```\n\nUse the project-local release command from the repository root when possible:\n\n```text\n/release-package @mocito/pi-goal 0.1.0\n```\n\n## Security and privacy\n\nPi packages execute arbitrary code with your user permissions. Install only from sources you trust.\n\n`pi-goal` does not require API keys and does not read provider credentials. Goal state is stored in local Pi session entries and goal objectives may be sent to the active model as hidden continuation context. Do not put secrets, credentials, tokens, or private data into goal objectives.\n\nOn startup, Pi Goal sends a best-effort install/update telemetry ping once per package version unless Pi telemetry is disabled, offline mode is enabled, or Pi runs in CI. See [SECURITY.md](./SECURITY.md) for the full security model and reporting instructions.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "goal",
+    "automation"
+  ],
+  "author": {
+    "name": "Jose Mocito"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/jvm/pi-mono/tree/main/packages/pi-goal#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jvm/pi-mono.git",
+    "directory": "packages/pi-goal"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-28T08:18:32.352Z",
+    "modified": "2026-06-16T18:07:31.295Z",
+    "0.1.0": "2026-05-28T08:18:32.672Z",
+    "0.1.1": "2026-05-28T08:27:55.630Z",
+    "0.1.2": "2026-05-28T08:37:51.481Z",
+    "0.1.6": "2026-06-06T00:23:30.532Z",
+    "0.1.7": "2026-06-08T17:00:43.014Z",
+    "0.1.8": "2026-06-08T21:03:00.356Z",
+    "0.1.9": "2026-06-16T18:07:30.900Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": null,
+  "download_trend": []
+}

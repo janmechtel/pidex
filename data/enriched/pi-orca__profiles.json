@@ -1,0 +1,51 @@
+{
+  "name": "@pi-orca/profiles",
+  "latest_version": "0.0.5",
+  "description": "Named extension sets with CLI switcher",
+  "readme": "# @pi-orca/profiles\n\nNamed settings snapshots with CLI switcher for switching between curated Pi configurations.\n\n## Overview\n\nProfiles let you save and switch between named Pi settings configurations. Each profile is a snapshot of managed settings fields (packages, model defaults, etc.) stored in `profiles.yaml`. Switching profiles updates `settings.json` and reloads extensions to match.\n\nThe package also provides `pi-orca-switch-profile`, a standalone CLI binary that switches profile before launching Pi \u2014 no `/reload` needed.\n\n## Installation\n\nThe package is part of the Pi Orca monorepo and loaded as a Pi extension:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./dist/index.js\"]\n  }\n}\n```\n\n## Bootstrap\n\nOn first run, the extension creates `~/.pi/agent/orca/profiles.yaml` with two profiles:\n\n| Profile | Description |\n|---------|-------------|\n| `default` | Snapshot of current `settings.json` at bootstrap time |\n| `solo` | Solo coding \u2014 tasks, models, cleanup, profiles only |\n\n## Slash Commands\n\n### `/profiles` (no args)\n\nShow the current active profile (or \"custom\" if settings don't match any saved profile).\n\n### `/profiles list`\n\nList all available profiles with descriptions.\n\n### `/profiles switch <name>` (alias: `/profiles set`)\n\nSwitch to a named profile. Updates `settings.json` with the profile's managed fields and triggers a reload so extensions match the new configuration. Supports tab-completion for profile names.\n\n```\n/profiles switch solo\n```\n\n### `/profiles save <name> [description]`\n\nSave the current `settings.json` as a named profile. If the profile already exists, it is overwritten.\n\n```\n/profiles save my-config My custom configuration\n```\n\n## CLI: `pi-orca-switch-profile`\n\nSwitch profile before launching Pi so the correct extensions are loaded from the start:\n\n```bash\n# Just switch (updates settings.json and exits)\npi-orca-switch-profile solo\n\n# Switch then launch Pi\npi-orca-switch-profile default pi --resume\n```\n\n**How it works:** The binary calls `bootstrapProfiles()` and `switchProfile()` to update `settings.json` *before* Pi starts. When Pi launches, settings already reflect the desired profile \u2014 no `/reload` needed.\n\nAvailable via `npx`, `npm install -g @pi-orca/profiles`, or directly in the monorepo's `node_modules/.bin/`.\n\n## Profile Storage\n\nProfiles are stored in YAML at `~/.pi/agent/orca/profiles.yaml`:\n\n```yaml\nprofiles:\n  default:\n    description: Current Pi configuration\n    settings:\n      packages:\n        - npm:@pi-orca/tasks\n        - npm:@pi-orca/models\n        # ...\n  solo:\n    description: \"Solo coding \u2014 tasks, models, cleanup\"\n    settings:\n      packages:\n        - npm:@pi-orca/tasks\n        - npm:@pi-orca/models\n        - npm:@pi-orca/cleanup\n        - npm:@pi-orca/profiles\n```\n\n## Managed Fields\n\nProfiles manage specific fields from `settings.json`, split into two categories:\n\n**Replace fields** \u2014 fully controlled by the profile. If a field is not present in the profile, it is cleared from `settings.json` on switch:\n- `packages` \u2014 list of Pi packages\n- `extensions` \u2014 local extension overrides\n- `skills` \u2014 local skill overrides\n- `prompts` \u2014 local prompt overrides\n- `themes` \u2014 local theme overrides\n\n**Merge fields** \u2014 user preferences preserved across switches. Only updated if the profile explicitly specifies them:\n- `theme` \u2014 active theme name\n- `defaultProvider` \u2014 default AI provider\n- `defaultModel` \u2014 default model\n- `defaultThinkingLevel` \u2014 default thinking level\n\nThe field lists are defined in `types.ts` via `REPLACE_FIELDS` and `MERGE_FIELDS`.\n\n## Architecture\n\n```\nsrc/\n\u251c\u2500\u2500 cli.ts          # pi-orca-switch-profile standalone CLI binary\n\u251c\u2500\u2500 index.ts        # Extension entry point, slash command handler\n\u251c\u2500\u2500 loader.ts       # Profile I/O, switching, settings comparison, bootstrap\n\u251c\u2500\u2500 commands.ts     # Slash command implementations (show, list, switch, save)\n\u251c\u2500\u2500 types.ts        # Profile, ProfilesConfig, PiSettings, REPLACE_FIELDS, MERGE_FIELDS\n\u2514\u2500\u2500 __tests__/\n    \u2514\u2500\u2500 loader.test.ts  # Unit tests for loader functions\n```\n\n## Dependencies\n\n- `@pi-orca/core` \u2014 Path utilities, completion tree resolution, settings I/O (`readPiSettings`, `writePiSettings`, `getUserOrcaDir`, `ensureDir`)\n- `yaml` \u2014 YAML parse/stringify for profile storage\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-orca",
+    "pi-agent",
+    "pi-extension"
+  ],
+  "author": {
+    "name": "Bindu / Ba"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/binduwavell/pi-orca#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/binduwavell/pi-orca.git",
+    "directory": "packages/profiles"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-04-13T22:24:13.926Z",
+    "modified": "2026-05-27T04:09:38.536Z",
+    "0.0.1": "2026-04-13T22:11:39.382Z",
+    "0.0.2-dev.20260413161640": "2026-04-13T22:16:56.406Z",
+    "0.0.2-dev.20260413162335": "2026-04-13T22:24:14.149Z",
+    "0.0.2-dev.20260414090345": "2026-04-14T15:04:03.778Z",
+    "0.0.2-dev.20260414091409": "2026-04-14T15:14:24.341Z",
+    "0.0.2-dev.20260414093420": "2026-04-14T15:34:33.669Z",
+    "0.0.2-dev.20260421080334": "2026-04-21T14:04:12.956Z",
+    "0.0.2-dev.20260422150519": "2026-04-22T21:06:55.110Z",
+    "0.0.2-dev.20260422214056": "2026-04-23T03:41:40.915Z",
+    "0.0.2-dev.20260517151352": "2026-05-17T21:15:10.263Z",
+    "0.0.2": "2026-05-17T21:16:38.787Z",
+    "0.1.0-dev.20260517151644": "2026-05-17T21:17:02.112Z",
+    "0.0.3-dev.20260517154318": "2026-05-17T21:43:45.918Z",
+    "0.0.3-dev.20260526215119": "2026-05-27T03:52:21.870Z",
+    "0.0.3": "2026-05-27T03:54:10.138Z",
+    "0.0.4": "2026-05-27T04:03:12.626Z",
+    "0.0.5": "2026-05-27T04:09:38.424Z"
+  },
+  "versions_count": 15,
+  "downloads_last_week": 7,
+  "download_trend": []
+}

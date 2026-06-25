@@ -1,0 +1,43 @@
+{
+  "name": "pi-google-services",
+  "latest_version": "0.1.16",
+  "description": "Google Calendar & Gmail MCP server for Pi \u2014 login once, manage your calendar and emails from your AI agent.",
+  "readme": "# pi-google-services\n\nGoogle Calendar, Gmail, and Google Meet MCP server for Pi.\nSingle binary, zero runtime deps. Login once, manage everything from your agent.\n\n## Quick Install\n\n```bash\npi install npm:pi-google-services\npi-google-services setup\n# Restart Pi session, then:\n# \"show my events\", \"read my inbox\", \"create a meeting with Meet\"\n```\n\n## Updates\n\n```bash\n# Via Pi (recommended)\npi update pi-google-services\n\n# Via binary\npi-google-services update\n```\n\nAfter updating, restart your Pi session.\n\n## Tools\n\n### Calendar (7)\n\n| Tool | Description |\n|------|-------------|\n| `list-events` | List events in a date range |\n| `create-event` | Create event with attendees + Meet link |\n| `update-event` | Modify existing event |\n| `delete-event` | Remove event |\n| `search-events` | Search by text |\n| `list-calendars` | Show all calendars |\n| `get-freebusy` | Check availability |\n\n### Gmail (5)\n\n| Tool | Description |\n|------|-------------|\n| `list-inbox` | Show recent emails |\n| `get-email` | Read full email by ID |\n| `search-emails` | Search with Gmail syntax |\n| `send-email` | Send new email with optional file attachments |\n| `reply-to-email` | Reply to thread with optional file attachments |\n\n### Email Attachments\n\nBoth `send-email` and `reply-to-email` accept an optional `attachments` array.\nEach attachment can reference a local file or a Google Drive file:\n\n```json\n{\n  \"to\": \"user@example.com\",\n  \"subject\": \"Report\",\n  \"body\": \"See attached\",\n  \"attachments\": [\n    { \"localPath\": \"/home/user/report.pdf\" },\n    { \"driveFileId\": \"1a2b3c4d5e6f\" }\n  ]\n}\n```\n\n### Tasks (5)\n\n| Tool | Description |\n|------|-------------|\n| `list-tasklists` | Show all task lists |\n| `list-tasks` | List tasks (pending/completed) |\n| `create-task` | Create a new task |\n| `complete-task` | Mark task as done |\n| `delete-task` | Remove a task |\n\n### Meet\n\nPass `\"withMeet\": true` to `create-event` to auto-generate a Google Meet link.\n\n## Architecture\n\n```\npi-google-services/          npm package (pi-package)\n\u251c\u2500\u2500 main.go                  CLI entry point\n\u251c\u2500\u2500 package.json             Pi manifest + npm\n\u251c\u2500\u2500 SKILL.md                 Pi skill\n\u251c\u2500\u2500 install.js               postinstall: download binary + credentials\n\u251c\u2500\u2500 internal/\n\u2502   \u251c\u2500\u2500 mcp/                 MCP protocol (JSON-RPC 2.0 / stdio)\n\u2502   \u251c\u2500\u2500 services/            Service interface + tool implementations\n\u2502   \u2502   \u251c\u2500\u2500 calendar.go      7 tools\n\u2502   \u2502   \u2514\u2500\u2500 gmail.go         5 tools\n\u2502   \u251c\u2500\u2500 calendar/api.go      Google Calendar API wrapper\n\u2502   \u251c\u2500\u2500 gmail/api.go         Gmail API wrapper\n\u2502   \u251c\u2500\u2500 auth/                OAuth2 PKCE (browser login)\n\u2502   \u2514\u2500\u2500 config/              Token storage\n\u2514\u2500\u2500 .github/workflows/\n    \u2514\u2500\u2500 release.yml          CI: build + npm publish (OIDC)\n```\n\nCredentials are stored as a GitHub secret (GOOGLE_OAUTH_CREDENTIALS_JSON),\nNOT in the repository. install.js downloads them during npm postinstall.\n\n## Transparency & Security\n\n### Open Source, Auditable Code\n\nThis entire project is open source. Every line of code can be reviewed,\naudited, and verified. The Go binary is built from this source in\nGitHub Actions with provenance attestation \u2014 you can verify the build\nmatches the published source.\n\n### How OAuth Works\n\npi-google-services uses **OAuth 2.0 with PKCE** (Proof Key for Code\nExchange), the industry standard for desktop applications:\n\n1. You run `login` or `setup`\n2. Your browser opens to Google's consent screen\n3. You see exactly what permissions are being requested (calendar,\n   email, tasks, drive, contacts)\n4. You authorize with your Google account\n5. A token is saved **locally** on your machine (`~/.config/pi-google-services/`)\n6. The token never leaves your machine \u2014 all API calls go directly\n   from your binary to Google\n\n### About the Client ID\n\nThe package ships with a pre-registered Google Cloud OAuth client ID.\nThis is **not a secret** \u2014 it's the same mechanism used by every app\nthat offers \"Sign in with Google\" (Todoist, Notion, Fantastical, etc.).\n\nThe client ID is publicly visible in the authorization URL and only\nserves to identify which app is requesting access. The actual security\nis in the OAuth consent screen where **you** decide what to share.\n\n### Why Google Shows \"This app is not verified\"\n\nWhen you run `login` or `setup`, Google shows a warning screen saying\nthe app is not verified. **This is normal and safe.**\n\nGoogle's verification process requires a registered domain, a formal\nbrand review, and proof of ownership \u2014 it's designed for public web\napps with a business behind them, not open-source CLI tools.\n\nThe warning appears once per user. Click **\"Continue\"** to authorize.\nYour data goes directly from your machine to Google \u2014 no intermediate\nservers, no tracking, no telemetry.\n\nThis is an open-source project built for utility, not monetization.\nDomain registration and Google verification are not a priority.\nMany popular CLI tools for Google services (like `gcalcli`) are also\nunverified. This does not affect security.\n\n### Credential Storage\n\n| What | Where |\n|------|-------|\n| OAuth client ID | Embedded in the binary (public by design) |\n| Access/Refresh tokens | `~/.config/pi-google-services/tokens.json` (0600 permissions) |\n| No data leaves your machine | All Google API calls are direct from your binary |\n\nThe binary never phones home, tracks usage, or sends telemetry.\n\n## Development\n\n```bash\ncp /path/to/credentials.json .\ngo build -o pi-google-services .\n./pi-google-services login\n./pi-google-services serve\n```\n\n## Tests\n\n```bash\ngo test ./... -v\n```\n\n26 unit tests (MCP protocol, config, service metadata, services, MIME multipart attachments).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "lucasvidela94"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/lucasvidela94/pi-google-services",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lucasvidela94/pi-google-services.git"
+  },
+  "pi": {
+    "skills": [
+      "./SKILL.md"
+    ],
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-11T03:17:49.022Z",
+    "modified": "2026-06-25T03:48:27.089Z",
+    "0.1.0": "2026-06-11T03:17:49.657Z",
+    "0.1.1": "2026-06-11T03:41:52.839Z",
+    "0.1.7": "2026-06-11T03:54:12.944Z",
+    "0.1.8": "2026-06-11T04:00:00.410Z",
+    "0.1.11": "2026-06-11T15:36:04.621Z",
+    "0.1.12": "2026-06-11T15:41:44.131Z",
+    "0.1.13": "2026-06-25T03:37:02.186Z",
+    "0.1.14": "2026-06-25T03:42:06.902Z",
+    "0.1.15": "2026-06-25T03:44:52.474Z",
+    "0.1.16": "2026-06-25T03:48:26.641Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": null,
+  "download_trend": []
+}

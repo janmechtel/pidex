@@ -1,0 +1,32 @@
+{
+  "name": "@resolutedev/pi-flow",
+  "latest_version": "2.0.0",
+  "description": "Multi-stage development workflow orchestrator for pi",
+  "readme": "# pi-flow\n\nRun your own multi-stage skill workflows in [pi](https://pi.dev) \u2014 pick the model for each skill, and mark which skills need you and which run unattended.\n\n## Concepts\n\n- **Flow** \u2014 an ordered list of skills you trigger by name.\n- **Stage** \u2014 one skill in a flow, with its own optional model and a mode.\n- **Mode** \u2014 `HITL` (the flow pauses after the skill and waits for `/pi-flow:next`) or `AFK` (the flow auto-advances when the skill's agent run ends). A flow whose stages are all `AFK` runs start to finish unattended.\n\n## Quick start\n\n```bash\npi install npm:@resolutedev/pi-flow\n```\n\nThen, in pi, write the three starter flows into your config:\n\n```\n/pi-flow:setup\n```\n\nThat creates `~/.pi/agent/pi-flow.json` with `new-feature`, `improve-arch`, and `debug`. Now run one:\n\n```\n/pi-flow:run new-feature add dark mode\n```\n\nStart typing `/pi-flow:run ` and pi autocompletes your flow names. Until you run `/pi-flow:setup` (or write the file yourself), there are no flows \u2014 `/pi-flow:status` will tell you so.\n\n## Where flows live\n\nAll flows \u2014 the starter ones and your own \u2014 live in a single file you own: **`~/.pi/agent/pi-flow.json`** (alongside pi's own `models.json` / `settings.json`). `/pi-flow:setup` seeds it once with the three built-ins; after that it's yours and pi-flow never rewrites it.\n\n```json\n{\n  \"flows\": {\n    \"ship-it\": {\n      \"description\": \"Plan, build, and review\",\n      \"stages\": [\n        { \"skill\": \"grill-with-docs\", \"model\": \"opencode-go/qwen3.7-max\", \"mode\": \"HITL\" },\n        { \"skill\": \"to-prd\",          \"model\": \"opencode-go/qwen3.7-max\", \"mode\": \"AFK\"  },\n        { \"skill\": \"tdd\",             \"model\": \"opencode-go/kimi-k2.6\",   \"mode\": \"AFK\"  }\n      ]\n    }\n  }\n}\n```\n\nEach stage:\n\n- **`skill`** (required) \u2014 the pi skill to run.\n- **`model`** (optional) \u2014 `\"provider/id\"`. Omit it to keep whatever model is currently active. All models are validated when you start a flow, so a typo fails before the first stage runs.\n- **`mode`** (optional) \u2014 `HITL` or `AFK`. Defaults to `HITL`, so a stage never runs unattended unless you opt in.\n\nRun `/pi-flow:help` any time to print this schema.\n\n## How a flow runs\n\n- On each stage, pi-flow switches to the stage's model (if set) and hands the skill a kickoff message. The first stage receives your `run` input; later stages continue from what the session has produced so far.\n- When the agent finishes a stage:\n  - **AFK** \u2192 advance to the next stage automatically, unless the agent reports it is stuck or has a question (then the flow pauses).\n  - **HITL** \u2192 pause and wait for `/pi-flow:next`.\n- If a stage can't start (unknown or unavailable model), the flow pauses instead of cascading through later stages.\n- When the last stage finishes, the flow completes.\n\nWant a checkpoint in an otherwise-unattended flow? Mark that stage `HITL` \u2014 that's what it's for.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/pi-flow:setup` | Write the three starter flows into `~/.pi/agent/pi-flow.json` |\n| `/pi-flow:help` | Print the flow schema |\n| `/pi-flow:run <name> [input]` | Start a flow (autocompletes flow names) |\n| `/pi-flow:next` | Advance past a HITL pause |\n| `/pi-flow:skip` | Abandon the current stage and move to the next |\n| `/pi-flow:retry` | Re-run the current stage |\n| `/pi-flow:cancel` | Stop the active flow (produced work stays in the session) |\n| `/pi-flow:status` | Show your flows and the active stage |\n\nFlow progress is persisted, so a flow survives `/new` and session restarts; if you delete a flow that was mid-run, its leftover state is cleared on the next start.\n\n### For Maintainers: Publishing Releases\n\nThe GitHub Actions workflow automatically publishes to npm when a version tag is pushed. To enable this:\n\n1. **Generate an npm access token** with publish permissions:\n   ```bash\n   npm login\n   npm token create --read-only=false\n   ```\n\n2. **Add the token to GitHub Secrets**:\n   - Go to your repository Settings \u2192 Secrets and variables \u2192 Actions\n   - Click \"New repository secret\"\n   - Name: `NPM_TOKEN`\n   - Value: the token from step 1\n\n3. **Create a release**:\n   ```bash\n   npm version patch  # or minor/major\n   git push origin main --tags\n   ```\n\nThe workflow will:\n- Run tests\n- Extract version from the tag (e.g., `v1.2.3`)\n- Patch `package.json` with the version\n- Publish to npm with `--access public`\n- Create a GitHub Release with auto-generated notes\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/dev-resolute/pi-flow#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dev-resolute/pi-flow.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-08T11:29:39.318Z",
+    "modified": "2026-06-14T16:47:52.896Z",
+    "1.0.0": "2026-06-08T11:29:39.652Z",
+    "1.2.0": "2026-06-09T02:29:12.863Z",
+    "1.3.0": "2026-06-11T13:47:00.047Z",
+    "2.0.0": "2026-06-14T16:47:52.791Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 20,
+  "download_trend": []
+}

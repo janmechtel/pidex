@@ -1,0 +1,40 @@
+{
+  "name": "@nukcole-xinluo9510/pi-critic-guy",
+  "latest_version": "0.2.2",
+  "description": "Pi extension \u2014 spawn a second-opinion reviewer by typing \"critic\"",
+  "readme": "# \ud83e\uddd0 Critic Guy\n\n**A pi extension that trusts the model.** Type `critic` in any pi session and get a\nsecond opinion \u2014 from an independent, read-only reviewer you spawn with a single word.\n\nNo extra tools. No agent files. No configuration. Just say `critic`.\n\n<p align=\"center\">\n  <img src=\"https://raw.githubusercontent.com/luoxin9510/pi-packages/main/packages/pi-critic-guy/assets/philosophy.png\" alt=\"Critic Guy \u2014 freedom in the middle, rails at the edge\" width=\"840\">\n</p>\n\n```\ncritic\ncritic review the auth code\ncritic using claude check for race conditions\ncritic model=deepseek-v4-flash review the error handling\n```\n\n---\n\n## Why it's different \u2014 built the pi way\n\npi's core bet is simple: **the model is capable \u2014 give it good context and good tools,\nthen get out of the way.** Critic Guy is built on exactly that bet.\n\nIt does **not** wrap reviewing in a rigid tool with fixed modes and schemas. It teaches\nthe model a *capability* and hands over the judgment:\n\n- **What to review?** The model picks the most valuable target from your conversation \u2014\n  you don't have to spell it out.\n- **One critic or several in parallel?** The model decides, splitting large scope into\n  focused reviewers however it sees fit.\n\nThe only thing Critic Guy locks down is the **boundary** \u2014 and it locks it down with\n*mechanism*, not by asking the model nicely:\n\n- The critic spawns as a fresh `pi -p` session with **read-only tools** (`read`, `grep`,\n  `find`, `ls`) \u2014 it physically cannot edit files, write files, or run shell commands.\n- `--offline -ne` means the child never hangs on startup network calls and never\n  re-loads this extension (so no runaway nesting).\n- Its persona refuses to read credentials, secrets, or dotfiles.\n\n> **Freedom in the middle, hard rails at the edge.**\n> Judgment goes to the model; safety is enforced in code.\n\nThat's the whole philosophy \u2014 and it's why Critic Guy stays a tiny prompt injection\ninstead of a 1000-line tool. It's the most pi-native way to get a critic.\n\n## Highlights\n\n- \ud83e\udeb6 **Zero dependencies, zero config** \u2014 no companion extension, no `reviewer.md`,\n  nothing to install beyond this package.\n- \ud83d\udd12 **Safe by construction** \u2014 the reviewer is read-only and isolated; the boundary is\n  enforced by `--tools`, not by trust.\n- \ud83e\udde0 **Model-driven** \u2014 you decide *that* you want a review; the model decides *what* and\n  *how*.\n- \ud83d\udcb8 **Zero overhead when idle** \u2014 instructions are injected **only** on turns where you\n  actually type `critic`. Silent the rest of the time.\n- \ud83c\udfaf **Model-aware** \u2014 resolves the reviewer model from your current session, or one you\n  name with `using <name>` / `model=<id>`.\n- \u2696\ufe0f **Actionable verdict** \u2014 every review sorts findings into BAD / UGLY / OK and ends\n  with a machine-readable `VERDICT: PASS/FAIL` line (PASS only when nothing is BAD or UGLY).\n\n## Install\n\n```bash\n# From npm\npi add npm:@nukcole-xinluo9510/pi-critic-guy\n\n# Or from a local checkout during development\npi add /path/to/pi-critic-guy\n```\n\nThat's it. No other setup.\n\n## Usage\n\nIn any pi session, just mention `critic`:\n\n| You type | What happens |\n|---|---|\n| `critic` | Model picks the most valuable thing from the conversation and reviews it |\n| `critic review the auth code` | Targeted review of what you point at |\n| `critic using claude` | Spawn the critic on a model matching \"claude\" |\n| `critic model=deepseek-v4-flash` | Spawn the critic on an exact model id |\n\nWord-boundary matching means `critical`, `criticism`, etc. will **not** trigger it \u2014\nonly a standalone `critic`.\n\n## How it works\n\nCritic Guy hooks `before_agent_start`. On any turn where you mention `critic`:\n\n1. It resolves the reviewer model (your current model, the registry, or one you named).\n2. It appends a short **\"Capability: Critic Guy\"** section to the system prompt \u2014 the\n   capability, the resolved model id, and one spawn command with the hard-boundary flags.\n3. The model spawns one or more critics:\n   ```bash\n   pi -p --offline -ne --no-session -nc --model \"<resolved>\" \\\n     --tools read,grep,find,ls \\\n     --append-system-prompt \"<reviewer persona>\" \\\n     \"Task: review <files> ...\"\n   ```\n4. Each critic reads the named files in its own isolated context and returns a critique,\n   which the model relays to you.\n\nIf the system prompt is already very large, Critic Guy skips injection that turn and says\nso \u2014 it never silently no-ops.\n\n## The critic's contract\n\nThe one thing Critic Guy *does* standardize is the **output** \u2014 a predictable verdict is\nwhat makes the result actionable:\n\n- **Severity buckets** \u2014 every finding is sorted into **BAD** (broken or unsafe \u2014 must\n  fix), **UGLY** (smell, unclear, or untested \u2014 should fix), or **OK** (fine / done well).\n- **Clear pass/fail** \u2014 the critic closes with a single line: `VERDICT: PASS` only when\n  there are zero BAD and zero UGLY findings, otherwise `VERDICT: FAIL`.\n- **No hanging** \u2014 running non-interactively, the critic never asks questions or waits for\n  input; if something's missing it states an assumption and judges anyway, then closes\n  with its `VERDICT:` line. A missing verdict is itself a signal the run didn't finish.\n- **Timeout = split, not repeat** \u2014 if a critic times out or returns no verdict, the model\n  re-runs on smaller, **non-overlapping** slices (one identical retry is allowed for a\n  transient hiccup) instead of blindly repeating the same run; if a target is already a\n  minimal unit, it stops and reports the timeout instead.\n\n`parseVerdict()` is exported as a small helper for CI or programmatic callers that want to\nread that final line (`PASS` / `FAIL` / `null` when absent).\n\n## Requirements\n\n- pi 0.79+\n\n(Yes, that's the whole list.)\n\n## Development\n\n```bash\nnpm run check   # tsc --noEmit\nnpm test        # node --test (matchModel, parseModelQuery, parseVerdict)\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "critic",
+    "review",
+    "code-review"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/luoxin9510/pi-packages#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luoxin9510/pi-packages.git",
+    "directory": "packages/pi-critic-guy"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/critic-guy.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/luoxin9510/pi-packages/main/packages/pi-critic-guy/assets/philosophy.png"
+  },
+  "time": {
+    "created": "2026-06-18T02:23:43.561Z",
+    "modified": "2026-06-25T16:47:16.044Z",
+    "0.1.0": "2026-06-18T02:23:43.897Z",
+    "0.1.1": "2026-06-18T02:28:21.394Z",
+    "0.1.2": "2026-06-18T02:55:31.244Z",
+    "0.2.0": "2026-06-18T03:14:36.959Z",
+    "0.2.1": "2026-06-18T08:55:55.189Z",
+    "0.2.2": "2026-06-25T16:47:15.891Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 651,
+  "download_trend": []
+}

@@ -1,0 +1,39 @@
+{
+  "name": "pi-autonomy-profiles",
+  "latest_version": "0.3.0",
+  "description": "Standalone Auto Mode commands, permission modes, and guardrails for Pi",
+  "readme": "# pi-autonomy-profiles\n\nStandalone Auto Mode and manual approval guardrails for Pi, inspired by Claude Code.\n\nThis package is distributed as a [Pi package](https://pi.dev/packages). It ships the TypeScript extension entrypoint directly; Pi loads package extensions with its TypeScript runtime, so there is no build output to publish.\n\n## Install from npm\n\n```bash\npi install npm:pi-autonomy-profiles\n```\n\n## Commands\n\n- `/autonomy auto` \u2014 enable standalone Auto Mode\n- `/autonomy manual` \u2014 use manual approvals\n- `/autonomy status` \u2014 show effective status and config paths\n- `/autonomy defaults` \u2014 print a starter config\n\n## What it does\n\n- Runs as a standalone extension\n- Implements its own deny \u2192 ask \u2192 allow checks before each tool call\n- Prompts from the extension UI for manual approval modes\n- Stores session-scoped approvals in memory\n- Blocks protected path writes such as `.git`, `.claude`, `.pi`, shell startup files, package manager config, and MCP config\n- Provides a simple Auto Mode/manual command surface while still supporting advanced config modes\n- Adds deterministic Auto Mode guardrails for obvious risky bash operations: `curl | bash`, `sudo`, recursive force delete, force/main pushes, infra mutations, production deploys, external POST/upload, and cloud/IAM destructive commands\n- Pauses Auto Mode after repeated guardrail denials, falling back to manual prompts until `/autonomy auto` is run again\n\nThis is a local deterministic approximation, not Claude Code\u2019s hosted classifier. It cannot infer natural-language organization rules as deeply as Claude Code Auto Mode, but it is installable as a single standalone Pi extension.\n\n## Configuration\n\nGlobal config:\n\n```text\n~/.pi/agent/extensions/pi-autonomy-profiles/config.json\n```\n\nProject config:\n\n```text\n<project>/.pi/extensions/pi-autonomy-profiles/config.json\n```\n\nProject config is honored only for trusted projects. It can tighten rules or choose a more restrictive non-auto mode, but it cannot grant new capabilities: project-local `allow`, `additionalDirectories`, `trustedDomains`, `trustedPaths`, `allowCommands`, and `mode: \"auto\"` are ignored so a repository cannot grant itself autonomy.\n\nExample:\n\n```jsonc\n{\n  \"$schema\": \"https://raw.githubusercontent.com/hafiezul/pi-autonomy-profiles/main/schemas/autonomy.schema.json\",\n  \"mode\": \"default\",\n  \"permissions\": {\n    \"deny\": [\n      \"Bash(curl * | *sh*)\",\n      \"Bash(wget * | *sh*)\",\n      \"Bash(git push * --force*)\",\n      \"Edit(.env)\",\n      \"Write(.env)\"\n    ],\n    \"allow\": [\"Read(*)\"]\n  },\n  \"autoMode\": {\n    \"trustedDomains\": [\"api.internal.example.com\", \"*.corp.example.com\"],\n    \"trustedPaths\": []\n  }\n}\n```\n\nPermission rule syntax is intentionally Claude-like:\n\n- `Bash(pattern)` matches bash commands with `*` wildcards\n- `Read(pattern)` matches `read`, `grep`, `find`, and `ls` path inputs\n- `Edit(pattern)` matches `edit` and `write` path inputs\n- bare tool names such as `bash`, `edit`, or `*` match whole tools\n\nRule precedence is non-overridable built-in blockers first, then deny, ask, out-of-scope write checks, allow, and finally mode defaults. Built-in protected-write and Auto Mode guardrails still block even if an allow rule is present.\n\nThe command UI intentionally focuses on `auto` and `manual`. Advanced config-only modes remain supported for existing configs and power users: `acceptEdits`, `plan`, and `dontAsk`.\n\n## Local development\n\n```bash\nnpm install\nnpm run check\npi install /path/to/pi-autonomy-profiles\n```\n\n## Release checklist\n\n```bash\nnpm install\nnpm run check\nnpm pack --dry-run\nnpm publish --dry-run\nnpm publish\n```\n\nThe package has a `prepack` check, so `npm pack` and `npm publish` run TypeScript validation before creating the tarball.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "auto-mode",
+    "autonomy",
+    "permissions",
+    "standalone"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/hafiezul/pi-autonomy-profiles#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hafiezul/pi-autonomy-profiles.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-11T08:23:59.873Z",
+    "modified": "2026-06-23T10:03:03.978Z",
+    "0.1.0": "2026-06-11T08:24:00.194Z",
+    "0.2.2": "2026-06-19T11:09:40.856Z",
+    "0.2.3": "2026-06-19T11:14:51.767Z",
+    "0.2.4": "2026-06-20T04:41:02.033Z",
+    "0.3.0": "2026-06-23T10:03:03.841Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": null,
+  "download_trend": []
+}

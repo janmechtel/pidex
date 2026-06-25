@@ -1,0 +1,40 @@
+{
+  "name": "@capyup/pi-auto-compact",
+  "latest_version": "0.2.4",
+  "description": "Pre-turn auto-compaction for pi",
+  "readme": "# pi-auto-compact\n\nPre-turn auto-compaction extension for pi. Proactively manages context window usage to prevent overflow errors.\n\n## The Problem\n\nPi's default auto-compaction only checks **after `agent_end`**. This means context can overflow during long multi-tool turns before compaction triggers.\n\n## Strategy\n\nThis extension checks tokens at **three points**:\n\n1. **Pre-turn:** Before sending any request to the LLM (`turn_start`)\n2. **Mid-turn:** After tool execution, before follow-up LLM calls (`turn_end`)\n3. **Emergency:** Synchronous truncation in the `context` event as a last resort\n\nIt also handles the **session resume** case: when an existing session is\nreopened above the threshold, compaction kicks off as soon as the session\nstarts.\n\n### Continuing After Auto-Compaction\n\n`ctx.compact()` aborts the running agent internally, so without a nudge the\nsession would sit idle once the summary is written. After every\n**auto-triggered** compaction this extension sends a short English follow-up\nuser message to make pi resume the in-flight task. The exact wording depends\non which check fired (pre-turn, mid-turn, emergency, or session-resume).\n\nThe follow-up is suppressed in two cases:\n\n- The user ran `/compact` manually \u2014 the callback path used here only fires\n  for compactions this extension started, so manual compaction is never\n  touched.\n- The agent is no longer idle when the summary finishes, e.g. the user\n  already typed something or another extension started a turn while\n  summarising. Their input acts as the kickoff and we stay quiet.\n\n### Compaction Strategies\n\n| Strategy | Description |\n|----------|-------------|\n| `keep-recent` | Keep only the most recent messages (default) |\n| `keep-bookends` | Keep oldest + newest messages, compact the middle |\n| `summarize-all` | Remove everything except the last user message |\n\n## Configuration\n\nUse `/auto-compact` to open the interactive settings menu:\n\n```\n/auto-compact              # Open settings menu\n/auto-compact status       # Show current status\n/auto-compact reset        # Reset to defaults\n```\n\n### Settings\n\n| Setting | Default | Options |\n|---------|---------|---------|\n| Auto-compact threshold | **90%** | 80%, 85%, 90%, 95% |\n| Keep recent budget | **15%** | 5%, 10%, 15%, 20% |\n| Strategy | **keep-recent** | keep-recent, keep-bookends, summarize-all |\n| Debug logging | **off** | on/off |\n\n### Example\n\nFor a 200K context window model:\n- Compact at **180K** tokens (90%)\n- Keep **30K** recent tokens (15%)\n\n## Install\n\nAs a pi package:\n\n```bash\npi install npm:@capyup/pi-auto-compact\n```\n\nOr via git:\n\n```bash\npi install git:github.com/capyup/pi-auto-compact\n```\n\nOr run directly:\n\n```bash\npi -e ./extensions/auto-compact.ts\n```\n\n## How It Differs from Pi's Default\n\n| Aspect | Pi Default | This Extension |\n|--------|-----------|----------------|\n| Check timing | After `agent_end` only | Before requests + after tools |\n| Overflow protection | None | Emergency truncation |\n| Mid-turn handling | None | Checks after each tool batch |\n| Auto-continue | No | Yes \u2014 sends an English follow-up nudge after auto-compaction |\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "auto-compact",
+    "compaction",
+    "context-window"
+  ],
+  "author": {
+    "name": "capyup"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/capyup/pi-auto-compact#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/capyup/pi-auto-compact.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-05-09T02:30:22.698Z",
+    "modified": "2026-05-09T10:45:53.448Z",
+    "0.2.0": "2026-05-09T02:30:22.927Z",
+    "0.2.1": "2026-05-09T02:37:10.613Z",
+    "0.2.2": "2026-05-09T02:58:00.156Z",
+    "0.2.3": "2026-05-09T08:03:11.900Z",
+    "0.2.4": "2026-05-09T10:45:53.335Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 255,
+  "download_trend": []
+}

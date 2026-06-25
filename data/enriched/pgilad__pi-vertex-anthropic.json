@@ -1,0 +1,357 @@
+{
+  "name": "@pgilad/pi-vertex-anthropic",
+  "latest_version": "0.7.0",
+  "description": "Pi extension: Claude on Google Cloud Vertex AI via ADC. Uses the official @anthropic-ai/vertex-sdk for real Application Default Credentials (gcloud user creds, service account JSON, GCE/GKE metadata server, workload identity).",
+  "readme": "# pi-vertex-anthropic\n\n[![npm version](https://img.shields.io/npm/v/@pgilad/pi-vertex-anthropic.svg)](https://www.npmjs.com/package/@pgilad/pi-vertex-anthropic)\n[![license](https://img.shields.io/npm/l/@pgilad/pi-vertex-anthropic.svg)](./LICENSE)\n\nA [pi](https://pi.dev) provider extension for Anthropic Claude models hosted on Google Cloud Vertex AI, using Google Application Default Credentials (ADC) for authentication.\n\nUse this extension if you want to use Claude in pi with billing through GCP, no API keys, and no `gcloud` subprocess calls \u2014 auth is handled by `google-auth-library`, the same way other Google Cloud client libraries do.\n\n## Features\n\n- Claude Opus, Sonnet, and Haiku on Google Cloud Vertex AI.\n- Application Default Credentials support: `gcloud` user credentials, service account JSON, GCE/GKE metadata server, Workload Identity, and other ADC sources.\n- No Anthropic API keys in pi.\n- No `gcloud` subprocess calls at request time.\n- Streaming, tool calls, prompt caching, image input, and thinking support through pi-ai's built-in Anthropic pipeline.\n- Interactive `/login` region picker, with environment-variable overrides for non-interactive setups.\n\n## When to use this\n\nUse this extension if:\n\n- You want to use Anthropic Claude models from pi through Google Cloud Vertex AI.\n- You want billing, IAM, audit logs, org policy, and quota to stay in GCP.\n- You already use Application Default Credentials locally, on GCE/GKE, or with Workload Identity.\n- You do not want to manage Anthropic API keys in pi.\n\nDo not use this extension if:\n\n- You want to call Anthropic's direct API with an Anthropic API key \u2014 use pi's built-in Anthropic provider instead.\n- Your GCP project does not have Vertex AI enabled or Anthropic Claude model access granted in Model Garden.\n- You need this extension to provision GCP resources or request Model Garden access for you; it only connects pi to an already-configured Vertex AI project.\n\n## Relationship to pi-ai's built-in `google-vertex` provider\n\npi 0.75+ ships a built-in `google-vertex` provider, so after `/login` you may see two Vertex-related providers in `pi --list-models`. They do not overlap \u2014 each serves a different model family:\n\n| Provider | Serves | SDK |\n|---|---|---|\n| `google-vertex` (built into pi-ai) | **Gemini** models on Vertex AI | `@google/genai` |\n| `vertex-anthropic` (this extension) | **Anthropic Claude** models on Vertex AI | `@anthropic-ai/vertex-sdk` |\n\nBoth authenticate through Application Default Credentials, but pi-ai's `google-vertex` provider does not expose Claude. Use this extension for Claude on Vertex; use the built-in provider for Gemini on Vertex.\n\n## Quick start\n\n1. Install the package:\n\n```bash\npi install npm:@pgilad/pi-vertex-anthropic\n```\n\n2. Set up Application Default Credentials once (any of these work):\n\n```bash\ngcloud auth application-default login\n# or\nexport GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json\n# or run on GCE/GKE with an attached workload identity\n```\n\n3. Start pi, log in, and pick a model:\n\n```bash\npi\n/login          # choose \"Google Vertex AI (ADC)\" \u2014 prompts for region\n/model          # choose vertex-anthropic/claude-opus-4-7\n```\n\nThe login flow probes ADC, then prompts you to pick a Vertex AI region (`global` is the recommended default; `us-east5`, `us-central1`, `europe-west1`, `europe-west4`, `asia-southeast1` are offered). If `GOOGLE_CLOUD_LOCATION` is set in your environment, the picker is skipped and that value is used.\n\n## Requirements\n\n- Node.js 24 LTS or newer\n- pi 0.75.x or newer (`@earendil-works/*` namespace). If you're still on pi 0.73.x (`@mariozechner/*`), pin this extension to `0.1.x`.\n- A GCP project with Vertex AI enabled and Anthropic Claude models granted via [Model Garden](https://console.cloud.google.com/vertex-ai/model-garden)\n- ADC configured via `gcloud` user credentials, service account JSON, the GCE/GKE metadata server, Workload Identity, or any other ADC source\n- The ADC principal must have permission to call Vertex AI prediction APIs, typically via `roles/aiplatform.user` on the project\n\nNo `gcloud` CLI is required at request time. The extension only uses `gcloud` if that's how you configured ADC; pure service account or Workload Identity setups work without it.\n\n## GCP/IAM setup\n\nAt minimum, the GCP project you use with this extension needs:\n\n1. The Vertex AI API enabled.\n2. Anthropic Claude model access granted in [Vertex AI Model Garden](https://console.cloud.google.com/vertex-ai/model-garden).\n3. An ADC identity authorized to call Vertex AI prediction APIs.\n\nFor most users, granting the ADC principal the Vertex AI User role is sufficient:\n\n```bash\ngcloud projects add-iam-policy-binding PROJECT_ID \\\n  --member=\"user:you@example.com\" \\\n  --role=\"roles/aiplatform.user\"\n```\n\nFor service-account ADC, grant the role to the service account instead:\n\n```bash\ngcloud projects add-iam-policy-binding PROJECT_ID \\\n  --member=\"serviceAccount:my-service-account@PROJECT_ID.iam.gserviceaccount.com\" \\\n  --role=\"roles/aiplatform.user\"\n```\n\nIf your organization uses custom roles or stricter IAM, make sure the principal can invoke Vertex AI publisher/model prediction endpoints for the Anthropic models you enabled.\n\n## Compatibility\n\n| Extension version | pi namespace |\n|---|---|\n| `0.1.x` | `@mariozechner/*` (pi 0.73.x) \u2014 frozen |\n| `0.2.x` and newer (current: `0.6.x`) | `@earendil-works/*` (pi 0.75.x+) |\n\nSee [CHANGELOG.md](./CHANGELOG.md) for the rename details.\n\n## Install\n\nThe GitHub repository is `pgilad/pi-vertex-anthropic`; the published npm package is scoped as `@pgilad/pi-vertex-anthropic`.\n\n### Global install\n\n```bash\npi install npm:@pgilad/pi-vertex-anthropic\n```\n\n### Project-local install\n\nUse `-l` to record the package in the current project's `.pi/settings.json` instead of your global pi settings, so it ships with the project:\n\n```bash\npi install -l npm:@pgilad/pi-vertex-anthropic\n```\n\n### Try from a local checkout\n\nFor development against this repository:\n\n```bash\ngit clone https://github.com/pgilad/pi-vertex-anthropic ~/repos/pi-vertex-anthropic\ncd ~/repos/pi-vertex-anthropic && npm install\npi install ~/repos/pi-vertex-anthropic\n```\n\n## Configuration\n\nThe extension reads (in order):\n\n| Setting | Sources |\n|---|---|\n| Project ID | `ANTHROPIC_VERTEX_PROJECT_ID` \u2192 `GOOGLE_CLOUD_PROJECT` \u2192 `GCLOUD_PROJECT` \u2192 `quota_project_id` field of `~/.config/gcloud/application_default_credentials.json` \u2192 `google-auth-library`'s `auth.getProjectId()` |\n| Region | `GOOGLE_CLOUD_LOCATION` \u2192 `CLOUD_ML_REGION` \u2192 interactive picker at `/login` \u2192 `\"global\"` |\n| Credentials | Sources resolved by `new GoogleAuth().getClient()` \u2014 `GOOGLE_APPLICATION_CREDENTIALS`, ADC file, GCE/GKE metadata server, Workload Identity |\n\nIn most cases, `gcloud auth application-default login` is the only setup needed \u2014 the project ID is recorded in the ADC file's `quota_project_id` and `google-auth-library` finds the credentials automatically.\n\nFor explicit shell-based setup, use the extension-specific project variable plus a Vertex AI region:\n\n```bash\nexport ANTHROPIC_VERTEX_PROJECT_ID=my-gcp-project\nexport GOOGLE_CLOUD_LOCATION=global\n```\n\nFor service-account ADC:\n\n```bash\nexport GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json\nexport ANTHROPIC_VERTEX_PROJECT_ID=my-gcp-project\nexport GOOGLE_CLOUD_LOCATION=global\n```\n\nIf you want to avoid setting `GOOGLE_CLOUD_PROJECT` globally (because it affects `gcloud`, Terraform, `bq`, and other tools), don't set it \u2014 the extension falls back to the ADC file or `ANTHROPIC_VERTEX_PROJECT_ID`.\n\n## Verify your setup\n\nAfter `/login`, list the registered models:\n\n```bash\npi --list-models | grep vertex-anthropic\n```\n\nExpected output:\n\n```\nvertex-anthropic  claude-fable-5                         1M       128K     yes       yes\nvertex-anthropic  claude-haiku-4-5@20251001              200K     64K      yes       yes\nvertex-anthropic  claude-opus-4-7                        1M       128K     yes       yes\nvertex-anthropic  claude-opus-4-8                        1M       128K     yes       yes\nvertex-anthropic  claude-sonnet-4-6                      1M       64K      yes       yes\n```\n\nSmoke test:\n\n```bash\npi --provider vertex-anthropic --model claude-opus-4-7 --no-tools --thinking off \\\n   -p \"Reply with exactly: smoke test passed\"\n```\n\n## Troubleshooting\n\n### `ADC not configured`\n\npi could not find usable Application Default Credentials. Configure an ADC source, then run `/login` again:\n\n```bash\ngcloud auth application-default login\n# or\nexport GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json\n```\n\n### `no GCP project resolvable`\n\nCredentials were found, but no project ID could be determined. Set an explicit project for this extension:\n\n```bash\nexport ANTHROPIC_VERTEX_PROJECT_ID=your-gcp-project-id\n```\n\nOr record a quota project in your local ADC file:\n\n```bash\ngcloud auth application-default set-quota-project your-gcp-project-id\n```\n\n### Permission denied\n\nCheck that:\n\n- Vertex AI API is enabled in the project.\n- The Anthropic Claude model is enabled for the project in Model Garden.\n- The ADC principal has permission to call Vertex AI prediction APIs, typically `roles/aiplatform.user`.\n- You are using the intended project ID; `ANTHROPIC_VERTEX_PROJECT_ID` overrides ADC project detection.\n\n### Model or region not found\n\nClaude availability on Vertex AI varies by region and model, and Google/Anthropic can change regional availability independently for each model. A model that works in one region may fail in another, and newly released models may not appear everywhere at the same time.\n\nTry the `global` region first:\n\n```bash\nexport GOOGLE_CLOUD_LOCATION=global\n```\n\nIf you need a specific region, confirm that the selected Claude model is available there in the current Anthropic/Vertex AI documentation. If one model fails in your region, test another registered model before assuming ADC or pi is misconfigured.\n\n### `/login` succeeds but requests still fail\n\n`/login` only verifies that ADC exists and stores the selected project and region in pi. Access tokens are still acquired by `google-auth-library` at request time, so request failures usually mean project, IAM, Model Garden access, quota, or region/model availability issues.\n\n## Choosing a model\n\nPick interactively with `/model`, or pass on the command line:\n\n```bash\npi --provider vertex-anthropic --model claude-opus-4-7\npi --provider vertex-anthropic --model claude-opus-4-8\npi --provider vertex-anthropic --model claude-sonnet-4-6\npi --provider vertex-anthropic --model claude-haiku-4-5@20251001\npi --provider vertex-anthropic --model claude-fable-5\n```\n\nModel IDs are taken verbatim from [Anthropic's Vertex AI docs](https://platform.claude.com/docs/en/about-claude/models/overview) and the Vertex Model Garden catalog:\n\n| Model | Vertex AI ID | Context | Max output | Thinking | `xhigh` |\n|---|---|---|---|---|---|\n| Claude Opus 4.7 | `claude-opus-4-7` | 1M | 128K | adaptive (effort) | \u2705 |\n| Claude Opus 4.8 | `claude-opus-4-8` | 1M | 128K | adaptive (effort) | \u2705 |\n| Claude Sonnet 4.6 | `claude-sonnet-4-6` | 1M | 64K | adaptive (effort) | clamped to `high` |\n| Claude Haiku 4.5 | `claude-haiku-4-5@20251001` | 200K | 64K | extended (budget) | \u2014 |\n| Claude Fable 5 | `claude-fable-5` | 1M | 128K | adaptive (effort) | \u2705 |\n\n> **Vertex versioning.** `claude-opus-4-8` and `claude-fable-5` are listed in the Vertex Model Garden catalog with `versionId: default` (no dated `@YYYYMMDD` alias yet). Pricing and limits here match Anthropic's published model cards (Opus-tier `$5` / `$25` per MTok; Fable-tier `$10` / `$50`); the `default` versionId is the only Vertex-specific caveat.\n\npi maps thinking levels automatically:\n\n- **Opus 4.7, Opus 4.8, Fable 5** (adaptive, with `xhigh`): `--thinking low|medium|high|xhigh` becomes the SDK's `effort` parameter directly.\n- **Sonnet 4.6** (adaptive, no `xhigh` slot): `low|medium|high` pass through; `xhigh` is clamped to `high` so Anthropic's API doesn't 400 the request. Matches upstream pi-ai's `mapThinkingLevelToEffort` fallback when a model's `thinkingLevelMap` lacks an `xhigh` entry.\n- **Haiku 4.5** (extended/budgeted thinking): pi thinking levels map to `thinkingBudgetTokens` using the default budgets (1k / 4k / 10k / 20k / 32k for `minimal`/`low`/`medium`/`high`/`xhigh`) or your `settings.thinkingBudgets` overrides. See pi's [`thinkingBudgets` settings docs](https://github.com/earendil-works/pi-coding-agent/blob/main/docs/settings.md#thinkingbudgets) for the exact shape. The extension grows `max_tokens` (capped at the model maximum) to absorb the budget \u2014 mirroring upstream's `adjustMaxTokensForThinking` \u2014 so `--max-tokens 4000 --thinking high` won't violate Anthropic's `budget_tokens < max_tokens` constraint.\n\n## Security notes\n\n- The extension does not store Google access tokens, refresh tokens, service-account keys, or Anthropic API keys.\n- pi stores only a sentinel auth record for this provider, plus the resolved `projectId` and selected `region`, in its normal auth storage.\n- Request-time Google access tokens are acquired and refreshed by `google-auth-library` through `@anthropic-ai/vertex-sdk`.\n- Model requests are sent to Google Cloud Vertex AI for the configured project and region.\n- No `gcloud auth print-access-token` subprocess is run per request.\n- If you use `GOOGLE_APPLICATION_CREDENTIALS`, the referenced service-account JSON file remains in its configured location; this extension only relies on Google ADC resolution to find it.\n\n## How it works\n\nThe extension is a single-file shim (~650 lines, a large share of it explanatory comments):\n\n1. **Auth.** `oauth.login` calls `new GoogleAuth().getClient()` from `google-auth-library`. If credentials are available, it stores a sentinel credential in `~/.pi/agent/auth.json` and revalidates daily via `oauth.refreshToken`. Real per-request access token refresh is handled by `google-auth-library` inside the SDK.\n2. **Streaming.** `streamSimple` constructs an `AnthropicVertex` client (cached by project and region) and injects it into pi-ai's built-in `streamAnthropic` via its `client` option. All message conversion, SSE parsing, tool-call handling, prompt caching, and thinking-block plumbing come from upstream pi-ai unchanged.\n\nNo subprocess calls, no hand-rolled SSE parser, no Anthropic Messages reimplementation.\n\n## Similar projects\n\n- [skyfallsin/pi-vertex-anthropic](https://github.com/skyfallsin/pi-vertex-anthropic) \u2014 an earlier extension that solves the same problem. It uses `gcloud auth print-access-token` (subprocess per request) instead of `google-auth-library`, and implements its own Anthropic streaming pipeline rather than delegating to pi-ai's built-in Anthropic support.\n- [SafeAI-Lab-X/ClawKeeper](https://github.com/SafeAI-Lab-X/ClawKeeper) \u2014 internal `AnthropicVertex` integration inside a broader watcher tool. The architectural pattern this extension follows (`AnthropicVertex` client injected into pi-ai's `streamAnthropic`) is adapted from `clawkeeper-watcher/src/agents/anthropic-vertex-stream.ts`.\n- [gsd-build/gsd-2](https://github.com/gsd-build/gsd-2) \u2014 fork of pi-mono with a native `anthropic-vertex` provider added at the SDK layer. This is likely the cleanest long-term direction if upstream merges similar support.\n\n## Development\n\n```bash\nnpm install\nnpm run check    # tsc --noEmit\n```\n\nLocal iteration without reinstalling:\n\n```bash\npi -e /path/to/pi-vertex-anthropic/index.ts\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "anthropic",
+    "claude",
+    "vertex-ai",
+    "gcp",
+    "adc"
+  ],
+  "author": {
+    "name": "Gilad Peleg",
+    "email": "gilad.peleg@rna-data.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/pgilad/pi-vertex-anthropic#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pgilad/pi-vertex-anthropic.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-25T09:04:45.099Z",
+    "modified": "2026-06-18T06:08:57.537Z",
+    "0.2.0": "2026-05-25T09:04:45.594Z",
+    "0.3.0": "2026-05-25T13:08:21.842Z",
+    "0.4.0": "2026-05-26T05:49:01.781Z",
+    "0.5.0": "2026-06-14T08:36:28.894Z",
+    "0.6.0": "2026-06-16T06:49:25.537Z",
+    "0.7.0": "2026-06-18T06:08:57.226Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 248,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 335
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 39
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 41
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 316
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 257
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 11
+    }
+  ]
+}

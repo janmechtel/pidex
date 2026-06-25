@@ -1,0 +1,345 @@
+{
+  "name": "@fgladisch/pi-bash-approval",
+  "latest_version": "0.2.6",
+  "description": "Interactive allow-list guard for Pi bash tool calls",
+  "readme": "# @fgladisch/pi-bash-approval\n\nGuards Pi `bash` tool behind interactive allow-list. Every bash tool call is\nintercepted; commands matching configured pattern run silently, anything else\nprompts user. In non-interactive contexts (`pi -p`, no UI), unknown commands\nare blocked with reason pointing at config file.\n\n## Install\n\n```bash\npi install npm:@fgladisch/pi-bash-approval\n```\n\n## Config\n\nThis extension reads two files:\n\n1. **Global settings**: `~/.pi/agent/settings.json`\n2. **Allow-list rules**: `~/.pi/agent/.bash-approval`\n\n### Global settings (`settings.json`)\n\n`splitChains` lives at `bashApproval.splitChains`:\n\n```json\n{\n  \"bashApproval\": {\n    \"splitChains\": true\n  }\n}\n```\n\nIf missing/malformed, `splitChains` defaults to `true`.\n\n### Allow-list rules (`.bash-approval`)\n\nOne rule per line:\n\n```text\n# bash approval allow-list\nls\nls:*\ngit status:*\nnpm test:*\n```\n\nBlank lines and `#` comment lines are ignored.\n\n### Pattern syntax (`.bash-approval` lines)\n\n| Pattern        | Matches                                            |\n| -------------- | -------------------------------------------------- |\n| `ls`           | exact: `ls` only                                   |\n| `ls:*`         | `ls` exactly, or `ls <anything>` (space-separated) |\n| `git status:*` | `git status` exactly, or `git status <anything>`   |\n| `git*`         | trailing-`*` glob: any command starting with `git` |\n\n`:*` form is recommended: requires exact match or trailing space, so\n`git status:*` does **not** match `git statusfoo`. Bare `*` form is raw prefix\nmatch. Use sparingly.\n\n### `splitChains`\n\nDefault `true`: split incoming commands on shell separators (`&&`, `||`, `;`,\n`|`, newline) and require **every** segment to match allow-list. Example:\n`cd foo && git log` only runs unprompted when both segments are allow-listed.\n\nSet `false` to match entire command string as one unit.\n\n### Shell control filtering\n\nWhen `splitChains` is `true`, shell control/declaration segments are ignored so\napproval checks focus on actual commands:\n\n- ignored heads include: `if`, `then`, `elif`, `else`, `for`, `do`, `done`,\n  `fi`, `while`, `until`, `case`, `esac`, `function`\n- condition tests (`[ ... ]`, `[[ ... ]]`, `test ...`) are ignored\n- assignment-only segments like `FOO=bar` are ignored\n- redirection-only segments like `> /tmp/out` after shell groups are ignored\n- separators inside command substitutions like `$(git ls-files | sort)` are not\n  treated as outer command-chain separators\n- assignment prefixes before commands are stripped\n  (for example: `FOO=bar npm test` evaluates as `npm test`)\n- command substitutions inside assignment tokens are evaluated by their inner\n  command, including assignment-only segments and assignment prefixes (for\n  example: `tmp=$(mktemp -d /tmp/foo-XXXXXX)` evaluates as\n  `mktemp -d /tmp/foo-XXXXXX`, and `FOO=$(./setup) npm test` checks both\n  `./setup` and `npm test`)\n- heredoc bodies are ignored during command splitting, so literal content inside\n  substitutions such as `$(cat <<'EOF' ... EOF)` is not treated as executable\n  command text\n\n## Approval prompt\n\nOn non-matching command in interactive mode, user picks:\n\n- **Allow once**: run this invocation, persist nothing.\n- **Allow always (exact): `<command>`**: append literal command as new rule in\n  `~/.pi/agent/.bash-approval` (truncated to 60 chars in label only). Hidden\n  when exact command already on allow-list.\n- **Allow always: `<prefix>:*`**: append suggested parameter-aware prefix rule.\n  Suggestion uses first two tokens when present (`git status:*`,\n  `npm install:*`, `mkdir -p:*`, `kubectl get:*`), otherwise first token\n  (`ls:*`). Suggestion is derived from **first failing chain segment**, not\n  head.\n- **Allow always (command): `<command>:*`**: append command-only prefix rule\n  using the first token of the first failing segment (`mkdir:*`, `git:*`,\n  `npm:*`). Hidden when it would duplicate the parameter-aware suggestion.\n- **Deny**: block with reason `Blocked by user`.\n\nSelecting nothing (cancel) is treated as deny. \"Allow always\" choices persist\nimmediately to `~/.pi/agent/.bash-approval`.\n\n## Slash commands\n\n| Command                 | Action                                                                          |\n| ----------------------- | ------------------------------------------------------------------------------- |\n| `/bash-approval-reload` | Re-read `~/.pi/agent/.bash-approval` and `~/.pi/agent/settings.json` from disk. |\n| `/bash-approval-list`   | Show currently allowed bash patterns.                                           |\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/fgladisch/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fgladisch/pi-extensions.git"
+  },
+  "pi": {},
+  "time": {
+    "created": "2026-04-30T21:46:26.106Z",
+    "modified": "2026-06-08T12:09:23.173Z",
+    "0.1.0": "2026-04-30T21:46:26.407Z",
+    "0.2.0": "2026-05-06T11:26:59.313Z",
+    "0.2.1": "2026-05-08T10:43:24.861Z",
+    "0.2.2": "2026-05-18T22:45:48.291Z",
+    "0.2.3": "2026-05-27T15:09:29.953Z",
+    "0.2.4": "2026-06-05T10:35:38.787Z",
+    "0.2.5": "2026-06-05T11:39:16.066Z",
+    "0.2.6": "2026-06-08T12:09:22.895Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 35,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 72
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 276
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 142
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 36
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 170
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 461
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 63
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 42
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 6
+    }
+  ]
+}

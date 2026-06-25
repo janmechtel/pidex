@@ -1,0 +1,356 @@
+{
+  "name": "pi-knowledge-search",
+  "latest_version": "1.3.5",
+  "description": "Semantic search over local files for pi. Indexes a directory of text files, watches for changes, and exposes a knowledge_search tool to the LLM.",
+  "readme": "# pi-knowledge-search\n\nHybrid search over local files for [pi](https://github.com/badlogic/pi). Indexes directories of text/markdown files using vector embeddings **and** SQLite FTS5 keyword search, and exposes `knowledge_search` + `kb_read` tools the LLM can call. Indexing runs on session startup (file changes mid-session are picked up on next restart or via `/knowledge-sync`).\n\nOn session start, injects a folder+keyword overview of the indexed vault as a custom message so the model knows what\u2019s worth searching for before it asks.\n\n## How search works\n\nEvery query runs against two backends in parallel and fuses the results via Reciprocal Rank Fusion (k=60):\n\n- **Vector cosine similarity** \u2014 good for conceptual/fuzzy queries (\"how did we handle X\")\n- **BM25 full-text** via SQLite FTS5 \u2014 good for exact matches, proper nouns, error strings, file paths, code identifiers\n\nDocs that both backends agree on get boosted; either backend alone still surfaces relevant hits. If the embedder fails transiently, search falls back to pure BM25; if the FTS side-car is empty, it falls back to pure vector. Existing users upgrade seamlessly \u2014 the FTS side-car is backfilled from the vector index on first load with no re-embedding needed.\n\n## Tools\n\nThe extension registers two LLM-facing tools:\n\n| Tool | What it does |\n|------|--------------|\n| `knowledge_search` | Hybrid vector + BM25 search over indexed files (and any Bedrock Knowledge Bases). Returns passage-level excerpts ranked by Reciprocal Rank Fusion. |\n| `kb_read` | Resolve a note reference \u2014 `[[wikilink]]`, basename, or relative path \u2014 to an indexed file and return its full content. Use when the model knows a note's name but not its full path, instead of running find/grep first. |\n\n`kb_read` handles `[[Foo]]`, `[[Foo|alias]]`, `[[Foo#Heading]]`, bare names with or without extension (`Foo`, `Foo.md`), and relative paths (`evergreen/foo`). Multi-match references get a disambiguation prompt instead of guessing.\n\n## Overview injection\n\nOn session start, pi-knowledge-search injects a one-shot folder+keyword summary of the indexed vault as a custom message. This gives the model a prior on what's in the knowledge base without having to discover the structure through trial-and-error searches.\n\nThe overview is built from whatever the index has loaded from disk \u2014 no extra scan \u2014 and includes:\n\n- Folders grouped at configurable depth, sorted by note count\n- Top keywords per folder (TF-IDF over filenames and headings)\n- Optional `NAPKIN.md` / `README.md` / `_about.md` body as folder context\n\nOverride settings in the config file:\n\n```json\n{\n  \"overview\": {\n    \"inject\": true,\n    \"maxDepth\": 2,\n    \"maxFoldersPerDir\": 20,\n    \"maxKeywordsPerFolder\": 5\n  }\n}\n```\n\nOr via env vars: `KNOWLEDGE_SEARCH_OVERVIEW_INJECT=false` disables injection, `KNOWLEDGE_SEARCH_OVERVIEW_MAX_DEPTH=3` deepens bucketing, etc.\n\n## Install\n\n**Recommended:** Install [pi-total-recall](https://github.com/samfoy/pi-total-recall) to get the complete context stack \u2014 persistent memory, session history search, and local knowledge search in one package:\n\n```bash\npi install pi-total-recall\n```\n\nOr install pi-knowledge-search standalone:\n\n```bash\npi install git:github.com/samfoy/pi-knowledge-search\n```\n\nOr try without installing:\n\n```bash\npi -e git:github.com/samfoy/pi-knowledge-search\n```\n\nRequires **Node 24+** \u2014 `node:sqlite` must include FTS5, which Node 22's bundled SQLite does not. On Node 22 you'll get `Error: no such table: chunks` at startup because the FTS5 virtual table never gets created.\n\n## Setup\n\nRun the interactive setup command inside pi:\n\n```\n/knowledge-search-setup\n```\n\nThis walks you through:\n\n1. **Directories** to index (comma-separated paths)\n2. **File extensions** to include (default: `.md, .txt`)\n3. **Directories to exclude** (default: `node_modules, .git, .obsidian, .trash`)\n4. **Embedding provider** \u2014 OpenAI, OpenAI-compatible (local/self-hosted), AWS Bedrock, or Ollama\n\nConfig is saved to `~/.pi/knowledge-search.json`. Run `/reload` to activate.\n\n### Config file\n\nYou can also edit the config file directly:\n\n```json\n{\n  \"dirs\": [\"~/notes\", \"~/docs\"],\n  \"fileExtensions\": [\".md\", \".txt\"],\n  \"excludeDirs\": [\"node_modules\", \".git\", \".obsidian\", \".trash\"],\n  \"provider\": {\n    \"type\": \"openai\",\n    \"model\": \"text-embedding-3-small\"\n  }\n}\n```\n\nThe API key for OpenAI can be set in the config file (`\"apiKey\": \"sk-...\"`) or via the `OPENAI_API_KEY` environment variable.\n\n<details>\n<summary>Bedrock config</summary>\n\n```json\n{\n  \"dirs\": [\"~/vault\"],\n  \"provider\": {\n    \"type\": \"bedrock\",\n    \"profile\": \"my-aws-profile\",\n    \"region\": \"us-west-2\",\n    \"model\": \"amazon.titan-embed-text-v2:0\"\n  }\n}\n```\n\nRequires the AWS SDK and valid credentials for the specified profile.\n\n</details>\n\n<details>\n<summary>Ollama config (free, local)</summary>\n\n```json\n{\n  \"dirs\": [\"~/notes\"],\n  \"provider\": {\n    \"type\": \"ollama\",\n    \"url\": \"http://localhost:11434\",\n    \"model\": \"nomic-embed-text\"\n  }\n}\n```\n\nRequires [Ollama](https://ollama.ai) running locally:\n\n```bash\nollama serve\nollama pull nomic-embed-text\n```\n\n</details>\n\n<details>\n<summary>OpenAI-compatible config (free, local/self-hosted)</summary>\n\nAny server that exposes an OpenAI-compatible `/v1/embeddings` endpoint works:\n[llama.cpp](https://github.com/ggml-org/llama.cpp), [vLLM](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html),\n[litellm](https://docs.litellm.ai/), [Ollama's OpenAI-compatibility mode](https://ollama.com/blog/openai-compatibility), etc.\n\n```json\n{\n  \"dirs\": [\"~/notes\"],\n  \"provider\": {\n    \"type\": \"openai-compatible\",\n    \"baseUrl\": \"http://127.0.0.1:8080\",\n    \"apiKey\": \"your-local-key\",\n    \"model\": \"qwen3-embeddings\"\n  }\n}\n```\n\nThe `baseUrl` should be your server root **without** a trailing `/v1` path \u2014 the embedder appends `/v1/embeddings` automatically.\n\nFor example with llama-cpp-python:\n\n```bash\npython -m llama_cpp.server --model ./models/qwen3-embedding.gguf --port 8080\n```\n\nThen configure knowledge-search to point at `http://127.0.0.1:8080` as shown above.\n\nThe `apiKey` field is optional; omit it if your runner doesn't require authentication.\n\n</details>\n\n### Bedrock Knowledge Bases\n\nYou can add [Amazon Bedrock Knowledge Bases](https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base.html) as additional search sources. These are managed RAG services \u2014 Amazon handles chunking, embedding, and vector storage. pi-knowledge-search queries them at search time and merges results with local file results.\n\nAdd via command:\n\n```\n/knowledge-add-kb\n```\n\nOr add directly to the config file:\n\n```json\n{\n  \"dirs\": [\"~/notes\"],\n  \"provider\": { \"type\": \"openai\" },\n  \"knowledgeBases\": [\n    {\n      \"id\": \"XXXXXXXXXX\",\n      \"region\": \"us-east-1\",\n      \"profile\": \"default\",\n      \"label\": \"Team docs\"\n    }\n  ]\n}\n```\n\nYou can use Knowledge Bases alongside local file indexing, or on their own (omit `dirs` and `provider` for KB-only mode).\n\nKB-only config:\n\n```json\n{\n  \"knowledgeBases\": [\n    {\n      \"id\": \"XXXXXXXXXX\",\n      \"region\": \"us-east-1\",\n      \"profile\": \"my-work-profile\",\n      \"label\": \"Engineering wiki\"\n    }\n  ]\n}\n```\n\nRequires the AWS SDK and valid credentials with `bedrock:Retrieve` permissions.\n\n### Environment variable overrides\n\nEvery config field can be overridden via environment variables. This is useful for CI or when you want different settings per shell session. See [env-vars.md](docs/env-vars.md) for the full list.\n\n## How it works\n\n1. On session start, loads the index from disk and incrementally syncs \u2014 only re-embeds new or modified files\n2. Registers a `knowledge_search` tool the LLM calls with natural language queries\n3. Returns ranked results with file paths, relevance scores, and content excerpts\n\nSync runs on session startup only. Files changed mid-session won't be searchable until the next session start or a manual `/knowledge-reindex`.\n\nThe index is stored at `~/.pi/knowledge-search/index.json`.\n\n## Commands\n\n| Command                   | Description                                     |\n| ------------------------- | ----------------------------------------------- |\n| `/knowledge-search-setup` | Interactive setup wizard                        |\n| `/knowledge-add-kb`       | Add a Bedrock Knowledge Base as a search source |\n| `/knowledge-overview`     | Force-rebuild and re-inject the vault overview  |\n| `/knowledge-reindex`      | Force a full re-index                           |\n\n## Performance\n\nTypical numbers for ~500 markdown files (~20MB):\n\n| Operation                     | Time   |\n| ----------------------------- | ------ |\n| Full index build              | ~7s    |\n| Incremental sync (no changes) | ~12ms  |\n| Search query                  | ~250ms |\n| Index file size               | ~5MB   |\n\n## Project-local storage\n\nBy default, config lives at `~/.pi/knowledge-search.json` and the index at `~/.pi/knowledge-search/`. To relocate per-project, add one of the following to `{project}/.pi/settings.json`:\n\n```jsonc\n{\n  \"pi-knowledge-search\": {\n    \"localPath\": \".pi/knowledge-search\"   // config.json + index/ under this path\n  }\n}\n```\n\nOr via the [`pi-total-recall`](https://github.com/samfoy/pi-total-recall) cascade:\n\n```jsonc\n{\n  \"pi-total-recall\": {\n    \"localPath\": \".pi/total-recall\"\n    // pi-knowledge-search \u2192 {project}/.pi/total-recall/knowledge-search/\n  }\n}\n```\n\n**Resolution order (highest priority first):**\n\n1. `KNOWLEDGE_SEARCH_CONFIG` / `KNOWLEDGE_SEARCH_INDEX_DIR` env vars\n2. `pi-knowledge-search.localPath` in `{cwd}/.pi/settings.json`\n3. `pi-total-recall.localPath` cascade \u2192 `{localPath}/knowledge-search/`\n4. Global default: `~/.pi/knowledge-search.json` + `~/.pi/knowledge-search/`\n\nPer-project indexes are particularly useful for vault- or doc-tree-scoped embeddings where you don't want cross-project bleed.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "extension"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/samfoy/pi-knowledge-search#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/samfoy/pi-knowledge-search.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-03-14T22:33:24.615Z",
+    "modified": "2026-06-10T18:27:51.578Z",
+    "0.1.0": "2026-03-14T22:33:24.822Z",
+    "0.1.1": "2026-03-14T22:52:27.275Z",
+    "0.1.2": "2026-04-21T13:59:07.189Z",
+    "1.0.0": "2026-04-21T20:03:54.139Z",
+    "1.0.1": "2026-04-23T02:18:40.021Z",
+    "1.0.2": "2026-04-30T04:20:35.472Z",
+    "1.1.0": "2026-05-01T16:38:38.418Z",
+    "1.2.0": "2026-05-03T17:08:02.885Z",
+    "1.3.0": "2026-05-03T21:54:58.175Z",
+    "1.3.1": "2026-05-08T14:55:42.075Z",
+    "1.3.2": "2026-05-11T22:30:33.561Z",
+    "1.3.3": "2026-05-12T18:35:02.901Z",
+    "1.3.4": "2026-05-29T21:01:13.753Z",
+    "1.3.5": "2026-06-10T18:27:51.456Z"
+  },
+  "versions_count": 14,
+  "downloads_last_week": 56,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 199
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 226
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 232
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 595
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 511
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 165
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 99
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 209
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 75
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 139
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 56
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 7
+    }
+  ]
+}

@@ -1,0 +1,354 @@
+{
+  "name": "pi-tasks",
+  "latest_version": "0.1.5",
+  "description": "Pi-native execution contracts for AI agents \u2014 evidence-gated completion, ordered plans, and compaction-safe resume",
+  "readme": "# pi-tasks\n\n> Pi-native execution contracts for AI agents \u2014 no more \"trust me, it's done.\"\n\n## Why pi-tasks?\n\nAI coding agents say \"done\" without proof. Context compaction loses progress. Multi-step work drifts without anyone noticing. You end up asking \"what's the status?\" over and over.\n\n**pi-tasks** gives your Pi agent a binding execution contract: structured plans, evidence gates, ordered execution, and compaction-safe resume \u2014 all visible in your TUI.\n\n## What makes it different\n\nEvery other task tool for AI agents is just a todo list. pi-tasks enforces three hard contracts no competitor offers:\n\n| Contract | What it means |\n|----------|---------------|\n| **Evidence-gated completion** | Agents cannot mark work done without traceable, reproducible proof |\n| **Atomic step decomposition** | Vague or compound steps are rejected; non-atomic steps must be broken down before execution |\n| **Compaction-safe resume** | Context window limits don't lose your progress \u2014 snapshot replay picks up exactly where you left off |\n\nPlus: ordered step execution, scope drift detection, weak-model recovery guidance, decision/blocker audit trails, and branch-aware persistence.\n\n## Competitive landscape\n\nDifferent tools solve different parts of the agentic workflow. Pick based on what matters most to your team:\n\n| Tool | Focus | Strengths | Trade-offs |\n|------|-------|-----------|------------|\n| **Claude Code Tasks** (built-in) | Cross-session coordination | Shared task lists, dependency tracking, zero setup | No completion verification, no step-level contracts |\n| **rpiv-pi** (9.4K/mo, 413\u2605) | Structured workflows | 6 end-to-end flows, 12 subagents, code-review loops | Workflow-oriented; task visibility via separate rpiv-todo |\n| **@tintinweb/pi-tasks** (3.2K/mo, 113\u2605) | Task tracking & subagents | Dependency DAG, auto-cascade, file/session/project scoping | Tracks progress; completion is self-reported |\n| **Microsoft hve-core** (1,183\u2605) | RPI workflow for Copilot | Research\u2192Plan\u2192Implement\u2192Review, custom agents | Copilot-native; not designed for Pi |\n| **pi-tasks** (this project) | Execution contracts | Evidence-gated completion, atomic decomposition, compaction-safe resume | Narrower scope; no subagent orchestration (yet) |\n\n**pi-tasks is for you if** your core problem is agents claiming \"done\" without proof, plans drifting mid-execution, or context compaction losing progress. If you need workflow orchestration or multi-agent coordination, the tools above may be a better fit \u2014 or complement pi-tasks.\n\n## Install\n\n```sh\npi install npm:pi-tasks\n```\n\nFor local development:\n\n```sh\npi install ./\n```\n\n## How it works\n\n```\ntask_plan \u2192 ordered steps with acceptance criteria\n    \u2193\ntask_focus \u2192 agent sees exactly what's in scope\n    \u2193\ntask_update \u2192 step-by-step execution with evidence lock\n    \u2193\ntask_evidence \u2192 attach proof before marking done\n    \u2193\ntask_complete \u2192 only succeeds when all gates pass\n```\n\nThe agent gets 12 tools. The user gets `/tasks`. Everything persists in Pi's session tree.\n\n## Agent Tools\n\n| Tool | Purpose |\n|------|---------|\n| `task_plan` | Create a task with objectives, criteria, and ordered steps |\n| `task_next` | One-step guidance for weak/small-context models |\n| `task_focus` | What work is in scope right now |\n| `task_resume` | Recover state after compaction or session switch |\n| `task_checkpoint` | Save a durable snapshot for compaction resilience |\n| `task_granularity_check` | Verify a step is truly atomic |\n| `task_decompose` | Break non-atomic steps into child steps |\n| `task_list` | List tasks with optional filtering |\n| `task_update` | Advance steps, record activity, flag scope drift |\n| `task_evidence` | Attach verification evidence to steps/criteria |\n| `task_decision` | Record explicit user decisions |\n| `task_complete` | Close a task (only if all gates pass) |\n\n## Completion Gates\n\n`task_complete` rejects when:\n\n- No evidence exists\n- Any ordered plan step is still active or pending\n- Required criteria are not satisfied\n- A criterion is satisfied without evidence\n- Unresolved blockers remain\n- Unresolved scope drift warnings remain\n- All evidence is only `not_verified`\n\nForced completion requires `force_with_reason` and produces a low-confidence warning.\n\n## Token Efficiency\n\nNormal tool results return only the compact resume contract needed for the next action \u2014 not the full task state.\n\n```text\n# Compact defaults during work:\ntask_next\ntask_resume\n/tasks\n\n# Detailed view only when debugging:\n/tasks detail\ntask_list include_evidence=true\n```\n\n## Technical Details\n\n### Capabilities\n\n- Typed task, acceptance criterion, evidence, decision, blocker, and event model\n- Pure reducer with transition validation and evidence-before-completion enforcement\n- Ordered plan steps; agents must complete or skip the current step before advancing\n- Step-level contracts with expected output, linked criteria, required evidence, and allowed actions\n- Plan quality gate rejects vague, unverifiable, or over-broad atomic steps\n- Stricter atomic scoring rejects compound wording (`and`, `then`, `\u4e26\u4e14`, `\u7136\u5f8c`)\n- Recursive decomposition gate for non-atomic steps\n- Step-scoped evidence through `task_evidence.step_ids`\n- Current-step evidence lock unless explicit `override_reason` is supplied\n- Evidence quality gate: traceable, reproducible, with artifact references\n- Evidence budget gate: oversized text is rejected to keep context lean\n- Tool rejections include structured recovery details + `task_resume` guidance\n- `task_next` one-step weak-model contract with mode, current-step lock, recommended tool, blocked tools, minimum params\n- Scope drift recording for `scope_change` and `off_plan` activity\n- Derived progress from completed steps, satisfied criteria, and evidence\n- Duplicate evidence detection\n- Branch-aware persistence via Pi custom entries (`pi-tasks:event`)\n- Session replay from `ctx.sessionManager.getBranch()` on `session_start` and `session_tree`\n- Compaction snapshot hook via `session_before_compact`\n- Compact status bar and above-editor widget\n\n### Verification\n\nLocal verification suite:\n\n- `npm run release:check` (typecheck + lint + test + build + import smoke + pack + audit)\n- Real Pi dogfood passed on 2026-06-18, 2026-06-19, 2026-06-20, and 2026-06-23\n\nDogfood coverage includes: task lifecycle, evidence enforcement, ordered step rejection, structured plan steps, recursive decomposition, compaction-safe resume, duplicate evidence rejection, blocked task display, forked-session replay, tarball install, and weak-model smoke.\n\n## Documentation\n\n- [Product Plan](docs/PRODUCT_PLAN.md) \u2014 positioning, scope, research, and `/goal` boundary\n- [Implementation Specification](docs/IMPLEMENTATION_SPEC.md) \u2014 data contracts, reducer rules, tool contracts, TUI spec\n- [Dogfood Checklist](docs/DOGFOOD.md) \u2014 real Pi dogfood scenarios and status\n- [Weak-Model Prompts](docs/dogfood-prompts/) \u2014 English and Traditional Chinese validation prompts\n- [Release Process](docs/RELEASE_PROCESS.md) \u2014 gates required before publishing\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "ai-agent",
+    "coding-agent",
+    "task-management",
+    "todo",
+    "progress-tracking",
+    "agent-workflow",
+    "developer-tools"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/nczz/pi-tasks#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nczz/pi-tasks.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-06-20T05:13:02.172Z",
+    "modified": "2026-06-23T13:41:45.184Z",
+    "0.1.1": "2026-06-20T05:13:02.478Z",
+    "0.1.3": "2026-06-20T13:17:45.516Z",
+    "0.1.4": "2026-06-21T10:28:58.841Z",
+    "0.1.5": "2026-06-23T13:41:45.090Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 661,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 631
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 30
+    }
+  ]
+}

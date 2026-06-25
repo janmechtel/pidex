@@ -1,0 +1,52 @@
+{
+  "name": "@vanillagreen/pi-web-tools",
+  "latest_version": "1.3.1",
+  "description": "First-party Pi web tools: provider-toggled web search, Exa deep research, content retrieval, and OpenAI native web_search integration.",
+  "readme": "# pi-web-tools\n\n![Web Tools settings panel](https://raw.githubusercontent.com/vanillagreencom/vstack/main/pi-extensions/pi-web-tools/assets/settings-panel.png)\n![Exa web_search results renderer](https://raw.githubusercontent.com/vanillagreencom/vstack/main/pi-extensions/pi-web-tools/assets/web-search.png)\n\nWeb access tools for Pi: search, deep research, content fetch, and code search.\n\nFor the Exa-specific API map and tool semantics, see [`EXA.md`](./EXA.md).\n\n## Highlights\n\n- `web_search` with provider selection: `auto`, `exa`, `perplexity`, `gemini`, `exa-mcp`, `duckduckgo`, `openai-native`.\n- `web_research` runs Exa Deep Search with `lite`, `standard`, or `full` modes. Writes findings reports with raw-metadata sidecars.\n- `web_fetch` extracts GitHub repos (clone cache), URL and local PDFs, HTML/text/JSON, YouTube and local video, with Jina Reader fallback on blocked pages.\n- `web_answer` and `web_find_similar` for Exa-first quick answers.\n- `code_search` uses Exa Code `/context` with fallback to code-focused Exa search.\n- `get_web_content` retrieves stored full content by id \u2014 no refetch.\n- OpenAI-native `web_search` rewrite on supported Codex models.\n\n`auto` provider tries keyed providers first (Exa, Perplexity, Gemini API), then no-key fallbacks (Exa MCP, DuckDuckGo), then Gemini Web cookies if enabled, then `openai-native`.\n\n## Install\n\nVia [npm](https://www.npmjs.com/package/@vanillagreen/pi-web-tools):\n\n```bash\npi install npm:@vanillagreen/pi-web-tools\n```\n\nVia [vstack](https://github.com/vanillagreencom/vstack):\n\n```bash\ncargo install --git https://github.com/vanillagreencom/vstack.git vstack\nvstack add vanillagreencom/vstack --pi-extension pi-web-tools --harness pi -y\n```\n\nRestart Pi after installation.\n\n## Commands\n\n| Command | Action |\n| --- | --- |\n| `/web-tools` | Open settings (or print status if extension-manager isn't installed). |\n| `/web-tools:doctor` | Show status and diagnostics. |\n| `/web-tools:provider:<name>` | Switch the active provider for this session. |\n\n## Fetch storage\n\n`web_fetch` returns a compact preview and stores extracted content in the current Pi session under a generated content id (e.g. `web-...`). Use `get_web_content` with that id to retrieve the stored text \u2014 it doesn't refetch the URL.\n\n- GitHub, direct HTTP, and PDF paths store full extracted text before preview truncation.\n- Exa-provider paths (`provider=exa` and auto-mode Exa fallback) store provider-capped excerpts (default 6000 chars; override per call with `textMaxCharacters`). `get_web_content` labels these as `stored excerpt` so the caller knows to set a larger cap or fetch directly if it needs the full document.\n- Local PDFs supported via `filePath`/`filePaths`, `file://...`, or PDF-looking paths.\n- `textMaxCharacters` caps the immediate preview (default 4k chars).\n- `get_web_content.maxCharacters` caps retrieval (default 50k chars).\n\n### Multi-URL preview caps\n\nA single `web_fetch` call accepts many URLs via `urls`/`filePaths`. To keep `content[0].text` from blowing past the model's input window, multi-URL calls cap the aggregate preview size and emit a manifest for large batches. Single-URL calls and explicit `textMaxCharacters` opt-ins are unaffected.\n\n| URLs in call | Per-URL preview | Aggregate cap | Format |\n| --- | --- | --- | --- |\n| 1 | `textMaxCharacters` (default 4k) | \u2014 | preview blocks |\n| 2\u20135 | `min(textMaxCharacters, floor(16 KB / count))` | 16 KB | preview blocks |\n| 6+ | 512 chars head | 25 KB | manifest of all URLs + short preview heads |\n\nThe sidecar (`pi-web-tools.content` events + `get_web_content`) stores per-URL full extracted text for direct/GitHub/PDF/HTTP paths and provider-capped excerpts for Exa paths. The aggregate cap only applies to the inline preview returned to the model. Pass `textMaxCharacters` to opt back into larger inlined previews when the caller knows the context budget allows it; for Exa paths the same flag also raises the provider-side excerpt cap.\n\n## API keys\n\nSet via environment variables, project `.env.local`/`.env`, or a private config file. Process env wins over files.\n\n- `EXA_API_KEY`\n- `PERPLEXITY_API_KEY`\n- `GEMINI_API_KEY`\n- `OPENAI_API_KEY`\n- `JINA_API_KEY` (optional; anonymous Jina Reader works without it)\n- `PI_WEB_TOOLS_CONFIG_FILE=/path/to/private.json`\n\nValues may be 1Password references such as `op://Private/Exa API Key/credential` when the `op` CLI is installed and signed in. References resolve best-effort with a short startup timeout (default 1500 ms, override with `PI_WEB_TOOLS_OP_READ_TIMEOUT_MS`); unresolved references are treated as unset so Pi startup does not block.\n\n## Deep research modes\n\n| Mode | Exa type | Results | Text cap | Highlight cap |\n| --- | --- | ---: | ---: | ---: |\n| `lite` | `deep-lite` | 15 | 10k | 600 |\n| `standard` | `deep-reasoning` | 50 | 16k | 900 |\n| `full` | `deep-reasoning` | 150 | 24k | 1200 |\n\n`standard` and `full` request Exa summaries and structured output. `full` runs the primary query plus each `additionalQueries` entry, then dedupes URLs.\n\nOverride per-mode defaults with the **Exa research mode overrides** setting (JSON keyed by `lite`/`standard`/`full`).\n\n## Settings\n\nOpen `/extensions:settings`; settings appear under the **Web Tools** tab.\n\nProject settings in `.pi/settings.json` apply only after Pi marks the workspace trusted; before trust, vstack Pi extensions read user/global settings only.\n\nGlyph style: each package exposes `glyphStyle` (`unicode` default, `ascii` for terminal-safe chrome). `@vanillagreen/pi-tool-renderer.globalGlyphStyleOverride=ascii` forces ASCII chrome across vstack Pi extensions while leaving tool/model/user content unchanged.\n\n### General\n\n| Setting | What it does |\n| --- | --- |\n| Auto-enable web tools | Add web tools to the active set while preserving Pi natives. |\n| Default provider | Provider used by `web_search` unless the call overrides. |\n| Enabled providers | Comma-separated allow-list. |\n\n### OpenAI native\n\n| Setting | What it does |\n| --- | --- |\n| OpenAI native web_search | Rewrite `web_search` to native OpenAI/Codex Responses `web_search`. |\n| OpenAI external web access | Set `external_web_access` on native tools. |\n\n### Exa\n\n| Setting | What it does |\n| --- | --- |\n| Exa deep research | Register and enable `web_research`. |\n| Exa research mode overrides | JSON object keyed by `lite`/`standard`/`full`. |\n| Exa advanced tools | Enable `web_answer`, `web_find_similar`, `code_search`. |\n\n### Content\n\n| Setting | What it does |\n| --- | --- |\n| Jina Reader fallback | Fall back to `r.jina.ai` for blocked or 403/429/5xx pages. |\n| GitHub clone extraction | Use a clone cache for GitHub repo URLs. |\n| GitHub clone max size | Large-repo fallback threshold in MB. |\n| Video extraction | YouTube and local video understanding via Gemini. |\n| Browser cookie access | Opt-in browser cookie extraction for Gemini Web fallback. |\n\n### Compatibility\n\n| Setting | What it does |\n| --- | --- |\n| Compatibility aliases | Register legacy aliases like `fetch_content` and `web_search_exa`. |\n\n## Notes\n\n`web_search` moved here from `pi-codex-minimal-tools`. Install both updated packages together; `pi-codex-minimal-tools` now owns only `image_generation`, `view_image`, and `apply_patch`.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "web-search",
+    "exa",
+    "deep-research",
+    "perplexity",
+    "gemini"
+  ],
+  "author": {
+    "name": "vanillagreen"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/vanillagreencom/vstack/tree/main/pi-extensions/pi-web-tools",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vanillagreencom/vstack.git",
+    "directory": "pi-extensions/pi-web-tools"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "appendSystem": "./instructions.md",
+    "image": "https://raw.githubusercontent.com/vanillagreencom/vstack/main/pi-extensions/pi-web-tools/assets/settings-panel.png"
+  },
+  "time": {
+    "created": "2026-05-06T17:17:23.239Z",
+    "modified": "2026-06-12T16:06:55.595Z",
+    "1.0.0": "2026-05-06T17:17:23.448Z",
+    "1.0.1": "2026-05-06T22:30:53.285Z",
+    "1.0.2": "2026-05-07T00:21:15.396Z",
+    "1.0.3": "2026-05-07T01:27:00.462Z",
+    "1.1.0": "2026-05-07T05:55:15.517Z",
+    "1.1.1": "2026-05-07T22:33:52.300Z",
+    "1.2.0": "2026-05-10T06:01:26.267Z",
+    "1.2.1": "2026-05-14T09:38:47.161Z",
+    "1.2.2": "2026-05-15T05:46:02.700Z",
+    "1.2.3": "2026-05-19T07:05:28.154Z",
+    "1.3.0": "2026-05-24T03:43:10.996Z",
+    "1.3.1": "2026-06-12T16:06:55.475Z"
+  },
+  "versions_count": 12,
+  "downloads_last_week": 74,
+  "download_trend": []
+}

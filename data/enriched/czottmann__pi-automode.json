@@ -1,0 +1,38 @@
+{
+  "name": "@czottmann/pi-automode",
+  "latest_version": "1.4.0",
+  "description": "Claude Code-style auto mode guardrail for pi.",
+  "readme": "# pi-automode\n\nClaude Code-style auto mode for Pi.\n\nThis is a guardrail extension. It intercepts agent tool calls before execution and blocks actions that match permission deny rules, deterministic hard-deny checks, or the auto-mode classifier's block decision.\n\nIt is not a sandbox. Extensions run in the Pi process, and a determined malicious extension can do anything your user account can do. It also does not guard user `!` / `!!` shell commands; by design, it guards agent tool calls only. Use this to reduce unsafe autonomous tool use, not as an OS security boundary.\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:@czottmann/pi-automode\n```\n\nFrom a local checkout:\n\n```bash\npi install .\n```\n\nFor one run from a local checkout:\n\n```bash\npi -e ./extensions/auto-mode.ts\n```\n\n## Commands\n\n```text\n/automode status    # current state, rules, and classifier\n/automode on        # re-enable for this session\n/automode off       # disable for this session\n/automode reload    # reload config from disk\n/automode reset     # reset denial counters only\n/automode defaults  # print the built-in rule lists\n/automode config    # current effective config + diagnostics\n/automode denials   # denial history for this session\n/automode model     # open classifier model selector and save to ~/.pi/agent/automode.json\n/automode model provider/model-id # save classifier model to ~/.pi/agent/automode.json\n```\n\n`/auto-mode` is an alias.\n\n## Docs\n\n- [Defaults and rule-list behavior](docs/defaults.md)\n- [Auto-mode classifier flow](docs/automode-classifier-flow.md)\n\n## Configuration\n\nThe extension follows Claude Code's documented config model where Pi can support it.\n\nIt reads `autoMode` from Pi-owned config only:\n\n- `~/.pi/agent/automode.json`\n- `.pi/automode.local.json`\n- `PI_AUTOMODE_SETTINGS_JSON`\n\nIt deliberately does not read `autoMode` from shared project `.pi/automode.json`, because a checked-in repo should not be able to weaken auto-mode rules. Shared project config may still contribute `permissions.deny` and `permissions.ask`.\n\nSet a global default classifier model in `~/.pi/agent/automode.json`; override it per project in `.pi/automode.local.json`.\n\nExample:\n\n```json\n{\n  \"autoMode\": {\n    \"classifierModel\": \"provider/model-id\",\n    \"environment\": [\n      \"$defaults\",\n      \"Source control: github.example.com/acme-corp and all repos under it\",\n      \"Trusted internal domains: *.corp.example.com, git.example.com\",\n      \"Trusted cloud buckets: s3://acme-dev-artifacts, gs://acme-ci-cache\",\n      \"Key internal services: staging deploy API at deploy.corp.example.com\"\n    ],\n    \"allow\": [\"$defaults\"],\n    \"protectedPaths\": [\"$defaults\"],\n    \"soft_deny\": [\"$defaults\"],\n    \"hard_deny\": [\n      \"$defaults\",\n      \"Never send repository contents to third-party code-review APIs\"\n    ]\n  },\n  \"permissions\": {\n    \"deny\": [\"bash(rm -rf *)\"],\n    \"ask\": [\"bash(git push *)\"]\n  }\n}\n```\n\n### `$defaults`\n\nSee [Defaults and rule-list behavior](docs/defaults.md) for built-in `environment`, `allow`, `protectedPaths`, `soft_deny`, and `hard_deny` entries, plus replacement behavior when `$defaults` is omitted.\n\n### Permission patterns\n\nPermission patterns use Pi tool names, for example `bash(...)`, `write(...)`, `edit(...)`, `read(...)`. The parser accepts capitalized names like `Bash(...)` for convenience, but the documented form is lowercase because Pi tool names are lowercase.\n\n## What is enforced before the classifier\n\nThe extension blocks these before any allow or classifier decision:\n\n- `permissions.deny` matches\n- declined `permissions.ask` matches\n- shell profile writes\n- SSH `authorized_keys` writes\n- cron, launch agent, and system service persistence\n- TLS/certificate/auth weakening patterns\n- root, home, and system-path destructive deletes\n- edits to `.pi/automode*`, `.pi` auto-mode files, and this extension's safety-control files\n\nRead-only Pi tools (`read`, `grep`, `find`, `ls`) are allowed after those checks.\n\nWrites to [protected paths](docs/defaults.md#protectedpaths) (shell profiles, tool configs, `.git`, `.vscode`, `.pi`, etc.) always go to the classifier, even if an `allow` rule matches. The classifier decides whether to permit the write.\n\nEverything else goes to the classifier. If the classifier is missing, fails, or returns invalid JSON, the action is blocked.\n\n## Examples\n\n- `examples/automode.local.json`: copy to `.pi/automode.local.json` in a project and edit the domains, buckets, and source-control org.\n\n## Known limits\n\nClaude Code's real classifier and exact built-in rules are private. This package implements the documented precedence and configuration behavior, with a local classifier prompt and deterministic hard-deny checks.\n\n## Development\n\n```bash\nnpm run check\nnpm test\nnpm pack --dry-run\n```\n\nThe tests cover the risky parts: scoped permission matching, config-source precedence, `$defaults` behavior, config diagnostics, deterministic hard-deny checks, shell parsing for risky bash fragments, classifier JSON parsing, hook-level blocking/allowing, classifier mocking, and protected-path enforcement.\n\n## Publishing\n\nGitHub Actions publishes the package to npm when a GitHub Release is published. The release tag must match `package.json` exactly, with or without a leading `v` (`v1.0.0` and `1.0.0` both work for version `1.0.0`).\n\nThe workflow uses npm Trusted Publishing, so it does not need an npm token secret. Configure this package on npm with this repository and workflow file (`.github/workflows/publish.yml`). The workflow builds the package, runs `npm run check`, and publishes with npm provenance.\n\n## Author\n\nCarlo Zottmann, <carlo@zottmann.dev>\n\n- Website: https://actions.work\n- GitHub: https://github.com/czottmann\n- Bluesky: https://bsky.app/profile/zottmann.dev\n- Mastodon: https://norden.social/@czottmann\n",
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "pi-package",
+    "auto-mode",
+    "llm",
+    "coding-agent"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/czottmann/pi-automode#readme",
+  "repository": {
+    "url": "git+https://github.com/czottmann/pi-automode.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/auto-mode.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-14T14:13:15.519Z",
+    "modified": "2026-06-25T19:21:11.038Z",
+    "0.1.0": "2026-06-14T14:13:15.786Z",
+    "1.0.0": "2026-06-14T14:24:57.195Z",
+    "1.1.0": "2026-06-14T16:36:45.944Z",
+    "1.2.0": "2026-06-14T18:26:46.503Z",
+    "1.3.0": "2026-06-15T09:56:55.722Z",
+    "1.4.0": "2026-06-25T19:21:10.727Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": null,
+  "download_trend": []
+}

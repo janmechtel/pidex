@@ -1,0 +1,34 @@
+{
+  "name": "pi-revdiff-plan",
+  "latest_version": "0.1.4",
+  "description": "Pi plan mode with revdiff TUI review",
+  "readme": "# pi-revdiff-plan\n\nPlan-first workflow for [Pi](https://github.com/earendil-works/pi-coding-agent) using [revdiff](https://github.com/umputun/revdiff) for interactive markdown plan review.\n\n## What it does\n\nThis extension adds a lightweight state machine to Pi:\n\n- `idle` \u2192 normal Pi behavior\n- `planning` \u2192 the agent can explore, but may only write/edit markdown plan files\n- `executing` \u2192 after plan approval, full tools are restored and checklist progress is tracked\n\nThe review loop is simple:\n\n1. Start plan mode with `/plan`\n2. Let the agent explore and write a markdown plan\n3. The agent calls `plan_submit(\"PLAN.md\")`\n4. `revdiff` opens for review\n5. If you quit with no annotations, the plan is approved\n6. If you annotate lines, the feedback goes back to the agent for revision\n7. Once approved, execution starts and checklist progress is tracked via `[DONE:n]`\n\n## Prerequisites\n\n- [Node.js](https://nodejs.org/) 20+ recommended\n- [Pi coding agent](https://github.com/earendil-works/pi-coding-agent)\n- [revdiff](https://github.com/umputun/revdiff) available in `PATH`\n  - macOS/Homebrew example:\n    ```bash\n    brew install umputun/apps/revdiff\n    ```\n- A terminal environment where Pi can launch TUI tools\n\n## Install\n\n```bash\npi install pi-revdiff-plan\n```\n\nThen verify:\n\n```bash\npi list\n```\n\n### From source\n\n```bash\ngit clone <this-repo>\ncd pi-revdiff-plan\npi install .\n```\n\n## Usage\n\n### Start in normal mode\n\n```bash\npi\n```\n\n### Start directly in plan mode\n\n```bash\npi --plan\n```\n\n### Typical session\n\n```text\n/plan\n# agent explores codebase and writes PLAN.md\n# agent calls plan_submit(\"PLAN.md\")\n# revdiff opens for review\n# annotate and quit, or quit clean to approve\n```\n\nAfter approval, the extension restores the previously active tool set and tracks progress using checklist items parsed from the approved markdown file.\n\n## Commands\n\n### `/plan`\n\nToggles plan mode when safe:\n\n- `idle` \u2192 `planning`\n- `planning` \u2192 `idle`\n- during `executing`, it does not abort silently; it warns you to use `/plan-abort`\n\n### `/plan-abort`\n\nCancels the current execution phase and returns to idle mode.\n\n### `/plan-status`\n\nShows:\n\n- current phase\n- current plan file, if any\n- checklist progress\n- remaining unchecked steps\n\n## Flags\n\n### `--plan`\n\nStarts Pi with plan mode enabled.\n\nExample:\n\n```bash\npi --plan\n```\n\n## How plan files should look\n\nThe agent is prompted to create a markdown plan with sections like:\n\n- Context\n- Approach\n- Files to modify\n- Steps\n- Verification\n\nChecklist items should be standard markdown task items, for example:\n\n```md\n- [ ] Add parser tests\n- [ ] Refactor state restoration\n- [ ] Update README\n```\n\nDuring execution, the extension tracks completion when the agent emits markers like:\n\n```text\n[DONE:0]\n[DONE:1]\n```\n\nThese markers should appear on their own lines.\n\n## Validation commands\n\nThis project currently uses a minimal validation flow through npm scripts:\n\n```bash\nnpm run typecheck\nnpm run build\nnpm run test\nnpm run lint\nnpm run validate\n```\n\n### Script details\n\n- `typecheck` \u2014 run TypeScript with `--noEmit`\n- `build` \u2014 compile project to `dist/`\n- `test` \u2014 build and run Node test suites\n- `lint` \u2014 currently aliases the type-safe validation baseline\n- `validate` \u2014 run typecheck and tests together\n\n## Troubleshooting\n\n### `revdiff binary not found`\n\nMake sure `revdiff` is installed and available in `PATH`.\n\nYou can verify with:\n\n```bash\ncommand -v revdiff\n```\n\nYou can also point to a custom binary path with `REVDIFF_BIN`.\n\n### Plan submit is rejected\n\nThe extension only allows plan files that:\n\n- are inside the current working directory\n- end with `.md` or `.mdx`\n- exist and are not empty\n\nExamples of rejected paths:\n\n- `../PLAN.md`\n- `/absolute/path/outside/repo.md`\n- `plan.txt`\n\n### The agent cannot edit source files in plan mode\n\nThat is expected. During planning, `write` and `edit` are restricted to markdown files only. Approve the plan first to restore full tool access.\n\n### Progress did not update\n\nChecklist progress only updates in executing mode and depends on `[DONE:n]` markers matching the zero-based checklist index.\n\n### Restored session looks wrong\n\nThe extension restores plan state from Pi session history. If the approved plan file was deleted or moved, restore falls back to idle.\n\n## CI and releases\n\nRecommended repository improvements:\n\n- CI to run type checking and tests on pushes and pull requests\n- automated release/versioning flow for publishing\n\nIf those files exist in your fork, check `.github/workflows/`.\n\n## Project structure\n\n```text\nindex.ts                # extension entrypoint\nsrc/constants.ts        # shared constants\nsrc/parsing.ts          # checklist parsing and path validation\nsrc/prompts.ts          # agent prompt helpers\nsrc/review.ts           # revdiff launch/review flow\nsrc/state.ts            # persistence and restore helpers\nsrc/commands.ts         # slash commands and flag registration\n.pi/extensions/rtk.ts   # optional RTK bash rewrite helper\ntest/*.test.ts          # automated tests\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "plan",
+    "revdiff"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/a4180p/pi-revdiff-plan#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a4180p/pi-revdiff-plan.git"
+  },
+  "pi": {
+    "extensions": [
+      "./"
+    ]
+  },
+  "time": {
+    "created": "2026-06-04T13:24:57.142Z",
+    "modified": "2026-06-04T16:40:05.757Z",
+    "0.1.0": "2026-06-04T13:24:57.401Z",
+    "0.1.1": "2026-06-04T16:32:46.484Z",
+    "0.1.3": "2026-06-04T16:36:34.959Z",
+    "0.1.4": "2026-06-04T16:40:05.647Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": null,
+  "download_trend": []
+}

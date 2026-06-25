@@ -1,0 +1,43 @@
+{
+  "name": "pi-agent-sandbox",
+  "latest_version": "0.2.0",
+  "description": "Sandbox awareness for pi: shows a colored [sandboxed:<profile>] footer and injects sandbox-access context when pi runs inside agent-sandbox (asb), plus an asb-pi shell wrapper that launches pi sandboxed inside tmux.",
+  "readme": "# pi-agent-sandbox\n\nSandbox awareness for [pi](https://github.com/earendil-works/pi). When pi runs\ninside [agent-sandbox](https://github.com/anonx3247/agent-sandbox) (`asb`), this\npackage:\n\n- shows a colored **`[sandboxed:<profile>]` footer** so it is always obvious that\n  the current pi session is confined to a sandbox profile;\n- injects **sandbox-access context** (parsed from the `ASB_PROFILE_JSON` env var)\n  so the agent knows what the active profile is allowed to read, write, and reach;\n- installs an **`asb-pi` shell wrapper** that launches pi sandboxed inside tmux.\n\n> **Status:** this is the initial scaffold. The footer, context injection, and\n> `asb-pi` wrapper are implemented in subsequent PRs; the extension currently\n> loads as a no-op stub.\n\n## Install\n\nThis is a pi *package* (it declares a pi extension + skill under the `pi` key in\n`package.json`). Install it with `pi install` in any of these forms:\n\n```sh\n# from npm\npi install pi-agent-sandbox\n\n# from git\npi install github:anonx3247/pi-agent-sandbox\n\n# from a local checkout\npi install /path/to/pi-agent-sandbox\n```\n\n## How sandbox detection works\n\nDetection relies entirely on the `ASB_*` environment variables that `asb` emits\ninside the sandbox:\n\n| Variable           | Meaning                                                        |\n| ------------------ | ------------------------------------------------------------- |\n| `ASB_SANDBOX=1`    | Marks that pi is running inside an `asb` sandbox.             |\n| `ASB_PROFILE`      | The active sandbox profile name (shown in the footer).        |\n| `ASB_PROFILE_JSON` | The resolved profile as JSON (parsed into access context).    |\n| `ASB_SECRETS_FILE` | Optional: path to the secrets file the profile may read.      |\n| `ASB_AWS_PROFILE`  | Optional: the named AWS profile the sandbox may use.          |\n\nSee [`docs/agent-sandbox-handoff.md`](docs/agent-sandbox-handoff.md) for the full\ncontract of what `asb` injects.\n\n## Running pi sandboxed in tmux \u2014 the safe launch pattern\n\n> **Security footgun \u2014 read this.** To run pi sandboxed inside tmux you must give\n> the inner tmux server a **dedicated socket** so it starts fresh *inside* the\n> sandbox. The `asb-pi` wrapper uses:\n>\n> ```sh\n> asb -p <profile> -- tmux -L asb-pi new-session -A -s \"pi-$RANDOM\" pi\n> ```\n>\n> The `-L asb-pi` flag is the critical part: it names a dedicated tmux socket.\n> Without it, a bare `tmux new-session` collides with the host's default tmux\n> socket and **attaches to the host tmux server**, which runs *outside* the\n> sandbox \u2014 silently escaping confinement. Always launch the inner tmux on its\n> own socket so the server is spawned inside `asb`.\n>\n> Each run gets a **unique tmux session** (the session name carries a per-run\n> `$RANDOM` suffix) so concurrent `asb-pi` launches in the same repo don't\n> collide on or reattach to each other's session. Set `ASB_PI_SESSION` to a\n> fixed name to opt into a shared/reattachable session instead.\n>\n> The wrapper also runs the sandboxed pi with **`PI_OFFLINE=1`** by default. This\n> gates pi's npm self-update, which would otherwise try to write to the\n> read-only `~/.npm` inside the sandbox, hit `EPERM`, and crash the process\n> (taking the tmux pane down with it). Export your own `PI_OFFLINE` before\n> running `asb-pi` to override this default.\n\n## Secrets\n\nThe `sx` secrets skill (for running commands that need credentials without\nexposing their values) is installed separately:\n\n```sh\nsx skill install\n```\n\n## License\n\nMIT \u00a9 anonx3247\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "sandbox",
+    "agent-sandbox",
+    "asb",
+    "tmux",
+    "security"
+  ],
+  "author": {
+    "name": "anonx3247"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/anonx3247/pi-agent-sandbox#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anonx3247/pi-agent-sandbox.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/asb-sandbox.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-09T21:31:09.199Z",
+    "modified": "2026-06-10T22:52:55.480Z",
+    "0.1.0": "2026-06-09T21:31:09.577Z",
+    "0.1.1": "2026-06-10T21:44:12.382Z",
+    "0.2.0": "2026-06-10T22:52:55.382Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

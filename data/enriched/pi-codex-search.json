@@ -1,0 +1,51 @@
+{
+  "name": "pi-codex-search",
+  "latest_version": "0.1.2",
+  "description": "Pi extension for Codex Web Search \u2014 reuse your ChatGPT Plus/Pro Codex subscription in pi-coding-agent",
+  "readme": "# pi-codex-search\n\n[![npm](https://img.shields.io/npm/v/pi-codex-search)](https://www.npmjs.com/package/pi-codex-search)\n[![license](https://img.shields.io/npm/l/pi-codex-search)](./LICENSE)\n\n**Search the web in Pi through your Codex subscription.**\n\nPi keeps the harness small. Codex already has a ChatGPT-backed search path. This package connects the two: it adds a `codex_search` tool to Pi and uses the same `openai-codex` login Pi already knows about.\n\nNo `ACCESS_TOKEN` env var. No separate login flow. If Pi can use your Codex subscription, this extension can use the same auth.\n\n## Why this exists\n\nWeb search does not have to be built into Pi. It can be a tool.\n\nThis extension is for Pi workflows that need fresh or source-backed information:\n\n- **Look up current docs and release notes.** Ask the model to check things that changed after its training cutoff.\n- **Get sources with the answer.** Search results include citations when Codex returns them.\n- **Reuse your Codex login.** The tool uses Pi's existing `openai-codex` OAuth credential instead of asking you to paste tokens.\n- **Batch related searches.** One tool call can run up to five related queries in parallel and return the results grouped by query.\n- **Keep projects in control.** Rename the tool, change defaults, or disable it per project.\n\n## What this package adds\n\n- A `codex_search` Pi tool.\n- 1\u20135 search queries per call, run in parallel.\n- `live` or `cached` freshness, plus `low` / `medium` / `high` search context size.\n- Streaming progress while Codex responds.\n- Collapsed result previews in the TUI, with full text and sources available when expanded.\n- Structured details: model, citations, search calls, response ids, usage, and per-query failures.\n- Config files for home and project defaults.\n- `/codex-search-settings` for status, editing, reset, rename, and disable.\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:pi-codex-search\n```\n\nOr load a local checkout without installing:\n\n```bash\npi -e /path/to/pi-codex-search\n```\n\n### Install from GitHub Release tarball\n\nIf you prefer not to use npm, download the tarball from the [latest release](https://github.com/Leechael/pi-codex-search/releases/latest), extract it, and install from the local path:\n\n```bash\ncurl -L https://github.com/Leechael/pi-codex-search/releases/latest/download/pi-codex-search.tar.gz | tar -xz -C /tmp\npi install /tmp/pi-codex-search\n```\n\n## Sign in\n\nInside Pi, run:\n\n```text\n/login openai-codex\n```\n\nChoose `ChatGPT Plus/Pro (Codex Subscription)` if Pi asks which provider to use. Pi stores and refreshes the credential.\n\nThe tool is registered by default. If Pi has no `openai-codex` token, or if the ChatGPT account id cannot be found from the stored OAuth credential or decoded access token, the first `codex_search` call fails with an `auth` error that points back to `/login openai-codex`.\n\nSet `enabled: false` if you want the extension installed but hidden for a project.\n\n## Tool\n\nDefault tool name:\n\n```text\ncodex_search\n```\n\nExample call:\n\n```json\n{\n  \"name\": \"codex_search\",\n  \"arguments\": {\n    \"queries\": [\"latest OpenAI Codex release notes\"],\n    \"search_context_size\": \"medium\",\n    \"freshness\": \"live\"\n  }\n}\n```\n\nArguments:\n\n- `queries` \u2014 required array of 1\u20135 search questions. Queries run in parallel; results are grouped by query.\n- `search_context_size` \u2014 optional, one of `low`, `medium`, `high`; defaults to `medium`.\n- `freshness` \u2014 optional, `live` or `cached`; defaults to `live`.\n\nThe tool returns text. When citations are available, the text includes a `Sources:` section.\n\nThe structured `details` object includes:\n\n- `model`\n- `freshness` / `searchContextSize`\n- `queryCount` / `failedQueryCount`\n- `successes`: per-query `{ query, text, citations, searchCalls, responseId?, usage? }`\n- `failures`: per-query `{ query, kind, message }`\n\nFailure `kind` is one of `auth`, `rate_limit`, `transport`, `timeout`, `schema`, or `unknown`.\n\n## Model used for search\n\nThe search request needs a Codex model id. The extension chooses it in this order:\n\n1. `model` from env / project / home config, if set.\n2. The active Pi model, if it comes from the `openai-codex` provider.\n3. The default model from Codex's `/codex/models` response.\n\nMost users do not need to set this.\n\n## Settings\n\nMost users only need `/login openai-codex`. Use settings when you want to rename the tool, disable it for a project, pin a model, or change defaults.\n\nOpen the interactive settings dialog:\n\n```text\n/codex-search-settings\n```\n\nUseful subcommands:\n\n```text\n/codex-search-settings status\n/codex-search-settings reset\n```\n\nSettings are merged from three layers, highest precedence first:\n\n1. Environment variables.\n2. Project file: `<cwd>/.pi/pi-codex-search.json`.\n3. Home file: `~/.pi/pi-codex-search.json`.\n\nEach layer is optional. Missing files are skipped. Malformed JSON or invalid values fail fast so you do not silently run with the wrong tool settings.\n\nFull schema, all fields optional:\n\n```json\n{\n  \"enabled\": true,\n  \"toolName\": \"codex_search\",\n  \"model\": \"gpt-5-codex\",\n  \"baseUrl\": \"https://chatgpt.com/backend-api\",\n  \"clientVersion\": \"1.0.0\",\n  \"searchContextSize\": \"medium\",\n  \"freshness\": \"live\"\n}\n```\n\n`enabled: false` skips tool registration entirely. The model will not see `codex_search` at all.\n\n`toolName` lets you avoid conflicts with another extension. Tool names must match `[a-zA-Z_][a-zA-Z0-9_]{0,63}`.\n\nEnvironment variable equivalents:\n\n| Field               | Env var                              |\n| ------------------- | ------------------------------------ |\n| `enabled`           | `PI_CODEX_WEB_SEARCH_ENABLED`        |\n| `toolName`          | `PI_CODEX_WEB_SEARCH_TOOL_NAME`      |\n| `model`             | `PI_CODEX_WEB_SEARCH_MODEL`          |\n| `baseUrl`           | `PI_CODEX_WEB_SEARCH_BASE_URL`       |\n| `clientVersion`     | `PI_CODEX_WEB_SEARCH_CLIENT_VERSION` |\n| `searchContextSize` | `PI_CODEX_WEB_SEARCH_CONTEXT_SIZE`   |\n| `freshness`         | `PI_CODEX_WEB_SEARCH_FRESHNESS`      |\n\n`PI_CODEX_WEB_SEARCH_ENABLED` accepts `true` / `false` (case-insensitive). Any other value fails config loading.\n\nInteractive edits write the selected config file immediately. When you close the dialog, Pi reloads so the new tool name and defaults apply without restarting the whole terminal.\n\n## Notes\n\n### Codex search vs model search\n\nThis does not add browsing to the model provider itself. It adds a Pi tool. The model decides when to call `codex_search`, just like any other tool.\n\n### Account id\n\nCodex requests need both the access token and the ChatGPT account id. The extension first checks Pi's stored OAuth credential. If that does not include an account id, it tries to extract one from the access token.\n\n## Troubleshooting\n\n### `codex_search` fails with an `auth` error\n\nRun:\n\n```text\n/login openai-codex\n```\n\nIf Pi asks for a provider, choose `ChatGPT Plus/Pro (Codex Subscription)`. The extension picks up the refreshed credential on the next call.\n\n### `codex_search` says the account id was not found\n\nThe stored OAuth credential did not include an account id, and the extension could not decode one from the access token. Re-run `/login openai-codex` so Pi refreshes the credential.\n\n### The model does not see `codex_search`\n\nCheck whether `enabled` is false in env, project config, or home config:\n\n```text\n/codex-search-settings status\n```\n\nRemember that env overrides project, and project overrides home.\n\n### Search uses the wrong model\n\nSet `model` in your config file, or set `PI_CODEX_WEB_SEARCH_MODEL`, to the Codex model id you want. If unset, the extension uses the active Codex model when possible, then falls back to the default model from `/codex/models`.\n\n### A different extension already registers `codex_search`\n\nUse `/codex-search-settings` to rename this extension's tool, or set `toolName` in `~/.pi/pi-codex-search.json`. Tool renames apply after the settings dialog reloads Pi.\n\n## Development\n\n```bash\nnpm install\nnpm run check\nnpm test\nnpm run lint\nnpm run format:check\n```\n\n## Release\n\nThis repository follows the same release shape as `pi-provider-kimi-code`:\n\n- `release-naming.env` defines `PKG_NAME=pi-codex-search` and `TAG_PREFIX=v`.\n- `scripts/next-version.sh` computes the next semantic version from tags.\n- `.github/workflows/release-command.yml` creates release commits and tags.\n- `.github/workflows/release-on-tag.yml` publishes to npm with provenance and attaches `pi-codex-search.tar.gz` to the GitHub release.\n\n## References\n\n- Pi: [earendil-works/pi](https://github.com/earendil-works/pi)\n\n## License\n\nMIT\n",
+  "keywords": [
+    "chatgpt",
+    "chatgpt-plus",
+    "chatgpt-pro",
+    "codex",
+    "coding-agent",
+    "oauth",
+    "openai",
+    "openai-codex",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "pi-mono",
+    "pi-package",
+    "responses-api",
+    "subscription",
+    "tool-extension",
+    "web-search",
+    "web_search"
+  ],
+  "author": {
+    "name": "Leechael"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Leechael/pi-codex-search#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Leechael/pi-codex-search.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-23T03:19:43.241Z",
+    "modified": "2026-05-23T15:08:24.584Z",
+    "0.1.0": "2026-05-23T03:19:43.545Z",
+    "0.0.1": "2026-05-23T03:26:55.344Z",
+    "0.1.1": "2026-05-23T05:20:46.338Z",
+    "0.1.2": "2026-05-23T15:08:24.322Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,346 @@
+{
+  "name": "pi-web-fetch",
+  "latest_version": "1.1.0",
+  "description": "Pi extension: fetch web pages via headless Chrome, extract content with trafilatura, and optionally process with an LLM",
+  "readme": "# pi-web-fetch\n\nA [pi](https://github.com/badlogic/pi-mono) extension that gives your agent a proper web browser. Fetches pages via headless Chrome, extracts clean content via [trafilatura](https://trafilatura.readthedocs.io/), and optionally distills it with an LLM.\n\n## Why not use Claude Code's built-in WebFetch?\n\nClaude Code's WebFetch uses Turndown to convert HTML to markdown \u2014 a simple regex-based converter that can't handle JavaScript-rendered pages, doesn't strip boilerplate well, and has no extensibility. pi-web-fetch improves on this in several ways:\n\n| | Claude Code WebFetch | pi-web-fetch |\n|---|---|---|\n| **Rendering** | Static HTTP fetch | Headless Chrome (handles SPAs, JS-rendered content) |\n| **Extraction** | Turndown (regex HTML\u2192md) | [trafilatura](https://trafilatura.readthedocs.io/) (ML-based boilerplate removal) |\n| **Raw content** | Never \u2014 prompt is mandatory | Optional \u2014 omit prompt to get full markdown |\n| **Batch fetching** | One URL at a time | Up to 10 URLs concurrently with per-URL progress |\n| **Concurrency** | Sequential | Browser pool with 6 parallel tabs |\n| **Extensibility** | None | Hook system for site-specific handling |\n| **Smart redirects** | Generic | Context-aware (e.g. GitHub URLs \u2192 `gh` CLI suggestions) |\n\n## Features\n\n- **`web_fetch` tool** \u2014 registered in pi's tool system, callable by the LLM\n- **Headless Chrome** via puppeteer \u2014 handles JavaScript-rendered pages, SPAs, pages behind cookie banners\n- **Content extraction** \u2014 strips boilerplate (nav, ads, footers) using trafilatura's ML-based extraction, outputs clean markdown\n- **LLM processing** \u2014 optionally distills page content to answer a specific question via a pi sub-agent\n- **Batch fetching** \u2014 fetch up to 10 pages concurrently in a single tool call with per-URL status in the UI\n- **Browser pool** \u2014 reuses a single Chrome instance with up to 6 parallel tabs, avoiding repeated browser startup overhead\n- **Smart large-page handling** \u2014 when content exceeds ~50KB and no prompt is given, automatically generates a structured summary\n- **15-minute cache** \u2014 avoids redundant fetches; enables summarize-then-drill-down workflows\n- **Cross-host redirect detection** \u2014 reported to the LLM for explicit follow-up rather than silently following\n- **HTTP\u2192HTTPS auto-upgrade**\n- **Extension hooks** \u2014 customize fetch behavior for specific sites (redirect, replace HTML, transform markdown, override summarization)\n- **Built-in site handlers** \u2014 GitHub URLs redirect to `gh` CLI, Google Docs redirect to workspace tools\n\n## Prerequisites\n\n- [pi](https://github.com/badlogic/pi-mono) coding agent\n- A Python tool runner for trafilatura (auto-detected in priority order):\n  1. [uv](https://docs.astral.sh/uv/) (`uvx`) \u2014 fastest, recommended\n  2. `uv run` \u2014 fallback if `uvx` alias is missing\n  3. [pipx](https://pipx.pypa.io/) \u2014 widely available on Debian/Ubuntu\n  4. [pip-run](https://github.com/jaraco/pip-run) \u2014 niche fallback\n- Node.js 18+\n\n## Installation\n\n```bash\nnpm install pi-web-fetch\n```\n\nOr clone for development:\n\n```bash\ngit clone https://github.com/georgebashi/pi-web-fetch\ncd pi-web-fetch\nnpm install\n```\n\n> **Note:** `npm install` will download puppeteer's bundled Chromium (~300MB). If you already have Chrome/Chromium installed, you can set `PUPPETEER_EXECUTABLE_PATH` to skip the download:\n> ```bash\n> export PUPPETEER_EXECUTABLE_PATH=/path/to/chrome\n> ```\n\n> **Note:** The first time `web_fetch` runs, `uvx` will download the trafilatura package (~10MB). Subsequent runs use the cached environment and are fast.\n\n### Add to pi\n\nAdd the package to your pi settings (`~/.pi/agent/settings.json`):\n\n```json\n{\n  \"extensions\": [\n    \"pi-web-fetch\"\n  ]\n}\n```\n\nOr point to a local checkout:\n\n```json\n{\n  \"extensions\": [\n    \"/path/to/pi-web-fetch\"\n  ]\n}\n```\n\nOr use the `-e` flag for quick testing:\n\n```bash\npi -e pi-web-fetch\n```\n\n## Usage\n\nThe extension registers a `web_fetch` tool. The LLM will use it automatically when it needs to fetch web content.\n\n### Single URL\n\n**With a prompt (recommended):**\n> Fetch https://docs.example.com/api and tell me what authentication methods are supported.\n\n**Without a prompt (full content):**\n> Fetch the content of https://example.com/changelog\n\n### Batch fetching\n\nFetch multiple pages concurrently by asking for several URLs at once:\n> Read these three pages and compare their approaches to error handling:\n> - https://docs.python.org/3/tutorial/errors.html\n> - https://go.dev/blog/error-handling-and-go\n> - https://doc.rust-lang.org/book/ch09-00-error-handling.html\n\nThe agent will use the `pages` parameter to fetch all URLs in parallel (up to 10 per call). The UI shows live per-URL progress:\n\n```\n\u25cf docs.python.org/3/tutorial/errors.html\n\u25d0 go.dev/blog/error-handling-and-go \u00b7 fetching\n\u25d1 doc.rust-lang.org/book/ch09-00-error-... \u00b7 extracting\n```\n\nEach URL independently transitions through: pending \u2192 fetching \u2192 extracting \u2192 summarizing \u2192 done/error. The browser pool manages concurrency automatically (6 tabs max).\n\n## Extensions\n\npi-web-fetch has a hook system for site-specific fetch behavior. Extensions can intercept any stage of the pipeline: before fetch, after fetch (HTML), after extraction (markdown), or at summarization time.\n\n### Built-in extensions\n\n- **GitHub redirect** \u2014 matches `github.com/**`, redirects to `gh` CLI with context-aware suggestions (e.g. `gh issue view 123`)\n- **Google Docs redirect** \u2014 matches `docs.google.com/**`, redirects to Google Workspace MCP tools\n\n### Writing extensions\n\nExtensions are TypeScript modules with a factory function default export:\n\n```typescript\nimport type { WebFetchExtension } from \"pi-web-fetch/types\";\n\nexport default function (): WebFetchExtension {\n  return {\n    name: \"my-handler\",\n    matches: [\"example.com/**\"],\n    async beforeFetch(ctx) {\n      // Return a HookResult to short-circuit, or void to continue\n      return ctx.redirect(\"Use a different tool for this site.\");\n    },\n    async afterFetch(ctx) {\n      // ctx.html \u2014 replace HTML or short-circuit\n    },\n    async afterExtract(ctx) {\n      // ctx.markdown \u2014 replace markdown or short-circuit\n    },\n    async summarize(ctx) {\n      // Override default LLM summarization\n    },\n  };\n}\n```\n\n### Extension sources (in priority order)\n\n1. **Event bus** \u2014 other pi extensions can register handlers via `pi.events.emit(\"web-fetch:register\", extension)`\n2. **Local** \u2014 TypeScript/JS files in `~/.pi/extensions/web-fetch/` (or configured `extensionsDir`)\n3. **Built-in** \u2014 shipped with pi-web-fetch in the `extensions/` directory\n\n## Configuration\n\nCreate `~/.pi/agent/web-fetch.json` to override defaults:\n\n```json\n{\n  \"model\": \"provider/model-id\",\n  \"thinkingLevel\": \"medium\",\n  \"extensionsDir\": \"~/.pi/extensions/web-fetch\"\n}\n```\n\n| Key | Default | Description |\n|-----|---------|-------------|\n| `model` | Current session model | Model for LLM content processing |\n| `thinkingLevel` | Current session thinking level | Thinking level for the sub-agent |\n| `extensionsDir` | `~/.pi/extensions/web-fetch/` | Directory for local extensions |\n\nWithout a config file, the extension uses whatever model and thinking level the current session is using.\n\n## Architecture\n\n```\nweb_fetch(url, prompt?)\n  \u2502\n  \u251c\u2500 URL validation & normalization (http\u2192https, scheme check)\n  \u251c\u2500 Cache check (15-min TTL)\n  \u251c\u2500 Extension: beforeFetch hook\n  \u251c\u2500 Browser pool \u2192 Puppeteer page (networkidle2, 30s timeout)\n  \u251c\u2500 Cross-host redirect detection\n  \u251c\u2500 Extension: afterFetch hook\n  \u251c\u2500 trafilatura extraction (HTML \u2192 clean markdown)\n  \u251c\u2500 Extension: afterExtract hook\n  \u251c\u2500 Cache store\n  \u2514\u2500 Content processing:\n      \u251c\u2500 With prompt \u2192 pi sub-agent (focused extraction)\n      \u251c\u2500 Small content, no prompt \u2192 return raw markdown\n      \u2514\u2500 Large content, no prompt \u2192 pi sub-agent (structured summary)\n```\n\nFor batch mode, each URL runs through this pipeline independently with its own browser tab. The browser pool (6 tabs max, 60s idle timeout) provides backpressure.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "georgebashi"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/georgebashi/pi-web-fetch#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/georgebashi/pi-web-fetch.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-13T03:29:12.578Z",
+    "modified": "2026-03-03T21:29:42.495Z",
+    "1.0.0": "2026-02-13T03:29:12.713Z",
+    "1.0.2": "2026-03-03T01:14:27.049Z",
+    "1.1.0": "2026-03-03T21:29:42.195Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 40,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 87
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 190
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 55
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 20
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 17
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 33
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 92
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 169
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 228
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 323
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 314
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 209
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 110
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 216
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 41
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 5
+    }
+  ]
+}

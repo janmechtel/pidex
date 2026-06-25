@@ -1,0 +1,47 @@
+{
+  "name": "pi-rewind",
+  "latest_version": "0.5.0",
+  "description": "Checkpoint/rewind extension for the Pi coding agent \u2014 per-tool snapshots, /rewind command, Esc+Esc shortcut, safe restore, redo stack",
+  "readme": "# pi-rewind\n\nCheckpoint/rewind extension for the [Pi coding agent](https://github.com/badlogic/pi-mono). Creates automatic git-based snapshots of your working tree, allowing you to rewind file changes and conversation state when the AI makes mistakes.\n\n## Why\n\nEvery major coding agent now has rewind/undo: Claude Code (`/rewind`), Gemini CLI (`/rewind`), OpenCode (`/undo`), Cline (Checkpoints). Pi already has community extensions for this \u2014 [checkpoint-pi](https://github.com/prateekmedia/pi-hooks/tree/main/checkpoint) and [pi-rewind-hook](https://github.com/nicobailon/pi-rewind-hook) \u2014 but neither offers a dedicated `/rewind` command, diff preview, or a redo stack.\n\n**pi-rewind** combines the best of both existing extensions with features from the top agents, closing every gap in one package.\n\n## Features\n\n- [x] Dedicated `/rewind` command \u2014 checkpoint browser \u2192 diff preview \u2192 restore\n- [x] `Esc+Esc` keyboard shortcut \u2014 quick files-only rewind\n- [x] Smart checkpointing \u2014 snapshots after write/edit/bash tools, 1 per turn\n- [x] Smart dedup \u2014 skips checkpoints when worktree unchanged (read-only bash like `ls`, `find`, `cat` don't create checkpoints)\n- [x] Descriptive labels \u2014 `\"user prompt\" \u2192 write \u2192 file.ts, edit \u2192 other.ts`\n- [x] Diff preview before restore \u2014 see exactly what changes\n- [x] Branch labels in picker \u2014 `[feature]` for same-branch, `\u26a0\ufe0f main` for cross-branch\n- [x] Redo stack (multi-level undo) \u2014 \"\u21a9 Undo last rewind\" in all flows\n- [x] Restore options: files + conversation, files only, conversation only\n- [x] Safe restore \u2014 never deletes `node_modules`, `.venv`, or large files\n- [x] Branch safety \u2014 blocks cross-branch restore (avoids OpenCode bug)\n- [x] Smart filtering \u2014 excludes 13 dir patterns, files >10MiB, dirs >200 files\n- [x] Git-based checkpoints stored as refs (survives restarts)\n- [x] Footer status indicator (`\u25c6 X checkpoints`)\n- [x] Auto-prune old sessions \u2014 deletes checkpoints from previous sessions on startup\n- [x] Auto-prune per session \u2014 50 max checkpoints per session\n- [x] Resume checkpoint on session start\n- [x] Fork/tree integration \u2014 restore prompts on `/fork` and `/tree` navigation\n- [ ] \"Summarize from here\" integration (`ctx.compact()`)\n\n## Install\n\n```bash\n# From npm\npi install npm:pi-rewind\n\n# From GitHub\npi install github.com/arpagon/pi-rewind\n\n# For development\ngit clone git@github.com:arpagon/pi-rewind.git\npi -e ./pi-rewind/src/index.ts\n```\n\n## Performance\n\nTested on repos from 20 files to 182K files (87GB monorepo):\n\n| Repo | createCheckpoint | loadAll (startup) |\n|---|---|---|\n| Small (20 files) | 62ms | 8ms |\n| Medium (500 files) | 62ms | 8ms |\n| Large (5,000 files) | 60ms | 8ms |\n| Real monorepo (182K files, 87GB) | 142ms | 8ms |\n\n- `createCheckpoint` = ~60-142ms constant \u2192 direct latency added per turn (imperceptible)\n- Pi executes extension handlers with `await` sequentially, so this is the actual overhead\n- Old sessions are auto-pruned on startup (525 stale refs \u2192 0 in real-world test)\n\nRun the benchmark yourself: `npx tsx tests/bench.ts`\n\n## Architecture\n\nTwo-layer split: `core.ts` is pure git operations with zero Pi dependency (independently testable), `index.ts` wires Pi events to core functions.\n\n```\nsrc/\n\u251c\u2500\u2500 core.ts       # 723 LOC \u2014 git operations, filtering, safe restore, branch safety, prune\n\u251c\u2500\u2500 index.ts      # 280 LOC \u2014 Pi event hooks, checkpoint scheduling, auto-prune\n\u251c\u2500\u2500 commands.ts   # 344 LOC \u2014 /rewind, Esc+Esc, fork/tree handlers\n\u251c\u2500\u2500 state.ts      #  74 LOC \u2014 shared mutable state\n\u2514\u2500\u2500 ui.ts         #  33 LOC \u2014 footer status indicator\ntests/\n\u251c\u2500\u2500 core.test.ts  # 362 LOC \u2014 20 tests passing\n\u2514\u2500\u2500 bench.ts      # 252 LOC \u2014 performance benchmarks\n```\n\n## Development\n\n```bash\n# Run tests\nnpx tsx tests/core.test.ts\n\n# Run benchmarks\nnpx tsx tests/bench.ts\n\n# Test with Pi\npi -e ./src/index.ts\n```\n\n## Lineage\n\nThis project builds on research and code from:\n\n- **[checkpoint-pi](https://github.com/prateekmedia/pi-hooks/tree/main/checkpoint)** by prateekmedia \u2014 Two-layer architecture, safe restore, smart filtering, unit tests (base)\n- **[pi-rewind-hook](https://github.com/nicobailon/pi-rewind-hook)** by nicobailon \u2014 Resume checkpoints, footer status, notifications, auto-pruning (UX inspiration)\n\nAnd draws feature parity targets from:\n- Claude Code `/rewind` \u2014 Summarize from here, double-escape trigger\n- Gemini CLI `/rewind` + `/restore` \u2014 Separate restore commands\n- Cline Checkpoints \u2014 Per-tool checkpointing, Compare/Restore UI\n- OpenCode `/undo` + `/redo` \u2014 Step-level patches, redo stack\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "pi-package",
+    "checkpoint",
+    "rewind",
+    "undo",
+    "git"
+  ],
+  "author": {
+    "name": "arpagon"
+  },
+  "license": "MIT",
+  "homepage": "https://arpagon.github.io/pi-rewind",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arpagon/pi-rewind.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-24T17:02:32.029Z",
+    "modified": "2026-03-31T19:05:50.179Z",
+    "0.1.0": "2026-02-24T17:02:32.283Z",
+    "0.2.0": "2026-02-24T18:22:02.105Z",
+    "0.2.1": "2026-02-24T18:24:24.340Z",
+    "0.2.2": "2026-02-24T18:32:32.444Z",
+    "0.3.0": "2026-02-24T19:25:16.504Z",
+    "0.3.1": "2026-02-24T19:58:25.043Z",
+    "0.3.2": "2026-03-03T18:31:14.757Z",
+    "0.4.0": "2026-03-03T21:12:35.670Z",
+    "0.4.1": "2026-03-12T02:53:24.492Z",
+    "0.5.0": "2026-03-31T19:05:49.897Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": 171,
+  "download_trend": []
+}

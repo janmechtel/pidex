@@ -1,0 +1,353 @@
+{
+  "name": "@roodriigoooo/pi-docket",
+  "latest_version": "0.7.1",
+  "description": "Review Pi agent work, run visible tmux workers, and save evidence outside model context",
+  "readme": "<p align=\"center\">\n  <a href=\"https://www.npmjs.com/package/@roodriigoooo/pi-docket\"><img src=\"https://img.shields.io/npm/v/@roodriigoooo/pi-docket?color=cb3837&label=npm&logo=npm\" alt=\"npm version\" /></a>\n</p>\n\n# pi-docket\n\n> Review Pi agent work, run visible tmux workers, and save evidence outside model context.\n\nDocket is a review inbox for work done inside Pi.\n\nWhen a Pi agent run gets long, important things hide in scrollback: failed commands, file edits, worker questions, proposed patches, notes, and results. Docket pulls those moments into review cards.\n\nOpen `/docket`, decide what matters, and attach evidence only when you want the model to see it.\n\n## What Docket helps with\n\n- **Review:** see only work that needs attention, not every line of history.\n- **Workers:** start background Pi workers for research or patches.\n- **Evidence:** save useful artifacts on disk and load them later without spending model context.\n- **Decisions:** accept, reject, redirect, promote, or dismiss worker output from cards.\n\nDocket keeps three things separate:\n\n- Pi keeps the conversation and session tree.\n- tmux keeps live worker terminals visible.\n- Docket keeps review cards, evidence, and decisions organized.\n\n## Watch it\n\nCompressed terminal recordings from the demo project.\n\n### Capture test failure evidence\n\n![Capture test failure evidence demo](.github/media/docket-capture-evidence.gif)\n\nShows:\n\n- Ask Pi to run tests and explain failures.\n- Docket turns the failed command and model answer into review cards.\n- Save useful bits as a bundle, then open the inbox.\n\n### Run a patcher worker and steer it\n\n![Run a patcher worker and steer it demo](.github/media/docket-worker-verdict.gif)\n\nShows:\n\n- Spawn a patcher for failing session tests.\n- Watch live worker status, then peek without attaching.\n- Pick a verdict when the worker asks how far to go.\n- Promote the patch only after you like the plan.\n\n## What it is not\n\nDocket is not a memory layer, transcript browser, todo app, or session manager.\n\nPi already has (and pi-docket integrates well with) `/tree`, `/fork`, `/clone`, `/compact`, `/new`, and `/resume`. Use those for session shape. Docket plugs into that flow by keeping evidence and unresolved decisions stable while you branch, compact, resume, or move work between sessions.\n\n## Install\n\n```bash\npi install git:github.com/roodriigoooo/pi-docket\n```\n\nOpen Docket:\n\n```text\n/docket\n```\n\nDependencies:\n\n- `tmux` is required for background workers.\n- `hunk` is optional for `h` worker-diff review. Docket falls back to its built-in diff viewer.\n- Clipboard actions use `pbcopy`, `wl-copy`, or `xclip` when available.\n\n## Basic loop\n\n```text\nwork -> capture evidence or spawn worker -> open /docket -> decide -> act\n```\n\n1. Work in Pi, or start a worker with `/docket spawn`.\n2. Docket records useful artifacts: errors, edits, answers, worker status, and bundles.\n3. `/docket` shows review cards for items that need judgment.\n4. You accept, reject, reply, attach evidence, save a bundle, or mark done.\n\nThe model does not see full evidence until you attach it with `/docket ref` or `/docket inject-full`.\n\n## Quick start\n\nStart a background worker:\n\n```text\n/docket spawn --as scout find the auth middleware and list risky paths\n```\n\nWorkers start fresh by default, without parent-session context. Add `--seed` only when the worker needs the current conversation:\n\n```text\n/docket spawn --seed --as patcher fix the failing auth test, but ask before edits\n```\n\nOpen worker progress:\n\n```text\nf8\n```\n\nReply to a worker:\n\n```text\n/docket tell w1 focus only on src/auth and tests/auth\n```\n\nSave useful evidence:\n\n```text\n/docket save auth middleware notes\n```\n\nLoad it later:\n\n```text\n/docket load last\n```\n\n## tmux, in plain terms\n\nDocket uses tmux so background workers stay visible and controllable.\n\nA worker is a normal Pi process running in a tmux window. Docket puts all worker windows in one shared tmux session:\n\n```bash\ntmux attach -t docket-workers\n```\n\nYou do not need to know tmux to use Docket. Most of the time:\n\n- Press `f8` to see worker status.\n- Press `p` on a worker row to peek at its live terminal.\n- Use `/docket tell w<N> ...` to reply.\n- Use `/docket attach w<N>` only when you need full terminal control.\n\nWhy tmux:\n\n- **Real terminals:** workers are visible Pi sessions, not hidden daemons.\n- **Safe inspection:** you can attach when a worker looks stuck or strange.\n- **Crash evidence:** if a worker dies, Docket captures the final pane output before cleanup.\n\nDocket stores status, artifacts, verdicts, and bundles on disk. tmux owns only the live worker terminals and scrollback.\n\nIf you run `/docket attach [w<N>]` from inside tmux, Docket switches you to the worker session with `tmux switch-client`. From a worker, `/docket attach parent` switches back to the parent tmux target recorded at spawn. Outside tmux, Docket copies the normal `tmux attach` command.\n\n### Peek without attaching\n\nPress `f8` or run `/docket workers`, then press `p` on a worker row. Docket shows a bounded, read-only tmux pane snapshot inside the dashboard.\n\nPeek is for quick checks:\n\n- Is the worker still running tests?\n- Is it waiting on a prompt?\n- Did it crash before reporting status?\n\nPeek does not focus the pane and costs zero model context.\n\nAttach only when you need full terminal control:\n\n```text\n/docket attach w2\n```\n\n### Review worker diffs\n\nWhen a ready worker has a patch, the verdict card offers `h Hunk review`.\n\nDocket opens the exact worker patch in `hunk patch`. If you leave Hunk comments, Docket can send them back to the worker for revision. If Hunk is not installed, Docket shows an install hint and opens its built-in full diff viewer.\n\n## Workers\n\nWorkers are explicit. Docket does not silently spawn them.\n\nUseful examples:\n\n```text\n/docket spawn --as scout map every caller of getUser()\n/docket spawn --as patcher fix the failing auth test, but ask before edits\n/docket tell w1 focus only on src/auth and tests/auth\n```\n\nBundled worker kinds:\n\n- `default`: general background work.\n- `scout`: read-only investigation.\n- `patcher`: plan-gated edits in an isolated worker workspace.\n\nA plan gate lets a worker inspect first, then requires it to ask before its first edit or mutating command.\n\n## Evidence bundles\n\n`/docket save` writes a small markdown note plus an artifact sidecar. It preserves evidence. It does not move your Pi session.\n\n`/docket load` mounts a bundle or worker artifacts into the current Docket view. Mounting costs zero model-context tokens. Loading a ready worker also marks it `loaded` in the dock, so it stops presenting as unresolved review work without pretending you accepted it.\n\nOnly these commands send evidence to the model:\n\n```text\n/docket ref <artifact-id>          # compact reference\n/docket inject-full <artifact-id>  # full text\n```\n\nMain rule: keep evidence available, not automatically injected.\n\n## Commands you will use most\n\n| Command | Use |\n|---|---|\n| `/docket` | Open review inbox. |\n| `/docket spawn <task>` | Start a background worker. Fresh session by default; `--seed` inherits parent context. |\n| `f8` | Open worker progress lens. |\n| `/docket tell w<N> <text>` | Reply to a worker. Multiline replies stay multiline. |\n| `/docket save [note]` | Save selected evidence as a bundle. |\n| `/docket load [id\\|last\\|w<N>]` | Mount bundle or worker artifacts. |\n\nFor full command reference, see [docs/full-reference.md](./docs/full-reference.md).\n\n## Philosophy\n\nDocket follows a few rules:\n\n- Human decides.\n- Background work stays visible.\n- Workers are useful but not trusted by default.\n- Evidence stays cheap to browse and explicit to inject.\n- Parallel work should not become parallel confusion.\n- Failed work should leave evidence, not disappear.\n\n## Data location\n\nDefault local data lives here:\n\n```text\n~/.pi/agent/docket/\n```\n\nProject config can live here:\n\n```text\n.pi/docket.json\n.pi/docket/worker-kinds/*.md\n```\n\nComing from old Trail builds? Docket is a breaking rename. Old `/trail` aliases are gone. Migration notes live in [docs/full-reference.md](./docs/full-reference.md#rename-from-trail).\n\n## Development\n\nRun from repo:\n\n```bash\npi --no-extensions -e ./extensions/docket.ts\n```\n\nSmoke test:\n\n```bash\nnpm run smoke:help\n```\n\nType check:\n\n```bash\nnpm run check\n```\n\nTests:\n\n```bash\nnpm test\n```\n\nDry-run package:\n\n```bash\nnpm run pack:dry\n```\n\n## More docs\n\n- [Full reference](./docs/full-reference.md)\n- [Configuration](./docs/configuration.md)\n- [Architecture](./docs/architecture.md)\n- [Changelog](./CHANGELOG.md)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "docket",
+    "evidence-bundles",
+    "context",
+    "coding-agent"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/roodriigoooo/pi-docket#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roodriigoooo/pi-docket.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/docket.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-06T22:27:10.599Z",
+    "modified": "2026-06-24T00:27:37.031Z",
+    "0.4.0": "2026-06-06T22:27:10.948Z",
+    "0.5.0": "2026-06-13T10:28:55.094Z",
+    "0.5.1": "2026-06-18T14:59:09.081Z",
+    "0.6.0": "2026-06-18T18:02:58.599Z",
+    "0.6.1": "2026-06-19T04:03:16.325Z",
+    "0.7.0": "2026-06-21T03:53:25.952Z",
+    "0.7.1": "2026-06-24T00:27:36.779Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 741,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 79
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 178
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 593
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 150
+    }
+  ]
+}

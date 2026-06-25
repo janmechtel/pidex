@@ -1,0 +1,40 @@
+{
+  "name": "pi-model-discovery",
+  "latest_version": "0.2.1",
+  "description": "Pi extension that discovers provider models, enriches metadata, caches results, and registers them dynamically.",
+  "readme": "# pi-model-discovery\r\n\r\n`pi-model-discovery` is a Pi extension that discovers provider models, enriches metadata, caches results, and registers them dynamically with `pi.registerProvider()` for `/scoped-models` and the `/pi-model-discovery` catalog.\r\n\r\n## Features\r\n\r\n- Auto-imports eligible provider definitions from `agent/models.json` and active API-key credentials from `agent/auth.json`.\r\n- Uses built-in read-only discovery profiles for supported auth-only providers such as NVIDIA, Cloudflare Workers AI, Cerebras, Qwen, Xiaomi, Cline, and Kilo.\r\n- Discovers OpenAI-compatible, Ollama, Anthropic-compatible, OpenAI Responses, LM Studio, llama.cpp, and static provider catalogs.\r\n- Enriches discovered models with metadata from supported catalog sources and preserves free/paid classification as best-effort metadata.\r\n- Registers cached models synchronously on startup/reload, then refreshes stale providers in the background.\r\n- Writes optional debug logs only to `debug/debug.log` under this extension directory when `debug` is enabled.\r\n\r\n## Installation\r\n\r\n### npm package\r\n\r\n```bash\r\npi install npm:pi-model-discovery\r\n```\r\n\r\n### Git repository\r\n\r\n```bash\r\npi install git:github.com/MasuRii/pi-model-discovery\r\n```\r\n\r\n### Local extension folder\r\n\r\nPlace this folder in one of Pi's extension discovery paths:\r\n\r\n```text\r\n~/.pi/agent/extensions/pi-model-discovery\r\n.pi/extensions/pi-model-discovery\r\n```\r\n\r\nPi discovers the extension through the root `index.ts` entry listed in `package.json`.\r\n\r\n## Usage\r\n\r\nOpen the cached/discovered model catalog in interactive TUI mode:\r\n\r\n```text\r\n/pi-model-discovery\r\n```\r\n\r\nThe catalog shows provider cache freshness, authoritative fallback state, search/filter controls, and discovered model metadata. Models registered by other runtime providers can appear alongside models known to `pi-model-discovery`.\r\n\r\n## Configuration\r\n\r\nRuntime configuration lives in `config.json` at the extension root. A starter template is included at `config/config.example.json`.\r\n\r\nBy default, `config.json` can leave `providers` empty. With `autoImport.enabled` set to `true` (the default), the extension reads active credentials from `agent/auth.json`, reuses provider metadata from `agent/models.json` when available, falls back to built-in read-only model-list profiles, and skips unsupported/OAuth/missing-auth entries with redacted debug diagnostics only when `debug` is enabled.\r\n\r\nManual `providers` remain supported for custom endpoints or overrides. Explicit providers take precedence over auto-imported providers with the same ID. Keep manual secrets in environment variables with `${ENV_VAR}` references; do not place raw keys in config files. `debug` defaults to `false`; when enabled, logs are written only to `debug/debug.log` in this extension directory.\r\n\r\n`baseUrl` values are validated before any network request. Use `https:` for remote providers; `http:` is accepted only for localhost/127.x development endpoints such as Ollama, LM Studio, or local proxies. URLs with credentials, query strings, fragments, or known metadata-service hosts are rejected.\r\n\r\nUse `providers[].discovery.allowModels` and `providers[].discovery.blockModels` as substring filters on discovered model IDs. Discovery is uncapped by default; set top-level `maxModels` or `providers[].maxModels` only when you want an explicit positive model limit. Use `providers[].modelDefaults` for explicit per-model metadata overrides and `providers[].fallbackModelIds` when a provider should still register known models after discovery fails and no cache exists.\r\n\r\nProvider IDs are a compatibility decision:\r\n\r\n- Provider IDs with user credentials owned by Pi Mono remain Pi Mono-managed and are not auto-imported for duplicate ownership. Explicit providers still use this extension config.\r\n- New provider IDs are isolated and use the API key supplied in this extension config.\r\n\r\nDiscovered model IDs are preserved exactly as returned by endpoints, so enabled model patterns use `providerId/modelId`. Before dynamic registration, optional Pi built-in model data is filtered by exact and provider-canonical IDs so `pi-model-discovery` does not register duplicate models already supplied by Pi built-ins.\r\n\r\n`registration.importMode` defaults to `replace` for backward compatibility on non-managed providers. Providers owned by pi-multi-auth default to merge behavior during explicit ownership conflicts so credential ownership remains with pi-multi-auth. Advanced callers can use `merge` to preserve stale `pi-model-discovery` entries and manual model overrides, or `sync` to remove stale `pi-model-discovery` entries while still preserving manual entries and overrides.\r\n\r\n## Runtime behavior\r\n\r\n- Registers fresh cached models synchronously on `session_start` and `resources_discover` (`/reload`).\r\n- Suppresses live discovery while an authoritative cache entry is within its provider TTL, and backs off for five minutes after non-authoritative discovery failures.\r\n- Debounces concurrent background refreshes and re-registers changed providers after discovery.\r\n- Honors `PI_MODEL_DISCOVERY_CACHE_ONLY=1` for delegated/cache-only runtimes: cached entries, including stale entries, can register without starting background discovery or catalog HTTP requests.\r\n- Uses `cache.json` in this extension directory and never writes `agent/models.json`.\r\n- Never calls `ModelRegistry.refresh()` because that would clear dynamically registered models.\r\n\r\n## Development\r\n\r\n```bash\r\nnpm install\r\nnpm run check\r\nnpm run package:dry-run\r\n```\r\n\r\n`config.schema.json` documents the supported configuration surface. `cache.json`, `config.json`, `debug/`, `dist/`, and `node_modules/` are intentionally excluded from release packaging.\r\n\r\n## Compatibility notes\r\n\r\nPi extension discovery uses `fs.readdirSync()` in the local Pi loader without an explicit sort. On common filesystems this is usually alphabetical, but synchronous cache-first registration avoids relying solely on load order. Discovered models that match pi-fast-mode globs are eligible for fast-mode.\r\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "pi-coding-agent",
+    "coding-agent",
+    "pi-model-discovery",
+    "model-catalog",
+    "dynamic-models"
+  ],
+  "author": {
+    "name": "MasuRii"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/MasuRii/pi-model-discovery#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MasuRii/pi-model-discovery.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-27T03:29:53.645Z",
+    "modified": "2026-06-16T15:48:47.196Z",
+    "0.1.0": "2026-05-27T03:29:53.982Z",
+    "0.2.0": "2026-06-01T10:46:02.821Z",
+    "0.2.1": "2026-06-16T15:48:47.077Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

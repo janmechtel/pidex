@@ -1,0 +1,36 @@
+{
+  "name": "pi-tool-guard",
+  "latest_version": "0.2.1",
+  "description": "Pi extension that corrects LLM tool calls: normalizes argument aliases for edit/write/read and strips trailing pipeline extractors from bash commands",
+  "readme": "# pi-tool-guard\n\nA pi extension that corrects common LLM tool call mistakes: normalizes argument aliases for `edit`/`write`/`read` and strips trailing pipeline extractors from `bash` commands.\n\n## Install\n\n```bash\npi install npm:pi-tool-guard\n```\n\n---\n\n## Features\n\n### 1. Argument alias normalization (`edit` / `write` / `read`)\n\nWhen the LLM calls a tool with wrong field names, the extension normalizes them before schema validation. No error, no re-execution.\n\n| Tool | Canonical | Accepted aliases |\n|---|---|---|\n| edit | `path` | `file`, `filePath`, `file_path`, `target`, `filename`, `file_name` |\n| edit | `edits[].oldText` | `old_str`, `old_string`, `oldContent`, `old`, `original`, `search` |\n| edit | `edits[].newText` | `new_str`, `new_string`, `newContent`, `new`, `replacement`, `replace` |\n| write | `path` | `file`, `filePath`, `file_path`, `target`, `filename`, `file_name` |\n| write | `content` | `text`, `body`, `code`, `data`, `fileContent`, `contents` |\n| read | `path` | `file`, `filePath`, `file_path`, `target`, `filename`, `file_name` |\n| read | `offset` | `start`, `startLine`, `start_line`, `from`, `line` |\n| read | `limit` | `lines`, `maxLines`, `max_lines`, `count`, `numLines`, `num_lines` |\n\n> **Edit tool shorthand**: top-level `oldText`/`newText` (or aliases) are automatically wrapped into an `edits` array.\n>\n> **Read tool type coercion**: string values for `offset` and `limit` are coerced to numbers.\n\n### 2. Bash pipeline extractor stripping\n\nWhen the LLM appends truncation commands (`tail`, `head`, `grep`, etc.) to bash commands, the extension strips them and applies the extractor intelligently.\n\n**Three-case strategy:**\n\n| Scenario | UI Notification | LLM Response |\n|---|---|---|\n| Fast command (< 10s), truncated | `Filtered via \\`head -5\\`` | Filtered result only |\n| Fast command (< 10s), not truncated | `Filtered via \\`head -5\\`` | Filtered result only |\n| Slow command (truncated or not) | `The full output is above...` | Result + `This is a slow command. Avoid re-running...` |\n\n> **Notification format**: The UI notification shows both the full original command and the extracted pipeline. Example: `Removed trailing pipeline commands: \\`grep FAIL | head -5\\` from \\`npm test | grep FAIL | head -5\\`.`\n\n**Example:** `vitest run | tail -n 10`\n- If vitest finishes in < 10s \u2192 run `tail` on result (or full output file if truncated), notify UI\n- If vitest is slow \u2192 return result as-is, notify UI, append slow-command hint to LLM\n\n**Detected extractors:** `head`, `tail`, `grep`, `egrep`, `fgrep`, `rg`, `sed`, `awk`, `cut`, `sort`, `uniq`, `wc`, `less`, `more`, `column`, `jq`, `yq`, `tr`\n\nAll trailing extractors are stripped: `npm test | grep FAIL | head -5` \u2192 strips `grep FAIL | head -5`\n\n---\n\n## Architecture\n\nBoth features use `prepareArguments` on overridden built-in tools \u2014 the cleanest pi extension pattern for argument correction:\n\n- **edit/write/read**: `createXxxToolDefinition(cwd)` + `prepareArguments` normalizes aliases before schema validation\n- **bash**: `createBashToolDefinition(cwd)` + custom `execute` override:\n  1. `prepareArguments` parses the command with [unbash](https://github.com/nicolo-ribaudo/unbash), strips trailing extractors\n  2. `execute` runs the stripped command via the original built-in execute\n  3. If fast (< 10s) + truncated \u2192 runs extractor on the full output file via `pi.exec`\n  4. If fast (< 10s) + not truncated \u2192 pipes result through extractor via `pi.exec`\n  5. If slow (truncated or not) \u2192 returns result as-is with notice\n\nNo error recovery, no session scanning.\n\n## Development\n\n```bash\npnpm install\npnpm test        # Run all tests\npnpm typecheck   # Type check\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "argument-normalization",
+    "alias-correction",
+    "tool-override",
+    "pipeline-optimization"
+  ],
+  "author": {
+    "name": "Jiajun Chen",
+    "email": "tychenjiajun@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-12T09:31:42.373Z",
+    "modified": "2026-06-15T08:45:18.969Z",
+    "0.1.0": "2026-06-12T09:31:42.683Z",
+    "0.2.0": "2026-06-12T10:14:34.503Z",
+    "0.2.1": "2026-06-15T08:45:18.871Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

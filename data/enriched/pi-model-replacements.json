@@ -1,0 +1,37 @@
+{
+  "name": "pi-model-replacements",
+  "latest_version": "0.3.1",
+  "description": "Model alias/tier (low/medium/high) replacement extension for pi coding agent",
+  "readme": "# pi-model-replacements\n\n![hero](./hero-image.png)\n\nA standalone [pi](https://github.com/earendil-works/pi) extension that lets\nagents, subagents, and prompt templates reference **abstract model tiers** (`low` /\n`medium` / `high`, or any alias name) instead of hard-coding `provider/model-id`. A single\nchange in `settings.json` re-points every template and subagent.\n\n## How it works\n\nAdd a `model_replacements` map to the active agent dir's `settings.json` (the dir selected\nby `PI_CODING_AGENT_DIR`, e.g. `~/.pi/agent/settings.json`):\n\n```json\n{\n  \"model_replacements\": {\n    \"low\": \"github-copilot/claude-haiku-4.5\",\n    \"medium\": \"github-copilot/claude-sonnet-4.6\",\n    \"high\": \"github-copilot/claude-opus-4.8\"\n  }\n}\n```\n\nNow any `model: low` in a prompt-template frontmatter, an agent definition, or a\n`subagent` tool call resolves to the concrete model \u2014 no file writes, no edits to other\nextensions.\n\n### Mechanism\n\n1. **`session_start`** \u2014 each alias is injected into the live model registry as a synthetic\n   model cloned from its concrete target (grouped per provider, idempotent across\n   `/reload`). Unresolvable targets warn once and are skipped.\n2. **`model_select`** + initial swap \u2014 when an alias becomes the active model, it is swapped\n   to the concrete `Model` object via `pi.setModel`. Self-terminating (the target is never\n   an alias key, so no loop).\n3. **`tool_call`** \u2014 an explicit `subagent` `model: \"high\"` argument is rewritten in place to\n   the concrete `provider/model-id` before the child process spawns.\n4. **`before_agent_start`** \u2014 a per-turn safety net that swaps any still-active alias\n   immediately before the API call (covers the agent-frontmatter path and child startup\n   ordering). The same extension code runs fresh inside subagent child processes.\n\n## Configuration resolution\n\n`PI_CODING_AGENT_DIR` is honoured exactly like `pi-subagents`:\n`~` / `~/...` are expanded; otherwise the literal value is used; default is `~/.pi/agent`.\nReading is fail-soft \u2014 a missing or malformed `settings.json`, or absent\n`model_replacements`, yields no aliases (extension is a no-op).\n\n## Installation\n\nInstall via pi:\n\n```bash\npi install npm:pi-model-replacements\n```\n\n## Development\n\n### Setup\n\n```sh\nnpm install\n```\n\n### Testing\n\n```sh\nnpm test   # tsx --test *.test.ts\n```\n\n## Works well with\n\n- [**pi-prompt-template-model**](https://github.com/nicobailon/pi-prompt-template-model) \u2014 Abstract model tiers in your prompt templates.\n- [**pi-subagents**](https://github.com/nicobailon/pi-subagents) \u2014 Delegate work to subagents with model-tier overrides in `subagent` tool calls.\n\n## Contracts and limitations\n\n### Thinking-suffix handling\n\n`pi-model-replacements` resolves aliases by **exact key match**. A suffixed string\nsuch as `\"high:thinking\"` does not match alias key `\"high\"` directly, so the\n`tool_call` handler splits the trailing `:thinking` suffix, resolves the base alias\n(`\"high\"`) to its concrete target, and re-attaches the suffix \u2014 producing e.g.\n`\"github-copilot/claude-opus-4.8:thinking\"`.\n\nThis is required because `pi-subagents`' `resolveModelCandidate()` only matches the\nbase model id against the live registry. Since `pi-model-replacements` injects each\nalias as a *synthetic* registry entry, passing `\"high:thinking\"` through unresolved\nwould make pi-subagents select the synthetic alias id (`\"github-copilot/high\"`),\nwhich is not a real API model and fails with `400 model not supported`. The alias\nmust therefore be resolved to its concrete target here, before the child spawns.\n\nThis behaviour is locked by a regression test in `tool-call.test.ts`\n(`\"subagent tool_call: suffixed alias ('high:thinking') resolves base alias and re-attaches suffix\"`).\n\n### Unsupported: alias chaining\n\nA configuration like `{ \"low\": \"medium\", \"medium\": \"provider/model\" }` \u2014 where an\nalias target is itself another alias key \u2014 is **not supported**. `buildAliasMap`\ndetects chained entries at map-build time, emits a `console.warn`, and skips them.\nOnly direct `alias \u2192 \"provider/model-id\"` mappings are accepted.\n\n### Code note: `getAgentDir()` duplication\n\n`alias-resolver.ts:getAgentDir()` is a character-for-character copy of\n`pi-subagents/src/shared/utils.ts:getAgentDir()`. Both are intentionally kept\nseparate to avoid cross-package coupling. Any future change to path-expansion\nlogic (e.g., Windows normalisation) must be applied to both files.\n\n---\n\nMade with \u2665 by [fractiunate](https://github.com/fractiunate)\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "model-selector",
+    "extension"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/fractiunate/pi-model-replacement#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fractiunate/pi-model-replacement.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/fractiunate/pi-model-replacement/main/hero-image.png"
+  },
+  "time": {
+    "created": "2026-06-09T10:08:19.795Z",
+    "modified": "2026-06-09T12:25:20.997Z",
+    "0.1.0": "2026-06-09T10:08:20.000Z",
+    "0.2.0": "2026-06-09T10:10:26.401Z",
+    "0.3.0": "2026-06-09T10:45:35.969Z",
+    "0.3.1": "2026-06-09T12:25:20.889Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 19,
+  "download_trend": []
+}

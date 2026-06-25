@@ -1,0 +1,39 @@
+{
+  "name": "graphify-pi",
+  "latest_version": "0.3.0",
+  "description": "Pi extension and skill package that makes graphify knowledge graphs always-on during coding sessions.",
+  "readme": "# graphify-pi\n\nPi extension and skill package for [graphify](https://github.com/safishamsi/graphify).\n\nIt brings graphify's Claude-style graph-first workflow to pi:\n\n- injects graphify guidance into the system prompt when `graphify-out/` exists\n- reminds the agent to read graph artifacts before broad raw search/read operations\n- prefers `graphify-out/wiki/index.md` when present, then `GRAPH_REPORT.md`, then `graph.json`\n- marks stale graphs when `graphify-out/needs_update` exists or code files changed in-session\n- recommends `graphify update .` before relying on modified areas\n- registers a native `/graphify ...` pi command that delegates to the graphify skill\n- shows a small graphify status indicator in pi\n- includes a `/skill:graphify` skill for build/update/query/path/explain/clone/merge/MCP workflows\n\n## Parity target\n\nCurrent parity target: upstream `safishamsi/graphify` v0.5.x Claude integration and skill workflow.\n\nSee [`docs/PARITY.md`](docs/PARITY.md) for the detailed parity matrix, intentional non-goals, and maintenance checklist.\n\nShort version:\n\n| Area | Status |\n| --- | --- |\n| Always-on Claude-style graph reminder | Implemented in Pi extension |\n| Wiki/report/graph artifact preference | Implemented; Pi prefers wiki first |\n| `needs_update` and post-edit freshness | Implemented |\n| `/graphify` trigger | Implemented as Pi command |\n| Full graphify CLI workflow guidance | Implemented in Pi skill docs |\n| Upstream Python graph building internals | Inherited from installed `graphifyy`, not vendored |\n| Claude-specific files/hooks | Not applicable; Pi uses extensions/skills |\n\n## Install\n\nFrom a local checkout:\n\n```bash\npi install .\n```\n\nOr for just the current project:\n\n```bash\npi install -l .\n```\n\nFrom npm:\n\n```bash\npi install npm:graphify-pi\n```\n\nFrom git:\n\n```bash\npi install git:github.com/juhas96/graphify-pi\n```\n\nGraphify itself is a Python package. If the `graphify` CLI is not installed:\n\n```bash\nuv tool install graphifyy\n# or\npipx install graphifyy\n# or\npython3 -m pip install graphifyy\n```\n\n## Usage\n\n### Native Pi command\n\n```text\n/graphify .\n/graphify update .\n/graphify query \"show the auth flow\"\n/graphify path \"AuthModule\" \"Database\"\n/graphify explain \"DigestAuth\"\n/graphify https://github.com/owner/repo\n```\n\nThe command sends a user message instructing the agent to use the packaged graphify skill with your arguments.\n\n### Skill command\n\n```text\n/skill:graphify .\n/skill:graphify update .\n/skill:graphify query \"show the auth flow\"\n```\n\n### Direct CLI commands\n\n```bash\ngraphify .\ngraphify update .\ngraphify . --wiki\ngraphify query \"show the auth flow\" --graph graphify-out/graph.json\ngraphify path \"AuthModule\" \"Database\" --graph graphify-out/graph.json\ngraphify explain \"DigestAuth\" --graph graphify-out/graph.json\ngraphify clone https://github.com/owner/repo\ngraphify merge-graphs repo-a/graphify-out/graph.json repo-b/graphify-out/graph.json --out graphify-out/cross-repo-graph.json\npython -m graphify.serve graphify-out/graph.json\n```\n\n## What the extension does\n\nWhen a graph exists, the extension adds graph-first guidance equivalent to the Claude/OpenCode reminder:\n\n> graphify: Knowledge graph exists. Read `graphify-out/GRAPH_REPORT.md` for god nodes and community structure before searching raw files.\n\nPi adds more context than the simple Claude hook:\n\n- wiki-first preference when `graphify-out/wiki/index.md` exists\n- `graph.json` fallback when report/wiki are absent\n- cross-module query guidance for `graphify query`, `graphify path`, and `graphify explain`\n- targeted raw-file follow-up after graph artifact inspection\n- stale graph warnings from `needs_update` or in-session code edits\n\n## Files\n\n- `extensions/graphify.ts` \u2014 pi extension\n- `skills/graphify/SKILL.md` \u2014 pi graphify skill\n- `docs/PARITY.md` \u2014 parity matrix against upstream graphify Claude integration\n- `evals/graphify-agent.test.ts` \u2014 deterministic extension behavior evals\n- `evals/run-live.ts` \u2014 model-in-the-loop, rule-based live eval runner\n- `evals/run-judge.ts` \u2014 LLM-as-judge eval runner for live traces\n- `evals/render-report.ts` \u2014 compact leaderboard/report generator\n- `evals/judge-rubric.md` \u2014 scoring rubric for the judge run\n- `evals/scenarios/*.json` \u2014 live eval scenarios\n- `package.json` \u2014 pi package manifest\n\n## Evals\n\nDeterministic behavior evals:\n\n```bash\nnpm run evals\n```\n\nLLM-driven evals:\n\n```bash\nnpm run evals:live:dry\nnpm run evals:live\nnpm run evals:judge:dry\nnpm run evals:judge\nnpm run evals:report\n```\n\nRun the full pipeline:\n\n```bash\nnpm run evals:full\n```\n\nOptional model selection:\n\n```bash\nPI_EVAL_MODEL=anthropic/claude-sonnet-4-20250514 npm run evals:live\nPI_JUDGE_MODEL=anthropic/claude-sonnet-4-20250514 npm run evals:judge\n```\n\nCurrent deterministic eval coverage includes:\n\n- graph-first prompt injection\n- report-first orientation\n- wiki-first orientation\n- graph.json-only fallback\n- redirect-loop prevention\n- targeted raw-file follow-up\n- stale graph status for `graphify-out/needs_update`\n- stale graph status after code edits\n- `/graphify` command delegation\n\nLive scenarios cover:\n\n- report-first orientation\n- wiki-first orientation\n- graph.json-only fallback\n- graph.json-only adversarial search bait\n- raw filename bait vs graph report\n- refresh-loop triage with targeted code follow-up\n- semantic routing triage with wiki + targeted router follow-up\n- wiki ownership chain with targeted raw follow-up\n- stale graph / `needs_update` guidance\n- graph query/path command selection for relationship questions\n\nOutputs:\n\n- live trace summary: `evals/results/last-live.json`\n- judge summary: `evals/results/last-judge.json`\n- compact leaderboard/report: `evals/results/last-report.md`\n\n## Publishing\n\nDry-run the package contents:\n\n```bash\nnpm run pack:check\n```\n\nPublish to npm:\n\n```bash\nnpm publish\n```\n\nThe package is configured to publish:\n\n- `extensions/`\n- `skills/`\n- `docs/`\n- `README.md`\n- `LICENSE`\n\nLocal helper/reference folders such as `upstream-graphify/` are not shipped.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "graphify",
+    "coding-agent",
+    "knowledge-graph"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/juhas96/graphify-pi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juhas96/graphify-pi.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-04-12T10:11:32.571Z",
+    "modified": "2026-04-25T15:43:34.299Z",
+    "0.1.0": "2026-04-12T10:11:33.217Z",
+    "0.1.1": "2026-04-16T06:40:19.849Z",
+    "0.2.0": "2026-04-22T22:16:07.866Z",
+    "0.3.0": "2026-04-25T15:43:34.213Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 104,
+  "download_trend": []
+}

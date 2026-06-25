@@ -1,0 +1,358 @@
+{
+  "name": "pi-lsp-adapter",
+  "latest_version": "0.1.2",
+  "description": "Pi extension that gives coding agents Language Server Protocol tools for diagnostics, hover, definitions, references, and symbol search",
+  "readme": "# pi-lsp-adapter\n\nLanguage-server intelligence for [Pi](https://github.com/earendil-works/pi) agents: diagnostics, hover/type info, definitions, references, and symbol search on demand.\n\n`pi-lsp-adapter` gives Pi a small set of read-only LSP tools without turning startup into an IDE boot. Language servers are lazy at session startup, installed servers can be warmed in the background when Pi reads source files, managed installs are isolated under Pi's runtime directory, and large LSP responses are paginated through a short-lived cache so they do not flood the context window.\n\n## Why this exists\n\nAgents make better edits when they can ask semantic questions instead of guessing from text search alone:\n\n- _What type is this symbol?_\n- _Where is this function defined?_\n- _What references will this change affect?_\n- _Did the language server report a type or lint error?_\n\nLSP already answers those questions. This extension makes those answers available to Pi as compact, read-only tools. It starts servers only when needed, keeps missing-server installs explicit by default, and returns the first useful page instead of dumping thousands of references into the model.\n\n## Install\n\nInstall from npm:\n\n```bash\npi install npm:pi-lsp-adapter\n```\n\nOr install directly from git:\n\n```bash\npi install git:github.com/nikmmd/pi-lsp-adapter\n```\n\nRestart Pi after installation, then check the extension:\n\n```text\n/lsp status\n```\n\nFor local development from a checkout:\n\n```bash\ngit clone https://github.com/nikmmd/pi-lsp-adapter.git\ncd pi-lsp-adapter\nnpm install\npi -e \"$PWD\"\n```\n\nThe default install mode is `prompt`: agent tool calls will not silently install missing language servers. Install servers explicitly with `/lsp install <serverId>`, or set `installMode` to `auto` if you want first-use installation.\n\n## What happens on first use\n\n| You do this                                            | What happens                                                                                                                                    |\n| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |\n| Run `/lsp` in an interactive Pi session                | Pi opens a compact LSP panel showing configured servers, install state, tracked processes, and config warnings.                                 |\n| Run `/lsp status`                                      | Pi prints the same status as text.                                                                                                              |\n| Run `/lsp install pyright`                             | The server is installed under `~/.pi/agent/lsp/`, and the resolved command is recorded in Pi's LSP lockfile.                                    |\n| Read a supported source file with Pi's `read` tool     | If `warmup` is enabled, the matching installed server is started in the background. Missing servers are ignored.                                |\n| Ask for diagnostics/hover/definitions on a source file | The extension detects the filetype and project root, reuses a warmed server or starts the matching server if needed, then runs the LSP request. |\n| Query many references or symbols                       | The first ranked page is returned immediately. If more pages exist, the result includes a `resultId` for `lsp_more`.                            |\n| Configure a Mason/Nix/system binary                    | Pi uses that command but does not own, update, or uninstall it. Use global config for executable overrides.                                     |\n\n## Quick start\n\n```text\n/lsp status\n/lsp install vtsls\n```\n\nThen ask Pi something that benefits from semantic context:\n\n```text\nCheck diagnostics for src/index.ts, then use hover on the exported function before editing it.\n```\n\nUseful first commands:\n\n```text\n/lsp doctor vtsls\n/lsp install pyright\n/lsp start\n```\n\n## Tools\n\nThe extension registers these read-only tools:\n\n| Tool                    | Use it for                                            | Required input                                         |\n| ----------------------- | ----------------------------------------------------- | ------------------------------------------------------ |\n| `lsp_diagnostics`       | Compiler/type/lint diagnostics for one file           | `filePath`                                             |\n| `lsp_hover`             | Type, signature, and documentation at a position      | `filePath`, 1-based `line`, 1-based `column`           |\n| `lsp_definition`        | Definition locations for a symbol                     | `filePath`, 1-based `line`, 1-based `column`           |\n| `lsp_references`        | Reference locations for a symbol                      | `filePath`, 1-based `line`, 1-based `column`           |\n| `lsp_document_symbols`  | Classes, functions, variables, and other file symbols | `filePath`                                             |\n| `lsp_workspace_symbols` | Symbol search across active or selected workspaces    | `query`; optional `serverId`                           |\n| `lsp_more`              | Next page from a cached multi-page LSP result         | Exact `resultId` returned by a previous paginated call |\n\nExamples:\n\n```text\nlsp_diagnostics({ filePath: \"src/index.ts\" })\n```\n\n```text\nlsp_hover({ filePath: \"src/index.ts\", line: 42, column: 13 })\n```\n\n```text\nlsp_workspace_symbols({ query: \"RuntimeManager\", serverId: \"vtsls\" })\n```\n\nLine and column inputs are 1-based. For hover, definitions, and references, put the column on the identifier token itself rather than on whitespace or an import path string.\n\n## Supported servers\n\nBuilt-in catalog entries currently include:\n\n| Server          | Languages/filetypes              | Managed installer |\n| --------------- | -------------------------------- | ----------------- |\n| `vtsls`         | JavaScript, JSX, TypeScript, TSX | npm               |\n| `pyright`       | Python                           | npm               |\n| `gopls`         | Go                               | go                |\n| `rust-analyzer` | Rust                             | GitHub release    |\n| `yamlls`        | YAML                             | npm               |\n| `jsonls`        | JSON, JSONC                      | npm               |\n| `jdtls`         | Java                             | GitHub release    |\n\nYou can override these definitions or add new server definitions in config.\n\n## Configuration\n\nMost users only need one file:\n\n```text\n~/.pi/agent/lsp.json\n```\n\nIf that file does not exist, the extension behaves as if this config were present:\n\n```json\n{\n  \"installMode\": \"prompt\",\n  \"warmup\": true,\n  \"servers\": {}\n}\n```\n\n`servers: {}` means \"use the built-in server catalog unchanged\". Add entries only when you want to override a built-in server or define a new one.\n\n### Config files and merge order\n\n| Priority | Path                   | Purpose                                                                                                          |\n| -------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------- |\n| 1        | built-in catalog       | Default server definitions for `vtsls`, `pyright`, `gopls`, `rust-analyzer`, `yamlls`, etc.                      |\n| 2        | `~/.pi/agent/lsp.json` | User-global config. Best place for executable, install, PATH, `installMode`, and `warmup`.                       |\n| 3        | `.pi/lsp.json`         | Project-local config. Safe server fields are honored before trust; process-starting fields require `/lsp trust`. |\n\n> Path gotcha: config is the file `~/.pi/agent/lsp.json`. Runtime state lives under the directory `~/.pi/agent/lsp/`.\n\n### Runtime paths\n\nDo not edit these by hand unless you are debugging or cleaning up state:\n\n| Path                            | Purpose                                                    |\n| ------------------------------- | ---------------------------------------------------------- |\n| `~/.pi/agent/lsp/packages/`     | Pi-managed language-server installs                        |\n| `~/.pi/agent/lsp/bin/`          | Pi-managed executable links                                |\n| `~/.pi/agent/lsp/lsp.lock.json` | Resolved managed install metadata                          |\n| `~/.pi/agent/lsp/logs/`         | Language-server logs                                       |\n| `~/.pi/agent/lsp/pids/`         | Per-session process registries used for lifecycle cleanup  |\n| `~/.pi/agent/lsp/workspaces/`   | Per-server workspaces, for example JDT LS data directories |\n| `~/.pi/agent/lsp/cache/`        | Runtime caches owned by the extension                      |\n\nDo not put extension source code under `~/.pi/agent/lsp/`; that directory is only for runtime state.\n\n### Top-level config fields\n\n| Field         | Default    | Behavior                                                                                       |\n| ------------- | ---------- | ---------------------------------------------------------------------------------------------- |\n| `installMode` | `\"prompt\"` | Missing servers are installed only when explicitly requested or interactively confirmed.       |\n| `warmup`      | `true`     | Pi `read` calls for supported source files start matching installed servers in the background. |\n| `servers`     | `{}`       | Per-server overrides merged into the built-in catalog.                                         |\n\n`installMode` can be:\n\n| Mode     | Behavior                                                                    |\n| -------- | --------------------------------------------------------------------------- |\n| `prompt` | Install only when explicitly requested or interactively confirmed.          |\n| `auto`   | Install missing servers automatically when an LSP tool needs them.          |\n| `off`    | Never install automatically. Use system commands or explicit installs only. |\n\n`warmup` never prompts and never installs missing servers. It only prepares already-installed servers after Pi reads a matching source file. `lazy` still means servers do not start at session startup.\n\n### Common config snippets\n\nDisable read warmup:\n\n```json\n{\n  \"warmup\": false\n}\n```\n\nAuto-install missing servers on first explicit LSP tool use:\n\n```json\n{\n  \"installMode\": \"auto\"\n}\n```\n\nTune Pyright analysis from project config without changing executables:\n\n```json\n{\n  \"servers\": {\n    \"pyright\": {\n      \"settings\": {\n        \"python\": {\n          \"analysis\": {\n            \"diagnosticMode\": \"workspace\"\n          }\n        }\n      }\n    }\n  }\n}\n```\n\n### Server override fields\n\nA server definition can include:\n\n| Field                   | Description                                                 |\n| ----------------------- | ----------------------------------------------------------- |\n| `displayName`           | Human-readable name shown in status output                  |\n| `filetypes`             | Filetypes handled by the server                             |\n| `rootMarkers`           | Files/directories used to detect the project root           |\n| `install`               | Managed install spec: `npm`, `go`, `github`, or `system`    |\n| `command`               | Command used to start the language server                   |\n| `cwd`                   | Working directory for the server command                    |\n| `env`                   | Environment overrides; supports `$env:VAR` references       |\n| `settings`              | LSP settings returned through `workspace/configuration`     |\n| `initializationOptions` | LSP initialization options                                  |\n| `lazy`                  | Whether the server should avoid session-start eager startup |\n\n`command` supports placeholders such as `{installBin}`, `{installDir}`, `{platform}`, and `{workspaceDir}`. Relative path-like values are resolved from the detected project root, and `~` is expanded.\n\nProject config is intentionally conservative. In untrusted projects, executable and install overrides are ignored; put those in global config.\n\n## Using existing LSP binaries\n\nYou do not need Pi to manage every language server. If you already have servers installed through Mason.nvim, your distro, Nix, mise/asdf, or another tool, point `pi-lsp-adapter` at those binaries with global config.\n\nPrefer global config for executable overrides:\n\n```text\n~/.pi/agent/lsp.json\n```\n\nExample: use Mason.nvim's Pyright:\n\n```json\n{\n  \"servers\": {\n    \"pyright\": {\n      \"install\": {\n        \"type\": \"system\",\n        \"command\": [\"~/.local/share/nvim/mason/bin/pyright-langserver\", \"--stdio\"]\n      }\n    }\n  }\n}\n```\n\nFor `type: \"system\"`, `command` is inferred from `install.command` when omitted.\n\nExample: use a binary already on `PATH`:\n\n```json\n{\n  \"servers\": {\n    \"gopls\": {\n      \"install\": {\n        \"type\": \"system\",\n        \"command\": [\"gopls\"]\n      }\n    }\n  }\n}\n```\n\n## Managed install overrides\n\nUse `install` without `type: \"system\"` when you want Pi to own the install lifecycle. In `prompt` mode, the server is still missing until you run `/lsp install <serverId>`. The resolved install metadata is then written to `~/.pi/agent/lsp/lsp.lock.json`.\n\nPin a managed npm server version:\n\n```json\n{\n  \"servers\": {\n    \"pyright\": {\n      \"install\": {\n        \"type\": \"npm\",\n        \"packages\": {\n          \"pyright\": \"1.1.410\"\n        },\n        \"bin\": \"pyright-langserver\"\n      }\n    }\n  }\n}\n```\n\nPin a managed GitHub release server:\n\n```json\n{\n  \"servers\": {\n    \"rust-analyzer\": {\n      \"install\": {\n        \"type\": \"github\",\n        \"repo\": \"rust-lang/rust-analyzer\",\n        \"version\": \"2026-05-25\",\n        \"asset\": \"rust-analyzer-{platform}.gz\",\n        \"bin\": \"rust-analyzer\"\n      }\n    }\n  }\n}\n```\n\nAdd a custom GitHub-release server:\n\n```json\n{\n  \"servers\": {\n    \"example-ls\": {\n      \"displayName\": \"Example Language Server\",\n      \"filetypes\": [\"example\"],\n      \"rootMarkers\": [\".git\"],\n      \"install\": {\n        \"type\": \"github\",\n        \"repo\": \"example/example-ls\",\n        \"version\": \"v1.2.3\",\n        \"asset\": \"example-ls-linux-x64.tar.gz\",\n        \"bin\": \"example-ls\",\n        \"stripComponents\": 1\n      },\n      \"command\": [\"{installBin}/example-ls\", \"--stdio\"],\n      \"settings\": {},\n      \"initializationOptions\": {},\n      \"lazy\": true\n    }\n  }\n}\n```\n\nWhy configure this explicitly instead of symlinking Mason into Pi's managed directory?\n\n- Ownership stays clear: Mason owns Mason installs; Pi owns `~/.pi/agent/lsp/`.\n- `/lsp uninstall <serverId>` will not remove external binaries.\n- `/lsp doctor <serverId>` can show the configured command directly.\n- Broken or stale symlinks are avoided.\n\n## Caching and pagination\n\nList-like LSP tools return a first page instead of dumping every result into context. When more results exist, output includes a `resultId`:\n\n```text\nShowing 1-25 of 143.\nMore available: call lsp_more with resultId: lspres_...\n```\n\nFetch the next page with:\n\n```text\nlsp_more({ resultId: \"lspres_...\" })\n```\n\nCache behavior:\n\n- Only multi-page results are cached.\n- Pages are returned sequentially by `lsp_more`.\n- Result IDs are session-local and in memory only.\n- Cache budget defaults to 64 MB and 128 entries.\n- Entries expire after 15 minutes of inactivity.\n- Cache is cleared on reload, shutdown, and session replacement.\n- Tool result details contain only the shown page, not the full result set.\n\n## Commands\n\n| Command                             | What it does                                                      |\n| ----------------------------------- | ----------------------------------------------------------------- |\n| `/lsp`                              | Open the interactive LSP panel, or show status in non-UI sessions |\n| `/lsp status`                       | Print status as text                                              |\n| `/lsp doctor`                       | Show config warnings and server details                           |\n| `/lsp doctor <serverId>`            | Show resolved details for one server                              |\n| `/lsp install <serverId[@version]>` | Install a managed language server                                 |\n| `/lsp update <serverId[@version]>`  | Update/reinstall one managed server                               |\n| `/lsp update --all`                 | Update all configured managed servers                             |\n| `/lsp uninstall <serverId>`         | Remove Pi-managed install state and stop matching processes       |\n| `/lsp start [serverId]`             | Start one installed server or all installed servers               |\n| `/lsp restart [serverId]`           | Restart one installed server or all installed servers             |\n| `/lsp stop [serverId]`              | Stop tracked LSP processes                                        |\n\nInteractive `/lsp` panel keys:\n\n```text\n\u2191\u2193 select \u2022 enter doctor \u2022 i install \u2022 u update \u2022 x uninstall \u2022 s stop \u2022 r refresh \u2022 esc close\n```\n\n## How it works\n\n- The extension adds read-only LSP tools and prompt guidance to Pi.\n- File requests are resolved by filetype and nearest project root marker.\n- Server definitions come from the built-in catalog plus global/project config.\n- Missing-server behavior follows `installMode`; read warmup never installs missing servers.\n- Servers start lazily over stdio and are tracked in a process registry.\n- When `warmup` is enabled, source-file reads can prepare installed servers in the background before an LSP tool call.\n- LSP responses are normalized into compact text plus structured details.\n- Diagnostics, locations, and symbols are sorted/paged before reaching the model.\n- Extra pages are stored in the in-memory result cache and fetched with `lsp_more`.\n- The Pi status line shows active LSP servers, total configured servers, and warning count.\n\n## Development\n\n```bash\nnpm run format:check\nnpm run lint\nnpm run typecheck\nnpm test\n```\n\nFor local development with Pi:\n\n```bash\nmkdir -p ~/.pi/agent/extensions\nln -sfnT \"$PWD\" ~/.pi/agent/extensions/pi-lsp-adapter\npi\n```\n\nRun `/reload` in Pi after editing the extension.\n\n## Release\n\nPublishing is CI-driven. Do not create release tags by hand. To cut a release, make a normal commit that bumps `package.json` and `package-lock.json`; after that commit lands on `main` and CI passes, `.github/workflows/publish.yml` creates the matching semver tag and publishes to npm.\n\nnpm publishing uses Trusted Publishing for `.github/workflows/publish.yml`, so no npm token secret is required. The npm package must have a Trusted Publisher configured for `nikmmd/pi-lsp-adapter` and workflow filename `publish.yml`.\n\n```bash\nnpm version 0.1.2 --no-git-tag-version\ngit add package.json package-lock.json\ngit commit -m \"chore: release v0.1.2\"\ngit push origin main\n```\n\nNon-release pushes to `main` also trigger the publish workflow, but it exits without publishing when the current `package.json` version already exists on npm.\n\nStable versions such as `0.1.2` publish with the npm `latest` dist-tag. Prerelease versions such as `0.2.0-beta.1` publish with the npm `next` dist-tag.\n\n## Troubleshooting\n\n### `server is not installed`\n\nInstall it explicitly:\n\n```text\n/lsp install <serverId>\n```\n\nOr set global config to auto-install:\n\n```json\n{\n  \"installMode\": \"auto\"\n}\n```\n\n### Check the resolved command\n\n```text\n/lsp doctor <serverId>\n```\n\nThis is the quickest way to see the final command, root markers, install state, and config warnings for one server.\n\n### Reuse Mason.nvim servers\n\nConfigure the server as `type: \"system\"` in `~/.pi/agent/lsp.json` and point `command` at the Mason binary. Pi will use it but will not manage or uninstall it.\n\n### Start fresh for one server\n\n```text\n/lsp stop <serverId>\n/lsp uninstall <serverId>\n/lsp install <serverId>\n```\n\nThis only removes Pi-managed install state. It does not remove external system/Mason binaries configured with `type: \"system\"`.\n\n## Limitations\n\n- Tools are read-only. Rename, code action, and formatting support are intentionally not exposed yet.\n- A language server must support the requested LSP capability for the matching tool to return data.\n- First explicit LSP use can still be slower while a server starts, initializes, or installs, especially when warmup is disabled or the server was not installed when the file was read.\n- `lsp_workspace_symbols` searches active clients by default; pass `serverId` to start/query a specific configured server.\n- Pagination result IDs are not persistent and can expire. Re-run the original LSP query if `lsp_more` says the cached result is gone.\n\n## License\n\n[MIT](https://opensource.org/license/MIT) \u00a9 2026 pi-lsp-adapter developers\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "lsp",
+    "language-server-protocol",
+    "language-server",
+    "diagnostics",
+    "hover",
+    "definitions",
+    "references",
+    "symbols",
+    "coding-agent",
+    "ai"
+  ],
+  "author": {
+    "name": "Nikmmd"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/nikmmd/pi-lsp-adapter#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nikmmd/pi-lsp-adapter.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-30T06:09:10.819Z",
+    "modified": "2026-05-30T07:05:04.891Z",
+    "0.1.0": "2026-05-30T06:09:11.062Z",
+    "0.1.1": "2026-05-30T06:43:12.916Z",
+    "0.1.2": "2026-05-30T07:05:04.610Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 30,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 440
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 35
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 20
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 25
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 8
+    }
+  ]
+}

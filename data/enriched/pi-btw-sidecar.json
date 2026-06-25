@@ -1,0 +1,354 @@
+{
+  "name": "pi-btw-sidecar",
+  "latest_version": "0.2.1",
+  "description": "Pi extension for persistent /btw side conversations with an isolated sidecar agent session.",
+  "readme": "# pi-btw-sidecar\r\n\r\n[![npm version](https://img.shields.io/npm/v/pi-btw-sidecar?style=flat-square)](https://www.npmjs.com/package/pi-btw-sidecar) [![License](https://img.shields.io/github/license/MasuRii/pi-btw-sidecar?style=flat-square)](LICENSE)\r\n\r\nPersistent `/btw` side conversations for the [Pi coding agent](https://github.com/mariozechner/pi).\r\n\r\n`pi-btw-sidecar` opens a focused, non-capturing modal sidecar session, keeps BTW discussion separate from the main transcript, and can inject or summarize the side conversation back into the main session on request.\r\n\r\n- **npm**: https://www.npmjs.com/package/pi-btw-sidecar\r\n- **GitHub**: https://github.com/MasuRii/pi-btw-sidecar\r\n\r\n## Features\r\n\r\n- `/btw` contextual side thread with current main-session context.\r\n- `/btw:tangent` contextless tangent thread.\r\n- Modal BTW composer with streaming markdown transcript, scrolling, and Escape dismissal.\r\n- Agent selection from `agent/agents/*.md` via `/btw:agent`; the selected agent markdown body becomes the sidecar instruction prompt. Agent frontmatter `color` field is used for per-agent accent styling.\r\n- BTW-only model and thinking overrides with `/btw:model` and `/btw:thinking`.\r\n- Transcript item selection for inject: when injecting the BTW thread, an interactive selection mode lets the user pick specific transcript items before injection.\r\n- Isolated no-tool sub-sessions: BTW agents receive selected instructions and seeded conversation context without tools, skills, prompts, agents files, themes, extension resource collections, or inherited main-session system prompts.\r\n- Configurable icon mode (`nerd`, `unicode`, `emoji`, or `auto`/`fallback`) with distinct icons for agents, session, model, and thinking status labels.\r\n- Debug logging controlled by root `config.json`, with logs written only under extension-local `debug/` when enabled.\r\n\r\n## Installation\r\n\r\n### npm package\r\n\r\n```bash\r\npi install npm:pi-btw-sidecar\r\n```\r\n\r\n### Git repository\r\n\r\n```bash\r\npi install git:github.com/MasuRii/pi-btw-sidecar\r\n```\r\n\r\n### Local extension folder\r\n\r\nPlace this folder in one of Pi's extension discovery paths:\r\n\r\n```text\r\n# Global default when PI_CODING_AGENT_DIR is unset\r\n~/.pi/agent/extensions/pi-btw-sidecar\r\n\r\n# Project-specific\r\n.pi/extensions/pi-btw-sidecar\r\n```\r\n\r\nPi discovers the extension through the root `index.ts` entry listed in `package.json`, which forwards to `src/btw-runtime.ts`.\r\n\r\n## Commands\r\n\r\n| Command | Description |\r\n| --- | --- |\r\n| `/btw [prompt]` | Open or continue the contextual BTW thread. Add `--save` to persist a visible note. |\r\n| `/btw:tangent [prompt]` | Open or continue a contextless tangent thread. |\r\n| `/btw:agent [name\\|list]` | Pick, list, or set the BTW instruction agent. |\r\n| `/btw:new [prompt]` | Reset BTW and start a fresh contextual thread. |\r\n| `/btw:clear` | Clear BTW state and dismiss the modal. |\r\n| `/btw:inject [instructions]` | Inject the full BTW thread into the main session. |\r\n| `/btw:summarize [instructions]` | Summarize the BTW thread and inject the summary. |\r\n| `/btw:model [provider model api\\|clear]` | Show, set, or clear the BTW-only model override. |\r\n| `/btw:thinking [level\\|clear]` | Show, set, or clear the BTW-only thinking override. |\r\n\r\n## Configuration\r\n\r\nRuntime configuration is stored at the extension root:\r\n\r\n```text\r\n~/.pi/agent/extensions/pi-btw-sidecar/config.json\r\n```\r\n\r\nA starter template is included at `config/config.example.json`. Missing `config.json` or missing keys fall back to production defaults.\r\n\r\n```bash\r\ncp config/config.example.json config.json\r\n```\r\n\r\n### Configuration options\r\n\r\n| Key | Type | Default | Purpose |\r\n| --- | --- | --- | --- |\r\n| `debug` | `boolean` | `false` | Enables debug logging under `debug/debug.log`. |\r\n| `showReasoning` | `boolean` | `true` | Shows sidecar assistant reasoning text when Pi exposes it. |\r\n| `modalSize` | `\"small\" \\| \"medium\" \\| \"large\"` | `\"medium\"` | Controls the default BTW modal size. |\r\n\r\nExample:\r\n\r\n```json\r\n{\r\n  \"debug\": false,\r\n  \"showReasoning\": true,\r\n  \"modalSize\": \"medium\"\r\n}\r\n```\r\n\r\nInvalid values are reported through Pi diagnostics and replaced with bounded defaults.\r\n\r\n## Debug logging\r\n\r\nDebug logging is disabled by default through `\"debug\": false`. When enabled, logs are appended only to:\r\n\r\n```text\r\ndebug/debug.log\r\n```\r\n\r\nThe extension does not write debug output to `console`, `stdout`, or `stderr`, and no debug directory or log handle is created when debug logging is disabled.\r\n\r\n## Repository structure\r\n\r\n```text\r\npi-btw-sidecar/\r\n\u251c\u2500\u2500 index.ts                         # Stable Pi extension entrypoint for auto-discovery\r\n\u251c\u2500\u2500 src/\r\n\u2502   \u251c\u2500\u2500 btw-runtime.ts               # Command registration and sidecar session orchestration\r\n\u2502   \u251c\u2500\u2500 agent-discovery.ts           # Agent markdown discovery and selection state\r\n\u2502   \u251c\u2500\u2500 agent-selection-ui.ts        # `/btw:agent` picker UI helpers\r\n\u2502   \u251c\u2500\u2500 config.ts                    # Config loading, validation, and defaults\r\n\u2502   \u251c\u2500\u2500 debug-logger.ts              # File-only debug logger gated by config.json\r\n\u2502   \u2514\u2500\u2500 icons.ts                     # Modal icon sets (nerd, unicode, emoji, fallback modes)\r\n\u251c\u2500\u2500 src/test/\r\n\u2502   \u2514\u2500\u2500 btw-runtime.test.ts\r\n\u251c\u2500\u2500 config/\r\n\u2502   \u2514\u2500\u2500 config.example.json          # Starter config template\r\n\u251c\u2500\u2500 CHANGELOG.md\r\n\u251c\u2500\u2500 LICENSE\r\n\u251c\u2500\u2500 package.json\r\n\u251c\u2500\u2500 README.md\r\n\u2514\u2500\u2500 tsconfig.json\r\n```\r\n\r\n## Development\r\n\r\n```bash\r\nnpm install\r\nnpm run build\r\nnpm run lint\r\nnpm run test\r\nnpm run check\r\nnpm run package:dry-run\r\n```\r\n\r\n## Publishing\r\n\r\nThe package metadata follows the publish-ready shape used by established Pi extensions:\r\n\r\n- entrypoint: `index.ts`\r\n- package exports: `.` \u2192 `./index.ts`\r\n- Pi extension manifest: `pi.extensions`\r\n- repository, bugs, and homepage links target `MasuRii/pi-btw-sidecar`\r\n- published files: source, README, changelog, license, and config template\r\n- runtime `config.json`, `debug/` logs, tests, and build artifacts excluded from npm publication\r\n\r\nDo not publish, push, or tag until the GitHub repository has been manually reviewed.\r\n\r\n## Changelog\r\n\r\nSee [CHANGELOG.md](CHANGELOG.md) for version history.\r\n\r\n## License\r\n\r\n[MIT](LICENSE) \u00a9 MasuRii\r\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "pi-coding-agent",
+    "pi-tui",
+    "coding-agent",
+    "btw",
+    "sidecar",
+    "side-conversation"
+  ],
+  "author": {
+    "name": "MasuRii"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/MasuRii/pi-btw-sidecar#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MasuRii/pi-btw-sidecar.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-27T01:29:58.796Z",
+    "modified": "2026-06-16T15:46:43.073Z",
+    "0.1.0": "2026-05-27T01:29:59.106Z",
+    "0.2.0": "2026-06-01T12:42:23.685Z",
+    "0.2.1": "2026-06-16T15:46:42.959Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 52,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 265
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 129
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 61
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

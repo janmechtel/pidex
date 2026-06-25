@@ -1,0 +1,358 @@
+{
+  "name": "pi-annotate",
+  "latest_version": "0.4.3",
+  "description": "Visual annotation tool for Pi coding agent with inline note cards",
+  "readme": "<p>\n  <img src=\"banner.png\" alt=\"Pi Annotate\" width=\"1100\">\n</p>\n\n# Pi Annotate\n\n**Visual annotation for AI. Click elements, capture screenshots, fix code.**\n\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)\n[![Browser](https://img.shields.io/badge/Browser-Chrome%20%7C%20Chromium-blue?style=for-the-badge)]()\n\n```\n/annotate\n```\n\nFigma-like annotation experience with floating inline note cards. DevTools-like element picker in vanilla JS.\n\nClick elements, add comments, submit. The agent gets selectors, box model, accessibility, screenshots \u2014 everything it needs to fix your UI.\n\nhttps://github.com/user-attachments/assets/115b10ca-86e8-4b1c-b8a4-492c68759c58\n\n## Quick Start\n\n### 1. Install Pi Extension\n\n```bash\npi install npm:pi-annotate\n```\n\nRestart pi to load the extension.\n\n### 2. Load Supported Browser Extension\n\n1. Open the extensions page in Google Chrome, Google Chrome for Testing, or Chromium, and enable **Developer mode**\n2. Click **Load unpacked** \u2192 select the `chrome-extension/` folder inside the installed package\n3. Click the **Pi Annotate icon** in the toolbar\n\n### 3. Install Native Host\n\nThe popup shows your extension ID. Click **Copy** next to the install command, then run it from `chrome-extension/native/` in the installed package:\n\n```bash\n./install.sh <extension-id>\n```\n\nThis installs the native messaging manifest for Google Chrome, Google Chrome for Testing, and Chromium on macOS, plus the default/current config-home locations for those browsers on Linux. Fully quit and reopen that browser. The popup will show **Connected** when ready.\n\n## Usage\n\n```bash\n/annotate                  # Current browser tab\n/annotate https://x.com    # Opens URL first\n```\n\n| Action | How |\n|--------|-----|\n| Select element | Click on page |\n| Cycle ancestors | Alt/\u2325+scroll while hovering |\n| Multi-select | Toggle \"Multi\" or Shift+click |\n| Add comment | Type in note card textarea |\n| Toggle screenshot | \ud83d\udcf7 button in note card header |\n| Reposition note | Drag by header |\n| Scroll to element | Click selector in note card |\n| Toggle note | Click numbered badge |\n| Expand/collapse all | \u25bc/\u25b2 buttons in toolbar |\n| Toggle edit capture | \"Etch\" toggle in toolbar |\n| Toggle annotation UI | `\u2318/Ctrl+Shift+P` |\n| Close | `ESC` |\n\n## Features\n\n**Context Capture** \u2014 Each element automatically gets box model breakdown (padding, border, margin), accessibility info (role, name, focusable, ARIA states), all HTML attributes, and key CSS styles (display, position, overflow, colors, typography). Enable **Debug mode** for computed styles (40+ properties), parent context, and CSS variables.\n\n**Inline Note Cards** \u2014 Draggable floating cards with per-element comments, SVG connectors linking notes to elements, click-to-scroll, and per-element screenshot toggles.\n\n**Screenshots** \u2014 Individual crops per element (20px padding) or full-page mode with numbered badges drawn on the screenshot to identify elements. Toggle per element with the \ud83d\udcf7 button.\n\n**Edit Capture** \u2014 Toggle \"Etch\" in the toolbar to record DevTools edits. Change inline styles, modify CSS rules, add/remove classes, edit text \u2014 everything is tracked via MutationObserver. A pulsing red dot and badge counter show recording status. At submit, the extension takes before/after screenshots by briefly undoing visual changes, and produces structured property-level diffs the agent can map to source code. Works alongside element selection or standalone.\n\n**Restricted Tabs** \u2014 If the current tab is `chrome://` or other restricted URLs, providing a URL opens a new tab automatically. Popup button and keyboard shortcut auto-inject the content script on fresh tabs.\n\n## Output\n\n```markdown\n## Page Annotation: https://example.com\n**Viewport:** 1440\u00d7900\n\n**Context:** Fix the styling issues\n\n### Selected Elements (2)\n\n1. **button**\n   - Selector: `#submit-btn`\n   - ID: `submit-btn`\n   - Classes: `btn, btn-primary`\n   - Text: \"Submit\"\n   - **Box Model:** 120\u00d740 (content: 96\u00d724, padding: 8 16, border: 1, margin: 0 8)\n   - **Attributes:** type=\"submit\", data-testid=\"submit\"\n   - **Styles:** display: flex, backgroundColor: rgb(59, 130, 246)\n   - **Accessibility:** role=button, name=\"Submit\", focusable=true, disabled=false\n   - **Comment:** Make this blue with rounded corners\n\n2. **div**\n   - Selector: `.error-message`\n   - Classes: `error-message, hidden`\n   - Text: \"Please fill required fields\"\n   - **Box Model:** 300\u00d720 (content: 300\u00d720, padding: 0, border: 0, margin: 0 0 8)\n   - **Accessibility:** focusable=false, disabled=false\n   - **Comment:** This should appear in red, not hidden\n\n### Screenshots\n\n- Element 1: /var/folders/.../pi-annotate-...-el1.png\n- Element 2: /var/folders/.../pi-annotate-...-el2.png\n\n## Edit Capture (2 changes, 35s)\n\n### Inline Style Changes\n\n**`#submit-btn`**\n- `background-color`: `rgb(59, 130, 246)` \u2192 `rgb(37, 99, 235)`\n- `border-radius`: added `8px`\n\n### CSS Rule Changes\n\n**`.btn-primary:hover`** (styles.css)\n- `background-color`: `rgb(37, 99, 235)` \u2192 `rgb(29, 78, 216)`\n\n### Before/After Screenshots\n\n- Before: /var/folders/.../pi-annotate-...-before.png\n- After: /var/folders/.../pi-annotate-...-after.png\n```\n\nDebug mode adds computed styles, parent context, and CSS variables per element. Edit capture appears when the Etch toggle is enabled and changes are detected.\n\n## Architecture\n\n```\nPi Extension (index.ts)\n    \u2195 Unix Socket (/tmp/pi-annotate.sock)\nNative Host (host.cjs)\n    \u2195 Browser Native Messaging\nBrowser Extension (background.js \u2192 content.js)\n```\n\n| File | Purpose |\n|------|---------|\n| `index.ts` | Pi extension \u2014 `/annotate` command + tool |\n| `types.ts` | TypeScript interfaces |\n| `chrome-extension/content.js` | Element picker UI (vanilla JS) |\n| `chrome-extension/background.js` | Native messaging, screenshots, tab routing |\n| `chrome-extension/native/host.cjs` | Socket \u2194 native messaging bridge |\n| `chrome-extension/popup.html` | Connection status + setup |\n\nAuth token generated per-run at `/tmp/pi-annotate.token`. Socket and token files use 0600 permissions.\n\n## Development\n\nNo build step. Edit `content.js` or `background.js` directly, reload at `chrome://extensions`. Pi extension (TypeScript) loads via jiti \u2014 restart pi after changes.\n\n```bash\ntail -f /tmp/pi-annotate-host.log                    # Native host logs\n# chrome://extensions \u2192 Pi Annotate \u2192 service worker  # Background logs\n# DevTools on target page                              # Content script logs\n```\n\n## Troubleshooting\n\n| Issue | Fix |\n|-------|-----|\n| UI doesn't appear | Refresh page, check service worker console |\n| \"restricted URL\" error | Provide a URL: `/annotate https://example.com` |\n| Native host not connecting | Click extension icon \u2192 check status, re-run install, fully restart the supported browser |\n| \"Extension ID mismatch\" | Copy install command from popup, re-run |\n| Socket errors | `ls -la /tmp/pi-annotate.sock` |\n\n**Verify native host:**\n- macOS Google Chrome: `cat ~/Library/Application\\ Support/Google/Chrome/NativeMessagingHosts/com.pi.annotate.json`\n- macOS Google Chrome for Testing: `cat ~/Library/Application\\ Support/Google/ChromeForTesting/NativeMessagingHosts/com.pi.annotate.json`\n- macOS Chromium: `cat ~/Library/Application\\ Support/Chromium/NativeMessagingHosts/com.pi.annotate.json`\n- Linux Google Chrome (default path): `cat ~/.config/google-chrome/NativeMessagingHosts/com.pi.annotate.json`\n- Linux Google Chrome for Testing (default path): `cat ~/.config/google-chrome-for-testing/NativeMessagingHosts/com.pi.annotate.json`\n- Linux Chromium (default path): `cat ~/.config/chromium/NativeMessagingHosts/com.pi.annotate.json`\n- Linux with custom config home: `echo \"${CHROME_CONFIG_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}}\"`\n\nIf your Linux browser uses a different XDG config root, export `CHROME_CONFIG_HOME` or `XDG_CONFIG_HOME` before running `./install.sh <extension-id>`. Custom `--user-data-dir` layouts are not handled by this installer.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "annotation",
+    "visual-debugging",
+    "chrome-extension",
+    "extension"
+  ],
+  "author": {
+    "name": "Nico Bailon"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/nicobailon/pi-annotate#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicobailon/pi-annotate.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "video": "https://github.com/nicobailon/pi-annotate/raw/refs/heads/main/demo.mp4"
+  },
+  "time": {
+    "created": "2026-01-31T07:57:34.640Z",
+    "modified": "2026-04-23T05:35:53.785Z",
+    "0.3.2": "2026-01-31T07:57:34.995Z",
+    "0.3.3": "2026-02-01T02:58:39.972Z",
+    "0.3.4": "2026-02-01T03:42:45.598Z",
+    "0.3.5": "2026-02-01T21:06:44.903Z",
+    "0.3.6": "2026-02-02T00:39:41.318Z",
+    "0.4.1": "2026-04-04T02:13:28.814Z",
+    "0.4.2": "2026-04-20T03:59:22.355Z",
+    "0.4.3": "2026-04-23T05:35:53.669Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": null,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 642
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 97
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 46
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 30
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 67
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 29
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 34
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 43
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 297
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 119
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 332
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 455
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 149
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 103
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 111
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 111
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 67
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 81
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 176
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 76
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 15
+    }
+  ]
+}

@@ -1,0 +1,353 @@
+{
+  "name": "@ineersa/my-pi-jetbrains-index",
+  "latest_version": "0.3.3",
+  "description": "JetBrains index diagnostics gate extension for pi-coding-agent",
+  "readme": "# @ineersa/my-pi-jetbrains-index\n\n[pi-coding-agent](https://github.com/badlogic/pi-mono) extension that provides **JetBrains IDE index\u2013aware** first-class Pi wrapper tools, diagnostics, and guard behavior. Registers 13 IDE tools via Pi's custom tool API, provides IDE tool guidelines via tool `promptGuidelines`, blocks tools when the IDE/index is unavailable, syncs the project at turn start, and reports newly introduced diagnostics after code edits.\n\n## Mandatory dependency\n\n**[jetbrains-index-mcp-plugin](https://github.com/hechtcarmel/jetbrains-index-mcp-plugin)** must be installed and configured as an MCP server.  \nThis extension communicates with the JetBrains IDE through that MCP server \u2014 without it, the extension stays **dormant** for the session.\n\n## Activation requirements (both must be true)\n\n1. `.idea/` exists in the current working directory (i.e. a JetBrains project is open).\n2. A JetBrains index MCP server is configured and reachable (see Configuration below).\n\nIf either condition is missing, the extension stays dormant \u2014 no prompt injection, no guardrails, no diagnostics.\n\n## Install\n\n```bash\npi install npm:@ineersa/my-pi-jetbrains-index\n```\n\nLocal dev:\n\n```bash\npi install ./packages/jetbrains-index -l\n```\n\n## What it does\n\n### IDE tool prompt guidelines\n\nWhen active, each registered IDE wrapper tool contributes prompt guidelines to the system prompt `Guidelines` block via Pi's `promptGuidelines` mechanism. The guidelines direct the model to prefer IDE tools over bash/find/rg for code navigation, use specific tools for search/analysis/refactoring, and respect CWD scope.\n\n### Hard stop on broken IDE/index\n\nBefore every tool call, checks IDE/index readiness. If the IDE is in dumb mode or the index is busy after retries:\n\n1. The tool call is **blocked**.\n2. The user is notified.\n3. The agent run is **aborted**.\n4. User fixes the IDE and types `continue`.\n\nThe extension remains active and recovers on the next turn.\n\n### Turn-start project sync\n\nOn each agent turn start, performs a whole-project sync so the IDE is aware of any external file changes.\n\n### Post-mutation diagnostics\n\nAfter every successful `edit` or `write`:\n\n1. Opens the file in the IDE.\n2. Syncs the changed file path.\n3. Waits for index readiness.\n4. Runs diagnostics and reports **only newly introduced** issues (not pre-existing ones).\n\n### Move-refactor handling\n\nDetects `mv` / `git mv` in bash commands targeting files inside the current working directory, performs a whole-project IDE sync after the move, and reminds the agent to prefer `ide_move_file` so imports/references are updated automatically.\n\n## States\n\n| State | Behavior |\n|---|---|\n| **Dormant** | No `.idea/` or no healthy JetBrains MCP for `ctx.cwd`. Extension does nothing. |\n| **Active** | Health check passed. Prompt guidelines active. Guards active. |\n| **Blocked** | IDE/index broken mid-session. Tool blocked, user notified, agent aborted. Recovers on next turn after user fixes IDE and types `continue`. |\n\n## Architecture\n\n```\njetbrains-index.ts       \u2190 entry point, hooks, tool registration\n\u251c\u2500\u2500 wrappers.ts           \u2190 barrel/orchestrator (imports tools/*)\n\u2502   \u251c\u2500\u2500 tools/types.ts    \u2190 shared types (ToolResult, ToolRegistration)\n\u2502   \u251c\u2500\u2500 tools/shared.ts   \u2190 shared helpers (callTool, resolveAndMerge, etc.)\n\u2502   \u251c\u2500\u2500 tools/find-file.ts  \u2190 ide_find_file\n\u2502   \u251c\u2500\u2500 tools/search-text.ts  \u2190 ide_search_text\n\u2502   \u251c\u2500\u2500 tools/find-symbol.ts  \u2190 ide_find_symbol\n\u2502   \u251c\u2500\u2500 tools/find-references.ts  \u2190 ide_find_references\n\u2502   \u251c\u2500\u2500 tools/rename-symbol.ts    \u2190 ide_rename_symbol\n\u2502   \u251c\u2500\u2500 tools/rename-file.ts      \u2190 ide_rename_file\n\u2502   \u251c\u2500\u2500 tools/find-implementations.ts  \u2190 ide_find_implementations\n\u2502   \u251c\u2500\u2500 tools/find-super-methods.ts  \u2190 ide_find_super_methods\n\u2502   \u251c\u2500\u2500 tools/type-hierarchy.ts  \u2190 ide_type_hierarchy\n\u2502   \u251c\u2500\u2500 tools/call-hierarchy.ts  \u2190 ide_call_hierarchy\n\u2502   \u251c\u2500\u2500 tools/diagnostics.ts  \u2190 ide_diagnostics\n\u2502   \u251c\u2500\u2500 tools/move-file.ts  \u2190 ide_move_file\n\u2502   \u251c\u2500\u2500 tools/file-structure.ts  \u2190 ide_file_structure\n\u2502   \u2514\u2500\u2500 tools/\n\u251c\u2500\u2500 target-resolver.ts    \u2190 symbol \u2192 file/line/column resolution\n\u251c\u2500\u2500 jetbrains-service.ts  \u2190 MCP client (17-tool catalog, TOON, metadata)\n\u2502   \u2514\u2500\u2500 settings-config.ts  \u2190 config loader (settings.json + fallback)\n\u251c\u2500\u2500 problems-tracker.ts   \u2190 baseline capture + new-problem diffing\n\u251c\u2500\u2500 prompts.ts            \u2190 minimal IDE prompt + reminder builders\n\u251c\u2500\u2500 diagnostics.ts        \u2190 diagnostics summary formatting\n\u251c\u2500\u2500 constants.ts          \u2190 thresholds, cooldowns, regexes\n```\n\nEach tool lives in its own file under `tools/`. Each file owns its registration,\nschema, descriptions, and execute logic. Shared helpers and types are in\n`tools/types.ts` and `tools/shared.ts`. `wrappers.ts` is a thin barrel that\nimports all tool factories and exports `createAllWrapperTools`.\n\n### Key changes in v0.4.0\n\n- **First-class wrapper tools**: registers 13 Pi tools (`ide_find_file`,\n  `ide_search_text`, `ide_find_symbol`,\n  `ide_find_references`, `ide_rename_symbol`, `ide_rename_file`, `ide_find_implementations`,\n  `ide_find_super_methods`, `ide_type_hierarchy`, `ide_call_hierarchy`,\n  `ide_diagnostics`, `ide_move_file`, `ide_file_structure`) on session start\n  when IDE is available.\n- **Always-TOON results**: MCP payload decoded, actual data returned as TOON text.\n  Errors normalized to `{error, isRetryable, hint}` TOON with `isError: true`.\n  No `structuredContent`, no escaped JSON nesting.\n- **MCP metadata retention**: `JetBrainsService` stores full tool definitions\n  from `tools/list`, enabling wrappers to reuse original descriptions.\n- **Resolver-backed semantic tools**: all semantic tools share a common\n  targeting contract (file+line+column preferred, symbol fallback).\n- **Mutation lock**: `ide_rename_symbol`, `ide_rename_file`, and `ide_move_file` serialize\n  IDE-level mutations.\n- **Tool prompt guidelines**: IDE usage guidance contributed via `promptGuidelines` in the system prompt `Guidelines:` block.\n\n### Key changes in v0.3.0\n\n- **Target-resolution layer**: new `target-resolver.ts` resolves symbol or\n  location inputs to canonical `{ file, line, column }` targets. Supports PHP\n  (strong), Python (strong), TS/JS with fileHint (strong), and bare-symbol\n  best-effort for TS/JS, Rust, and Go via `findSymbol`.\n- **findSymbol in catalog**: the 17-tool JetBrainsService catalog now includes\n  `findSymbol` for symbol search across the codebase.\n\n### Key changes in v0.2.0\n\n- **Generic service layer**: the old `mcp-problems-client.ts` was generalized\n  into `JetBrainsService` \u2014 covers all JetBrains IDE tools in one catalog.\n- **Settings-based config**: connection config now loads from Pi\n  `settings.json` (`jetbrainsIndex` key) with fallback to legacy `mcp.json`.\n- **Always-TOON responses**: all tool results are encoded as TOON text; `encodeForModel`/`formatForModel` replaced with always-TOON helpers.\n- **Cleaner API**: convenience methods (`waitForIndexReady`, `syncFiles`,\n  `openFile`, `getFileDiagnostics`) no longer require explicit project path.\n\n## Configuration\n\n### Connection config (Pi settings.json)\n\n```json\n{\n  \"jetbrainsIndex\": {\n    \"url\": \"http://127.0.0.1:3000/mcp\",\n    \"headers\": {\n      \"Authorization\": \"Bearer ${JETBRAINS_TOKEN}\"\n    }\n  }\n}\n```\n\nThe extension reads the `jetbrainsIndex` key from Pi's `settings.json`\n(project `.pi/settings.json` overrides global `~/.pi/agent/settings.json`).\nEnvironment variable references in header values (e.g. `${JETBRAINS_TOKEN}`)\nare expanded at load time.\n\n**Legacy fallback**: If `settings.json` has no `jetbrainsIndex` key, the\nextension also checks `mcpServers.jetbrains-index` in `.pi/mcp.json` and\n`~/.pi/agent/mcp.json` (the old mcp.json format) for backward compatibility.\n\n### Built-in constants\n\n| Constant | Default | Purpose |\n|---|---|---|\n| `IDE_INDEX_STATUS_MAX_RETRIES` | 5 | Index readiness retries before failure |\n| `IDE_INDEX_STATUS_RETRY_BASE_DELAY_MS` | 2s | Base delay between retries (exponential backoff) |\n| `IDE_INDEX_STATUS_RETRY_MAX_DELAY_MS` | 30s | Maximum delay cap |\n| `NUDGE_COOLDOWN_MS` | 5m | Cooldown between move refactor nudges |\n| `MCP_TOOL_CALL_TIMEOUT_MS` | 30s | Timeout for a single MCP tool call |\n\n## Troubleshooting\n\n- **Extension not doing anything?** Make sure `.idea/` exists and the\n  `jetbrains-index` MCP server is configured and reachable via `settings.json`\n  (or legacy `mcp.json`).\n- **Tools getting blocked with \"IDE/index unavailable\"?** The IDE is in dumb\n  mode or indexing. Wait for it to finish, or restart the IDE.\n- **Agent run stopped mid-turn?** The IDE became unavailable during a tool\n  call. Fix the IDE and type `continue` to resume.\n\n## Build / typecheck\n\n```bash\n# from monorepo root\nnpm run typecheck\n```\n\n## Version bump & publish\n\n```bash\ncd packages/jetbrains-index\nnpm version patch\nnpm publish --access public\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/ineersa/my-pi/tree/main/packages/jetbrains-index#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ineersa/my-pi.git",
+    "directory": "packages/jetbrains-index"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/jetbrains-index/jetbrains-index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-17T18:15:11.392Z",
+    "modified": "2026-05-26T01:21:46.582Z",
+    "0.1.3": "2026-04-17T18:15:11.654Z",
+    "0.1.4": "2026-04-18T00:35:58.733Z",
+    "0.1.5": "2026-04-18T13:32:35.800Z",
+    "0.1.6": "2026-04-18T22:20:55.831Z",
+    "0.1.7": "2026-04-20T13:51:36.064Z",
+    "0.1.8": "2026-04-21T21:35:28.225Z",
+    "0.1.9": "2026-05-05T22:53:23.626Z",
+    "0.1.10": "2026-05-05T23:41:00.918Z",
+    "0.3.1": "2026-05-12T14:35:27.244Z",
+    "0.3.2": "2026-05-23T23:19:55.421Z",
+    "0.3.3": "2026-05-26T01:21:46.467Z"
+  },
+  "versions_count": 11,
+  "downloads_last_week": 35,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 706
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 46
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 175
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 212
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 334
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 55
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 48
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 37
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

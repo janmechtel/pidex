@@ -1,0 +1,47 @@
+{
+  "name": "pi-emote",
+  "latest_version": "0.2.10",
+  "description": "Animated pixel-art emote widget for pi TUI",
+  "readme": "# CGx's pi-emote\n\n> **Currently looking to expand the emotes gallery!** If you have an emote set you'd like to submit, please make a PR!\n\nAnimated pixel-art emote that lives in the top-right corner of your pi TUI session. Reacts to what the agent is doing \u2014 thinking, talking, reading, writing, using tools, etc.\n\n![pi-emote demo](pi-emote-demo.gif)\n\nSupports Kitty, iTerm2, and ASCII rendering.\n\n## Gallery\n\nCommunity-contributed emote sets. [Submit yours via PR!](#custom-emotes)\n\n### Image Sets\n\n| Avatar | Name | Contributor |\n|--------|------|-------------|\n| <img src=\"emotes/default/hi/hi1.png\" width=\"64\"> | `default` | [@cgxeiji](https://github.com/cgxeiji) |\n| <img src=\"emotes/aza_choi/hi/hi_1.png\" width=\"64\"> | `aza_choi` | [@shennguyenrs](https://github.com/shennguyenrs) |\n| <img src=\"emotes/aza_choi_nobg/hi/hi_1.png\" width=\"64\"> | `aza_choi_nobg` | [@shennguyenrs](https://github.com/shennguyenrs) |\n| <img src=\"emotes/red/hi/hi1.png\" width=\"64\"> | `red` | [@cgxeiji](https://github.com/cgxeiji) |\n\n### ASCII Sets\n\n| Avatar | Name | Contributor |\n|--------|------|-------------|\n| `(^ \u25e1 ^)/` | `ascii` | [@cgxeiji](https://github.com/cgxeiji) |\n| `\u0295\u2022\u032b\u0361\u2022\u0294` | `ascii-bear` | [@LCorleone](https://github.com/LCorleone) |\n\n## Install\n\n```bash\npi install git:github.com/cgxeiji/pi-emote\n```\n\n## States\n\n| State | Trigger |\n|-------|---------|\n| hi | Session start |\n| idle | Nothing happening (blinks occasionally) |\n| think | Reasoning tokens streaming |\n| talk | Text response streaming |\n| read | `read` tool / reading tool output |\n| write | `write` or `edit` tool |\n| tool | Any other tool |\n| success | Successful tool execution |\n| failure | Failed tool execution |\n| compact | Context compaction |\n\n## Config\n\nDrop a `config.json` in one of these paths (highest priority wins):\n\n- `~/.pi/agent/extensions/pi-emote/config.json` \u2014 your global prefs\n- `.pi/extensions/pi-emote/config.json` \u2014 project override\n\nOnly include what you want to change:\n\n```json\n{\n  \"size\": 12,\n  \"emotes\": [\n    { \"model\": \"*claude*\", \"emote-set\": \"my-avatar\" }\n  ]\n}\n```\n\nSee `config.json` in the extension root for all defaults.\n\n## Multiplexers\n\npi-emote can render image avatars through **tmux** using DCS passthrough. When tmux is detected, pi-emote auto-detects the outer terminal and picks the right image protocol.\n\n### tmux Setup\n\nAdd these to your `tmux.conf`:\n\n```bash\n# Required \u2014 allow image sequences to pass through to the outer terminal\nset -g allow-passthrough on\n\n# Required \u2014 detect outer terminal when attaching from a different terminal\nset -ga update-environment TERM\nset -ga update-environment TERM_PROGRAM\n\n# Recommended \u2014 reduces flicker during animation\nset -sg escape-time 0\n```\n\nThen restart tmux completely:\n\n```bash\ntmux kill-server && tmux\n```\n\nWithout `allow-passthrough`, pi-emote defaults to ASCII and shows a one-time warning with setup instructions.\n\n### Experimental Multiplexer Support\n\n| Outer Terminal | Protocol | Status |\n|----------------|----------|--------|\n| Ghostty | kitty-unicode | \u2705 Stable, pane-safe, auto-detected |\n| kitty | kitty-unicode | \u26a0\ufe0f Untested, pane-safe, auto-detected |\n| iTerm2 | iterm2 | \u26a0\ufe0f Experimental, opt-in only (pane bleed in multi-pane layouts) |\n| WezTerm | iterm2 | \u26a0\ufe0f Experimental, opt-in only (not verified) |\n\nThe outer terminal is detected via `tmux show-environment TERM_PROGRAM`, which reflects the currently attached terminal.\n\nGhostty and kitty use the **kitty-unicode** renderer (Unicode placeholders) which is pane-safe \u2014 images stay within their pane and clean up on session switch. This is the default when auto-detected.\n\niTerm2 and WezTerm use DCS passthrough for the iTerm2 image protocol. This works but has known limitations: images can bleed into adjacent panes and persist when switching sessions. **Not enabled by default** \u2014 opt in explicitly:\n\n```json\n{\n  \"terminals\": [\n    { \"match\": \"tmux\", \"render\": \"iterm2\" }\n  ]\n}\n```\n\n### Other Multiplexers\n\n**zellij** and **screen** are not yet supported and default to ASCII.\n\n### Manual Override\n\nForce a specific renderer:\n\n```json\n{\n  \"terminals\": [\n    { \"match\": \"tmux\", \"render\": \"kitty-unicode\" }\n  ]\n}\n```\n\nAvailable render values for tmux: `\"auto\"`, `\"kitty-unicode\"`, `\"kitty\"`, `\"iterm2\"`, `\"ascii\"`.\n\n- `\"auto\"` \u2014 detect outer terminal; uses kitty-unicode for Ghostty/kitty, ASCII for others\n- `\"kitty-unicode\"` \u2014 pane-safe Unicode placeholders (Ghostty, kitty)\n- `\"kitty\"` \u2014 classic DCS passthrough (single-pane only, experimental)\n- `\"iterm2\"` \u2014 iTerm2 DCS passthrough (single-pane only, experimental)\n- `\"ascii\"` \u2014 text fallback\n\n## Custom Emotes\n\nEmote sets live in `emotes/<set-name>/` with PNG frames per state:\n\n```\nemotes/my-avatar/\n\u251c\u2500\u2500 idle/*.png\n\u251c\u2500\u2500 think/*.png\n\u251c\u2500\u2500 talk/*.png\n\u251c\u2500\u2500 read/*.png\n\u251c\u2500\u2500 write/*.png\n\u251c\u2500\u2500 tool/*.png\n\u2514\u2500\u2500 ...          # hi, success, failure, compact\n```\n\nNot all states are required. Missing ones just won't animate.\n\n### Where to put them\n\npi-emote searches in order:\n\n1. `.pi/extensions/pi-emote/emotes/<name>/` (project)\n2. `~/.pi/agent/extensions/pi-emote/emotes/<name>/` (user)\n3. Extension built-in \u2192 falls back to `default`\n\n### Map models to sets\n\nGlob patterns against model ID, last match wins:\n\n```json\n{\n  \"emotes\": [\n    { \"model\": \"*\", \"emote-set\": \"default\" },\n    { \"model\": \"*claude*\", \"emote-set\": \"my-avatar\" },\n    { \"model\": \"*haiku*\", \"emote-set\": \"haiku-avatar\" }\n  ]\n}\n```\n\nIn this example, `claude` models use `my-avatar`, but `haiku` ones use `haiku-avatar`.\nSee `emotes/default/emotes.json` for per-set frame config (blink frames, talk weights).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pixel-art",
+    "emote",
+    "avatar",
+    "tui"
+  ],
+  "author": {
+    "name": "CGx",
+    "email": "31814150+cgxeiji@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/cgxeiji/pi-emote#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cgxeiji/pi-emote.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/cgxeiji/pi-emote/main/pi-emote-demo.gif"
+  },
+  "time": {
+    "created": "2026-05-07T22:22:03.438Z",
+    "modified": "2026-06-09T09:11:32.005Z",
+    "0.2.0": "2026-05-07T22:22:03.674Z",
+    "0.2.2": "2026-05-09T04:46:35.085Z",
+    "0.2.3": "2026-05-13T00:56:59.319Z",
+    "0.2.4": "2026-05-14T00:17:57.730Z",
+    "0.2.5": "2026-05-14T13:49:02.346Z",
+    "0.2.6": "2026-05-14T14:44:46.530Z",
+    "0.2.7": "2026-05-20T00:43:43.659Z",
+    "0.2.8": "2026-05-31T00:27:21.848Z",
+    "0.2.9": "2026-06-06T12:13:22.448Z",
+    "0.2.10": "2026-06-09T09:11:31.894Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": null,
+  "download_trend": []
+}

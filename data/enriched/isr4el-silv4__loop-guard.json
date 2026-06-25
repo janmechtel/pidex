@@ -1,0 +1,38 @@
+{
+  "name": "@isr4el-silv4/loop-guard",
+  "latest_version": "0.1.3",
+  "description": "Pi extension that detects and prevents LLM loops in tool calls and reasoning",
+  "readme": "# loop-guard\n\n![loop-guard](https://i.postimg.cc/W1r0m9vF/loop-guard.jpg)\n\nPi extension that detects and prevents LLM looping behavior in real-time across tool calls, thinking blocks, and streaming output.\n\n## Why\n\nLLMs can get stuck in repetitive loops: calling the same tool with the same arguments, repeating identical reasoning, or producing stagnant output. This wastes tokens, time, and can cause agents to run indefinitely without making progress.\n\nloop-guard watches for these patterns and escalates progressively:\n\n1. **Hint** \u2014 Inject a system prompt nudge to steer the model off its current path\n2. **Block** \u2014 Reject the tool call or abort streaming with a strong corrective message\n3. **Terminate** \u2014 Stop the agent entirely after persistent looping\n\n## Detection Modes\n\n### Tool Call Loops\n\nDetects three patterns in tool calls:\n\n| Pattern | Description |\n|---------|-------------|\n| **Exact repeat** | Same tool + identical arguments called consecutively |\n| **Fuzzy repeat** | Same tool with similar arguments (Jaccard similarity) |\n| **Cycle** | Repeating sequence of different tools (e.g. `read \u2192 edit \u2192 read \u2192 edit`) |\n\n### Thinking Loops (Streaming)\n\nDetects repetitive reasoning in real-time during streaming:\n\n| Pattern | Description |\n|---------|-------------|\n| **Consecutive** | N consecutive similar lines (exact match or n-gram similarity) |\n| **Density** | High repetition density in a sliding window (mode-based) |\n\nUses a **two-stage escalation** within a single prompt: warn on first detection, abort on second. This avoids false positives from legitimate repetitive output (e.g. listing items).\n\n### Thinking Loops (Post-Hoc)\n\nAt `message_end`, analyzes complete thinking blocks for repetitive patterns using n-gram similarity across a sliding window.\n\n### Result Stagnation\n\nDetects when the same tool returns identical results repeatedly, indicating the agent is stuck in a non-productive cycle.\n\n## Installation\n\nDrop this directory into your Pi extensions folder:\n\n```\n~/.pi/agent/extensions/loop-guard/\n```\n\nPi loads it automatically on startup. You'll see `loop-guard: active` in the notification log.\n\n## Usage\n\n### Commands\n\n| Command | Description |\n|---------|-------------|\n| `/loop-guard reset` | Clear all detection counters and allow the agent to continue |\n| `/loop-guard config` | Open interactive config menu to adjust thresholds |\n| `/loop-guard` | Same as `config` (opens menu) |\n\n### Configuration\n\nRun `/loop-guard config` to pick a setting and edit it. Key fields:\n\n#### Tool Call Detection\n\n| Field | Default | Description |\n|-------|---------|-------------|\n| `toolCallWindow` | 5 | Recent tool calls to scan |\n| `exactRepeatThreshold` | 2 | Consecutive identical calls before flagging |\n| `fuzzySimilarityThreshold` | 0.85 | Jaccard similarity threshold (0.0\u20131.0) |\n| `cycleLength` | 2 | Tools in a repeating cycle pattern |\n| `cycleRepetitions` | 2 | Times a cycle must repeat |\n| `cycleSimilarityThreshold` | 0.7 | Argument similarity for cycle confirmation |\n\n#### Thinking Loop Detection\n\n| Field | Default | Description |\n|-------|---------|-------------|\n| `thinkingWindow` | 3 | Recent thinking blocks to compare (post-hoc) |\n| `thinkingSimilarityThreshold` | 0.8 | N-gram similarity threshold (post-hoc) |\n| `thinkingMinLength` | 100 | Min chars to analyze (shorter blocks skipped) |\n\n#### Streaming Detection\n\n| Field | Default | Description |\n|-------|---------|-------------|\n| `consecutiveThreshold` | 4 | Consecutive similar lines to trigger |\n| `densityThreshold` | 0.75 | Repetition density to trigger |\n| `densityWindow` | 100 | Sliding window size for density |\n| `lineSimilarityThreshold` | 0.85 | N-gram threshold for near-identical lines |\n| `maxBufferSize` | 10240 | Chunk buffer cap in bytes |\n| `escalationTurns` | 2 | Loop detections per prompt before abort |\n\n#### Result Stagnation\n\n| Field | Default | Description |\n|-------|---------|-------------|\n| `resultStagnationThreshold` | 3 | Consecutive identical results before flagging |\n\n#### Escalation\n\n| Field | Default | Description |\n|-------|---------|-------------|\n| `hintAfter` | 1 | Detections before system prompt hint |\n| `blockAfter` | 2 | Detections before blocking |\n| `blockBeforeTerminate` | 3 | Blocked calls before termination |\n| `maxTurns` | null | Hard turn limit (null = unlimited) |\n\n## Architecture\n\n```\nindex.ts              Extension entry point, wires Pi events to trackers\n\u251c\u2500\u2500 tool-tracker.ts   Detects exact, fuzzy, and cycle patterns in tool calls\n\u251c\u2500\u2500 thinking-tracker.ts  Streaming + post-hoc thinking loop detection\n\u251c\u2500\u2500 result-tracker.ts   Detects identical results from the same tool\n\u251c\u2500\u2500 escalation.ts     Multi-level escalation (hint \u2192 block \u2192 terminate)\n\u251c\u2500\u2500 similarity.ts     Jaccard + n-gram similarity utilities\n\u2514\u2500\u2500 config.ts         Config schema, defaults, /loop-guard command\n```\n\n### Event Flow\n\n```\nsession_start  \u2192  reset all trackers\nagent_start    \u2192  reset thinking tracker (full)\nmessage_start  \u2192  reset thinking tracker (per-message)\nmessage_update \u2192  onChunk() / onThinkingEnd() (streaming detection)\ntool_call      \u2192  toolTracker.check() \u2192 escalate if loop found\ntool_result    \u2192  resultTracker.check() \u2192 escalate if stagnant\nmessage_end    \u2192  thinkingTracker.check() (post-hoc detection)\nturn_end       \u2192  max turns safety net\n```\n\n## Testing\n\n```bash\nnpm test\n```\n\n88 tests covering all detection modes, escalation paths, similarity algorithms, and edge cases.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "pi-coding-agent"
+  ],
+  "author": {
+    "name": "isr4el-silv4"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/isr4el-silv4/loop-guard#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isr4el-silv4/loop-guard.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://i.postimg.cc/W1r0m9vF/loop-guard.jpg"
+  },
+  "time": {
+    "created": "2026-06-10T17:48:16.317Z",
+    "modified": "2026-06-10T20:41:09.932Z",
+    "0.1.0": "2026-06-10T17:48:16.641Z",
+    "0.1.1": "2026-06-10T19:29:31.963Z",
+    "0.1.2": "2026-06-10T20:35:49.617Z",
+    "0.1.3": "2026-06-10T20:41:09.835Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 71,
+  "download_trend": []
+}

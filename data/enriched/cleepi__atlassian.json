@@ -1,0 +1,357 @@
+{
+  "name": "@cleepi/atlassian",
+  "latest_version": "0.4.1",
+  "description": "Cleevio taste layer over Atlassian's Rovo MCP server: skill + /spec-from-ticket prompt for the ticket \u2192 spec \u2192 implementation pipeline. Soft-aware of @cleepi/sdd.",
+  "readme": "# @cleepi/atlassian\n\nCleevio taste layer over [Atlassian's Rovo MCP server][rovo-mcp] for the\n**ticket \u2192 spec \u2192 implementation** pipeline. Soft-aware of\n[`@cleepi/sdd`](../sdd).\n\n## What's in the box\n\n- **Skill** (`skills/atlassian/SKILL.md`) \u2014 teaches the agent which\n  Jira/Confluence fields map to which spec sections, what to ignore\n  (status churn, bot comments, sprint metadata), and how to degrade\n  honestly when something's missing. Loaded automatically when the\n  conversation is ticket-shaped, or explicitly with `/skill:atlassian`.\n- **Prompt** \u2014 `/spec-from-ticket <KEY|URL>` fetches the ticket,\n  optionally pulls up to 3 linked Confluence pages, and hands off to\n  `/spec` when `@cleepi/sdd` is installed (or to a structured manual\n  printout when it isn't).\n- **MCP config snippet** (`mcp.example.json`) \u2014 paste into your\n  `.mcp.json` to wire Atlassian's remote MCP server into pi via\n  [`pi-mcp-adapter`][pi-mcp-adapter] with OAuth and a curated\n  allowlist covering reads (for ticket context) and the useful Jira\n  writes (create, edit, transition, comment). The pi-mcp-adapter\n  proxy stays enabled for exploring further upstream tools.\n\nThis package ships **no TypeScript tool code**. All HTTP, OAuth, and\nADF rendering live in Atlassian's MCP server and pi-mcp-adapter. See\n[ADR 0005](../../docs/adr/0005-mcp-adapter-over-native-atlassian-client.md)\nfor why.\n\n## Install\n\n```bash\n# 1. The MCP adapter (one-time, per machine)\npi install npm:pi-mcp-adapter\n\n# 2. This package\npi install git:github.com/cleevio/cleepi/packages/atlassian\n```\n\nYou'll usually want `@cleepi/sdd` alongside \u2014 that's what\n`/spec-from-ticket` hands off to:\n\n```bash\npi install git:github.com/cleevio/cleepi/packages/sdd\n```\n\nThere's no hard dependency. `/spec-from-ticket` works without sdd; it\njust degrades to a structured printout and suggests installing sdd.\n\n### Configure the MCP server\n\nCopy [`mcp.example.json`](./mcp.example.json) contents into your\n`.mcp.json` (project) or `~/.config/mcp/mcp.json` (user-global). If you\nalready have an `.mcp.json`, merge the `atlassian` entry into your\nexisting `mcpServers` block.\n\nThen restart pi.\n\n### First-run OAuth\n\nThe first time the agent calls a Jira or Confluence tool,\npi-mcp-adapter launches your browser. Sign in to Atlassian and consent\nto the requested read scopes. Tokens are stored by the adapter; you\nwon't be asked again until they expire.\n\n## Admin one-time setup (per Atlassian organisation)\n\nThis isn't your job as a Cleevian unless you're also a Cleevio\nAtlassian admin. Document for the admin:\n\n- In **Atlassian Administration \u2192 Rovo MCP server settings**, enable\n  the permission groups you want available through the package:\n  - **Required for the primary `/spec-from-ticket` workflow**\n    (read-only): `read_jira`, `search_jira`, `read_confluence`.\n  - **Required to use the bundled write tools** (`createJiraIssue`,\n    `editJiraIssue`, `transitionJiraIssue`, `addCommentToJiraIssue`):\n    `write_jira`.\n  - **Optional, only if Confluence writes are desired via the MCP\n    proxy** (not promoted by this package, available through\n    pi-mcp-adapter's `mcp` tool): `write_confluence`.\n- **The permission groups are the authoritative safety layer.** Per\n  [ADR 0006](../../docs/adr/0006-allow-writes-in-atlassian-v0.1.0.md),\n  this package does not duplicate the gate client-side via\n  `excludeTools`. If your organisation should not be able to write\n  Jira from pi, *do not enable* `write_jira` upstream.\n- The **first user** to authorize through MCP for the Cleevio site\n  must have access to both Jira *and* Confluence. This ensures the\n  Atlassian MCP app installs with the right scope footprint for\n  everyone else.\n- No OAuth app registration is needed. Atlassian's MCP server uses\n  OAuth Dynamic Client Registration.\n\nIf OAuth succeeds but tool calls fail with a scope error, the relevant\npermission group isn't enabled yet.\n\n## Usage\n\n```\n/spec-from-ticket PROJ-123\n/spec-from-ticket https://cleevio.atlassian.net/browse/PROJ-123\n```\n\nThe prompt:\n\n1. Fetches the Jira issue.\n2. Scans the description and top-level comments for linked Confluence\n   pages; fetches up to 3.\n3. Hands off to `/spec` (sdd installed) or prints a structured summary\n   (sdd absent).\n\n### Known limitations in v0.1.0\n\n- **Jira comments come back as ADF, not Markdown.** The description\n  field renders as Markdown when `responseContentFormat: \"markdown\"`,\n  but comment bodies are returned as ADF (Atlassian Document Format,\n  nested JSON). The agent reads ADF well enough for spec drafting,\n  but tooling that expects pure Markdown will need to walk the tree.\n  Verified live against `honem.atlassian.net`.\n- **Single-site assumption.** If your Atlassian account spans multiple\n  Cloud sites, the agent will call `getAccessibleAtlassianResources`\n  to pick one. Behavior is best-effort.\n- **Write tools are admin-gated upstream.** The bundled allowlist\n  promotes `createJiraIssue`, `editJiraIssue`, `transitionJiraIssue`,\n  `addCommentToJiraIssue` \u2014 but these are only callable if your org\n  admin has enabled the `write_jira` permission group in *Atlassian\n  Administration \u2192 Rovo MCP server*. If they're missing from\n  `mcp({server: \"atlassian\"})`, that's why.\n- **Confluence writes, worklogs, and Compass tools are reachable via\n  the proxy** (`mcp({tool: \"...\"})`) but not promoted via\n  `directTools`. Use deliberately.\n\n## Troubleshooting\n\n| Symptom | Likely cause |\n|---|---|\n| `mcp` tool not found | `pi-mcp-adapter` not installed. Run `pi install npm:pi-mcp-adapter`, restart pi. |\n| `atlassian` server not found by adapter | Snippet not merged into `.mcp.json`, or pi not restarted. |\n| OAuth opens browser then fails | Admin hasn't enabled `read_jira` / `read_confluence` permission groups. |\n| Tool call returns \"insufficient scope\" | Same as above. |\n| `/spec-from-ticket` says \"sdd not loaded\" | Install `@cleepi/sdd` or accept the manual printout path. |\n\n## Related\n\n- [SPEC.md](./SPEC.md) \u2014 what this package is and isn't.\n- [CHANGELOG.md](./CHANGELOG.md) \u2014 release history.\n- [Spec 0003 (repo)](../../docs/specs/0003-cleepi-atlassian-v0.1.0-mcp.md) \u2014 v0.1.0 design.\n- [ADR 0005 (repo)](../../docs/adr/0005-mcp-adapter-over-native-atlassian-client.md) \u2014 MCP over native rationale.\n\n[rovo-mcp]: https://support.atlassian.com/atlassian-rovo-mcp-server/docs/getting-started-with-the-atlassian-remote-mcp-server/\n[pi-mcp-adapter]: https://github.com/nicobailon/pi-mcp-adapter\n",
+  "keywords": [
+    "pi-package",
+    "cleepi",
+    "cleevio",
+    "atlassian",
+    "jira",
+    "confluence",
+    "mcp"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/honzanemecek/cleepi/tree/main/packages/atlassian#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/honzanemecek/cleepi.git",
+    "directory": "packages/atlassian"
+  },
+  "pi": {
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-01T11:53:14.955Z",
+    "modified": "2026-06-03T13:51:25.673Z",
+    "0.1.0": "2026-06-01T11:53:15.300Z",
+    "0.2.0": "2026-06-02T14:04:54.263Z",
+    "0.3.0": "2026-06-02T19:56:04.259Z",
+    "0.3.1": "2026-06-02T20:28:49.097Z",
+    "0.4.0": "2026-06-03T10:09:22.853Z",
+    "0.4.1": "2026-06-03T13:51:25.534Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 63,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 476
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 143
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 44
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 55
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 12
+    }
+  ]
+}

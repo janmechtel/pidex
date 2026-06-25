@@ -1,0 +1,358 @@
+{
+  "name": "@false00/cyber-news",
+  "latest_version": "1.1.4",
+  "description": "Interactive cybersecurity news briefing for the Pi coding agent with live multi-source headlines and deep-dive story prompts",
+  "readme": "# @false00/cyber-news\n\n[![npm version](https://img.shields.io/npm/v/@false00/cyber-news.svg)](https://www.npmjs.com/package/@false00/cyber-news)\n[![license](https://img.shields.io/npm/l/@false00/cyber-news.svg)](LICENSE)\n[![CI](https://github.com/false00/cyber-news/actions/workflows/ci.yml/badge.svg)](https://github.com/false00/cyber-news/actions/workflows/ci.yml)\n\nInteractive cybersecurity news briefing for the Pi coding agent.\n\n`@false00/cyber-news` adds a Pi-native header widget that pulls live headlines from 14 cybersecurity sources, lets you manage sources from the TUI, and can queue a deep-dive research prompt for any story you pick.\n\n| Resource | Link |\n|---|---|\n| npm | [`@false00/cyber-news`](https://www.npmjs.com/package/@false00/cyber-news) |\n| GitHub | [github.com/false00/cyber-news](https://github.com/false00/cyber-news) |\n| License | [MIT](LICENSE) |\n| Changelog | [CHANGELOG.md](CHANGELOG.md) |\n| Security policy | [SECURITY.md](SECURITY.md) |\n| Contributing guide | [CONTRIBUTING.md](CONTRIBUTING.md) |\n| Compatibility notes | [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) |\n\n## Why this package\n\nThis package is for Pi users who want a lightweight, always-available cybersecurity news surface inside the TUI without leaving their current session.\n\nWhat it does well:\n\n- **Live multi-source feed** \u2014 fetches enabled RSS and Atom feeds in parallel\n- **Readable Pi widget** \u2014 width-aware rendering that avoids the broken wrapping shown by earlier builds\n- **Interactive source management** \u2014 `/cyber_sources` opens a simple TUI source manager\n- **Deep-dive handoff** \u2014 `/cyber_menu` queues a focused research prompt for a selected headline\n- **Persistent source state** \u2014 enabled source choices persist across Pi sessions in `~/.config/cyber-news/sources.json`\n- **Ephemeral banner behavior** \u2014 the widget shows a short-lived headline banner, then disappears instead of lingering forever\n- **Pi-native packaging** \u2014 installable through npm as a normal Pi package\n\n## Design philosophy\n\nThis package is intentionally a **small, TUI-native news briefing extension** for Pi.\n\nThat means:\n\n- it focuses on concise headline discovery rather than becoming a full threat-intelligence platform\n- it favors predictable rendering over dense layouts that look impressive but break in real terminals\n- it keeps persistence lightweight with a single user-level JSON file for source state\n- it tries to be explicit about what is confirmed versus what Pi may infer during a deep-dive follow-up\n\n## Stability guarantees\n\nThis repository aims to provide a stable lightweight automation surface for Pi users.\n\nCurrent guarantees:\n\n- published command names are treated as stable once released\n- the widget remains width-aware and should not guess based on full terminal width\n- source state persists through the documented `~/.config/cyber-news/sources.json` file\n- the public behavior stays command-driven; the package does not currently expose custom Pi tools\n\n## Trust, safety, and operating model\n\nThis extension is intentionally narrow in scope.\n\nImportant expectations:\n\n- It **does not register custom LLM tools**; it only adds Pi commands, a widget, and lifecycle hooks\n- It **fetches public RSS/Atom feeds over HTTPS** from the configured news sources\n- It **does not require API keys or secrets**; it creates `~/.config/cyber-news/sources.json` only for source preferences\n- Choosing a story from `/cyber_menu` sends a hidden user-style message into Pi to trigger a research turn\n- Source enable/disable state persists globally in `~/.config/cyber-news/sources.json`; legacy Pi session entries are only used for migration/fallback\n- Deep-dive output quality depends on the current model and the available public reporting behind the selected headline\n\nIf you are evaluating the package for team or long-term use, review:\n\n- [AGENTS.md](AGENTS.md)\n- [CHANGELOG.md](CHANGELOG.md)\n- [SECURITY.md](SECURITY.md)\n- [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)\n- [tests/](tests/)\n\n## Install\n\nInstall into Pi as a package:\n\n```bash\npi install npm:@false00/cyber-news\n```\n\nUse it for a single run without changing your settings:\n\n```bash\npi -e npm:@false00/cyber-news\n```\n\nRun it from this repository during local development:\n\n```bash\npi -e .\n```\n\n## Quick start\n\nA typical flow:\n\n```text\n/cyber_sources\n/cyber_enable sophos\n/cyber_refresh\n/cyber_menu\n```\n\nYou can also ask Pi to help operate the extension in plain English, for example:\n\n```text\nEnable SANS ISC in the cyber-news extension\nRefresh the cyber-news widget\nOpen the cyber-news headline menu\nDisable Troy Hunt in the cyber-news extension\n```\n\n## Commands\n\n| Command | Description |\n|---|---|\n| `/cyber_menu` | Open a headline picker for deep-dive research on a story. |\n| `/cyber_refresh` | Refresh the widget with the latest headlines from enabled sources. |\n| `/cyber_sources` | Open the source manager in TUI, or print source status in non-TUI mode. |\n| `/cyber_enable <source name>` | Enable a source by exact or partial name. |\n| `/cyber_disable <source name>` | Disable a source by exact or partial name. |\n\n## Widget behavior\n\nThe widget:\n\n- renders above the editor\n- shows fresh, prioritized headlines from enabled sources\n- filters dated items older than 7 days when fresher headlines are available, so old high-severity stories do not stay pinned\n- disappears after 60 seconds unless you manually refresh it again\n- keeps layout bounded to the widget width instead of guessing based on the full terminal width\n- uses broader headline categorization so more stories get specific emoji instead of a generic fallback\n\n## Sources\n\nTop 3 are enabled by default. Source choices persist globally in `~/.config/cyber-news/sources.json`; the folder and JSON file are created automatically the first time the extension starts or sources are changed.\n\n| # | Source | Icon | Default |\n|---|---|---|---|\n| 1 | BleepingComputer | \ud83d\udcbb | \u2705 enabled |\n| 2 | The Hacker News | \ud83d\udcf0 | \u2705 enabled |\n| 3 | Krebs on Security | \ud83d\udd0d | \u2705 enabled |\n| 4 | WeLiveSecurity (ESET) | \ud83e\udda0 | \u274c disabled |\n| 5 | Graham Cluley | \ud83d\udc26 | \u274c disabled |\n| 6 | Securelist | \ud83d\udee1\ufe0f | \u274c disabled |\n| 7 | Darknet Diaries | \ud83c\udf99\ufe0f | \u274c disabled |\n| 8 | SANS ISC | \ud83c\udf10 | \u274c disabled |\n| 9 | Schneier on Security | \ud83d\udd10 | \u274c disabled |\n| 10 | Sophos Security Ops | \ud83d\udee1\ufe0f | \u274c disabled |\n| 11 | Sophos Threat Research | \ud83d\udd2c | \u274c disabled |\n| 12 | Troy Hunt | \ud83d\udd11 | \u274c disabled |\n| 13 | USOM Threats | \ud83c\udf0d | \u274c disabled |\n| 14 | USOM Announcements | \ud83d\udce2 | \u274c disabled |\n\n## Deep-dive workflow\n\nA typical flow looks like this:\n\n1. Start Pi with the package enabled\n2. Let the widget populate from the enabled sources\n3. Run `/cyber_menu`\n4. Pick a story\n5. Pi receives a hidden follow-up prompt asking for:\n   - Executive Summary\n   - Why It Matters\n   - Technical Details / likely TTPs\n   - Immediate Mitigations\n   - What to Monitor Next\n\n## Repository layout\n\n```text\ndist/                     Compiled extension output committed to the repo\nindex.ts                  TypeScript source\ntests/                    Non-network unit and package-structure tests\ndocs/COMPATIBILITY.md     Compatibility notes\nREADME.md                 User-facing package documentation\nAGENTS.md                 Maintainer and agent guidance\nCONTRIBUTING.md           Contributor workflow\nSECURITY.md               Vulnerability reporting policy\nCHANGELOG.md              Release history\n```\n\n## Compatibility\n\nCurrent project expectations:\n\n- Node.js `>=20`\n- Pi extension runtime support\n- outbound HTTPS access to the enabled news feeds\n\nSee [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for the maintained notes.\n\n## Development\n\n```bash\nnpm install\nnpm test\nnpm pack --dry-run\n```\n\nThe test suite covers:\n\n- feed title extraction behavior\n- source-query matching behavior\n- widget line-width formatting guarantees\n- package metadata and publish-file expectations\n\n## Publishing\n\n```bash\nnpm pack --dry-run\nnpm publish\n```\n\nVersioning and release discipline live in [AGENTS.md](AGENTS.md).\n\n## Support and feedback\n\nWhen reporting problems, include the package version, Pi version, command used, and source name if relevant.\n\n## See also\n\n- [AGENTS.md](AGENTS.md) \u2014 maintainer and agent guidance\n- [CHANGELOG.md](CHANGELOG.md) \u2014 release history\n- [CONTRIBUTING.md](CONTRIBUTING.md) \u2014 contributor workflow\n- [SECURITY.md](SECURITY.md) \u2014 security policy\n- [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) \u2014 compatibility notes\n\n## License\n\nMIT \u2014 see [LICENSE](LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "cybersecurity",
+    "news",
+    "rss",
+    "security",
+    "false00"
+  ],
+  "author": {
+    "name": "false00",
+    "email": "jortega@curl.red"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/false00/cyber-news#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/false00/cyber-news.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-06-09T17:30:25.757Z",
+    "modified": "2026-06-24T03:53:41.016Z",
+    "1.0.0": "2026-06-09T17:30:26.136Z",
+    "1.0.1": "2026-06-16T06:56:34.534Z",
+    "1.0.2": "2026-06-16T07:08:33.779Z",
+    "1.1.1": "2026-06-17T13:55:59.936Z",
+    "1.1.2": "2026-06-17T14:16:33.867Z",
+    "1.1.3": "2026-06-24T03:33:10.753Z",
+    "1.1.4": "2026-06-24T03:53:40.900Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 307,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 281
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 285
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 253
+    }
+  ]
+}

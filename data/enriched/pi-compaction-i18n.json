@@ -1,0 +1,42 @@
+{
+  "name": "pi-compaction-i18n",
+  "latest_version": "0.4.2",
+  "description": "Locale-aware compaction and branch summarization for pi",
+  "readme": "# pi-compaction-i18n\n\n> **Make pi's compaction and branch summaries speak your language.**\n\n`pi-compaction-i18n` is a Pi extension that overrides the default English-only `/compact` and `/tree` branch summaries with **fully localized output** in 11 languages \u2014 auto-detected from your system locale.\n\n## \u2728 What it does\n\n| Feature | Default pi | With this extension |\n|---|---|---|\n| `/compact` summary headings | `## Goal`, `## Progress`\u2026 (English) | `## \u76ee\u6807`, `## \u8fdb\u5c55`\u2026 (your language) |\n| `/tree` branch summary | English only | Localized |\n| Language detection | N/A | Auto from `PI_LOCALE` > `LC_ALL` > `LANG` |\n| Supported languages | English only | **11 languages** |\n\n## \ud83c\udf0d Supported languages\n\n| Locale | Language | Headings example |\n|---|---|---|\n| `zh-CN`, `zh_*` | \u7b80\u4f53\u4e2d\u6587 (Simplified Chinese) | `## \u76ee\u6807 / ## \u8fdb\u5c55 / ## \u4e0b\u4e00\u6b65` |\n| `zh-TW`, `zh-HK`, `zh-MO` | \u7e41\u9ad4\u4e2d\u6587 (Traditional Chinese) | `## \u76ee\u6a19 / ## \u9032\u5c55 / ## \u4e0b\u4e00\u6b65` |\n| `ja-*` | \u65e5\u672c\u8a9e (Japanese) | `## \u76ee\u6a19 / ## \u9032\u6357 / ## \u6b21\u306e\u30b9\u30c6\u30c3\u30d7` |\n| `ko-*` | \ud55c\uad6d\uc5b4 (Korean) | `## \ubaa9\ud45c / ## \uc9c4\ud589 \uc0c1\ud669 / ## \ub2e4\uc74c \ub2e8\uacc4` |\n| `de-*` | Deutsch (German) | `## Ziel / ## Fortschritt / ## N\u00e4chste Schritte` |\n| `fr-*` | Fran\u00e7ais (French) | `## Objectif / ## Progression / ## \u00c9tapes suivantes` |\n| `es-*` | Espa\u00f1ol (Spanish) | `## Objetivo / ## Progreso / ## Pr\u00f3ximos pasos` |\n| `pt-*` | Portugu\u00eas (Portuguese) | `## Objetivo / ## Progresso / ## Pr\u00f3ximos passos` |\n| `ru-*` | \u0420\u0443\u0441\u0441\u043a\u0438\u0439 (Russian) | `## \u0426\u0435\u043b\u044c / ## \u041f\u0440\u043e\u0433\u0440\u0435\u0441\u0441 / ## \u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0438\u0435 \u0448\u0430\u0433\u0438` |\n| `ar-*` | \u0627\u0644\u0639\u0631\u0628\u064a\u0629 (Arabic) | `## \u0627\u0644\u0647\u062f\u0641 / ## \u0627\u0644\u062a\u0642\u062f\u0645 / ## \u0627\u0644\u062e\u0637\u0648\u0627\u062a \u0627\u0644\u062a\u0627\u0644\u064a\u0629` |\n| other | English | `## Goal / ## Progress / ## Next Steps` |\n\n## \ud83d\udce6 Install\n\n```bash\npi install npm:pi-compaction-i18n\n```\n\n**Works out of the box.** No configuration needed \u2014 uses your current session's model by default.\n\n## \u2699\ufe0f Configuration\n\nConfig file is **auto-generated** on first use at `~/.pi/agent/pi-compaction-i18n.json`:\n\n```json\n{\n  \"locale\": \"auto\",\n  \"model\": \"\"\n}\n```\n\n| Field | Type | Default | Description |\n|---|---|---|---|\n| `locale` | string | `\"auto\"` | Force a locale (e.g. `\"zh-CN\"`). Set to `\"auto\"` for auto-detection from environment |\n| `model` | string | _(session model)_ | Override the LLM model for summaries (`provider/modelId`). Empty = use current session's active model |\n\n> **Note**: Compaction summaries benefit from strong models (they need deep context understanding). The default behavior of using your session model is recommended in most cases. Only override if you have a specific reason.\n\n## \ud83d\ude80 Usage\n\n### Check status\n\nAfter installing, open any Pi session and run:\n\n```\n/compaction-i18n-status\n```\n\nExample output on a Chinese system:\n\n```\npi-compaction-i18n: enabled\nDetected locale: zh-CN\nSummary language: zh-Hans\nInstruction: Write the entire summary in Simplified Chinese (\u7b80\u4f53\u4e2d\u6587). All headings and body content must be in Simplified Chinese.\n```\n\n### Trigger localized summaries\n\n- **Compaction**: Type `/compact` or let auto-compaction trigger naturally\n- **Branch summary**: Use `/tree` to navigate between branches with summarization enabled\n\nBoth will now produce fully localized markdown summaries.\n\n## \ud83d\udd27 How it works\n\n1. **Locale detection**: Reads `PI_LOCALE` \u2192 `LC_ALL` \u2192 `LANG` environment variables (e.g., `zh_CN.UTF-8` \u2192 `zh-CN`). Can be overridden via config.\n2. **Language mapping**: Maps locale code to one of 11 supported languages\n3. **Template generation**: Builds a compaction/branch-summary prompt with **localized section headings** and a **language instruction** prepended\n4. **Event interception**: Registers handlers for `session_before_compact` and `session_before_tree` events via Pi's extension API\n5. **LLM call**: Uses `complete()` from `@earendil-works/pi-ai` to generate the summary with the localized prompt. Uses session's active model by default, or a configured override.\n\n### Event precedence\n\nFor `session_before_compact` and `session_before_tree` events, **the last handler that returns a non-null result wins**. If you have multiple extensions that override compaction, ensure only one is active at a time.\n\n## \ud83e\uddea Development\n\n```bash\n# Clone & test\ngit clone https://github.com/ssdiwu/pi-compaction-i18n.git\ncd pi-compaction-i18n\nnpm install\nnpm test\n\n# Install locally into pi for testing\npi install .\n```\n\n## \ud83d\udd17 Related\n\n- [pi-autoname](https://github.com/ssdiwu/pi-autoname) \u2014 AI-powered session naming (sibling project)\n\n## \ud83d\udcc4 License\n\nMIT \u00a9 [ssdiwu](https://github.com/ssdiwu)\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "i18n",
+    "compaction",
+    "summary",
+    "locale",
+    "extension"
+  ],
+  "author": {
+    "name": "ssdiwu"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ssdiwu/pi-compaction-i18n#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ssdiwu/pi-compaction-i18n.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-24T12:24:25.112Z",
+    "modified": "2026-06-11T09:46:07.852Z",
+    "0.1.0": "2026-05-24T12:24:25.334Z",
+    "0.2.0": "2026-05-25T17:32:44.770Z",
+    "0.3.0": "2026-05-25T17:38:53.576Z",
+    "0.4.0": "2026-05-25T17:46:16.919Z",
+    "0.4.1": "2026-06-10T17:37:35.094Z",
+    "0.4.2": "2026-06-11T09:46:07.755Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": null,
+  "download_trend": []
+}

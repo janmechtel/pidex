@@ -1,0 +1,42 @@
+{
+  "name": "pi-killswitch",
+  "latest_version": "0.2.2",
+  "description": "Keep Pi runs controlled with automatic context-budget wrap-up and kill thresholds.",
+  "readme": "# \u2620\ufe0f Killswitch\n\nKillswitch keeps Pi runs controlled by enforcing context-budget wrap-up and kill thresholds.\n\nStart working. Stop before the context gets out of hand.\n\n<p align=\"center\">\n  <img src=\"banner.jpg\" alt=\"Killswitch preview: Wrap Up. Kill Run.\">\n</p>\n\n## What it does\n\n`pi-killswitch` watches Pi's current context usage and can request a wrap-up or kill the current run when configured thresholds are reached.\n\nIt can:\n\n- send a wrap-up steering message near the context budget\n- abort the current run at the kill threshold\n- auto-disable after a kill until the next safe rearm\n- persist per-session state across reloads\n\n## What it does not do\n\n`pi-killswitch` does not switch models, manage subagents, manage compaction, or route between premium and economy models.\n\n## Package contract\n\n`pi-killswitch` is a Pi package, not a generic Node library. Pi loads the TypeScript extension entry directly, and the package does not define Node library entry points.\n\n## Install\n\n```bash\npi install pi-killswitch\n```\n\nOpen the config UI:\n\n```text\n/killswitch\n```\n\nIf no config file exists, Killswitch uses safe defaults. To disable it globally, set `enabled` to `false` in `/killswitch`, or use `/killswitch off` to disable only the current session.\n\n## Commands\n\n```text\n/killswitch\n/killswitch status\n/killswitch wrap\n/wrap-up\n/killswitch on\n/killswitch off\n/killswitch help\n```\n\n- `/killswitch` opens the config UI.\n- `/killswitch status` shows current usage, active threshold, thresholds, mode, state, config path, and version.\n- `/killswitch wrap` requests an immediate wrap-up.\n- `/wrap-up` is a shortcut for requesting an immediate wrap-up.\n- `/killswitch on` enables Killswitch for the current session.\n- `/killswitch off` disables Killswitch for the current session.\n- `/killswitch help` shows command help.\n\n## Config\n\nConfig is stored in your Pi agent directory as `killswitch.json`.\n\nFields:\n\n- `enabled`: enable or disable globally\n- `mode`: `kill`, `wrap-up`, or `wrap-up-then-kill`\n- `autoDisarmAfterKill`: auto-disable after a kill before the next prompt\n- `autoRearmWhenSafe`: auto-rearm when usage falls back below the relevant threshold\n- `wrapUpThreshold`: threshold for wrap-up, required unless mode is `kill`\n- `killThreshold`: threshold for kill\n- `wrapUpMessage`: wrap-up message\n\nThresholds are explicit and use exactly one metric:\n\n```json\n{ \"metric\": \"percent\", \"value\": 75 }\n```\n\nor:\n\n```json\n{ \"metric\": \"tokens\", \"value\": 100000 }\n```\n\nIn `wrap-up-then-kill` mode, the wrap-up and kill thresholds must use the same metric, and wrap-up must be lower than kill.\n\nInvalid or unreadable config produces a visible error and falls back to safe defaults.\n\n## Wrap-up vs kill\n\nA wrap-up sends a user steering message asking the agent to finish gracefully, summarize current state, avoid more tools, and stop.\n\nA kill aborts the current agent run immediately, marks the session as killed, then auto-disables before the next prompt. It re-arms automatically when context falls back below the kill threshold.\n\nIn `wrap-up-then-kill` mode, Killswitch requests wrap-up when the wrap threshold is reached. If the kill threshold is already reached in the same context event, it kills immediately rather than waiting for another event.\n\n## Recommended defaults\n\nThe default mode is `wrap-up-then-kill`:\n\n```json\n{\n  \"enabled\": true,\n  \"mode\": \"wrap-up-then-kill\",\n  \"autoDisarmAfterKill\": true,\n  \"autoRearmWhenSafe\": true,\n  \"wrapUpThreshold\": { \"metric\": \"percent\", \"value\": 75 },\n  \"killThreshold\": { \"metric\": \"percent\", \"value\": 85 },\n  \"wrapUpMessage\": \"Context budget reached. Finish gracefully, summarize current state, do not call more tools, and stop.\"\n}\n```\n\n## Relationship to pi-downshift\n\n[`pi-downshift`](https://github.com/boadij/pi-downshift) switches to a cheaper model after a context threshold.\n\n[`pi-killswitch`](https://github.com/boadij/pi-killswitch) wraps up or kills the run after a context threshold.\n\nThey solve related but different problems.\n\n## Release\n\nLocal checks before publishing:\n\n```bash\nnpm ci\nnpm run check\nnpm pack --dry-run\n```\n\nRelease Please is configured for `pi-killswitch` and npm provenance publishing. See [RELEASING.md](./RELEASING.md).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "context-window",
+    "llm",
+    "token-limit",
+    "killswitch",
+    "cost-control"
+  ],
+  "author": {
+    "name": "Jeffrey Boadi"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/boadij/pi-killswitch#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/boadij/pi-killswitch.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/boadij/pi-killswitch/main/banner.jpg"
+  },
+  "time": {
+    "created": "2026-06-08T14:32:55.761Z",
+    "modified": "2026-06-08T15:27:27.789Z",
+    "0.1.0": "2026-06-08T14:32:56.084Z",
+    "0.2.0": "2026-06-08T14:36:00.501Z",
+    "0.2.1": "2026-06-08T14:56:41.937Z",
+    "0.2.2": "2026-06-08T15:27:27.537Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,30 @@
+{
+  "name": "pi-bg-run",
+  "latest_version": "1.1.4",
+  "description": "Background process management for Pi coding agent \u2014 spawn, monitor, and get notified when long-running commands complete.",
+  "readme": "# pi-bg-run\n\nBackground process management for [Pi](https://pi.dev) coding agent.\n\nSpawn long-running commands (ML training, builds, tests, experiments) and get automatically notified when they complete. Monitor jobs via widget, TUI panel, or tool calls.\n\n## Install\n\n```bash\npi install npm:pi-bg-run\n```\n\n## Tools\n\n### `bg_run`\n\nRun a shell command in the background.\n\n**Parameters:**\n- `command` (string, required) \u2014 Shell command to run\n- `label` (string, optional) \u2014 Human-readable label\n\nReturns job ID and log path. Agent is automatically notified on completion.\n\n### `bg_list`\n\nList all background jobs with status and elapsed time.\n\n### `bg_kill`\n\nTerminate a running job. Sends SIGTERM, escalates to SIGKILL after timeout.\n\n**Parameters:**\n- `job_id` (string, required) \u2014 Job ID to kill\n\n## Interactive Panel\n\nPress `/bg` in Pi TUI to open the interactive jobs panel:\n\n- `\u2191/\u2193` \u2014 Navigate jobs\n- `Enter` \u2014 View log tail\n- `k` \u2014 Kill (press twice to confirm)\n- `q` / `Esc` \u2014 Close panel\n\n## Widget\n\nThe inline widget shows a compact single-line status above the editor:\n\n```\n \u2736 bg: build 2m30s, train 5m12s \u00b7 3 done \u00b7 1 failed\n```\n\n- **Running**: Star spinner (\u2736) + job names with elapsed time\n- **Completed**: Collapsed summary (`N done \u00b7 N failed \u00b7 N killed`)\n- **Auto-dismiss**: Widget clears 10s after all jobs finish\n- **No stale data**: Only counts recent jobs within TTL window\n\n## Configuration\n\nAdd to `.pi/settings.json` or `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"bgRun\": {\n    \"maxConcurrentJobs\": 10,\n    \"completedTtlMs\": 604800000,\n    \"widgetRefreshMs\": 3000,\n    \"killTimeoutMs\": 10000\n  }\n}\n```\n\n| Setting | Default | Description |\n|---|---|---|\n| `maxConcurrentJobs` | 10 | Maximum simultaneous background jobs |\n| `completedTtlMs` | 604800000 (7 days) | How long completed job data is kept before garbage collection |\n| `widgetRefreshMs` | 3000 | Base widget refresh interval (auto-adapts to 500ms when jobs are running) |\n| `killTimeoutMs` | 10000 (10s) | Time before SIGKILL escalation after SIGTERM |\n\n## Notification Delivery Model\n\nWhen a background job completes, `pi-bg-run` uses `pi.sendMessage()` with `deliverAs: \"steer\"` and `triggerTurn: true`. This means:\n\n- **Agent idle**: Notification triggers a new agent turn immediately.\n- **Agent running a tool call**: Notification is queued and delivered **after the current tool call finishes**, before the next LLM call. There is no delay beyond the current tool call's remaining duration.\n- **Multiple jobs completing while agent is busy**: Each notification is delivered as a separate steer message, one after each tool call boundary.\n\n**Known limitation**: Notifications cannot interrupt a running tool call. If the agent is executing a long-running tool (e.g., a slow `bash` command), all pending notifications wait until that tool call completes. This is an architectural constraint of Pi's message delivery model, not `pi-bg-run` itself.\n\n## Storage\n\nJob data is stored under `/tmp/bg-run/` keyed by **project path hash** \u2014 all sessions working on the same project share the same directory:\n\n```\n/tmp/bg-run/<project-hash>/\n\u251c\u2500\u2500 jobs.json          # Job metadata (sidecar)\n\u251c\u2500\u2500 bg_abc12345.log    # Job output logs\n\u2514\u2500\u2500 bg_def67890.log\n```\n\n**Garbage collection** runs on session start:\n- Removes log files and their entries from `jobs.json` for completed jobs older than `completedTtlMs`\n- Removes empty project directories\n- Skips directories with running jobs\n\n## Architecture\n\n```\nsrc/\n  index.ts           # Extension entry point\n  types.ts           # Shared types\n  config.ts          # Settings loader\n  core/\n    job-manager.ts   # Orchestrator (DI)\n    process-spawner.ts\n    process-monitor.ts\n    process-killer.ts\n    persistence.ts   # Sidecar JSON + GC\n  ui/\n    notifier.ts      # Batched notifications (deliverAs: steer)\n    widget.ts        # Star spinner, single-line compact display\n    panel.ts         # TUI panel component\n  tools/\n    bg-run.ts\n    bg-list.ts\n    bg-kill.ts\n```\n\n## Development\n\n```bash\nnpm install\nnpm run build         # Vite production build\nnpm run deploy        # Build + deploy to ~/.pi/agent/extensions/\nnpm test              # Run all tests\nnpm run test:unit     # Unit tests only\nnpm run test:integration  # Integration tests only\nnpm run test:watch    # Watch mode\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-06-07T03:54:56.395Z",
+    "modified": "2026-06-07T04:15:55.117Z",
+    "1.1.0": "2026-06-07T03:54:56.646Z",
+    "1.1.1": "2026-06-07T04:00:27.797Z",
+    "1.1.2": "2026-06-07T04:04:13.061Z",
+    "1.1.3": "2026-06-07T04:07:51.525Z",
+    "1.1.4": "2026-06-07T04:15:54.987Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": null,
+  "download_trend": []
+}

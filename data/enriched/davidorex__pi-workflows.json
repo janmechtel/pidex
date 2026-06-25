@@ -1,0 +1,66 @@
+{
+  "name": "@davidorex/pi-workflows",
+  "latest_version": "0.31.0",
+  "description": "Workflow orchestration extension for Pi",
+  "readme": "# pi-workflows\n\nSchema-driven workflow orchestration for [Pi](https://github.com/badlogic/pi-mono).\n\nData flows through workflows as typed JSON, not strings. Each agent step declares an `output.schema` \u2014 the agent's output is validated against a JSON Schema before it's accepted into the pipeline. The expression engine passes typed fields between steps (`${{ steps.investigate.output.findings }}`), not raw text. Templates compose typed data into agent prompts, so agents receive structured context. The entire pipeline is schema-governed: **schema defines shape \u2192 agent produces to shape \u2192 validator enforces shape \u2192 next step consumes typed fields.**\n\nThe schemas in `schemas/` (investigation-findings, decomposition-specs, execution-results, etc.) are the typed contracts between workflow steps. They're not metadata \u2014 they're the enforcement boundary.\n\n## Install\n\n```bash\npi install npm:@davidorex/pi-context    # dependency\npi install npm:@davidorex/pi-workflows\n```\n\nOr install both at once: `pi install npm:@davidorex/pi-project-workflows`\n\n## Getting Started\n\n```\n/workflow init\n```\n\nCreates `.workflows/` for run state. Workflow YAML specs are discovered automatically from the package's bundled workflows \u2014 no setup needed to start running them.\n\n## What It Does\n\npi-workflows replaces ad-hoc agent chaining with composable, typed workflow orchestration. Workflows are YAML specs. Steps run as subprocesses (`pi --mode json`) with their own context windows. The main conversation is the control plane; workflows are subordinate.\n\nWorkflows consume project blocks as typed input via `readBlock()` \u2014 structured data, not raw files. When workflow agents write back to project blocks, pi-context's schema validation enforces the shape at write time. Block-write steps stamp a `workflow`-kind `DispatchContext` (`created_by: \"workflow/<step_id>\"`) so workflow-written items carry attestation; the post-step artifact write threads the same context (`workflow/<name>:<runId>:artifact:<artifact>`). The two extensions form a typed loop: project state \u2192 workflow input \u2192 agent output \u2192 validated project state.\n\n**Tools registered:**\n- `workflow-execute` \u2014 execute a named workflow with typed input (auto-resumes compatible incomplete runs unless `fresh: \"true\"`)\n- `workflow-resume` \u2014 explicitly resume an incomplete workflow run by name + runId; rejects on no-match or runId mismatch\n- `workflow-list`, `workflow-agents`, `workflow-validate`, `workflow-status`, `workflow-init` \u2014 discovery / inspection / scaffolding surfaces\n- `render-item-by-id`, `enforce-budget` \u2014 per-item rendering + budget enforcement helpers\n\n**Commands registered:**\n- `/workflow init` \u2014 scaffold `.workflows/` directory for run state\n- `/workflow list` \u2014 discover and select a workflow to run\n- `/workflow run <name> [--input '<json>']` \u2014 execute a workflow\n- `/workflow resume <name>` \u2014 resume an incomplete run from checkpoint\n- `/workflow validate [name]` \u2014 validate workflow specs (agents, schemas, step references, filters)\n\n**Keybindings:**\n- `Ctrl+H` \u2014 pause running workflow after current step\n- `Ctrl+J` \u2014 resume a paused/incomplete workflow\n\n## Workflow Spec Format\n\nWorkflows are `.workflow.yaml` files discovered from `.workflows/` (project), `~/.pi/agent/workflows/` (user), or the package's `workflows/` directory (builtin).\n\n```yaml\nname: my-workflow\ndescription: What this workflow does\ninput:\n  type: object\n  properties:\n    target: { type: string, description: \"What to analyze\" }\n  required: [target]\n\nsteps:\n  investigate:\n    agent: investigator\n    input: |\n      Investigate: ${{ input.target }}\n    output:\n      schema: investigation-findings\n\n  synthesize:\n    agent: synthesizer\n    input: |\n      Findings: ${{ steps.investigate.output | json }}\n\ncompletion:\n  message: |\n    Analysis complete. Key findings: ${{ steps.synthesize.output.summary }}\n```\n\n### Step Types\n\n| Type | Purpose |\n|------|---------|\n| `agent` | Dispatch to a Pi agent subprocess |\n| `command` | Run a shell command |\n| `transform` | Map/reshape data between steps |\n| `gate` | Conditional branching (`check` expression) |\n| `parallel` | Run nested steps concurrently |\n| `foreach` | Iterate over an array |\n| `loop` | Repeat steps with a condition |\n| `pause` | Halt execution for human review |\n\n### Expressions\n\n`${{ }}` expressions access step outputs, inputs, and apply filters:\n\n```yaml\n${{ input.target }}                    # workflow input\n${{ steps.investigate.output }}        # step output\n${{ steps.investigate.output | json }} # pipe through filter\n${{ steps.gather.output | length }}    # array length\n```\n\nAvailable filters: `length`, `keys`, `filter`, `json`, `upper`, `lower`, `trim`, `default`, `first`, `last`, `join`, `split`, `replace`, `includes`, `map`, `sum`, `min`, `max`, `sort`, `unique`, `flatten`, `zip`, `group_by`, `count_by`, `chunk`, `pick`, `omit`, `entries`, `from_entries`, `merge`, `values`, `not`, `and`, `or`.\n\n## Source Files\n\n| File | Purpose |\n|------|---------|\n| `src/index.ts` | Extension entry point \u2014 tool, command, keybinding registration |\n| `src/workflow-executor.ts` | Main orchestration loop |\n| `src/workflow-spec.ts` | YAML parsing, `STEP_TYPES` registry |\n| `src/workflow-sdk.ts` | SDK: vocabulary, discovery, introspection |\n| `src/workflow-discovery.ts` | Three-tier workflow discovery (project > user > builtin) |\n| `src/expression.ts` | `${{ }}` evaluator, `FILTER_NAMES` registry |\n| `src/template.ts` | Nunjucks template environment |\n| `src/dispatch.ts` | Agent subprocess spawn (`pi --mode json`) |\n| `src/dag.ts` | Dependency graph, execution plan from `${{ steps.X }}` refs |\n| `src/agent-spec.ts` | `.agent.yaml` parser |\n| `src/state.ts` | Atomic run state persistence |\n| `src/checkpoint.ts` | Checkpoint detection, resume validation |\n| `src/output.ts` | Step output persistence |\n| `src/completion.ts` | Post-workflow message resolution |\n| `src/tui.ts` | Terminal progress widget |\n| `src/types.ts` | Shared type definitions |\n| `src/format.ts` | Output formatting utilities |\n| `src/step-shared.ts` | Shared step execution utilities |\n| `src/workflows-dir.ts` | `WORKFLOWS_DIR` constant (`.workflows`) |\n| `src/step-*.ts` | Step type executors (one per type) |\n\n## Bundled Resources\n\n| Directory | Contents |\n|-----------|----------|\n| `agents/` | agent specs (`.agent.yaml`): investigator, decomposer, verifier, synthesizer, \u2026 \u2014 `ls agents/` or `availableAgents(cwd)` for the current set |\n| `schemas/` | output schemas (`.schema.json`): investigation-findings, execution-results, \u2026 \u2014 `ls schemas/` for the current set |\n| `workflows/` | workflow specs (`.workflow.yaml`): do-gap, create-phase, parallel-analysis, \u2026 \u2014 `ls workflows/` or `availableWorkflows(cwd)` for the current set |\n\nThe Nunjucks prompt templates no longer ship from this package. They were relocated into `@davidorex/pi-jit-agents`; consumers resolve the bundled template root via its `bundledTemplateDir()` export, and project (`.pi/templates/`) / user overrides still take precedence in the three-tier search.\n\n## SDK (`src/workflow-sdk.ts`)\n\nSingle queryable surface for the extension's capabilities:\n\n```typescript\n// Vocabulary (derived from code registries)\nstepTypes(): StepTypeDescriptor[]\nfilterNames(): string[]\nexpressionRoots(): readonly string[]\n\n// Discovery (derived from filesystem, three-tier search)\navailableAgents(cwd): AgentSpec[]\navailableWorkflows(cwd): WorkflowSpec[]\navailableTemplates(cwd): string[]\navailableSchemas(cwd): string[]\n\n// Introspection (derived from parsed spec)\nextractExpressions(spec): ExpressionRef[]\ndeclaredSteps(spec): string[]\ndeclaredAgentRefs(spec): string[]\ndeclaredSchemaRefs(spec): string[]\n```\n\n## Architecture\n\n- Each workflow step runs as a subprocess (`pi --mode json`) with its own context window\n- DAG planner infers parallelism from `${{ steps.X }}` references \u2014 no manual dependency declaration\n- Agent specs are `.agent.yaml` only. Compiled to prompts via Nunjucks at dispatch time.\n- State persisted atomically after each step (tmp + rename). State write failure is fatal.\n- Three-tier resource search: project (`.workflows/`, `.pi/agents/`, `.pi/templates/`) > user `~/.pi/agent/` > package builtin\n- `completion` field controls what message is sent back to the main conversation after a workflow finishes\n\n## For LLMs\n\nWhen working with this extension:\n\n- **Read `src/workflow-sdk.ts`** for the full vocabulary, discovery, and introspection API\n- **Read `src/workflow-spec.ts`** for the `STEP_TYPES` registry and YAML parsing rules\n- **Read `src/expression.ts`** for `FILTER_NAMES` and expression evaluation rules\n- **Read `src/types.ts`** for `WorkflowSpec`, `StepSpec`, `AgentSpec`, and `ExecutionState` type definitions\n- **Read `src/dag.ts`** to understand how execution order is inferred from expressions\n- **Read agent `.agent.yaml` files** in `agents/` to understand available agent capabilities\n- **Read workflow `.workflow.yaml` files** in `workflows/` for examples of workflow structure\n- Use the `workflow-execute` tool to execute workflows \u2014 it handles discovery, input validation, checkpoint detection (auto-resume), and result formatting. Use `workflow-resume` for explicit-only resume by runId (rejects on no-match).\n- The `/workflow list` command provides an interactive picker; `/workflow run <name>` runs directly\n\n## Tests\n\n```bash\nnpm test\n```\n\nRuns `tsx --test src/*.test.ts`. 500+ tests covering step types, expressions, DAG planning, state persistence, checkpoint/resume, and template compilation.\n\n## Development\n\nPart of the [`pi-project-workflows`](../../README.md) monorepo. All four packages (pi-context, pi-jit-agents, pi-workflows, pi-behavior-monitors) are versioned in lockstep (current version in each `package.json`).\n\n`npm run build` compiles TypeScript to `dist/` via `tsc`. The package ships `dist/`, not `src/` \u2014 the `pi.extensions` entry point is `./dist/index.js`.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "David Ryan"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/davidorex/pi-project-workflows/tree/main/packages/pi-workflows",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/davidorex/pi-project-workflows.git",
+    "directory": "packages/pi-workflows"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-03-16T10:32:35.114Z",
+    "modified": "2026-06-13T23:55:56.450Z",
+    "0.1.0": "2026-03-16T10:32:35.481Z",
+    "0.2.0": "2026-03-16T23:00:10.534Z",
+    "0.3.0": "2026-03-18T22:29:19.680Z",
+    "0.3.1": "2026-03-24T22:44:56.839Z",
+    "0.3.2": "2026-03-26T14:28:54.851Z",
+    "0.3.4": "2026-03-27T00:17:45.592Z",
+    "0.4.0": "2026-03-27T10:52:08.307Z",
+    "0.4.1": "2026-03-27T12:25:12.547Z",
+    "0.5.0": "2026-03-28T00:36:54.696Z",
+    "0.6.1": "2026-03-28T06:32:46.174Z",
+    "0.9.0": "2026-03-29T12:48:07.220Z",
+    "0.9.1": "2026-03-30T22:52:30.967Z",
+    "0.9.2": "2026-03-30T23:54:34.719Z",
+    "0.10.0": "2026-04-01T22:36:39.387Z",
+    "0.10.1": "2026-04-01T22:53:00.157Z",
+    "0.10.2": "2026-04-01T23:20:44.094Z",
+    "0.10.3": "2026-04-01T23:32:21.213Z",
+    "0.10.5": "2026-04-03T20:37:24.728Z",
+    "0.11.0": "2026-04-04T00:44:27.938Z",
+    "0.11.3": "2026-04-04T07:26:36.906Z",
+    "0.12.0": "2026-04-06T02:14:47.234Z",
+    "0.13.0": "2026-04-06T03:55:39.544Z",
+    "0.14.1": "2026-04-06T10:59:21.160Z",
+    "0.14.2": "2026-04-06T11:32:35.401Z",
+    "0.14.4": "2026-04-06T23:58:29.335Z",
+    "0.14.6": "2026-04-27T22:39:41.305Z",
+    "0.26.0": "2026-05-24T22:48:28.376Z",
+    "0.28.0": "2026-06-03T10:27:24.150Z",
+    "0.28.1": "2026-06-03T11:06:56.159Z",
+    "0.29.0": "2026-06-04T02:40:37.233Z",
+    "0.30.0": "2026-06-04T21:30:09.910Z",
+    "0.31.0": "2026-06-13T23:55:56.357Z"
+  },
+  "versions_count": 32,
+  "downloads_last_week": 93,
+  "download_trend": []
+}

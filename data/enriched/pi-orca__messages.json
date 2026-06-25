@@ -1,0 +1,51 @@
+{
+  "name": "@pi-orca/messages",
+  "latest_version": "0.0.5",
+  "description": "Inter-session messaging with inbox delivery",
+  "readme": "# pi-orca-messages\n\n**Inter-session messaging for Pi coding-agent sessions.**\n\nLicense: MIT\n\n## Overview\n\nThis extension lets multiple Pi sessions running against the same project deliver messages to each other. A \"primary\" session can ask a \"secondary\" session a question, an agent can broadcast a status update, and so on. Messages arrive in the recipient's chat as if the user had pasted them in \u2014 the recipient's LLM responds on its own turn without manual prompting.\n\n**Architecture in one screen:**\n\n- **Store / inbox split.** Senders write the message body once to `~/.pi/agent/sessions/<project-slug>/orca/messages/store/<yyyy>/<mm>/<dd>/msg-<uuid>.md` and create a small `.ref` pointer in each recipient's `inbox/<recipient-session-id>/`. The store is immutable; the inbox is the work queue.\n- **Registry.** Each running session registers itself in `<project-slug>/orca/registry.yaml` at `session_start` (and deregisters on shutdown), recording its UUID, optional human-friendly name, PID, and labels. Senders look recipients up here.\n- **Delivery into the LLM.** Two paths, both atomic (deliver + consume in one shot):\n  - **Idle push (`pi.sendUserMessage`)** \u2014 every `polling.idleIntervalSeconds` (default 30s) the extension peeks the inbox, and if the session is idle it renders all unread messages as a rich user prompt (sender name + UUID, sent-at, title, labels, body) and pushes them via `pi.sendUserMessage`. The agent responds as if the recipient typed a summary themselves.\n  - **Context-hook inject** \u2014 when a turn is already starting (user typed something, or idle-push deferred because the session was busy), the `context` event hook injects the same rich prompt into the outbound `event.messages` array.\n- Each path consumes only the refs it just delivered, so messages are never silently dropped.\n\nSee the [Pi Orca specification \u00a74](../../docs/spec-v0.3.0.md) for full details.\n\n## Tool\n\n```jsonc\n{\n  \"name\": \"message\",\n  \"parameters\": {\n    \"action\": \"send\",          // send | broadcast | read | list | register | sessions\n    \"to\": \"primary\",           // session UUID, name, or unique prefix of either\n    \"title\": \"Auth scan results\",\n    \"body\": \"Found 3 files...\",\n    \"labels\": { \"topic\": \"auth-refactor\" }\n  }\n}\n```\n\nThe `to` field is resolved through `resolveSession()` \u2014 exact UUID match wins, then exact name, then unique prefix on UUID, then unique prefix on name (case-insensitive). Ambiguous prefixes return an error listing the candidates.\n\n## Slash commands\n\n| Command | Description |\n|---|---|\n| `/messages` | Open the interactive overlay (inbox / detail / sessions / compose). |\n| `/messages send <session> \"<title>\" \"<body>\"` | Send to a UUID, name, or unique prefix. Quotes preserve multi-word arguments. |\n| `/messages broadcast \"<title>\" \"<body>\"` | Send to every registered session except yourself. |\n| `/messages read` | Consume your inbox manually (turns refs into a one-shot dump). |\n| `/messages list` | List all messages in the project store without consuming refs. |\n| `/messages sessions` | List currently-registered sessions, leading with each session's display name. |\n\nThe `<session>` argument may be a UUID, a `/name`-set display name, or a unique prefix of either. Quoted args (`\"\u2026\"` / `'\u2026'`) preserve whitespace; backslash escapes work inside quotes.\n\n## Naming sessions\n\nPi's built-in `/name <text>` slash command sets a display name on the current session. The messages extension records the name in the registry so other sessions can address you by name instead of UUID. Renames propagate immediately when you next interact with the messages extension (slash command, tool, or overlay) and within `polling.idleIntervalSeconds` otherwise.\n\n## Logging / observability\n\nThe extension emits `info`-level entries to `~/.pi/agent/orca/log.jsonl` for every meaningful lifecycle event:\n\n- `send: <from> \u2192 <to> \"<title>\" (<msg-id>)`\n- `broadcast: <from> \u2192 N recipient(s) \"<title>\" (<msg-id>)`\n- `idle-poll \u2192 sendUserMessage: N message(s) (<titles>)`\n- `idle-poll: N unread, session not idle \u2014 deferring to context hook`\n- `context-inject: N message(s) \u2192 <recipient> (<titles>)`\n\n`debug`-level entries (one per `.ref` written or consumed) are emitted when `logLevel: debug` is set in `config.yaml`. Tail the log file to follow the flow end-to-end across multiple sessions.\n\n## Configuration\n\n`~/.pi/agent/orca/config.yaml` (or `<project>/.pi/orca/config.yaml`):\n\n```yaml\npolling:\n  idleIntervalSeconds: 30   # how often the idle push checks the inbox\n```\n\n## Dependencies\n\n- `@pi-orca/core` \u2014 shared types, utilities, `bindSession()`, `tokenizeArgs()`, registry helpers.\n\n## License\n\nMIT License \u2014 see [LICENSE](../../LICENSE) for details.\n",
+  "keywords": [
+    "pi-package",
+    "pi-orca",
+    "pi-agent",
+    "pi-extension"
+  ],
+  "author": {
+    "name": "Bindu / Ba"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/binduwavell/pi-orca#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/binduwavell/pi-orca.git",
+    "directory": "packages/messages"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-04-13T22:23:50.256Z",
+    "modified": "2026-05-27T04:09:30.308Z",
+    "0.0.1": "2026-04-13T22:11:28.173Z",
+    "0.0.2-dev.20260413161640": "2026-04-13T22:16:47.210Z",
+    "0.0.2-dev.20260413162335": "2026-04-13T22:23:50.493Z",
+    "0.0.2-dev.20260414090345": "2026-04-14T15:03:52.092Z",
+    "0.0.2-dev.20260414091409": "2026-04-14T15:14:16.455Z",
+    "0.0.2-dev.20260414093420": "2026-04-14T15:34:26.672Z",
+    "0.0.2-dev.20260421080334": "2026-04-21T14:04:02.648Z",
+    "0.0.2-dev.20260422150519": "2026-04-22T21:06:45.500Z",
+    "0.0.2-dev.20260422214056": "2026-04-23T03:41:27.671Z",
+    "0.0.2-dev.20260517151352": "2026-05-17T21:15:02.928Z",
+    "0.0.2": "2026-05-17T21:16:31.758Z",
+    "0.1.0-dev.20260517151644": "2026-05-17T21:16:54.849Z",
+    "0.0.3-dev.20260517154318": "2026-05-17T21:43:38.175Z",
+    "0.0.3-dev.20260526215119": "2026-05-27T03:52:13.265Z",
+    "0.0.3": "2026-05-27T03:54:03.498Z",
+    "0.0.4": "2026-05-27T04:03:05.567Z",
+    "0.0.5": "2026-05-27T04:09:30.200Z"
+  },
+  "versions_count": 15,
+  "downloads_last_week": null,
+  "download_trend": []
+}

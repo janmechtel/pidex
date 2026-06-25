@@ -1,0 +1,351 @@
+{
+  "name": "@isr4el-silv4/pi-script-tools",
+  "latest_version": "0.1.3",
+  "description": "Pi extension that auto-discovers shell scripts and registers them as tools",
+  "readme": "# pi-script-tools\n\n![pi-script-tools](https://i.postimg.cc/tgBJFPYh/pi-script-tools.jpg)\n\nAuto-discovers `.sh` scripts and registers them as Pi tools, so the LLM can call them alongside built-in tools like `read`, `write`, and `bash`.\n\n## How It Works\n\nAt each session start, the extension scans two directories for `.sh` files:\n\n| Scope | Path |\n|-------|------|\n| **Global** | `~/.pi/agent/scripts/*.sh` |\n| **Project-local** | `./.pi/scripts/*.sh` |\n\nEach script is parsed for metadata in its comment header, then registered as a Pi tool via `pi.registerTool()`. Project-local scripts override global scripts if they share the same tool name.\n\n### Metadata Comments\n\nScripts declare their metadata with comment headers at the top:\n\n```bash\n#!/bin/bash\n# Name: gather_logs\n# Description: Retrieves recent system logs from journalctl or syslog fallback\n# Usage: gather_logs [entry_count]\n# Timeout: 60000\n\nentry_count=\"${1:-20}\"\njournalctl -n \"$entry_count\" --no-pager 2>/dev/null || tail -n \"$entry_count\" /var/log/syslog\n```\n\n| Comment | Purpose | Default if omitted |\n|---------|---------|-------------------|\n| `# Name: <name>` | Tool name base (`<name>_sh`) | Filename, hyphens \u2192 underscores, `_sh` appended |\n| `# Description: <text>` | Shown to the LLM | `(no description)` |\n| `# Usage: <text>` | Appended to description | Omitted |\n| `# Timeout: <ms>` | Max execution time | `30000` (30s) |\n\nThe `# Name:` value must match `^[a-z0-9_]+$` or the filename is used as fallback.\n\n### Tool Parameters\n\nEvery registered tool accepts a single optional parameter:\n\n```json\n{ \"args\": \"value1 value2\" }\n```\n\nSpace-separated values are passed to the script as `$1`, `$2`, etc. Scripts are executed via `execFile(\"bash\", [scriptPath, ...args], { cwd, timeout })` \u2014 no shell is spawned, so arguments cannot contain shell metacharacters.\n\n## Getting Started\n\n### 1. Install the extension\n\nPlace this directory (or a clone) under your Pi extensions folder:\n\n```\n~/.pi/agent/extensions/pi-script-tools/\n```\n\nRestart Pi to load the extension.\n\n### 2. Create your scripts\n\nDrop `.sh` files into either directory:\n\n**Global** (available in every project):\n```bash\nmkdir -p ~/.pi/agent/scripts\n```\n\n**Project-local** (overrides global, scoped to a project):\n```bash\nmkdir -p ./.pi/scripts\n```\n\n### 3. Write a script\n\nExample \u2014 `~/.pi/agent/scripts/check-disk.sh`:\n\n```bash\n#!/bin/bash\n# Name: check_disk\n# Description: Reports disk usage for the current project directory\n# Usage: check_disk [path]\n# Timeout: 15000\n\ntarget=\"${1:-.}\"\ndu -sh \"$target\" 2>/dev/null || echo \"Could not read disk usage for $target\"\n```\n\nThis registers as the tool `check_disk_sh`. The LLM can call it with:\n\n```json\n{ \"args\": \"/home/user/my-project\" }\n```\n\n### 4. Use in a persona\n\nScript tools appear in `pi.getAllTools()` automatically, so they show up in the persona wizard's tool selector alongside built-in tools. Select which script tools a persona is allowed to use during creation or editing.\n\n## Lifecycle\n\n- **`session_start`** \u2014 Scripts are discovered and tools are registered\n- **`/reload`** \u2014 Pi reloads the extension, re-scans directories, re-registers tools\n- **`session_shutdown`** \u2014 No cleanup needed; tools are unregistered when the extension tears down\n\n## Error Handling\n\n| Scenario | Behavior |\n|----------|----------|\n| Missing script directory | Silently skipped |\n| Unreadable `.sh` file | Skipped |\n| Invalid `# Name:` | Falls back to filename-derived name |\n| Invalid `# Timeout:` | Uses default `30000`ms |\n| Script exits with non-zero code | Returns stderr as the tool result |\n\n## Project Structure\n\n```\npi-script-tools/\n\u251c\u2500\u2500 index.ts              # Extension entry point\n\u251c\u2500\u2500 metadata.ts           # Comment-header parsing\n\u251c\u2500\u2500 discovery.ts          # Directory scanning & merge logic\n\u251c\u2500\u2500 scripts/              # Example scripts\n\u2502   \u2514\u2500\u2500 gather-logs.sh\n\u251c\u2500\u2500 test/                 # Test suite (30 tests)\n\u2502   \u251c\u2500\u2500 metadata.test.ts\n\u2502   \u251c\u2500\u2500 discovery.test.ts\n\u2502   \u2514\u2500\u2500 index.test.ts\n\u251c\u2500\u2500 package.json\n\u251c\u2500\u2500 tsconfig.json\n\u2514\u2500\u2500 jest.config.js\n```\n\n## Running Tests\n\n```bash\nnpm install\nnpm test\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "pi-coding-agent"
+  ],
+  "author": {
+    "name": "isr4el-silv4"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/isr4el-silv4/pi-script-tools#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isr4el-silv4/pi-script-tools.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://i.postimg.cc/tgBJFPYh/pi-script-tools.jpg"
+  },
+  "time": {
+    "created": "2026-06-10T17:48:16.318Z",
+    "modified": "2026-06-10T20:41:10.050Z",
+    "0.1.0": "2026-06-10T17:48:16.656Z",
+    "0.1.1": "2026-06-10T19:29:32.273Z",
+    "0.1.2": "2026-06-10T20:35:49.489Z",
+    "0.1.3": "2026-06-10T20:41:09.928Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 15,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 585
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 3
+    }
+  ]
+}

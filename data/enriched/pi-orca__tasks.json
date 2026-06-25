@@ -1,0 +1,364 @@
+{
+  "name": "@pi-orca/tasks",
+  "latest_version": "0.0.5",
+  "description": "File-backed task DAG with locking",
+  "readme": "# pi-orca-tasks\n\n**File-backed task DAG with locking, state machine, and interactive UI**\n\nVersion: 0.0.2-dev  \nLicense: MIT\n\n## Overview\n\nA complete task management extension for Pi, providing file-backed tasks with a directed acyclic graph (DAG) for dependency tracking, PID-based locking for concurrent safety, a full state machine with 9 transitions, and an interactive TUI overlay.\n\n## Features\n\n- **State machine** \u2014 9 transitions: create, claim, complete, fail, abandon, unclaim, retry, reopen, unlock\n- **DAG dependencies** \u2014 cycle detection, cascading blocked status, transitive dependent resolution\n- **PID-based locking** \u2014 dead-process detection with automatic unlock\n- **Notes with resumption** \u2014 append timestamped notes, resume context on re-claim\n- **Label filtering** \u2014 key-value labels with special values (`_unset`, `_empty`, `_blank`)\n- **Two-mode HUD widget** \u2014 compact (less) and expanded multi-column (more) views\n- **Idle polling** \u2014 checks for external task changes every 30s and refreshes the widget automatically\n- **Interactive overlay** \u2014 task browser with list, detail, and filter screens\n- **Keyboard shortcut** \u2014 `Alt+T` toggles HUD visibility\n\n## Tool Actions\n\n| Action | Description | Required Params |\n|--------|-------------|-----------------|\n| `create` | Create a new task | `title` |\n| `claim` | Claim a task for work (pending \u2192 in_progress) | `taskId` |\n| `complete` | Mark task complete (in_progress \u2192 completed) | `taskId` |\n| `fail` | Mark task failed with reason (in_progress \u2192 failed) | `taskId`, `note` |\n| `abandon` | Abandon task with reason (in_progress \u2192 abandoned) | `taskId`, `note` |\n| `unclaim` | Release claim (in_progress \u2192 pending) | `taskId` |\n| `retry` | Retry a failed task (failed \u2192 pending) | `taskId` |\n| `reopen` | Reopen an abandoned task (abandoned \u2192 pending) | `taskId` |\n| `unlock` | Force-release a stuck lock | `taskId` |\n| `update` | Update title, labels, or dependencies | `taskId` |\n| `note` | Append a note to a task | `taskId`, `note` |\n| `list` | List tasks with optional status/label filter | (optional: `status`, `labels`) |\n\n## Slash Commands\n\n| Command | Description |\n|---------|-------------|\n| `/tasks` | Open interactive task overlay |\n| `/tasks more` | Show expanded multi-column HUD widget |\n| `/tasks less` | Show compact 1-line HUD widget |\n| `/tasks list [status]` | List tasks, optionally filtered by status |\n| `/tasks create <title>` | Quick-create a task |\n| `/tasks stuck` | Scan for stuck tasks (dead locks) |\n| `/tasks unlock <id>` | Force-release a stuck task lock |\n| `/tasks deps <id>` | Show dependency graph for a task |\n| `/tasks validate [id]` | Validate task file integrity |\n\n## Widget Modes\n\n### Compact (`/tasks less`) \u2014 default\n\nSingle summary line with status counts for all states:\n\n```\n\ud83d\udccb Tasks 3/7 done | \u25c92 in-progress \u25cb1 pending \u27171 failed \u22981 blocked \u20141 abandoned   /tasks more\n```\n\n### Expanded (`/tasks more`)\n\nMulti-column task list with responsive layout. Adapts columns based on terminal width. Excludes abandoned tasks from the list (stats header still includes them).\n\n```\n\ud83d\udccb Tasks 3/7 done | \u25c92 in-progress \u25cb1 pending \u27171 failed\n  \u25c9 task-001 Implement auth...   \u25c9 task-003 Write API endp...   \u25cb task-004 Add rate limiti...\n  \u2717 task-005 Deploy to stag...   \u2298 task-006 Run integration...                      /tasks less\n```\n\n### Toggle\n\n`Alt+T` toggles the HUD on/off, preserving the current mode.\n\n### Idle Polling\n\nThe extension polls the task file every 30 seconds (configurable via `DEFAULT_CONFIG.polling.idleIntervalSeconds`) to detect changes made by other sessions or external processes. When changes are detected, the widget is automatically refreshed \u2014 including showing the widget if it was hidden and tasks now exist, or hiding it if all tasks were cleared.\n\n## Architecture\n\n```\nsrc/\n\u251c\u2500\u2500 index.ts          # Extension entry: tool, commands, shortcuts, lifecycle\n\u251c\u2500\u2500 tool.ts           # Tool action dispatcher (12 actions)\n\u251c\u2500\u2500 widget.ts         # HUD renderers (less/more modes)\n\u251c\u2500\u2500 overlay.ts        # Interactive overlay (list/detail/filter screens)\n\u251c\u2500\u2500 commands.ts       # Slash command implementations\n\u2514\u2500\u2500 engine/\n    \u251c\u2500\u2500 index.ts      # Engine barrel export\n    \u251c\u2500\u2500 crud.ts       # Create, read, update, list, delete\n    \u251c\u2500\u2500 state-machine.ts  # State transitions with validation\n    \u251c\u2500\u2500 dag.ts        # Dependency validation, cycle detection\n    \u251c\u2500\u2500 notes.ts      # Note append with timestamps\n    \u2514\u2500\u2500 locking.ts    # PID-based lock management (via @pi-orca/core)\n```\n\n## Test Coverage\n\n86+ tests across 6 test files:\n\n- `crud.test.ts` \u2014 CRUD operations, frontmatter parsing\n- `state-machine.test.ts` \u2014 All state transitions, error cases\n- `dag.test.ts` \u2014 Cycle detection, cascading, transitive deps\n- `locking.test.ts` \u2014 Lock/unlock, PID detection\n- `notes.test.ts` \u2014 Note append, timestamp, resumption\n- `integration.test.ts` \u2014 End-to-end tool dispatcher flows\n- `widget.test.ts` \u2014 HUD mode rendering, multi-column layout\n\n## Dependencies\n\n- `@pi-orca/core` \u2014 Shared types, utilities, filesystem helpers\n\n## License\n\nMIT License \u2014 see [LICENSE](../../LICENSE) for details.\n",
+  "keywords": [
+    "pi-package",
+    "pi-orca",
+    "pi-agent",
+    "pi-extension"
+  ],
+  "author": {
+    "name": "Bindu / Ba"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/binduwavell/pi-orca#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/binduwavell/pi-orca.git",
+    "directory": "packages/tasks"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-04-13T22:23:45.807Z",
+    "modified": "2026-05-27T04:09:29.102Z",
+    "0.0.1": "2026-04-13T22:11:25.979Z",
+    "0.0.2-dev.20260413161640": "2026-04-13T22:16:45.472Z",
+    "0.0.2-dev.20260413162335": "2026-04-13T22:23:46.085Z",
+    "0.0.2-dev.20260414090345": "2026-04-14T15:03:50.114Z",
+    "0.0.2-dev.20260414091409": "2026-04-14T15:14:14.701Z",
+    "0.0.2-dev.20260414093420": "2026-04-14T15:34:25.065Z",
+    "0.0.2-dev.20260421080334": "2026-04-21T14:04:00.084Z",
+    "0.0.2-dev.20260422150519": "2026-04-22T21:06:43.501Z",
+    "0.0.2-dev.20260422214056": "2026-04-23T03:41:26.088Z",
+    "0.0.2-dev.20260517151352": "2026-05-17T21:14:39.028Z",
+    "0.0.2": "2026-05-17T21:16:30.267Z",
+    "0.1.0-dev.20260517151644": "2026-05-17T21:16:53.288Z",
+    "0.0.3-dev.20260517154318": "2026-05-17T21:43:36.844Z",
+    "0.0.3-dev.20260526215119": "2026-05-27T03:51:55.441Z",
+    "0.0.3": "2026-05-27T03:54:02.146Z",
+    "0.0.4": "2026-05-27T04:03:03.859Z",
+    "0.0.5": "2026-05-27T04:09:28.976Z"
+  },
+  "versions_count": 15,
+  "downloads_last_week": 6,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 450
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 33
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 538
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 92
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

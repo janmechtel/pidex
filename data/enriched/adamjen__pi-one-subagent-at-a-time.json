@@ -1,0 +1,41 @@
+{
+  "name": "@adamjen/pi-one-subagent-at-a-time",
+  "latest_version": "0.1.2",
+  "description": "Enforces sequential subagent execution \u2014 prevents concurrent subagent spawns that cause model swapping overhead on single-GPU setups.",
+  "readme": "# @adamjen/pi-one-subagent-at-a-time\n\n**Enforces sequential subagent execution \u2014 prevents concurrent subagent spawns.**\n\n---\n\n## Why This Exists\n\nThis extension was born from a real hardware constraint.\n\nI'm running a **Qwen3.6-27B orchestrator** on an **RTX 3090** (24GB VRAM) using **llama-swap** for model swapping between agents. The orchestrator would naturally want to spawn multiple subagents simultaneously \u2014 but each subagent spawn triggers a model swap, which means:\n\n1. **Unload current model from VRAM**\n2. **Load new model into VRAM** (takes seconds per swap)\n3. **Reload full context** (adds more overhead)\n\nWith 3-4 agents spawning concurrently, this meant constant swapping \u2014 models loading and unloading in rapid succession. The time overhead was massive: what should take 10 seconds of actual work would take 60+ seconds just waiting for model swaps to complete.\n\nThe solution? **Force subagents to run one at a time.** No concurrent spawns, no model swapping chaos, no unnecessary context reloads. Just clean sequential execution.\n\nIf you're running local models on a single-GPU setup and experiencing similar slowdowns from agent spawning, this extension solves that problem.\n\n---\n\n## What It Does\n\nBlocks concurrent `subagent()` tool calls. When one subagent is already running, subsequent spawn attempts are blocked with a clear message until the first completes.\n\n**Before:** Orchestrator spawns 3 agents simultaneously \u2192 model swapping chaos \u2192 60+ second delays  \n**After:** Agents run sequentially \u2192 no swapping overhead \u2192 clean execution flow\n\n---\n\n## Install\n\n```bash\npi install npm:@adamjen/pi-one-subagent-at-a-time\n```\n\nOr try without installing:\n\n```bash\npi -e npm:@adamjen/pi-one-subagent-at-a-time\n```\n\nFor local development:\n\n```bash\npi install ~/projects/pi-one-subagent-at-a-time\n```\n\n---\n\n## How It Works\n\nThe extension hooks into three pi lifecycle events:\n\n1. **`session_start`** \u2014 Shows status indicator (\"\ud83d\udd12 agent-gate active\")\n2. **`tool_call`** \u2014 Intercepts `subagent` calls; blocks if one is already pending\n3. **`agent_end`** \u2014 Decrements the pending counter when an agent finishes\n\n```typescript\n// Simplified logic\nlet pending = 0;\n\npi.on(\"tool_call\", async (event, ctx) => {\n  if (event.toolName === \"subagent\") {\n    if (pending >= 1) {\n      return { block: true, reason: \"BLOCKED: subagent already running. Wait for steer-back.\" };\n    }\n    pending++;\n  }\n});\n\npi.on(\"agent_end\", async () => {\n  if (pending > 0) pending--;\n});\n```\n\n---\n\n## Target Audience\n\nThis extension is ideal for users who:\n\n- **Run local models** on single-GPU hardware (RTX 3090, 4090, etc.)\n- **Use model swapping** (llama-swap or similar) between agents\n- **Experience slowdowns** from concurrent agent spawns causing context reloads\n- **Want predictable sequential execution** rather than parallel chaos\n\nIf you have multiple GPUs or cloud models with no swap overhead, this extension is optional \u2014 but it still enforces cleaner execution patterns.\n\n---\n\n## Configuration\n\nNo configuration needed \u2014 works out of the box with a hard limit of **1 concurrent subagent**.\n\nThe status indicator shows in the pi TUI:\n- `\ud83d\udd12 agent-gate active` \u2014 extension loaded, no agents running\n- `\ud83d\udd12 1 running` \u2014 one subagent is currently executing\n\n---\n\n## Browse All Packages\n\n**[pi.dev/packages/@adamjen/pi-one-subagent-at-a-time?name=adamjen](https://pi.dev/packages/@adamjen/pi-one-subagent-at-a-time?name=adamjen)** \u2014 browse all my pi extensions.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "subagent",
+    "sequential",
+    "single-agent",
+    "local-models",
+    "rate-limiter"
+  ],
+  "author": {
+    "name": "Adam",
+    "email": "adamjen"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/adamjen/pi-one-subagent-at-a-time",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adamjen/pi-one-subagent-at-a-time.git"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/one-subagent-at-a-time.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/adamjen/pi-one-subagent-at-a-time/master/screenshot.png"
+  },
+  "time": {
+    "created": "2026-05-23T13:36:48.266Z",
+    "modified": "2026-05-23T14:36:23.282Z",
+    "0.1.0": "2026-05-23T13:36:48.625Z",
+    "0.1.1": "2026-05-23T13:43:43.057Z",
+    "0.1.2": "2026-05-23T14:36:23.179Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,40 @@
+{
+  "name": "pi-perplexity",
+  "latest_version": "0.2.4",
+  "description": "Perplexity web search for pi \u2014 uses your Pro/Max subscription, no API credits needed",
+  "readme": "# pi-perplexity\n\nA [pi](https://github.com/badlogic/pi-mono) extension that gives your coding agent real-time web search powered by your **Perplexity Pro or Max subscription**\n## Requirements\n\n- [pi](https://github.com/badlogic/pi-mono) coding agent with its bundled Node runtime (Node 18.14.1+ if running outside pi)\n- A **Perplexity Pro** or **Max** subscription\n- macOS (for zero-interaction auth), an interactive terminal (for email OTP), or a signed-in browser session cookie/token\n\n## Installation\n\n```bash\npi install npm:pi-perplexity\n```\n\nOr from GitHub:\n\n```bash\npi install github:ivanrvpereira/pi-perplexity\n```\n\n## Authentication\n\nRun login once:\n\n```text\n/perplexity-login\n```\n\nThis usually reuses an existing cached login, borrows the Perplexity macOS app login if available, or asks for your email OTP code.\n\nIf login fails with a Cloudflare \u201cJust a moment...\u201d page, use browser login instead:\n\n```text\n/perplexity-login --browser\n```\n\n### Browser login\n\nUse this on Linux/headless machines when direct OTP is blocked.\n\n1. Open `https://www.perplexity.ai` and sign in.\n2. Open browser DevTools \u2192 **Network**.\n3. Reload the page, or ask one Perplexity question.\n4. Right-click a `www.perplexity.ai` request, preferably `perplexity_ask`.\n5. Choose **Copy** \u2192 **Copy as cURL**.\n6. Paste the copied cURL command into the pi prompt.\n\nThe copied text must include cookies. A good copy contains one of `-b`, `--cookie`, or `Cookie:`, and should include `__Secure-next-auth.session-token`. If it does not, copy a different request.\n\nYou can also paste just the request `Cookie:` header, or just the `__Secure-next-auth.session-token` cookie value. Full cURL is recommended because it also includes Cloudflare cookies like `cf_clearance`.\n\nThe token is saved to `~/.config/pi-perplexity/auth.json` (mode `0600`) and reused across sessions. On auth failure, run `/perplexity-login --force` to clear and re-authenticate.\n\n### Environment variables\n\n| Variable | Description |\n|---|---|\n| `PI_AUTH_NO_BORROW=1` | Skip macOS desktop app extraction and go straight to email OTP |\n| `PI_PERPLEXITY_TOKEN` | Raw Perplexity session token/JWT/JWE copied from a browser or another machine |\n| `PI_PERPLEXITY_COOKIE` / `PI_PERPLEXITY_COOKIES` | Full Perplexity `Cookie` header copied from a signed-in browser |\n| `PI_PERPLEXITY_EMAIL` | Pre-fill the email prompt (useful for non-interactive setups) |\n| `PI_PERPLEXITY_OTP` | Pre-fill the OTP prompt |\n\n## Usage\n\nOnce installed, the agent automatically calls `perplexity_search` whenever it needs current information. You can also ask it directly:\n\n> \"Search Perplexity for the latest React 19 release notes\"\n\n### Tool parameters\n\n| Parameter | Type | Required | Description |\n|---|---|---|---|\n| `query` | string | \u2705 | The search query |\n| `recency` | string | \u2014 | Filter by age: `hour` \u00b7 `day` \u00b7 `week` \u00b7 `month` \u00b7 `year` |\n| `limit` | number | \u2014 | Max sources to include (1\u201350) |\n| `incognito` | boolean | \u2014 | Whether to hide the search from Perplexity history; defaults to `true` |\n\nModel selection is configured globally with `/perplexity-config` or `PI_PERPLEXITY_MODEL`; it is not exposed as a tool parameter, so agent-generated tool calls cannot accidentally override your configured model.\n\n### Output format\n\nThe tool returns structured text the agent can reason over:\n\n```\n## Answer\nReact 19 introduces Actions, use() hook, and improved Server Components...\n\n## Sources\n3 sources\n[1] React 19 Release Notes (1d ago)\n    https://react.dev/blog/2024/12/05/react-19\n    React 19 is now stable. This release includes Actions for async...\n\n[2] What's New in React 19 (3d ago)\n    https://vercel.com/blog/react-19\n    A deep dive into the new primitives landing in React 19...\n\n## Meta\nProvider: perplexity (oauth)\nModel: pplx_pro_upgraded\n```\n\nQueries default to `is_incognito: true`, but you can override that per call or via config.\n\n## How It Works\n\nThe extension calls Perplexity's internal SSE endpoint (`perplexity_ask`) using your subscription credentials obtained from the macOS app, email OTP, or a browser-imported session. Responses stream as incremental events that are merged into a final result. Network calls use the Node runtime already provided by pi; no extra runtime is required. Email OTP auth requires `Headers.getSetCookie()` support so auth cookies are exposed reliably.\n\n## Development\n\n```bash\nnpm install          # Install dev dependencies\nnpm test             # Run tests\nnpm run typecheck    # Type check\n```\n\nOptional live model-selection E2E test (requires cached auth from `/perplexity-login`):\n\n```bash\nPI_PERPLEXITY_E2E=1 npm test\nPI_PERPLEXITY_E2E=1 PI_PERPLEXITY_E2E_MODELS=pplx_pro_upgraded,gpt54 npm test\n```\n\n## License\n\nMIT \u2014 see [LICENSE](LICENSE) for details.\n\n---\n\n## Disclaimer\n\nThis project is intended for **educational and demonstration purposes only**. It reverse-engineers an undocumented internal endpoint and uses credentials borrowed from the Perplexity macOS desktop app. This likely violates Perplexity's Terms of Service. Use at your own risk \u2014 your account may be suspended. The author makes no warranties and accepts no liability for any consequences of its use.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension"
+  ],
+  "author": {
+    "name": "ivanrvpereira"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ivanrvpereira/pi-perplexity#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ivanrvpereira/pi-perplexity.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-23T12:31:01.128Z",
+    "modified": "2026-06-24T16:35:03.277Z",
+    "0.1.0": "2026-02-23T12:31:01.277Z",
+    "0.1.1": "2026-02-23T12:41:27.919Z",
+    "0.1.2": "2026-02-23T13:14:15.720Z",
+    "0.1.3": "2026-02-23T18:08:36.762Z",
+    "0.2.0": "2026-03-21T22:26:54.896Z",
+    "0.2.1": "2026-05-11T14:21:57.746Z",
+    "0.2.2": "2026-06-22T10:34:43.422Z",
+    "0.2.3": "2026-06-24T14:39:15.685Z",
+    "0.2.4": "2026-06-24T16:35:02.785Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": null,
+  "download_trend": []
+}

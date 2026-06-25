@@ -1,0 +1,35 @@
+{
+  "name": "pi-read-before-write",
+  "latest_version": "0.1.3",
+  "description": "Pi extension that blocks stale edit/write operations when files changed since the agent last read them.",
+  "readme": "# pi-read-before-write\n\nPi package that blocks stale `edit` and destructive existing-file `write` operations when files changed since the agent last read them.\n\n> Disclaimer: this is clanker slop. Use at your own risk.\n\n## Why\n\nThis adds Claude Code-style stale-file protection to Pi without patching Pi core. It reduces accidental clobbers when a file is edited externally, by another agent, or by a parallel workflow after the current agent last read it.\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:pi-read-before-write\n```\n\nFrom GitHub:\n\n```bash\npi install git:github.com/SteelDynamite/pi-read-before-write\n```\n\nFor project-local install:\n\n```bash\npi install -l npm:pi-read-before-write\n```\n\nFor local development/testing:\n\n```bash\nnpm install\nnpm run build\npi -e ./dist/index.js\n```\n\n## Behavior\n\n- Successful `read` calls record a SHA-256 fingerprint of the full file on disk.\n- `edit` is blocked unless the file was read in the current Pi session and is unchanged.\n- `write` to an existing file is blocked unless the file was read in the current Pi session and is unchanged.\n- `write` to a new file is allowed.\n- If a previously read file is deleted before `edit` or `write`, the operation is blocked.\n- Successful `edit`/`write` calls refresh the recorded fingerprint.\n- Fingerprints are held in a bounded LRU cache: 100 files or 1MB of fingerprint metadata, whichever is hit first.\n- Paths are resolved against Pi's current working directory, normalize Unicode spaces, strip a leading `@`, expand `~`, support `file://` URLs, and use `realpath()` when possible so symlink aliases share one fingerprint.\n\n## Block messages\n\nUnread file:\n\n```text\nBlocked stale write: file has not been read in this session. Read it before editing: path/to/file.ts\n```\n\nChanged file:\n\n```text\nBlocked stale write: file changed on disk since the last read. Read it again before editing: path/to/file.ts\n```\n\nDeleted file:\n\n```text\nBlocked stale write: file was deleted since the last read: path/to/file.ts\n```\n\n## Limitations\n\n1. It does not block file mutations through `bash`, external scripts, or other custom tools.\n2. It cannot fully close the small race between extension preflight and Pi's built-in write execution without core support.\n3. Fingerprints are in memory and are lost when Pi restarts; resumed sessions should re-read files before editing.\n4. Multiple Pi processes do not share fingerprint state.\n5. Large files are hashed in full.\n6. Fingerprints can be evicted from the bounded LRU cache; evicted files must be read again before editing.\n\n## Development\n\n```bash\nnpm install\nnpm run typecheck\nnpm test\nnpm run test:pack\nnpm run audit:release\nnpm run build\n```\n\nThe implementation lives in `src/index.ts`. The original design notes are in [docs/PLAN.md](docs/PLAN.md).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "read-before-write",
+    "stale-file-protection"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/SteelDynamite/pi-read-before-write#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SteelDynamite/pi-read-before-write.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-05-23T21:46:59.640Z",
+    "modified": "2026-05-23T22:34:45.269Z",
+    "0.1.1": "2026-05-23T21:46:59.963Z",
+    "0.1.2": "2026-05-23T22:22:06.258Z",
+    "0.1.3": "2026-05-23T22:34:45.156Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 12,
+  "download_trend": []
+}

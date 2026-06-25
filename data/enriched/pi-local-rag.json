@@ -1,0 +1,367 @@
+{
+  "name": "pi-local-rag",
+  "latest_version": "0.4.1",
+  "description": "Local hybrid RAG pipeline for the Pi coding agent. SQLite FTS5 + sqlite-vec, ONNX embeddings via Transformers.js, PDF/DOCX/HTML extraction (with OCR fallback), per-project storage, auto-injection. Zero cloud dependency.",
+  "readme": "# pi-local-rag\n\nLocal hybrid RAG pipeline for the [Pi coding agent](https://github.com/badlogic/pi-mono). Index your local files and search them with BM25 + vector similarity \u2014 **zero cloud dependency, works fully offline**.\n\n## Features\n\n- **Hybrid BM25 + vector search** \u2014 SQLite FTS5 for keyword scoring, [`sqlite-vec`](https://github.com/asg017/sqlite-vec) for 384-dim cosine NN, blended at retrieval time\n- **Local ONNX embeddings** \u2014 `Xenova/all-MiniLM-L6-v2` via Transformers.js (~23 MB model, runs fully offline after first download)\n- **Many file formats** \u2014 text, source code, Markdown, JSON, YAML, plus PDF (with optional OCR fallback for scanned docs), DOCX, HTML (auto-converted to Markdown)\n- **Per-project storage** \u2014 walks up from cwd looking for `.pi/rag/`; falls back to `~/.pi/rag/` global store\n- **Tracked paths + exclude patterns** \u2014 `/rag index <path>` remembers what to keep current; gitignore-style `/rag exclude` for `dist/`, `*.log`, etc.\n- **Auto-refresh** \u2014 stale index (>24 h) silently refreshed before the next agent turn; manual `/rag refresh` for on-demand incremental updates\n- **Auto-injection** \u2014 relevant chunks appended after the user prompt before every agent turn (KV-cache friendly)\n- **3 AI tools** \u2014 `rag_index`, `rag_query`, `rag_status` for the agent to call directly\n\n## Install\n\n```bash\npi install npm:pi-local-rag\n```\n\nOr via git:\n\n```bash\npi install git:github.com/vahidkowsari/pi-local-rag\n```\n\nOptional: install `pdftoppm` (poppler) + `tesseract` with `eng`/`jpn` traineddata to enable OCR fallback for image-only PDFs.\n\n```bash\n# macOS\nbrew install poppler tesseract tesseract-lang\n\n# Debian/Ubuntu\napt install poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-jpn\n```\n\nThe OCR fallback is silent when these tools aren't installed (logs one stderr hint on the first image-only PDF encountered).\n\n## Commands\n\n| Command | Description |\n|---|---|\n| `/rag index <path>` | Index a file or directory (chunks \u2192 embeds \u2192 stores); adds the path to tracked paths |\n| `/rag search <query>` | Hybrid BM25 + vector search over the index |\n| `/rag find <glob>` | List indexed files matching a glob (e.g. `*.ts`, `src/*`) |\n| `/rag status` | Show index stats, active config, tracked paths, exclude patterns, storage scope |\n| `/rag rebuild [--force]` | Re-walk tracked paths and re-embed all files. `--force` wipes the DB and bypasses the hash-cache check |\n| `/rag refresh` | Incremental refresh \u2014 only new/changed files (same code path as the 24 h auto-refresh) |\n| `/rag clear` | Wipe the entire index (tracked paths are preserved) |\n| `/rag exclude <pattern>` | Add a gitignore-style exclude pattern; `/rag exclude -<pattern>` to remove; no arg to list |\n| `/rag ext list \\| add <.ext> \\| remove <.ext> \\| reset` | Manage the indexable file-extension allowlist |\n| `/rag on` \\| `off` | Toggle auto-injection |\n| `/rag help` | Show all subcommands |\n\nTab-completion is available for every subcommand.\n\n## Example session\n\n```text\n$ /rag index ~/code/my-app\nFound 412 files to index\nIndexing  \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588  100%\nfile:    src/server/handlers/payments.ts\ndone:    412 embedded \u00b7 0 unchanged\n\u2705 Indexed 412 files (1,847 chunks) \u00b7 0 unchanged \u00b7 38.4s \u00b7 tracking 1 path(s) \u00b7 project store\n\n$ /rag status\n\ud83d\udd0d pi-local-rag\n\n  Files indexed:    412\n  Chunks:           1847\n  Vectors:          1847  (100% coverage)\n  Total tokens:     438,219\n  Embedding model:  Xenova/all-MiniLM-L6-v2\n  Last build:       2026-05-26T20:14:03.221Z\n  Storage:          /Users/you/code/my-app/.pi/rag (project)\n\n  RAG injection:    enabled  topK=5  threshold=0.1  alpha=0.4\n\n  File types:\n    .ts    231\n    .tsx   118\n    .md     34\n    .json   18\n    .yaml    7\n\n  Tracked paths:\n    /Users/you/code/my-app\n\n  Exclude patterns:\n    (none \u2014 add with /rag exclude <pattern>)\n\n$ /rag search \"stripe webhook signature verification\"\n\ud83d\udd0d 4 results for \"stripe webhook signature verification\"  hybrid BM25+vector\n\npayments.ts:142-187  score=0.92\n  export async function verifyStripeWebhook(req: Request) {\n    const sig = req.headers.get(\"stripe-signature\");\n    if (!sig) throw new Error(\"missing signature header\");\n\nwebhooks.md:1-23  score=0.71\n  # Webhook signing\n  All inbound webhooks are verified against the shared secret stored in\n  STRIPE_WEBHOOK_SECRET. Stripe signs each request with a t= timestamp...\n\n$ /rag exclude dist/\n\u2705 Added exclude: dist/ \u00b7 1 pattern(s) total. Run /rag rebuild to re-apply.\n\n$ /rag find *.html\n\ud83d\udd0d 12 indexed files matching \"*.html\"\nsrc/docs/install.html\nsrc/docs/quickstart.html\n...\n\n$ /rag rebuild\nScanning tracked paths...\nDiscovered 3 new files\nRebuilding 415 files...\nRebuilding  \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588  100%\nEmbedding   \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588  100%  1847/1847 chunks\n\u2705 Rebuilt: 3 re-indexed \u00b7 412 unchanged \u00b7 0 deleted \u00b7 1850 chunks \u00b7 14.2s\n```\n\n> Output above is approximate \u2014 actual colors, spacing, and widget layout depend on your terminal theme and the Pi agent's UI.\n\n## AI Tools\n\nThe extension registers three tools the agent can call directly:\n\n- **`rag_index`** \u2014 Index a path into the pipeline (also adds it to tracked paths)\n- **`rag_query`** \u2014 Hybrid BM25 + vector search; returns file paths + line numbers + previews + scores\n- **`rag_status`** \u2014 Index stats, RAG config, storage path + scope\n\n## How It Works\n\n1. **Index** \u2014 files are chunked (~50 lines each, broken at blank lines where possible), embedded with `Xenova/all-MiniLM-L6-v2` (384-dim), and stored in SQLite. PDF/DOCX go through `pdf-parse`/`mammoth`; HTML is converted to Markdown via `turndown`; scanned PDFs fall back to OCR (`pdftoppm` + `tesseract`) when the system tools are installed.\n2. **Search** \u2014 FTS5 `bm25()` + `sqlite-vec` cosine NN, normalized and blended: `alpha \u00d7 BM25 + (1-alpha) \u00d7 cosine` (default `alpha=0.4`). Filename matches on the first query term get a 1.5\u00d7 boost.\n3. **Auto-inject** \u2014 before every agent turn, the user's prompt is searched against the index and relevant chunks are appended after the prompt as a hidden `customType: \"rag\"` message (KV-cache friendly \u2014 the system prompt is unchanged across turns).\n4. **Auto-refresh** \u2014 if the index is older than 24 h, the `before_agent_start` hook re-walks tracked paths and re-indexes new/changed files in the background. Throttled to one stale check per hour.\n\n## Storage\n\nIndex data lives in `rag.db` (SQLite, WAL mode, with FTS5 + sqlite-vec extensions loaded). Three resolution rules:\n\n1. **`$PI_RAG_DIR`** \u2014 explicit override, wins over everything\n2. **Walk-up** from `process.cwd()` looking for an existing `.pi/rag/` directory (stopping before `$HOME`)\n3. **Global** fallback at `~/.pi/rag/`\n\n`/rag index <path>` creates a project store at the current cwd if no parent store is in scope. `/rag status` shows the resolved path and whether it's project-local or global.\n\nLegacy `~/.pi/lens/` directories are renamed to `~/.pi/rag/` on first run; legacy `index.json` files are migrated into `rag.db` and removed.\n\n## Configuration\n\nAuto-injection is on by default. Config lives in `<ragDir>/config.json`:\n\n| Setting | Default | Description |\n|---|---|---|\n| `ragEnabled` | `true` | Auto-inject context before each turn |\n| `ragTopK` | `5` | Max chunks to inject |\n| `ragScoreThreshold` | `0.1` | Min hybrid score to include |\n| `ragAlpha` | `0.4` | BM25/vector blend (0 = pure vector, 1 = pure BM25) |\n| `extraExtensions` | `[]` | Extra file extensions to index beyond the defaults |\n| `excludeExtensions` | `[]` | Default extensions to skip |\n| `trackedPaths` | `[]` | Absolute paths that `/rag rebuild`/`refresh` re-walk |\n| `excludePatterns` | `[]` | Gitignore-style patterns applied when walking tracked paths |\n\n## Testing\n\n```bash\nnpm test                          # full suite (downloads ~23 MB model on first run)\nSKIP_EMBEDDING_TESTS=1 npm test   # skip the real-ONNX semantic tests\n```\n\nOCR end-to-end test is skipped when `tesseract` isn't installed.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "pi-coding-agent",
+    "rag",
+    "search",
+    "bm25",
+    "vector",
+    "embeddings",
+    "hybrid-search",
+    "index",
+    "local",
+    "offline",
+    "transformers",
+    "sqlite",
+    "fts5",
+    "sqlite-vec",
+    "pdf",
+    "docx",
+    "ocr"
+  ],
+  "author": {
+    "name": "kowsari"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/vahidkowsari/pi-local-rag#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vahidkowsari/pi-local-rag.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-05T16:18:32.358Z",
+    "modified": "2026-05-27T17:22:52.446Z",
+    "0.1.0": "2026-04-05T16:18:32.585Z",
+    "0.2.0": "2026-04-05T18:13:34.754Z",
+    "0.3.0": "2026-04-07T19:44:19.053Z",
+    "0.4.0": "2026-05-27T06:41:20.421Z",
+    "0.4.1": "2026-05-27T17:22:52.350Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 64,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 325
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 64
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 25
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 42
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 26
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 41
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 309
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 39
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 61
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 69
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 5
+    }
+  ]
+}

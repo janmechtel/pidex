@@ -1,0 +1,354 @@
+{
+  "name": "@milespossing/pi-copilot-discovery",
+  "latest_version": "0.3.0",
+  "description": "Dynamic GitHub Copilot model discovery for pi \u2014 replaces pi-ai's static catalog with the live /models list from your Copilot tenant.",
+  "readme": "# pi-copilot-discovery\n\nA [pi](https://github.com/earendil-works/pi) extension that replaces pi's\nbuilt-in `github-copilot` provider with one that discovers your Copilot\ntenant's full model catalog at runtime instead of using pi-ai's bundled\nstatic list.\n\n## Why\n\npi-ai ships a hand-curated `models.generated.js` listing the GitHub Copilot\nmodels pi knows about. That list lags real Copilot tenants in two ways:\n\n- **Preview / tenant-private models are invisible.** Internal model families,\n  early-access SKUs, and anything your enterprise has been allow-listed for\n  never show up in `/model`.\n- **New public models need a pi-ai release.** When Copilot exposes a new\n  model id, pi can't talk to it until pi-ai cuts a release that adds it.\n\nThis extension solves both by calling Copilot's own `/models` endpoint on\nstartup and registering every chat-capable model the signed-in account is\nentitled to. Routing to the right pi-ai streamer (`anthropic-messages`,\n`openai-responses`, `openai-completions`) is derived from each model's\nfamily.\n\n## What it does\n\n- **Replaces the built-in `github-copilot` provider.** Same provider name, so\n  existing credentials, sessions, and `/login github-copilot` workflows keep\n  working. `pi --list-models` and `/model` simply show a larger, more\n  accurate catalog.\n- **Live discovery on start, login, and command.** Fetches `/models` once on\n  extension load (async), once after successful `/login github-copilot`, and\n  on demand via `/copilot-refresh`.\n- **Re-injects Copilot dynamic headers.** pi-ai's built-in streamers add\n  `X-Initiator`, `Openai-Intent`, and `Copilot-Vision-Request` only when\n  the built-in handler is the one running; this extension installs its own\n  `streamSimple` wrapper that re-adds them, preserving agent-vs-user quota\n  accounting and vision support.\n- **Enables tenant policies post-login.** Runs\n  `POST /models/<id>/policy {state:\"enabled\"}` against *every* discovered\n  model after `/login github-copilot`, so preview-tier models accept requests\n  on first use. (pi-ai's built-in flow only enables its hardcoded list.)\n- **Supports GitHub Enterprise.** The login flow prompts for an enterprise\n  domain; `enterpriseUrl` is preserved across pi restarts via\n  `OAuthCredentials`'s open-ended index signature.\n\nThe personal `github-copilot` credentials, sessions, and behavior stay\nintact \u2014 this is a drop-in upgrade of the provider, not a parallel one.\n\n## Install\n\n### As a pi package (recommended once published)\n\n```bash\npi install npm:@milespossing/pi-copilot-discovery\n```\n\nOr try it for one session without installing:\n\n```bash\npi -e npm:@milespossing/pi-copilot-discovery\n```\n\n### Directly from git\n\n```bash\npi install git:github.com/milespossing/pi-copilot-discovery\npi -e git:github.com/milespossing/pi-copilot-discovery\n```\n\n### From a local checkout\n\n```bash\ngit clone https://github.com/milespossing/pi-copilot-discovery ~/src/pi-copilot-discovery\nln -s ~/src/pi-copilot-discovery ~/.pi/agent/extensions/copilot-discovery\n```\n\nEither form auto-discovers as a global pi extension. Restart pi (or run\n`/reload`) and the live model list takes effect.\n\n### After installing\n\n- If you already have a `github-copilot` entry in `~/.pi/agent/auth.json`, no\n  action needed \u2014 the existing token is reused.\n- Otherwise: `/login github-copilot`. The flow prompts for an enterprise\n  host (leave blank for `github.com`).\n\n## Commands\n\n| Command                         | What it does                                              |\n| ------------------------------- | --------------------------------------------------------- |\n| `/login github-copilot`         | Device-code login + enable policies on all live models    |\n| `/copilot-refresh`              | Re-fetch the `/models` catalog without restarting pi      |\n| `/copilot-discovery-refresh`    | Alias of `/copilot-refresh` (back-compat)                 |\n| `/logout github-copilot`        | (Built-in) Clear stored credentials                       |\n\n## How it works\n\n```\npi starts\n  \u2514\u2500 extension factory runs\n       \u251c\u2500 register provider override immediately (without `models`)\n       \u2502    \u2514\u2500 keeps pi's built-in static github-copilot catalog usable\n       \u2514\u2500 async startup discovery\n            \u251c\u2500 read ~/.pi/agent/auth.json[\"github-copilot\"]\n            \u251c\u2500 if credentials present: GET <proxy>/models \u2192 ProviderModelConfig[]\n            \u2514\u2500 pi.registerProvider(\"github-copilot\", { models, oauth, streamSimple, ... })\n\n/login github-copilot\n  \u2514\u2500 oauth.login mints fresh creds, enables model policies, then triggers one\n     model discovery pass so /model updates immediately\n\n/copilot-refresh\n  \u2514\u2500 one manual re-fetch of /models\n\nper request\n  \u2514\u2500 pi resolves apiKey via oauth.getApiKey(creds)\n       \u2514\u2500 pi auth-storage owns token refresh + persistence\n```\n\n### Family \u2192 API routing\n\n| Model family pattern            | pi-ai api            | Reasoning |\n| ------------------------------- | -------------------- | --------- |\n| `claude-*` (3.5+, 4.x, 5.x)     | `anthropic-messages` | yes       |\n| `claude-2.x`, `claude-3` (3.0\u20133.4) | `anthropic-messages` | no    |\n| `gpt-5*`, `o1`, `o3`            | `openai-responses`   | yes       |\n| `gpt-4*`, `gemini-*`, `grok-*`, other | `openai-completions` | no  |\n\nHeuristics live in `families.ts` and are intentionally conservative \u2014 when\nuncertain we choose an `api` the model is *usable* under even if not optimal.\n\n## Troubleshooting\n\n| Symptom | Likely cause | Fix |\n|---------|--------------|-----|\n| `/model` shows no Copilot entries before login | No credentials yet. | Run `/login github-copilot`. |\n| `/model` empty *after* login on a fresh pi start | Startup discovery failed (network/auth/tenant outage) before the live catalog could load. | Run `/copilot-refresh`; if that also fails, re-run `/login github-copilot`. |\n| Some model returns 403 the first time you use it | Tenant policy was `\"unconfigured\"` and post-login policy enable didn't succeed. | Run `/copilot-refresh` (or re-run `/login github-copilot`). |\n| Editor-Version / User-Agent rejected by the work proxy | pi-ai bumped its hardcoded Copilot client strings. | Update `COPILOT_HEADERS` in `models.ts` and `index.ts` to the new values. |\n| A new family is misrouted to `openai-completions` | Default fallback. | Open an issue with the model id and tenant `capabilities.family`, or send a PR refining `families.ts`. |\n\n## Compatibility\n\n- pi-coding-agent \u2265 0.78.0 (uses the async extension factory, per-model\n  `api` override, OAuth `ProviderConfig`, and the `streamSimple` escape\n  hatch).\n- pi-ai \u2265 0.78.0 (uses `loginGitHubCopilot`, `refreshGitHubCopilotToken`,\n  `getGitHubCopilotBaseUrl`, `normalizeDomain`, and the `streamSimple*`\n  family).\n- Node.js \u2265 22.19.0 (matches pi's `engines` requirement).\n\n## Publishing\n\n```bash\nnpm version patch\ngit push origin main --follow-tags\n```\n\nPushing a `v*.*.*` tag triggers the npm publish workflow, which verifies the\ntag matches `package.json` and publishes the package to npm.\n\n## Layout\n\n```\n.\n\u251c\u2500\u2500 package.json     pi extension manifest, no runtime npm deps\n\u251c\u2500\u2500 src/\n\u2502   \u251c\u2500\u2500 index.ts     async factory: registerProvider + /command\n\u2502   \u251c\u2500\u2500 oauth.ts     wraps pi-ai loginGitHubCopilot/refresh; enables policies\n\u2502   \u251c\u2500\u2500 models.ts    fetch /models, build ProviderModelConfig[]\n\u2502   \u251c\u2500\u2500 families.ts  pure: family/id \u2192 { api, reasoning, thinkingLevelMap, compat }\n\u2502   \u251c\u2500\u2500 stream.ts    streamSimple wrapper: inject headers, dispatch\n\u2502   \u2514\u2500\u2500 headers.ts   local re-impl of pi-ai's Copilot dynamic headers\n\u251c\u2500\u2500 docs/\n\u2502   \u2514\u2500\u2500 PLAN.md      original design / build plan\n\u251c\u2500\u2500 AGENTS.md        contributor guide for AI agents\n\u251c\u2500\u2500 README.md\n\u2514\u2500\u2500 LICENSE\n```\n\n## License\n\n[MIT](./LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "pi-coding-agent",
+    "github-copilot",
+    "copilot",
+    "llm",
+    "ai"
+  ],
+  "author": {
+    "name": "Miles Possing"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/milespossing/pi-copilot-discovery#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/milespossing/pi-copilot-discovery.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-16T14:26:44.878Z",
+    "modified": "2026-06-16T17:43:09.080Z",
+    "0.1.0": "2026-06-16T14:26:45.160Z",
+    "0.2.0": "2026-06-16T15:37:09.653Z",
+    "0.2.1": "2026-06-16T16:19:55.457Z",
+    "0.3.0": "2026-06-16T17:43:08.834Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 53,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 483
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 60
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 9
+    }
+  ]
+}

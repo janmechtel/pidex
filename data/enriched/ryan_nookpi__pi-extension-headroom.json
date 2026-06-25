@@ -1,0 +1,32 @@
+{
+  "name": "@ryan_nookpi/pi-extension-headroom",
+  "latest_version": "0.1.2",
+  "description": "Headroom token compression for pi \u2014 compress large tool results via a local Headroom proxy to reclaim context window.",
+  "readme": "# @ryan_nookpi/pi-extension-headroom\n\nThis extension reclaims context window in pi by compressing large tool results through a [Headroom](https://github.com/headroom-ai/headroom) proxy before each LLM call.\n\nHeadroom runs locally, compresses only oversized `toolResult` payloads, and leaves your prompts, assistant turns, and tool-call metadata untouched. Compression is applied only when the proxy is online and the change passes strict alignment guards, so it never silently rewrites your conversation.\n\n## Install\n\n```bash\npi install npm:@ryan_nookpi/pi-extension-headroom\n```\n\nYou also need the Headroom proxy available on your machine:\n\n```bash\npip install \"headroom-ai[proxy]\"\n```\n\nBy default the extension auto-starts a local token-mode proxy (`headroom proxy --mode token --no-cache`) on `http://127.0.0.1:8788` and leaves it running after pi exits.\n\n## How it works\n\n- Listens on the `context` event fired before each LLM call.\n- Skips entirely until context usage reaches the configured token threshold.\n- Sends an OpenAI-shaped copy of the conversation to the proxy's `/v1/compress` endpoint.\n- Applies the result only to large `toolResult` messages, preserving pi metadata (`toolName`, `details`, tool-call ids, images).\n- Rejects any response that changes message count, roles, tool-call ids, or non-candidate content.\n\n## Privacy\n\nCompression sends conversation context to the proxy, so remote URLs are blocked by default. Only `localhost`/`127.0.0.1`/`::1` are allowed unless you explicitly set `PI_HEADROOM_ALLOW_REMOTE=1` for a proxy you trust.\n\n## Commands\n\n- `/headroom` \u2014 show current status and session stats.\n- `/headroom on` \u2014 enable compression and ensure the proxy is running.\n- `/headroom off` \u2014 disable compression for this session (the proxy keeps running).\n- `/headroom health` \u2014 check / start the proxy and report whether it is online.\n- `/headroom stats` \u2014 print the proxy's own `/stats` output.\n- `/headroom-health` \u2014 shortcut for `/headroom health`.\n\nThe footer shows a compact status (`\u2713 Headroom -42% (12,345 saved)`) once compression is applied.\n\n## Configuration\n\nSettings are read at startup from `~/.pi/agent/headroom/settings.json`. Values in this file override environment variables; environment variables remain supported as fallbacks.\n\nExample:\n\n```json\n{\n  \"minContextTokens\": 10000,\n  \"minMessageChars\": 1000\n}\n```\n\n| Setting key | Env fallback | Default | Description |\n| --- | --- | --- | --- |\n| `enabled` | `PI_HEADROOM_ENABLED` | `true` | Enable compression on start. |\n| `baseUrl` (`url` also accepted) | `PI_HEADROOM_URL` (`HEADROOM_URL` / `HEADROOM_BASE_URL` also accepted) | `http://127.0.0.1:8788` | Proxy base URL. |\n| `allowRemote` | `PI_HEADROOM_ALLOW_REMOTE` | `false` | Allow non-local proxy URLs. |\n| `autoStart` | `PI_HEADROOM_AUTO_START` | `true` | Auto-start a local persistent proxy when offline. |\n| `command` | `PI_HEADROOM_COMMAND` | `headroom` | Command used to launch the proxy. |\n| `minContextTokens` | `PI_HEADROOM_MIN_CONTEXT_TOKENS` | `20000` | Skip compression below this context token count. |\n| `minMessageChars` | `PI_HEADROOM_MIN_MESSAGE_CHARS` | `2000` | Only compress tool results at or above this size. |\n| `timeoutMs` | `PI_HEADROOM_TIMEOUT_MS` | `30000` | HTTP timeout for proxy requests. |\n\nBoolean values accept JSON booleans, or strings such as `1/0`, `true/false`, `yes/no`, `on/off`.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/Jonghakseo/pi-extension/tree/main/packages/headroom#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jonghakseo/pi-extension.git",
+    "directory": "packages/headroom"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-03T06:18:29.826Z",
+    "modified": "2026-06-04T12:53:10.451Z",
+    "0.1.0": "2026-06-03T06:18:30.169Z",
+    "0.1.1": "2026-06-04T04:53:33.763Z",
+    "0.1.2": "2026-06-04T12:53:10.346Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

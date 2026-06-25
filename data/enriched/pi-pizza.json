@@ -1,0 +1,350 @@
+{
+  "name": "pi-pizza",
+  "latest_version": "0.1.5",
+  "description": "Pizza mascot and multi-provider auto-router for pi.",
+  "readme": "# \ud83c\udf55 pi-pizza\n\n<img width=\"866\" height=\"524\" alt=\"Screenshot 2026-06-01 at 15-20-01 \u2014\" src=\"https://github.com/user-attachments/assets/3a90ac9f-2dc9-48a7-ba92-25ab3588361e\" />\n\n`pi-pizza` is a stock `pi` package that adds the Pizza startup mascot and a `pizza/auto` model provider.\n\nThe package keeps `pi` itself unmodified. Install it as an extension package, then use the `pizza/auto` model to route each turn to a task-appropriate provider/model.\n\n## Features\n\n- Registers a `pizza/auto` model provider.\n- Sets `pizza/auto` as the global default model after the extension first loads.\n- Keeps explicit CLI choices intact: `pi --model ...` or `pi --provider ...` are not overwritten.\n- Shows the Pizza mascot in the startup header while keeping the stock `pi` help text.\n- Creates `~/.pi/agent/pizza.json` on first load.\n- Routes turns by task category: quick, reader, visual, deep, ultrabrain, writing, architect, and executor.\n- Prints routing decisions to stderr, for example:\n\n```text\n[pizza] \ud83c\udf55 VISUAL -> CodeBuilder [Visual]: anthropic/claude-sonnet-4-6 (Heuristic frontend keyword match.)\n```\n\n## Install\n\nInstall the published npm package:\n\n```bash\npi install npm:pi-pizza\npi\n```\n\nAfter the first run, plain `pi` uses `pizza/auto` by default.\n\nFrom a local checkout:\n\n```bash\ngit clone https://github.com/parkjangwon/pi-pizza.git\ncd pi-pizza\nnpm install --ignore-scripts\npi install .\npi\n```\n\nFor one-off local testing without installing:\n\n```bash\npi -e .\n```\n\n## Default Model Behavior\n\nAfter the extension first loads, it writes these global defaults to `~/.pi/agent/settings.json` when `defaultProvider` or `defaultModel` is not set yet:\n\n```json\n{\n  \"defaultProvider\": \"pizza\",\n  \"defaultModel\": \"auto\"\n}\n```\n\nThat means plain `pi` will use `pizza/auto` on later runs when no default model was configured yet. If you already have a default provider/model configured, pi-pizza leaves it unchanged. After you switch models in a session, pi keeps your last selection on reconnect.\n\nTo bypass Pizza for a single run, pass a model explicitly:\n\n```bash\npi --model anthropic/claude-sonnet-4-6\n```\n\n## Configuration\n\nOn first load, `pi-pizza` creates `~/.pi/agent/pizza.json`:\n\n```json\n{\n  \"plannerModel\": \"\",\n  \"readerModel\": \"\",\n  \"quickModel\": \"\",\n  \"deepModel\": \"\",\n  \"visualModel\": \"\",\n  \"executorModel\": \"\",\n  \"architectModel\": \"\"\n}\n```\n\nLeave a field blank for auto-detection, or set a concrete `provider/model-id`.\n\nThe seven top-level fields are role defaults. `plannerModel` decides the route, and the other roles are used when a turn lands in a matching category.\n\nFor more control, add an optional `categoryModels` object. These are category-specific override chains. pi-pizza tries them first, skips unauthenticated entries, then falls back to the matching role default and auto-detected models.\n\n```json\n{\n  \"categoryModels\": {\n    \"VISUAL\": [\n      \"google/gemini-3.5-flash\",\n      \"anthropic/claude-sonnet-4-6\"\n    ],\n    \"DEEP\": [\n      \"openai/gpt-5.3-codex\",\n      \"anthropic/claude-sonnet-4-6\"\n    ],\n    \"QUICK\": [\n      \"openai/gpt-5.4-mini\",\n      \"deepseek/deepseek-v4-flash\"\n    ]\n  }\n}\n```\n\nIn short: `visualModel` is the normal default for visual work; `categoryModels.VISUAL` is an optional priority list for visual work.\n\n### Roles\n\nYou can leave every role blank and let pi-pizza choose from authenticated models, or pin roles when you want stronger cost/latency/quality control.\n\n| Role | What it does | Good fit |\n| --- | --- | --- |\n| `plannerModel` | Classifies the current user request into a routing category. Falls back to local heuristics if auth is unavailable. | Fast, cheap, reliable instruction-following model. Use a mini/chat model. |\n| `readerModel` | Handles repository analysis, summaries, explanations, and writing-oriented turns. | Cheap long-context model. Gemini Flash-style models are a good fit. |\n| `quickModel` | Handles `QUICK`: simple edits, small commands, light explanations, and routine tasks. | Low-cost fast model. Prefer cheap coding-capable chat models. |\n| `deepModel` | Handles `DEEP`: complex backend logic, debugging, TypeScript errors, scripts, tests, and system refactors. | Strong coding/reasoning model. Prefer Sonnet/GPT/Codex or `deepseek-v4-pro`. |\n| `visualModel` | Handles `VISUAL`: UI component structure, CSS/layout details, and visual frontend work. | Strong frontend-writing model. Claude Sonnet-style models are a good fit. |\n| `executorModel` | Handles `EXECUTOR`: post-tool execution turns and command-output diagnosis. | Very low-latency model. Prefer fast chat models that are good at concise debugging. |\n| `architectModel` | Handles `ARCHITECT` and `ULTRABRAIN`: planning, architecture design, algorithms, and high-risk reasoning. Activated directly on `/plan`, `/skill:plan`, `/skill:ralplan`, `/skill:writing-plans`, or `/skill:executing-plans`. | Strongest reasoning model available. Prefer Opus 4.8, Sonnet 4.6, GPT-5.5, or `deepseek-v4-pro` for complex design decisions. |\n\n### Routing Categories\n\n| Category | Routed role | Typical use |\n| --- | --- | --- |\n| `QUICK` | `quickModel` | Typos, simple commands, single-file edits, routine tasks. |\n| `READER` | `readerModel` | Codebase analysis, summaries, explanations, \"how does this work?\" requests. |\n| `VISUAL` | `visualModel` | React, HTML, CSS, UI/UX, styling, layout, animation, design. |\n| `DEEP` | `deepModel` | Multi-file implementation, debugging, backend logic, refactors, type errors, tests. |\n| `ULTRABRAIN` | `architectModel` | Complex architecture, algorithms, migration strategy, cross-system reasoning. |\n| `WRITING` | `readerModel` | README, docs, prose, release notes, changelogs. |\n| `ARCHITECT` | `architectModel` | Explicit planning/design mode. |\n| `EXECUTOR` | `executorModel` | Tool-result follow-up and command-output diagnosis. |\n\nEach category uses an ordered chain. For example, `VISUAL` first tries `categoryModels.VISUAL`, then `visualModel`, then auto-detected frontend/backend-capable fallbacks. If a candidate lacks auth, pi-pizza skips it and includes the skipped model/reason in `/pizza-route` and stderr routing output. If the final selected model still lacks auth, dry-run output marks that route with `would fail auth` before you spend a real turn on it.\n\nClear routing signals such as CSS/UI, README/docs, typo fixes, analysis requests, and architecture keywords are handled by local heuristics before calling `plannerModel`. Ambiguous requests still use `plannerModel`, and category auth checks are cached briefly to avoid repeated provider probing.\n\n### Model Suggestions\n\nUse model IDs that appear in your own `pi --list-models` output. Exact model IDs change over time, so treat these as examples. DeepSeek currently offers `deepseek-v4-flash` and `deepseek-v4-pro` only.\n\n| Goal | Example choices |\n| --- | --- |\n| Best quality | `anthropic/claude-opus-4-8`, `anthropic/claude-sonnet-4-6`, `openai/gpt-5.5`, `openai/gpt-5.3-codex` |\n| Cost-effective general routing | `deepseek/deepseek-v4-flash`, `openai/gpt-5.4-mini`, `google/gemini-3.5-flash` |\n| Long-context reading | `google/gemini-3.5-flash` |\n| Backend-heavy coding | `anthropic/claude-sonnet-4-6`, `openai/gpt-5.3-codex`, `deepseek/deepseek-v4-pro` |\n| Frontend-heavy coding | `anthropic/claude-sonnet-4-6`, `google/gemini-3.5-flash`, `openai/gpt-5.5` |\n| Fast execution diagnosis | `groq/*`, `deepseek/deepseek-v4-flash`, `openai/gpt-5.4-nano` |\n\nThe safest starting point is to set only the architect/deep/visual roles and leave the cheap/fast roles blank:\n\n```json\n{\n  \"plannerModel\": \"\",\n  \"readerModel\": \"\",\n  \"quickModel\": \"\",\n  \"deepModel\": \"anthropic/claude-sonnet-4-6\",\n  \"visualModel\": \"anthropic/claude-sonnet-4-6\",\n  \"executorModel\": \"\",\n  \"architectModel\": \"anthropic/claude-opus-4-8\"\n}\n```\n\nExample:\n\n```json\n{\n  \"plannerModel\": \"deepseek/deepseek-v4-flash\",\n  \"readerModel\": \"google/gemini-3.5-flash\",\n  \"quickModel\": \"deepseek/deepseek-v4-flash\",\n  \"deepModel\": \"anthropic/claude-sonnet-4-6\",\n  \"visualModel\": \"anthropic/claude-sonnet-4-6\",\n  \"executorModel\": \"groq/llama-3.3-70b-versatile\",\n  \"architectModel\": \"anthropic/claude-opus-4-8\"\n}\n```\n\nOnly models already known to `pi` and configured with auth can be selected automatically.\n\n## Commands\n\n- `/pizza` shows whether the extension is active and where the config lives.\n- `/pizza-route` shows recent routing decisions. Pass text to dry-run routing without streaming a final model response, for example `/pizza-route Polish this React layout`. Ambiguous dry-runs may still call `plannerModel` to classify the request.\n- `/pizza-models` shows the resolved concrete model for each Pizza role and the category fallback chains.\n- `/pizza-reset` asks for confirmation, deletes `~/.pi/agent/pizza.json`, and reloads the config in the current session.\n- `/pizza-header-reset` restores the built-in `pi` startup header for the current session.\n\n## Development\n\n```bash\nnpm install --ignore-scripts\nnpm run check\n```\n\nThe package is loaded by the `pi` manifest in `package.json`:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./extensions/index.ts\"]\n  }\n}\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pizza",
+    "router"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/parkjangwon/pi-pizza#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parkjangwon/pi-pizza.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-01T06:14:35.020Z",
+    "modified": "2026-06-20T11:28:48.487Z",
+    "0.1.0": "2026-06-01T06:14:35.301Z",
+    "0.1.1": "2026-06-02T12:23:38.512Z",
+    "0.1.2": "2026-06-02T14:42:51.732Z",
+    "0.1.3": "2026-06-05T01:29:32.657Z",
+    "0.1.4": "2026-06-20T11:18:22.960Z",
+    "0.1.5": "2026-06-20T11:28:48.396Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 325,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 374
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 183
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 25
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 326
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

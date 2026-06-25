@@ -1,0 +1,40 @@
+{
+  "name": "pi-persistent-term",
+  "latest_version": "0.5.0",
+  "description": "Integrated terminal panel for pi coding agent \u2014 persistent PTY shell, colored overlay, LLM tools",
+  "readme": "# pi-persistent-term\n\nIntegrated terminal panel for the [pi coding agent](https://github.com/badlogic/pi-mono). Provides a persistent PTY shell inside pi \u2014 state (cwd, virtualenvs, environment variables) survives across calls, unlike pi's built-in `bash` tool which spawns a fresh subshell each time.\n\n## Features\n\n- **Persistent shell** \u2014 `cd`, `source .venv/bin/activate`, `export`, etc. all carry over between calls\n- **Terminal overlay** \u2014 `/term` or `Ctrl+\\`` opens a full-color interactive panel, `Ctrl+Q` returns to pi\n- **LLM tools** \u2014 `run_in_terminal`, `write_terminal`, `read_terminal` let the LLM drive the shell\n- **Context injection** \u2014 recent terminal output is automatically prepended to every LLM prompt\n- **Colored display** \u2014 uses `@xterm/headless` for proper terminal emulation in the overlay\n- **Scrollback** \u2014 `PgUp`/`PgDn` to scroll, `Shift+PgUp`/`Shift+PgDn` for fine scroll\n\n## Installation\n\n```bash\ngit clone https://github.com/vahidkowsari/pi-persistent-term\ncd pi-persistent-term\nnpm install\npi install .\n```\n\n## Commands\n\n| Command | Description |\n|---|---|\n| `/term` | Open terminal overlay |\n| `/term-clear` | Clear the terminal buffer |\n| `/term-restart` | Restart the terminal shell process |\n| `/term-context` | Toggle auto-injecting terminal output into LLM prompts |\n| `/monitor-stop` | Stop the currently monitored background process |\n| `Ctrl+\\`` | Shortcut to open terminal overlay |\n\n## Keybindings (inside overlay)\n\n| Key | Action |\n|---|---|\n| `Ctrl+Q` | Close overlay, return to pi |\n| `Ctrl+C` | Interrupt running process |\n| `PgUp` / `PgDn` | Scroll by page |\n| `Shift+PgUp` / `Shift+PgDn` | Scroll by 5 lines |\n\n## LLM Tools\n\n### `monitor_process`\n\nStart, stop, or check a background process monitor. Output is captured from a child process (separate from the PTY shell) and can optionally be pushed into the conversation in real-time.\n\n```\n# Silent mode \u2014 output buffered, readable via read_terminal\nmonitor_process(action=\"start\", command=\"npm run build -- --watch\")\n\n# React mode \u2014 each output chunk triggers a new LLM turn\nmonitor_process(action=\"start\", command=\"pytest tests/ -v\", react=True)\n\n# Stop the monitor\nmonitor_process(action=\"stop\")\n\n# Check what's running\nmonitor_process(action=\"status\")\n```\n\n**Silent vs react mode:**\n\n| Mode | Behavior | Best for |\n|---|---|---|\n| `react=false` (default) | Output buffered quietly, check with `read_terminal` | Dev servers, chatty watchers |\n| `react=true` | Each output chunk \u2192 new LLM turn | Test runners, log monitors, error watching |\n\n**Note:** The monitor spawns an independent child process using the session's cwd and outer environment. It does not inherit PTY shell state (active virtualenvs, `cd`s inside the shell). Prefix with `source .venv/bin/activate &&` when needed. Only one monitor can run at a time.\n\n### `run_in_terminal`\n\nRuns a command in the persistent PTY shell and waits for it to complete (sentinel-based). Returns the full output **and the command's exit code** (`[exit code: N]` in the result, `exitCode` in `details`; a non-zero code marks the tool result as an error). Best for commands that finish \u2014 `npm install`, `pytest`, `git status`, etc.\n\n```\nrun_in_terminal(\"npm install\")\nrun_in_terminal(\"pytest tests/\", wait_ms=60000)\n```\n\n**Background mode** \u2014 set `background=true` for long-lived commands (dev servers, watchers). The command runs in the **same persistent shell** (keeping cwd and active virtualenv, unlike `monitor_process` which uses a separate child process) and the tool returns immediately with any early output. Read progress later with `read_terminal`, stop it with `write_terminal(\"\\x03\")`; you're notified (and a turn is triggered) when it exits.\n\n```\nrun_in_terminal(\"source .venv/bin/activate\", )   # state persists...\nrun_in_terminal(\"flask run\", background=True)     # ...so this dev server has the venv\nread_terminal()                                   # check it later\nwrite_terminal(\"\\x03\")                            # stop it\n```\n\nOnly one background command at a time \u2014 it holds the shell's foreground, so a second `run_in_terminal` call returns an error until you stop it.\n\n### `write_terminal`\n\nSends raw text or keypresses to the shell. Use for interactive prompts.\n\n```\nwrite_terminal(\"yes\\n\")\nwrite_terminal(\"\\x03\")   # Ctrl+C\n```\n\n### `read_terminal`\n\nReads recent output from the terminal buffer (includes monitor output when running).\n\n```\nread_terminal(lines=100)\n```\n\n## Tool comparison\n\n| | `bash` tool | `run_in_terminal` | `monitor_process` |\n|---|---|---|---|\n| Shell state | Fresh subshell | Persistent PTY | Own child process |\n| Blocking | Yes | Yes (sentinel), or `background=true` | No \u2014 background |\n| Output delivery | On completion | On completion / read later (bg) | Push (react) or buffer |\n| Infinite processes | \u274c timeout only | \u2705 `background=true` (in the persistent shell) | \u2705 separate process |\n| Keeps shell state (cwd/venv) | \u274c | \u2705 (incl. background) | \u274c separate process |\n| LLM reacts in real-time | \u274c | On exit (bg triggers a turn) | \u2705 react mode |\n| Best for | Stateless one-offs | Stateful commands; dev servers needing the venv | Watchers, log monitors |\n\n## Requirements\n\n- [pi coding agent](https://github.com/badlogic/pi-mono) installed globally\n- `pi-interactive-shell` installed globally (provides `@xterm/headless`)\n- Node.js \u2265 18\n- macOS or Linux (node-pty requires native compilation)\n\n## Architecture\n\n- **`PtyManager`** \u2014 wraps `node-pty`, manages the shell process lifecycle\n- **`MonitorManager`** \u2014 spawns an independent `child_process` for background monitoring; buffers output and flushes every 750ms (or at 4KB) into the pi conversation via `pi.sendMessage({ triggerTurn: true })` in react mode\n- **`XtermBuffer`** \u2014 wraps `@xterm/headless` for display only; renders colored lines for the overlay from raw PTY data\n- **`SimpleBuffer`** \u2014 plain-text append buffer for `read_terminal` and sentinel-based command completion detection in `run_in_terminal`; also receives monitor output so `read_terminal` sees it\n\nThe two buffers serve different purposes: xterm is a screen emulator (viewport model) which handles display correctly but can't be used for line-based output capture. `SimpleBuffer` handles the text side reliably.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "terminal",
+    "pty",
+    "shell"
+  ],
+  "author": {
+    "name": "vahidkowsari"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/vahidkowsari/pi-persistent-term#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vahidkowsari/pi-persistent-term.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/terminal.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-07T21:31:59.503Z",
+    "modified": "2026-05-31T14:20:32.453Z",
+    "0.1.2": "2026-04-07T21:31:59.718Z",
+    "0.1.3": "2026-04-07T21:33:31.839Z",
+    "0.2.0": "2026-04-09T18:44:23.371Z",
+    "0.3.0": "2026-04-10T15:36:42.199Z",
+    "0.3.1": "2026-05-25T15:09:45.620Z",
+    "0.5.0": "2026-05-31T14:20:32.087Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 55,
+  "download_trend": []
+}

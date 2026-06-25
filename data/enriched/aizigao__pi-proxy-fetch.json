@@ -1,0 +1,40 @@
+{
+  "name": "@aizigao/pi-proxy-fetch",
+  "latest_version": "1.0.2",
+  "description": "Pi extension package that routes globalThis.fetch through direct, proxy, or fallback behavior based on hostname rules.",
+  "readme": "# @aizigao/pi-proxy-fetch\n\n[![npm version](https://img.shields.io/npm/v/%40aizigao%2Fpi-proxy-fetch)](https://www.npmjs.com/package/@aizigao/pi-proxy-fetch)\n\nChinese: [`README-CN.md`](https://github.com/aizigao/pi-proxy-fetch/blob/master/README-CN.md)\n\nA Pi extension package that patches `globalThis.fetch` inside a Pi session and routes requests through SwitchyOmega-style `switchRules` and proxy profiles.\n\n## Features\n\n- **Multiple profiles**: define multiple proxy servers such as Clash or Whistle\n- **autoSwitch**: match requests by rules and route them to a target profile\n- **Built-in targets**: `direct` and `system` (`http_proxy` / `HTTP_PROXY` env)\n- **Remote rule lists**: `ruleListURL` downloads a local cached rule file and participates in matching\n- **Custom CA cert**: `proxy_server` supports optional `caCertPath` for tools like Whistle\n- **Interactive menu**: switch profiles, toggle enable/disable, inspect stats, refresh rule lists, reload config\n\n## Requirements\n\n- Node.js 20+\n- Pi coding agent installed\n\n## Installation\n\n```bash\npi install npm:@aizigao/pi-proxy-fetch\n```\n\n## npm package\n\n- Package: `@aizigao/pi-proxy-fetch`\n- npm: https://www.npmjs.com/package/@aizigao/pi-proxy-fetch\n\n## Configuration\n\nRecommended project-local config: `./.pi/proxy.json`\n\nGlobal config is also supported: `~/.pi/agent/proxy.json`\n\nIf neither config exists, a default global config is created at `~/.pi/agent/proxy.json`.\n\n```json\n{\n  \"$schema\": \"https://raw.githubusercontent.com/aizigao/pi-proxy-fetch/master/schema.json\",\n  \"version\": 1,\n  \"enabled\": true,\n  \"profileName\": \"auto-switch\",\n  \"profileConfig\": [\n    {\n      \"name\": \"my-clash\",\n      \"type\": \"proxy_server\",\n      \"server\": \"socks5://127.0.0.1:7890\"\n    },\n    {\n      \"name\": \"whistle\",\n      \"type\": \"proxy_server\",\n      \"server\": \"http://127.0.0.1:8899\",\n      \"caCertPath\": \"~/.WhistleAppData/.whistle/certs/root.crt\"\n    },\n    {\n      \"name\": \"auto-switch\",\n      \"type\": \"autoSwitch\",\n      \"ruleListURL\": \"https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt\",\n      \"switchRules\": [\n        {\n          \"note\": \"OpenAI direct\",\n          \"conditions\": [\n            { \"type\": \"host\", \"pattern\": \"api.openai.com\" }\n          ],\n          \"profileName\": \"direct\"\n        },\n        {\n          \"note\": \"Anthropic direct\",\n          \"conditions\": [\n            { \"type\": \"host\", \"pattern\": \"api.anthropic.com\" }\n          ],\n          \"profileName\": \"direct\"\n        },\n        {\n          \"note\": \"GitHub via Clash\",\n          \"conditions\": [\n            { \"type\": \"host\", \"pattern\": \"*.github.com\" }\n          ],\n          \"profileName\": \"my-clash\"\n        },\n        {\n          \"note\": \"Google via Clash\",\n          \"conditions\": [\n            { \"type\": \"url\", \"pattern\": \"*://*.google.com/*\" }\n          ],\n          \"profileName\": \"my-clash\"\n        }\n      ]\n    }\n  ]\n}\n```\n\n## Config path priority\n\n1. `./.pi/proxy.json` (project-local, preferred)\n2. `~/.pi/agent/proxy.json` (global)\n\n> Only configs with `version: 1` are treated as the current format. If the file is not the current format, the current file is backed up as `proxy.bak.json` and a default config is generated.\n\n## Top-level fields\n\n| Field | Type | Description |\n|---|---|---|\n| `version` | `1` | Current config schema version |\n| `enabled` | `boolean` | Master on/off switch. `false` bypasses all proxy logic |\n| `profileName` | `string` | Active profile name. Reserved values: `direct`, `system`; custom names must match `^[A-Za-z_-]+$` |\n| `profileConfig` | `Profile[]` | Profile list |\n\n## `proxy_server` fields\n\n| Field | Type | Description |\n|---|---|---|\n| `name` | `string` | Profile name; must match `^[A-Za-z_-]+$` |\n| `type` | `\"proxy_server\"` | Fixed value |\n| `server` | `string` | Required proxy URL, e.g. `socks5://127.0.0.1:7890` |\n| `caCertPath` | `string?` | Optional CA certificate path, useful for Whistle-style self-signed proxies |\n\n## `autoSwitch` fields\n\n| Field | Type | Description |\n|---|---|---|\n| `name` | `string` | Profile name; must match `^[A-Za-z_-]+$` |\n| `type` | `\"autoSwitch\"` | Fixed value |\n| `ruleListURL` | `string?` | Remote rule list URL |\n| `switchRules` | `SwitchRule[]` | Local rules |\n\n## `SwitchRule` fields\n\n| Field | Type | Description |\n|---|---|---|\n| `note` | `string?` | Note |\n| `conditions` | `Condition[]?` | Condition list with **OR** logic; empty means always match |\n| `profileName` | `string` | Target profile. Reserved: `direct`, `system`; custom names must match `^[A-Za-z_-]+$` |\n\n## `Condition` fields\n\n| Field | Type | Description |\n|---|---|---|\n| `type` | `host` / `url` / `regex` / `disabled` | Condition type |\n| `pattern` | `string?` | Match pattern |\n\n## Condition types\n\n| `type` | Matches | Notes |\n|---|---|---|\n| `host` | request hostname | Supports `*` / `?`; `*.example.com` matches both `example.com` and subdomains; `**.example.com` matches subdomains only |\n| `url` | full request URL | Supports `*` / `?`; no special `*.` behavior |\n| `regex` | full request URL | JavaScript regular expression |\n| `disabled` | - | Never matches |\n\n> If no rule matches, the request goes direct by default. No explicit catch-all rule is required.\n\n## `ruleListURL` behavior\n\n- `ruleListURL` is useful when you want to reuse a remote ruleset such as gfwlist / AutoProxy\n- Project configs save downloaded content next to the project config file\n- Global configs save downloaded content under `~/.pi/agent`\n- Filename format:\n\n```text\nproxy-rulelist-file--{profile_name_safe}.txt\n```\n\nExample:\n\n```text\n./.pi/proxy-rulelist-file--auto_switch.txt\n~/.pi/agent/proxy-rulelist-file--auto_switch.txt\n```\n\nBehavior:\n\n- On `session_start`, if the local file already exists, it is loaded directly\n- If the local file is missing, it is downloaded once automatically\n- You can also refresh it manually from the `/proxy` menu via **Refresh rule list files**\n- Downloaded remote rules are merged into memory at runtime only and are not written back into your original `switchRules`\n- Profile switching, reload, and menu actions never directly rewrite your original rules\n\n## Commands\n\nRun inside Pi:\n\n```text\n/proxy            # open interactive menu\n/proxy stats      # show stats\n/proxy reload     # reload config\n/proxy name       # switch directly to a profile\n```\n\nThe `/proxy` menu includes:\n\n- Select profile\n- Enable/Disable proxy\n- Show stats\n- Refresh rule list files\n- Reload config\n\n## Development\n\n```bash\nnpm install\nnpm run check\nnpm run lint\nnpm run schema\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "proxy",
+    "fetch",
+    "undici"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/aizigao/pi-proxy-fetch#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aizigao/pi-proxy-fetch.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "./assets/readme-cover.png"
+  },
+  "time": {
+    "created": "2026-05-20T10:37:30.126Z",
+    "modified": "2026-06-16T06:28:32.851Z",
+    "0.1.0": "2026-05-20T10:37:30.434Z",
+    "0.1.1": "2026-05-20T10:44:21.790Z",
+    "0.1.2": "2026-05-22T03:02:04.855Z",
+    "0.2.0": "2026-05-30T00:39:52.246Z",
+    "1.0.0": "2026-05-31T10:06:26.375Z",
+    "1.0.1": "2026-05-31T10:08:23.085Z",
+    "1.0.2": "2026-06-16T06:28:32.753Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,44 @@
+{
+  "name": "@ariesfish/pi-goal",
+  "latest_version": "0.4.0",
+  "description": "Autonomous experiment loop for pi \u2014 run, measure, keep or discard. Inspired by karpathy/autoresearch.",
+  "readme": "<div align=\"center\">\n\n# pi-goal\n### Autonomous experiment loops for pi\n**[Install](#install)** \u00b7 **[Usage](#usage)** \u00b7 **[Reference](#reference)**\n\n</div>\n\n*pi-goal lets pi try an idea, measure it, keep improvements, revert regressions, and continue from durable state.*\n\nUse it for any measurable optimization target: test speed, bundle size, training loss, build time, Lighthouse score, or custom benchmarks.\n\n---\n\n## Install\n\n```bash\npi install npm:@ariesfish/pi-goal\n```\n\nManual install:\n\n```bash\ncp -r extensions/pi-goal ~/.pi/agent/extensions/\ncp -r skills/goal-create ~/.pi/agent/skills/\ncp -r skills/goal-finalize ~/.pi/agent/skills/\ncp -r skills/goal-hooks ~/.pi/agent/skills/\n```\n\nThen run `/reload` in pi.\n\n---\n\n## Usage\n\n### Start a loop\n\n```text\n/skill:goal-create\n```\n\nThe skill asks for, or infers:\n\n- goal\n- benchmark command\n- primary metric and direction\n- files in scope\n- constraints\n\nIt creates a goal branch, writes `goal.md` and `goal.sh`, runs the baseline, then starts iterating.\n\n### Run directly with `/goal`\n\n```text\n/goal optimize unit test runtime, monitor correctness\n/goal model training, run 5 minutes of train.py and track validation loss\n```\n\nUseful subcommands:\n\n| Command | Purpose |\n|---|---|\n| `/goal <text>` | Start or resume goal mode |\n| `/goal off` | Leave goal mode; keep persisted files |\n| `/goal clear` | Delete `goal.jsonl` and reset state |\n| `/goal reinit` | Start a new comparable experiment with a fresh baseline |\n| `/goal select <goal-id>` | Switch active research under `.goal/researches/` |\n| `/goal export` | Open the live browser dashboard |\n\n### The loop\n\npi edits code, commits candidates, calls `run_goal`, then calls `log_goal`:\n\n```text\nedit \u2192 commit \u2192 run_goal \u2192 log_goal \u2192 keep or revert \u2192 repeat\n```\n\nResults are appended to `goal.jsonl`. The current plan and learnings live in `goal.md`, so a fresh agent can resume after restarts or context compaction.\n\n### Finalize results\n\n```text\n/skill:goal-finalize\n```\n\nThis reads `goal.jsonl`, groups kept runs into logical changesets, asks for approval, then creates one reviewable branch per group from the merge base.\n\n---\n\n## What it installs\n\n### Extension tools\n\n| Tool | Purpose |\n|---|---|\n| `init_goal` | Initialize the active research and first experiment |\n| `start_goal` | Open a new comparable experiment with a fresh baseline |\n| `run_goal` | Time a command, capture output, parse `METRIC name=value` lines |\n| `log_goal` | Record the run, keep improvements, revert failures/regressions |\n| `validate_goal` | Check goal files, metric output, checks, and workspace safety |\n\n### Skills\n\n| Skill | Purpose |\n|---|---|\n| `goal-create` | Set up and start an optimization loop |\n| `goal-finalize` | Turn a noisy goal branch into clean review branches |\n| `goal-hooks` | Help author optional `goal.hooks/before.sh` and `after.sh` scripts |\n\n### Files used by a loop\n\n| File | Purpose |\n|---|---|\n| `goal.md` | Goal, metric, scope, constraints, attempts, learnings |\n| `goal.sh` | Benchmark script; should output `METRIC name=value` |\n| `goal.jsonl` | Append-only run journal |\n| `goal.checks.sh` | Optional correctness checks after successful benchmarks |\n| `goal.ideas.md` | Optional backlog of promising ideas |\n| `goal.hooks/` | Optional scripts fired before/after iterations |\n\n---\n\n## UI\n\n- Status widget above the editor: `\ud83c\udfaf goal 12 runs 8 kept \u2502 \u2605 total_\u00b5s: 15,200 (-12.3%) \u2502 conf: 2.1\u00d7`\n- `Ctrl+Shift+T`: expand/collapse inline dashboard\n- `Ctrl+Shift+F`: fullscreen scrollable dashboard\n- `/goal export`: live browser dashboard with chart and share card\n\nOverride shortcuts in `<agent-dir>/extensions/pi-goal.json`:\n\n```json\n{\n  \"shortcuts\": {\n    \"toggleDashboard\": \"ctrl+shift+y\",\n    \"fullscreenDashboard\": null\n  }\n}\n```\n\nUse `null` to disable a shortcut.\n\n---\n\n## Reference\n\n### Benchmark contract\n\n`goal.sh` should exit non-zero on benchmark failure and print the primary metric as:\n\n```text\nMETRIC total_ms=123.4\n```\n\nSecondary metrics can use the same format:\n\n```text\nMETRIC bundle_kb=42.1\n```\n\n### Backpressure checks\n\nCreate executable `goal.checks.sh` to block unsafe keeps:\n\n```bash\n#!/bin/bash\nset -euo pipefail\npnpm test\npnpm typecheck\n```\n\nChecks run after a benchmark exits 0. Their runtime does not affect the primary metric. Failures are logged as `checks_failed` and code changes are reverted.\n\n### Confidence score\n\nAfter 3+ runs in an experiment, pi-goal estimates benchmark noise with Median Absolute Deviation (MAD):\n\n```text\nconfidence = |best improvement| / MAD\n```\n\n| Score | Meaning |\n|---|---|\n| `\u2265 2.0\u00d7` | likely real improvement |\n| `1.0\u20132.0\u00d7` | above noise but marginal |\n| `< 1.0\u00d7` | within noise; rerun to confirm |\n\nThe score is advisory. It never auto-discards.\n\n### Configuration\n\nCreate `goal.config.json` in the pi session directory:\n\n```json\n{\n  \"workingDir\": \"/path/to/project\",\n  \"maxIterations\": 50\n}\n```\n\n| Field | Purpose |\n|---|---|\n| `workingDir` | Override where goal files, commands, and git operations run |\n| `maxIterations` | Stop after this many runs until a new experiment is started |\n\n### Hooks\n\nOptional executable hooks live in `goal.hooks/`:\n\n| Hook | Fires | Typical use |\n|---|---|---|\n| `before.sh` | before activation and after each completed run | fetch research, rotate ideas, prime context |\n| `after.sh` | after each `log_goal` | append learnings, notify, tag winners |\n\nHooks receive one JSON object on stdin, write steer text on stdout, timeout after 30s, and append hook entries to `goal.jsonl`. See [`skills/goal-hooks/examples/`](skills/goal-hooks/examples/) for complete scripts.\n\n---\n\n## Example targets\n\n| Target | Metric | Command |\n|---|---|---|\n| Test speed | seconds \u2193 | `pnpm test` |\n| Bundle size | KB \u2193 | `pnpm build && du -sb dist` |\n| Training | val loss \u2193 | `uv run train.py` |\n| Build speed | seconds \u2193 | `pnpm build` |\n| Lighthouse | score \u2191 | `lighthouse http://localhost:3000 --output=json` |\n\n---\n\n## Prerequisites\n\n- pi installed and configured\n- an LLM provider API key\n- a benchmark command with a numeric metric\n\nGoal loops can run for a long time. Use provider-side budgets and `maxIterations` to cap cost.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "goal",
+    "experiment",
+    "optimization",
+    "benchmark",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "ariesfish",
+    "email": "zzlyldy@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ariesfish/pi-goal#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ariesfish/pi-goal.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-26T07:39:57.909Z",
+    "modified": "2026-05-26T10:04:49.851Z",
+    "0.2.0": "2026-05-26T07:39:58.215Z",
+    "0.3.0": "2026-05-26T08:34:25.436Z",
+    "0.4.0": "2026-05-26T10:04:49.550Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 29,
+  "download_trend": []
+}

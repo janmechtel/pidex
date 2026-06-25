@@ -1,0 +1,61 @@
+{
+  "name": "@lpirito/pi-diffloop",
+  "latest_version": "0.0.30",
+  "description": "Pair programming with Pi, be aware of every change made to the codebase.",
+  "readme": "# diffloop\n\n`diffloop` is a Pi extension that slows down the agentic coding workflow on purpose by presenting each code change to the developer, with a reason attached to it.\n\n![diffloop review UI](./assets/image.png)\n\n## What it does\n\nThis extension intercepts Pi `edit` and `write` tool calls and replaces the default fire-and-forget flow with an interactive review step.\n\nFor each proposed file change, diffloop:\n\n- can require a reason (captured through `set_change_reason`; optional via `/diffloop-reason off`)\n- shows a preview before execution\n- lets you:\n  - **approve** the change\n  - **steer** the change with an inline prompt\n  - **edit** the proposal before execution\n  - **deny** the change\n\n## Installation\n\n```sh\npi install npm:@lpirito/pi-diffloop\n```\n\n## Why use it\n\nWhen working with coding agents, I kept running into two extremes:\n\n- I write a long markdown file full of rules, conventions, and constraints, hoping the agent will stay aligned.\n- I prompt for a bugfix or feature and wait for the result, only to receive a large batch of changes all at once.\n\nBoth approaches can work, but they often come with the same problem: **context loss**.\n\nThe agent may go further than expected, touch more files than intended, or make reasonable local decisions that drift away from what you had in mind. By the time it returns, you are no longer reviewing a small decision, you are reconstructing a chain of reasoning that is not your own.\n\nThat is the problem diffloop is \"meant\" to solve.\n\nIt intentionally slows the workflow down so you can stay close to the agents decisions, review changes as they are proposed, and understand both **what** is changing and **why** before the change is applied.\n\n### A note on usage\n\ndiffloop is still an experiment for me, and Im grateful to Pi for providing such solid tools to explore ideas like this.\n\nThat said, constant review can become its own kind of fatigue. If every step requires approval, there is always the risk of falling into the habit of pressing \"Accept\" without really reviewing the change.\n\nIm still exploring whether this kind of intentional slowness has a real place in agentic coding workflows, especially for developers who want to stay close to the code without losing context.\n\nIdeas, feedback, and criticism are all welcome \ud83d\ude01\n\n## Review flow\n\nWhen the agent proposes an `edit` or `write`:\n\n1. diffloop intercepts the tool call\n2. it builds a preview of the change\n3. it opens a review UI\n4. you choose one of the available actions\n\n## Configuration (optional)\n\ndiffloop supports configuration via a global config file and a module-level fallback.\n\n### Config locations\n\n| Location | Path | Purpose |\n|---|---|---|\n| **Global** | `~/.pi/agent/extensions/diffloop-config.json` | User-wide defaults (applied first) |\n| **Module** | `diffloop-config.json` next to the installed package | Overrides global config |\n\nGlobal config is loaded first, then module config is shallow-merged on top (module wins for any key it contains). The `reviewScope` key is replaced entirely if both files define it. If neither file exists, diffloop uses its built-in defaults.\n\n### Config keys\n\n| Key | Type | Default | Description |\n|---|---|---|---|\n| `enabled` | `boolean` | `true` | Whether review is enabled |\n| `requireReason` | `boolean` | `true` | Whether the agent must call `set_change_reason` before each edit/write |\n| `diffViewMode` | `\"split\"` or `\"inline\"` | `\"split\"` | How the diff preview is rendered |\n| `reviewScope` | `object` | `{}` | Scope review to specific files/patterns |\n\n### `reviewScope` shape\n\nWhen present, `reviewScope` controls which files are reviewed:\n\n```json\n{\n  \"enabled\": true,\n  \"requireReason\": false,\n  \"diffViewMode\": \"inline\",\n  \"reviewScope\": {\n    \"includePatterns\": [\"*.ts\", \"*.tsx\"],\n    \"excludePatterns\": [\"**/*.snap\"],\n    \"includeExtensions\": [\".ts\", \".tsx\"],\n    \"excludeExtensions\": [\".lock\"]\n  }\n}\n```\n\nOut-of-scope paths bypass diffloop review and run through Pi's normal tool execution.\n\n## Agent prompt behavior\n\nThis extension does **not** re-register the `edit` and `write` tools.\n\nInstead, it registers a small helper tool called `set_change_reason` and prompts the agent to call it before each `edit`/`write` proposal.\n\nIt pushes the agent to provide reasons that are:\n\n- specific\n- grounded in existing code or repository patterns\n- explicit about behavior impact\n- not generic prose\n\n## Slash commands\n\n```text\n/diffloop off\n/diffloop on\n/diffloop toggle\n/diffloop status\n\n/diffloop-reason off\n/diffloop-reason on\n/diffloop-reason toggle\n/diffloop-reason status\n```\n\n`/diffloop-reason` controls whether the agent must call `set_change_reason` before each edit/write. It defaults to **on**. Turn it **off** when using local models that struggle with the extra tool step.\n\n## Development\n\n```bash\nnpm install\nnpm run build\nnpm run typecheck\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "diff-review",
+    "diff",
+    "agent-extension",
+    "review",
+    "code-review"
+  ],
+  "author": {
+    "name": "lucaspiritogit"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/lucaspiritogit/pi-diffloop#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lucaspiritogit/pi-diffloop.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/diffloop.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-06T02:47:10.716Z",
+    "modified": "2026-05-25T15:18:14.535Z",
+    "0.0.1": "2026-04-06T02:47:11.013Z",
+    "0.0.2": "2026-04-06T02:53:46.939Z",
+    "0.0.3": "2026-04-06T19:44:54.385Z",
+    "0.0.4": "2026-04-06T21:39:22.015Z",
+    "0.0.6": "2026-04-07T21:29:55.716Z",
+    "0.0.7": "2026-04-07T23:38:45.920Z",
+    "0.0.9": "2026-04-08T00:13:31.588Z",
+    "0.0.10": "2026-04-08T16:08:29.720Z",
+    "0.0.11": "2026-04-09T14:02:16.853Z",
+    "0.0.12": "2026-04-09T14:14:20.172Z",
+    "0.0.13": "2026-04-09T14:34:47.434Z",
+    "0.0.14": "2026-04-09T14:37:25.962Z",
+    "0.0.15": "2026-04-09T17:56:20.449Z",
+    "0.0.16": "2026-04-13T03:42:13.084Z",
+    "0.0.17": "2026-04-13T12:15:18.664Z",
+    "0.0.18": "2026-04-13T14:35:22.279Z",
+    "0.0.20": "2026-04-15T14:36:46.931Z",
+    "0.0.21": "2026-04-15T16:31:23.540Z",
+    "0.0.22": "2026-04-16T21:49:00.177Z",
+    "0.0.23": "2026-04-16T22:31:22.993Z",
+    "0.0.25": "2026-04-18T06:23:47.631Z",
+    "0.0.27": "2026-05-11T13:46:44.198Z",
+    "0.0.28": "2026-05-22T17:53:23.936Z",
+    "0.0.29": "2026-05-23T16:25:01.126Z",
+    "0.0.30": "2026-05-25T15:18:14.432Z"
+  },
+  "versions_count": 25,
+  "downloads_last_week": 73,
+  "download_trend": []
+}

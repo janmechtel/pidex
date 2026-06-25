@@ -1,0 +1,47 @@
+{
+  "name": "@counterposition/pi-web-search",
+  "latest_version": "0.5.1",
+  "description": "Multi-provider web search and markdown page fetch for Pi",
+  "readme": "# Pi Web Search\n\nA [Pi](https://github.com/earendil-works/pi) extension that gives the agent two tools for working with the open web:\n\n1. **`web_search`** for querying multiple search providers with automatic fallback.\n2. **`web_fetch`** for reading pages as clean markdown.\n\nThe extension manages three search backends ([Brave](https://brave.com/search/api/), [Tavily](https://www.tavily.com/), [Exa](https://exa.ai/)) behind a single interface. It selects the best available provider for each request based on the capabilities the request needs, falls back on transient failures, and tells the agent when a result has been degraded. Page fetching is backed by [Jina Reader](https://jina.ai/reader/).\n\n## Install\n\n```bash\npi install npm:@counterposition/pi-web-search\n```\n\n## Tools\n\n### `web_search`\n\nReturns titles, URLs, snippets, and dates. Parameters:\n\n| Parameter     | Description                                                                                                    |\n| ------------- | -------------------------------------------------------------------------------------------------------------- |\n| `query`       | Search query.                                                                                                  |\n| `depth`       | `basic` (default) returns snippets. `thorough` uses content-capable search and may include one inline excerpt. |\n| `freshness`   | Optional recency filter: `day`, `week`, `month`, or `year`.                                                    |\n| `domains`     | Optional allowlist of bare hostnames to restrict results (max 10).                                             |\n| `max_results` | 1--20, default 5.                                                                                              |\n\n### `web_fetch`\n\nFetches a URL through Jina Reader and returns the page content as markdown. Long pages are paginated: use `offset` and `max_chars` to page through content in 8,000-character windows by default (up to 20,000 per call). Fetched pages are cached in an LRU cache (20 entries, 5-minute TTL) so repeated reads of the same URL within a session are free.\n\n## Providers\n\nEach search provider has different capabilities. The extension routes requests to the provider best suited for the job:\n\n| Provider   | Capabilities                                               | Best for                                    |\n| ---------- | ---------------------------------------------------------- | ------------------------------------------- |\n| **Brave**  | search, freshness                                          | Fast basic queries; time-sensitive searches |\n| **Tavily** | search, content, semantic, freshness, domain filter, dates | Thorough searches; domain-scoped research   |\n| **Exa**    | search, content, semantic, freshness, domain filter, dates | Thorough searches; domain-scoped research   |\n| **Jina**   | page fetch                                                 | Reading full pages as markdown              |\n\n**How provider resolution works:** When a search comes in, the extension ranks available providers by how well they match the request. A `thorough` search needs the `content` capability, so Tavily and Exa are preferred. A `basic` search with a `freshness` filter prefers Brave. If the top-ranked provider fails transiently (network error, rate limit), the next provider in the ranking is tried. If no provider can serve the requested depth, a `thorough` search degrades to `basic` and the agent is told.\n\nYou can override the automatic ranking by setting a preferred provider per depth level (see [Settings](#settings) below).\n\n## Configuration\n\n### API keys\n\nSet at least one search provider key. Keys can be set as environment variables or in the global Pi settings file (`~/.pi/agent/settings.json` under `webSearch.apiKeys`). Project-level API keys are intentionally ignored.\n\n| Variable         | Provider                                                        | Required                                            |\n| ---------------- | --------------------------------------------------------------- | --------------------------------------------------- |\n| `BRAVE_API_KEY`  | [Brave Search](https://api-dashboard.search.brave.com/app/keys) | For basic/fresh searches                            |\n| `TAVILY_API_KEY` | [Tavily](https://app.tavily.com/home)                           | For thorough searches                               |\n| `EXA_API_KEY`    | [Exa](https://dashboard.exa.ai/api-keys)                        | For thorough searches                               |\n| `JINA_API_KEY`   | [Jina Reader](https://jina.ai/api-dashboard/key-manager)        | Optional (works without a key at lower rate limits) |\n\n**Recommended minimum:** `BRAVE_API_KEY` plus either `TAVILY_API_KEY` or `EXA_API_KEY`. Brave covers basic and freshness-filtered searches. Tavily or Exa covers thorough searches that need content-capable discovery. With only one provider, thorough searches may silently degrade to basic.\n\n### Settings\n\nOptional overrides in `settings.json` (global or project-level) under `webSearch`:\n\n```json\n{\n  \"webSearch\": {\n    \"preferredBasicProvider\": \"brave\",\n    \"preferredThoroughProvider\": \"tavily\"\n  }\n}\n```\n\nWhen set, the preferred provider is tried first for that depth level before falling back to the default ranking.\n\n## Security\n\nThe extension takes two precautions around untrusted web content:\n\n- **SSRF protection.** `web_fetch` validates URLs before fetching. Private and reserved IP ranges (RFC 1918, link-local, loopback), cloud metadata endpoints, and `.local`/`.internal` hostnames are all blocked. Only `http` and `https` schemes are allowed; embedded credentials are rejected.\n- **Prompt injection mitigation.** The extension appends a system prompt instructing the agent to treat web content as untrusted data, not as instructions to follow.\n",
+  "keywords": [
+    "brave-search",
+    "exa",
+    "pi-extension",
+    "pi-package",
+    "search",
+    "tavily",
+    "web-search"
+  ],
+  "author": null,
+  "license": "GPL-3.0-only",
+  "homepage": "https://github.com/counterposition/pi/tree/main/packages/pi-web-search",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/counterposition/pi.git",
+    "directory": "packages/pi-web-search"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/web-search.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-28T16:56:28.590Z",
+    "modified": "2026-06-06T05:01:28.373Z",
+    "0.1.0": "2026-03-28T16:56:28.803Z",
+    "0.1.1": "2026-03-28T19:41:47.626Z",
+    "0.1.2": "2026-03-28T20:26:02.890Z",
+    "0.2.0": "2026-03-30T00:27:41.091Z",
+    "0.2.1": "2026-03-30T00:34:55.064Z",
+    "0.2.2": "2026-04-06T02:35:35.225Z",
+    "0.2.3": "2026-04-06T03:13:53.885Z",
+    "0.3.0": "2026-04-07T00:30:06.860Z",
+    "0.4.0": "2026-04-07T03:10:45.836Z",
+    "0.4.1": "2026-05-05T18:43:05.586Z",
+    "0.5.0": "2026-05-16T03:05:01.015Z",
+    "0.5.1": "2026-06-06T05:01:28.053Z"
+  },
+  "versions_count": 12,
+  "downloads_last_week": 56,
+  "download_trend": []
+}

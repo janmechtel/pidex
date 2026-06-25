@@ -1,0 +1,41 @@
+{
+  "name": "@adamjen/pi-agent-turn-limiter",
+  "latest_version": "3.0.1",
+  "description": "Warns the pi orchestrator to delegate after 3 turns \u2014 prevents getting stuck in endless work loops",
+  "readme": "# @adamjen/pi-agent-turn-limiter\n\n**Warns the pi orchestrator to delegate after 3 turns \u2014 prevents getting stuck in endless work loops.**\n\n## The Problem\n\nYou give pi a big task. The orchestrator starts working directly \u2014 reading files, grepping code, writing content itself instead of spawning specialist subagents. After 20+ turns of the orchestrator doing grunt work, you realize it never delegated anything. It got \"in the weeds\" and lost sight of its role as an orchestrator.\n\nThis is especially bad with local models that have weaker instruction following \u2014 they forget their system prompt rules about delegation and just start doing everything themselves.\n\n## The Solution\n\nA tiny extension (~80 lines) that counts orchestrator turns. After **3 grace turns** (for setup), then **3 working turns** without delegating, it injects a warning prompt into the system context. **No hard block \u2014 just a reminder.**\n\n## Install\n\n```bash\npi install npm:@adamjen/pi-agent-turn-limiter\n```\n\n## How It Works\n\n1. **Session starts** \u2192 detects orchestrator (via `subagent` tool), status bar shows `\ud83d\udfe2 orch: 0/3 grace`\n2. **Grace turns (1-3)** \u2192 free turns for setup, reading context, planning\n3. **Countdown starts (turn 4+)** \u2192 shows `\ud83d\udd04 orch: 1/3`, `\ud83d\udd04 orch: 2/3`...\n4. **Orchestrator spawns subagent** \u2192 counter resets to 0, shows `\ud83d\udd04 orch: 0/3 \u2713 delegated`\n5. **Counter hits limit (turn 6)** \u2192 status turns yellow: `\u26a0\ufe0f orch: 3/3 \u2014 delegate now`\n6. **Warning injected** \u2192 system prompt gets: `\u26a0\ufe0f DELEGATION REMINDER: You have used 3 of 3 allowed turns without delegating...`\n\n## Status Bar\n\nShows real-time turn count in the pi TUI footer:\n\n```\n\ud83d\udd04 orch: 2/3          # Normal \u2014 under limit\n\ud83d\udd04 orch: 0/3 \u2713 delegated  # Reset after subagent spawn\n\u26a0\ufe0f orch: 3/3 \u2014 delegate now  # Warning injected (soft nudge)\n\ud83d\udd35 turn-limiter: not orchestrator  # Specialist agent (ignored)\n```\n\n## Design Decisions\n\n**Why no hard block?** The orchestrator sometimes needs extra turns for complex coordination. A warning is sufficient \u2014 if it ignores the warning, context will run out naturally.\n\n**Why orchestrator-only?** Specialist agents (`researcher`, `coder`, etc.) have their own `max_turns` from frontmatter. They don't need this limiter \u2014 they just run until context runs out.\n\n**Why 3 grace + 3 effective?** 3 turns lets the orchestrator read context and plan. Then 3 more turns for actual work before nudging delegation. Total: 6 turns before warning.\n\n## Pair With\n\n- **[`@adamjen/pi-one-subagent-at-a-time`](https://www.npmjs.com/package/@adamjen/pi-one-subagent-at-a-time)** \u2014 prevents parallel subagent spawns on single-GPU setups. One forces delegation, the other prevents melting.\n- **[`HazAT/pi-interactive-subagents`](https://github.com/HazAT/pi-interactive-subagents)** \u2014 interactive subagent management for advanced control.\n\n**Browse all my pi packages:** [pi.dev/packages/@adamjen/pi-agent-turn-limiter?name=adamjen](https://pi.dev/packages/@adamjen/pi-agent-turn-limiter?name=adamjen)\n\n## Why This Exists\n\nBuilt because my local Qwen3.6-27B orchestrator would spend 30+ turns reading files and writing content directly instead of spawning the `researcher` or `coder` subagents. After the 5th time I had to manually interrupt it, I wrote this extension. Now it delegates on the first try every time.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "subagent",
+    "orchestrator",
+    "turn-limit",
+    "delegation"
+  ],
+  "author": {
+    "name": "Adam"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/adamjen/pi-agent-turn-limiter#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adamjen/pi-agent-turn-limiter.git"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/agent-turn-limiter.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/adamjen/pi-agent-turn-limiter/master/screenshot.png"
+  },
+  "time": {
+    "created": "2026-05-23T14:02:32.765Z",
+    "modified": "2026-05-24T12:14:57.889Z",
+    "0.1.1": "2026-05-23T14:02:33.000Z",
+    "0.1.2": "2026-05-23T14:06:20.951Z",
+    "0.1.3": "2026-05-23T14:38:15.828Z",
+    "3.0.0": "2026-05-24T04:13:10.786Z",
+    "3.0.1": "2026-05-24T12:14:57.482Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 28,
+  "download_trend": []
+}

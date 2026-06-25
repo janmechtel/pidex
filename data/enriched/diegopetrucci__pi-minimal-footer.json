@@ -1,0 +1,43 @@
+{
+  "name": "@diegopetrucci/pi-minimal-footer",
+  "latest_version": "0.1.11",
+  "description": "A minimal custom footer for pi.",
+  "readme": "# minimal-footer\n\nA minimal custom footer for pi.\n\n![minimal-footer preview](https://raw.githubusercontent.com/diegopetrucci/pi-extensions/main/assets/minimal-footer-preview.png)\n\nIt replaces pi's built-in footer with a cleaner two-line layout that focuses on the information I care about most:\n\n- current git branch\n- TLH-style git dirty counts, ahead/behind counts, and optional PR number\n- current repo name\n- current context percentage\n- red `DUMB ZONE` indicator when context usage is above 200k tokens\n- current model and thinking level\n- OpenAI Codex 5-hour and 7-day usage when available\n- `xp` marker when Pi experimental features are enabled\n\n## Layout\n\nOn wide terminals it renders two lines:\n\n```text\n<git-branch> \u00b7 <git-status>                          <repo-name>\n<context-%>                                     <model> <thinking>\n```\n\nExample:\n\n```text\nfix/remove-detached-image-tasks                     SendItToMy\n44.1%                                              gpt-5.4 high\n```\n\nWhen the project is trusted and the repo has local or remote git state, the top-left line includes the same cached summary as `git-footer`:\n\n```text\nmain \u00b7 +1 ~2 ?3 \u21911 \u2022 PR #42\n```\n\nThe markers are `!` conflicts, `+` staged, `~` unstaged, `?` untracked, `\u2191` ahead, and `\u2193` behind. PR numbers are fetched best-effort with `gh pr view`. Git polling is skipped until Pi reports that the project is trusted, and `git status` is run with fsmonitor disabled.\n\nWhen context usage is above 200k tokens, the bottom-left line includes a red warning:\n\n```text\n44.1% \u00b7 DUMB ZONE\n```\n\nWhen using `openai-codex`, the bottom-left line also includes subscription usage:\n\n```text\n44.1% \u00b7 5h 12% \u00b7 7d 38%\n```\n\nWhen `PI_EXPERIMENTAL=1`, the bottom-left line also includes an experimental marker:\n\n```text\n44.1% \u00b7 xp\n```\n\nOn narrow terminals it falls back to one item per line.\n\n## Install\n\n### Standalone npm package\n\n```bash\npi install npm:@diegopetrucci/pi-minimal-footer\n```\n\n### Collection package\n\n```bash\npi install npm:@diegopetrucci/pi-extensions\n```\n\n### GitHub package\n\n```bash\npi install git:github.com/diegopetrucci/pi-extensions\n```\n\nThen reload pi:\n\n```text\n/reload\n```\n\n## Configuration\n\nConfig files are merged, with project config overriding global config:\n\n- `~/.pi/agent/extensions/minimal-footer.json`\n- `<project>/.pi/minimal-footer.json`\n\nProject config is only read after Pi reports that the project is trusted.\n\nA ready-to-copy sample file is included at [`minimal-footer.example.json`](./minimal-footer.example.json).\n\nExample:\n\n```json\n{\n  \"context\": {\n    \"showPercent\": true,\n    \"dumbZone\": {\n      \"enabled\": true,\n      \"thresholdTokens\": 200000,\n      \"label\": \"DUMB ZONE\",\n      \"color\": \"error\"\n    }\n  },\n  \"codexUsage\": {\n    \"enabled\": true,\n    \"cacheTtlMs\": 300000,\n    \"requestTimeoutMs\": 10000,\n    \"windows\": {\n      \"primary\": {\n        \"enabled\": true,\n        \"label\": \"5h\"\n      },\n      \"secondary\": {\n        \"enabled\": true,\n        \"label\": \"7d\"\n      }\n    }\n  },\n  \"experimentalMarker\": {\n    \"enabled\": true,\n    \"label\": \"xp\",\n    \"color\": \"warning\"\n  },\n  \"gitStatus\": {\n    \"enabled\": true,\n    \"refreshIntervalMs\": 8000,\n    \"gitTimeoutMs\": 1500,\n    \"ghTimeoutMs\": 3000\n  }\n}\n```\n\nDisable `DUMB ZONE`:\n\n```json\n{\n  \"context\": {\n    \"dumbZone\": {\n      \"enabled\": false\n    }\n  }\n}\n```\n\nDisable OpenAI Codex session-limit usage entirely:\n\n```json\n{\n  \"codexUsage\": {\n    \"enabled\": false\n  }\n}\n```\n\nDisable one session-limit window:\n\n```json\n{\n  \"codexUsage\": {\n    \"windows\": {\n      \"secondary\": {\n        \"enabled\": false\n      }\n    }\n  }\n}\n```\n\nDisable the experimental-features marker:\n\n```json\n{\n  \"experimentalMarker\": {\n    \"enabled\": false\n  }\n}\n```\n\nDisable git dirty/ahead/PR status:\n\n```json\n{\n  \"gitStatus\": {\n    \"enabled\": false\n  }\n}\n```\n\n### Config fields\n\n- `context.showPercent`: show the context percentage\n- `context.dumbZone.enabled`: show `DUMB ZONE` when context tokens exceed the threshold\n- `context.dumbZone.thresholdTokens`: token threshold for `DUMB ZONE`\n- `context.dumbZone.label`: warning text\n- `context.dumbZone.color`: theme color for the warning (`error`, `warning`, `accent`, `text`, or `dim`)\n- `codexUsage.enabled`: show OpenAI Codex session-limit usage when using `openai-codex`\n- `codexUsage.cacheTtlMs`: in-memory usage cache duration\n- `codexUsage.requestTimeoutMs`: usage request timeout\n- `codexUsage.windows.primary.enabled`: show the primary usage window\n- `codexUsage.windows.primary.label`: label for the primary usage window\n- `codexUsage.windows.secondary.enabled`: show the secondary usage window\n- `codexUsage.windows.secondary.label`: label for the secondary usage window\n- `experimentalMarker.enabled`: show the marker when `PI_EXPERIMENTAL=1`\n- `experimentalMarker.label`: marker text\n- `experimentalMarker.color`: theme color for the marker (`error`, `warning`, `accent`, `text`, or `dim`)\n- `gitStatus.enabled`: show cached git dirty counts, ahead/behind counts, and optional PR number for trusted projects\n- `gitStatus.refreshIntervalMs`: background git status refresh interval\n- `gitStatus.gitTimeoutMs`: timeout for `git status --porcelain=v2 --branch`\n- `gitStatus.ghTimeoutMs`: timeout for best-effort `gh pr view`\n\n## What it shows\n\n- **Top left:** current git branch plus dirty/ahead/PR status when available\n- **Top right:** current repo directory name\n- **Bottom left:** current context usage percentage, plus red `DUMB ZONE` above 200k context tokens\n- **Bottom left on `openai-codex`:** current context usage percentage plus 5-hour and 7-day Codex usage\n- **Bottom left with `PI_EXPERIMENTAL=1`:** current context usage percentage plus `xp`\n- **Bottom right:** model id and thinking level\n\n## Publishing notes\n\nThis extension also lives inside the broader [`pi-extensions`](../../README.md) collection, but it is set up to be publishable as its own npm package too.\n\n## Notes\n\n- Replaces pi's built-in footer entirely.\n- Uses pi footer data for git branch updates, plus background cached git/gh checks for dirty counts and PR number after project trust is granted.\n- Shows only context percentage, not context window size.\n- Shows `DUMB ZONE` only while context usage is above 200k tokens.\n- Shows the model id rather than a provider-specific display label.\n- Shows `xp` when `PI_EXPERIMENTAL=1`.\n- For `openai-codex`, reads pi's stored OAuth login and fetches usage from ChatGPT's backend usage endpoint.\n- Usage is cached briefly in memory and refreshed after turns.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "terminal",
+    "footer"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/diegopetrucci/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/diegopetrucci/pi-extensions.git",
+    "directory": "extensions/minimal-footer"
+  },
+  "pi": {
+    "extensions": [
+      "index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/diegopetrucci/pi-extensions/main/assets/minimal-footer-preview.png"
+  },
+  "time": {
+    "created": "2026-04-15T20:19:12.214Z",
+    "modified": "2026-06-23T06:45:40.957Z",
+    "0.1.2": "2026-04-15T20:19:12.444Z",
+    "0.1.3": "2026-04-15T20:29:46.948Z",
+    "0.1.4": "2026-05-01T12:59:45.880Z",
+    "0.1.5": "2026-05-01T16:48:55.799Z",
+    "0.1.6": "2026-05-09T11:11:35.892Z",
+    "0.1.7": "2026-05-28T08:10:05.294Z",
+    "0.1.8": "2026-06-01T10:23:32.317Z",
+    "0.1.9": "2026-06-21T13:38:26.954Z",
+    "0.1.10": "2026-06-22T18:47:40.210Z",
+    "0.1.11": "2026-06-23T06:45:40.845Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": null,
+  "download_trend": []
+}

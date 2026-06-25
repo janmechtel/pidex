@@ -1,0 +1,357 @@
+{
+  "name": "@tangle-network/tcloud-agent",
+  "latest_version": "0.3.2",
+  "description": "Agent run-loop primitive over Tangle sandbox transports \u2014 runs an AgentProfile against a brief with criterion gates, budget caps, and streaming events. Includes TangleToolProvider for Pi tool integration.",
+  "readme": "# @tangle-network/tcloud-agent\n\n> Agent run-loop primitive for [Tangle AI Cloud](https://tangle.tools). Runs an `AgentProfile` against a brief, evaluates criterion gates after each iteration, respects budget caps, and streams events. Use it when you need a `run-until-verified` loop over the Tangle sandbox bridge \u2014 without rebuilding the iteration / verification / budget plumbing yourself.\n\n[![npm version](https://img.shields.io/npm/v/@tangle-network/tcloud-agent.svg)](https://www.npmjs.com/package/@tangle-network/tcloud-agent)\n[![License: MIT/Apache-2.0](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](#license)\n\n## Why\n\nMost agent libraries either (a) ship a giant framework with opinions baked in (LangChain, Claude Agent SDK), or (b) give you a streaming-chat primitive and leave the loop to you (Vercel AI SDK). `tcloud-agent` is the third thing: a **single tight run-loop** that knows about *iterations*, *verification gates*, and *budget* \u2014 and nothing else. You bring the profile, the brief, and the criteria; it handles the loop and the streaming.\n\nIt composes the [Tangle TCloud SDK](https://www.npmjs.com/package/@tangle-network/tcloud) and runs over the sandbox-harness `BridgeSession`, so every iteration goes through Tangle routing with full control over operators, models, and policies.\n\n---\n\n## Table of contents\n\n- [Install](#install)\n- [Quick start](#quick-start)\n- [Concepts](#concepts)\n  - [`AgentRunOptions`](#agentrunoptions)\n  - [`AgentRunCriterion`](#agentruncriterion)\n  - [`AgentBudget`](#agentbudget)\n  - [`AgentRunResult` and verdicts](#agentrunresult-and-verdicts)\n  - [Streaming events](#streaming-events)\n- [Examples](#examples)\n  - [Minimal `run()`](#example-1-minimal-run)\n  - [Stream events to stdout](#example-2-stream-events-to-stdout)\n  - [Cataloged profile + custom criteria](#example-3-cataloged-profile--custom-criteria)\n  - [Budget-bounded loop](#example-4-budget-bounded-loop)\n  - [Workspace-bound run](#example-5-workspace-bound-run)\n  - [Inline `AgentProfile` from `@tangle-network/sandbox`](#example-6-inline-agentprofile)\n  - [Resume a session across calls](#example-7-resume-a-session-across-calls)\n  - [TangleToolProvider for Pi](#example-8-tangletoolprovider-for-pi)\n- [API reference](#api-reference)\n- [Architecture](#architecture)\n- [Comparison vs alternatives](#comparison-vs-alternatives)\n- [FAQ](#faq)\n- [Contributing](#contributing)\n- [License](#license)\n\n---\n\n## Install\n\n```bash\npnpm add @tangle-network/tcloud-agent @tangle-network/tcloud\n# npm install / yarn add also work\n```\n\nPeer dependencies (only needed for the Pi-extension entry point \u2014 skip if you're driving the agent from a server / CLI):\n\n```bash\npnpm add -D @mariozechner/pi-coding-agent @mariozechner/pi-tui\n```\n\nRequires Node 20+.\n\n---\n\n## Quick start\n\n```ts\nimport { TCloud } from '@tangle-network/tcloud'\nimport { agent } from '@tangle-network/tcloud-agent'\n\nconst client = new TCloud({ apiKey: process.env.TCLOUD_API_KEY! })\n\nconst result = await agent(client, {\n  profile: 'sf-proposer',\n  brief: 'Scaffold a Vite + React package and confirm pnpm build passes.',\n  criteria: [\n    { name: 'build-passes', check: async (ctx) => ({ ok: ctx.lastMessage.includes('pnpm build: ok') }) },\n  ],\n  budget: { iterations: 5, wallSec: 600, usd: 1 },\n}).run()\n\nconsole.log(result.verdict)        // 'verified' | 'blocked' | 'budget-exhausted' | 'error'\nconsole.log(result.iterations)     // how many turns it took\nconsole.log(result.usd)            // approximate spend (null if upstream didn't report usage)\nconsole.log(result.transcript)     // full conversation\n```\n\nFive lines of config, one `await`. The loop runs until *every* criterion returns `{ ok: true }`, the budget exhausts, or an error escapes the bridge.\n\n---\n\n## Concepts\n\n### `AgentRunOptions`\n\n| Field | Type | Description |\n|---|---|---|\n| `profile` | `AgentProfile \\| string` | Inline profile object (from `@tangle-network/sandbox`) or a cataloged profile id resolved server-side |\n| `brief` | `string` | First user turn \u2014 what the agent is being asked to do |\n| `criteria?` | `AgentRunCriterion[]` | Completion gates evaluated after each iteration. Empty/undefined \u21d2 first reply verifies. |\n| `budget?` | `AgentBudget` | `{ iterations?, wallSec?, usd? }` \u2014 first breach exits with `budget-exhausted` |\n| `resume?` | `string` | Stable session id for the selected transport |\n| `workspace?` | `{ dir: string }` | Transport-scoped workspace context; surfaced on `AgentRunContext.workspaceDir`. It is not injected into the prompt. |\n| `unlock?` | `string` | `BridgeOptions.unlock`. Falls back to `process.env.BRIDGE_UNLOCK`. |\n| `bridgeUrl?` | `string` | BYOB cli-bridge URL (forwarded to `BridgeOptions.bridgeUrl`) |\n| `bridgeBearer?` | `string` | BYOB cli-bridge bearer token |\n| `transport?` | `AgentSessionTransport` | Explicit runtime transport. Omit when using `agent(client, opts)` for router bridge. |\n| `stream?` | `boolean` | `false` to disable SSE \u2014 each iteration calls `chat()` non-streaming, emits one `message.delta` per turn. Default `true`. |\n\n### `AgentRunCriterion`\n\n```ts\ninterface AgentRunCriterion {\n  name: string  // stable id; surfaced on result.blockedBy if it fails\n  check: (ctx: AgentRunContext) => Promise<{ ok: boolean; reason?: string }> | { ok: boolean; reason?: string }\n}\n```\n\nCriteria are checked in order **after each assistant turn**. If any criterion returns `ok: false`, the loop continues to the next iteration with the criterion's `reason` appended as a follow-up user message. When *all* criteria pass, verdict is `verified`.\n\nEmpty `criteria` \u21d2 the first assistant reply auto-verifies.\n\n### `AgentBudget`\n\n```ts\ninterface AgentBudget {\n  iterations?: number  // max loop iterations\n  wallSec?: number     // wall-clock cap; first breach exits\n  usd?: number         // best-effort spend cap (relies on ChatCompletion.usage)\n}\n```\n\nAny field can be omitted. The first breach wins; verdict is `budget-exhausted`.\n\n### `AgentRunResult` and verdicts\n\n```ts\ninterface AgentRunResult {\n  verdict: 'verified' | 'blocked' | 'budget-exhausted' | 'error'\n  iterations: number\n  wallMs: number\n  usd: number | null         // null when no usage was reported\n  transcript: { role: 'user' | 'assistant' | 'system'; content: string }[]\n  blockedBy?: string         // criterion.name when verdict === 'blocked'\n  error?: string             // captured message when verdict === 'error'\n}\n```\n\n`run()` **never throws** \u2014 bridge failures land as `verdict: 'error'` with the message captured. Branch on `verdict`, not on try/catch.\n\n### Streaming events\n\n`stream()` emits `AgentEvent`s in this order per iteration:\n\n```\niteration.start\n  \u2192 message.delta*           (zero or more)\n  \u2192 iteration.complete\n  \u2192 criterion.check*         (one per evaluated criterion)\n... next iteration, or:\nverdict                       (terminal \u2014 same payload as run() returns)\n```\n\n---\n\n## Examples\n\n### Example 1: Minimal `run()`\n\n```ts\nimport { TCloud } from '@tangle-network/tcloud'\nimport { agent } from '@tangle-network/tcloud-agent'\n\nconst client = new TCloud({ apiKey: process.env.TCLOUD_API_KEY! })\nconst result = await agent(client, {\n  profile: 'sf-proposer',\n  brief: 'Reply with the literal text \"ok\".',\n}).run()\n\nconsole.log(result.verdict, '\u00b7', result.iterations, 'iter')\n```\n\nNo criteria, no budget \u2014 first reply \u21d2 verdict `verified`. Useful for smoke tests.\n\n### Example 2: Stream events to stdout\n\n```ts\nfor await (const ev of agent(client, opts).stream()) {\n  switch (ev.type) {\n    case 'iteration.start':\n      process.stdout.write(`\\n[iter ${ev.iteration}] `)\n      break\n    case 'message.delta':\n      process.stdout.write(ev.text)\n      break\n    case 'criterion.check':\n      process.stdout.write(`\\n  ${ev.ok ? '\u2713' : '\u2717'} ${ev.name}${ev.reason ? ` \u2014 ${ev.reason}` : ''}\\n`)\n      break\n    case 'verdict':\n      process.stdout.write(`\\n[verdict: ${ev.verdict}, ${ev.iterations} iter, $${ev.usd ?? '?'}]\\n`)\n      break\n  }\n}\n```\n\nLive observability into the loop \u2014 exactly what `run()` consumes internally.\n\n### Example 3: Cataloged profile + custom criteria\n\n```ts\nconst result = await agent(client, {\n  profile: 'sf-proposer',\n  brief: 'Scaffold an agent-runtime bundle for a music-producer agent.',\n  criteria: [\n    {\n      name: 'manifest-valid',\n      check: async (ctx) => {\n        const m = ctx.lastMessage.match(/^\\{[\\s\\S]+\\}$/m)\n        try {\n          JSON.parse(m?.[0] ?? '')\n          return { ok: true }\n        } catch (err) {\n          return { ok: false, reason: `manifest is not valid JSON: ${(err as Error).message}` }\n        }\n      },\n    },\n    {\n      name: 'has-frontmatter',\n      check: async (ctx) => ({\n        ok: /^---\\n[\\s\\S]+?\\n---/m.test(ctx.lastMessage),\n        reason: 'system-prompt.md frontmatter missing',\n      }),\n    },\n  ],\n}).run()\n\nif (result.verdict === 'blocked') {\n  console.error(`blocked by: ${result.blockedBy}`)\n}\n```\n\nWhen a criterion fails, the loop appends `Previous attempt failed: <reason>` as the next user turn \u2014 the agent gets to fix it without you re-prompting.\n\n### Example 4: Budget-bounded loop\n\n```ts\nconst result = await agent(client, {\n  profile: 'sf-proposer',\n  brief: 'Generate 50 manifest variants and report which pass schema validation.',\n  budget: {\n    iterations: 8,    // hard cap on loop count\n    wallSec: 300,     // 5 minutes wall clock\n    usd: 2,           // soft cap \u2014 relies on usage reporting\n  },\n}).run()\n\nif (result.verdict === 'budget-exhausted') {\n  console.warn(`stopped at ${result.iterations} iter / ${result.wallMs}ms / $${result.usd}`)\n}\n```\n\nCaps are checked at iteration boundaries. First breach wins \u2014 useful for cron jobs and CI gates.\n\n### Example 5: Workspace-aware criteria\n\n```ts\nimport { mkdtempSync } from 'node:fs'\nimport { tmpdir } from 'node:os'\nimport { join } from 'node:path'\n\nconst workspace = mkdtempSync(join(tmpdir(), 'agent-run-'))\n\nconst result = await agent(client, {\n  profile: 'sf-proposer',\n  brief: `Write the manifest into ${workspace}/manifest.json.`,\n  workspace: { dir: workspace },\n  criteria: [\n    {\n      name: 'file-written',\n      check: async (ctx) => {\n        const { existsSync } = await import('node:fs')\n        return {\n          ok: existsSync(`${ctx.workspaceDir}/manifest.json`),\n          reason: 'manifest.json missing in workspace',\n        }\n      },\n    },\n  ],\n}).run()\n```\n\n`workspace.dir` is surfaced to criteria and to transports that can enforce workspace context. It is not injected into the prompt; include the path in `brief` when a bridge-backed agent needs to know it.\n\n### Example 6: Inline `AgentProfile`\n\n```ts\nimport type { AgentProfile } from '@tangle-network/sandbox'\n\nconst profile: AgentProfile = {\n  name: 'one-off-reviewer',\n  systemPrompt: 'You review TypeScript diffs and report PASS or FAIL with a one-line justification.',\n  capabilities: { /* ... */ },\n}\n\nconst result = await agent(client, {\n  profile,                            // inline, not cataloged\n  brief: 'Review this diff:\\n```diff\\n... \\n```',\n}).run()\n```\n\nDrop in any `AgentProfile` object directly \u2014 no server-side catalog lookup, no extra round-trip.\n\n### Example 7: Resume a session across calls\n\n```ts\nconst first = await agent(client, {\n  profile: 'sf-proposer',\n  brief: 'Plan the family scaffold; reply with the plan only.',\n}).run()\n\nconst second = await agent(client, {\n  profile: 'sf-proposer',\n  brief: 'Implement the plan you just produced.',\n  resume: first.transcript[0]?.content?.startsWith('session:') ? /* extract id */ '' : undefined,\n}).run()\n```\n\n`resume` forwards to `BridgeOptions.resume` \u2014 when the bridge supports it, the second agent starts on top of the first agent's session state.\n\n### Example 8: `TangleToolProvider` for Pi\n\n```ts\nimport { TangleToolProvider, type CapabilityHandler } from '@tangle-network/tcloud-agent'\n\nconst handlers: CapabilityHandler[] = [\n  {\n    name: 'tangle_search',\n    description: 'Search the Tangle docs',\n    parameters: { query: { type: 'string' } },\n    execute: async ({ query }) => ({\n      results: await fetch(`https://docs.tangle.tools/search?q=${encodeURIComponent(query as string)}`).then(r => r.text()),\n    }),\n  },\n]\n\nconst provider = new TangleToolProvider({ handlers })\nconst tools = provider.toOpenAITools()       // hand to your chat call\nawait provider.invoke('tangle_search', { query: 'sandbox bridge' })\n```\n\nUse directly with any OpenAI-compatible chat surface, or register the package as a Pi extension via the `./pi-extension` subpath.\n\n---\n\n## API reference\n\n### `agent(client, options)` / `new Agent(client, options)`\n\nBuild a runnable agent. Identical surface \u2014 function form is just `new Agent(...)`.\n\n| Method | Signature | Description |\n|---|---|---|\n| `run` | `(): Promise<AgentRunResult>` | Run to completion. Never throws \u2014 failures land on `result.verdict === 'error'`. |\n| `stream` | `(): AsyncIterable<AgentEvent>` | Event stream. Final event is always `{ type: 'verdict', ... }`. |\n\n`run()` is a thin consumer of `stream()` \u2014 the loop logic lives once.\n\n### Re-exports\n\n`Agent`, `agent`, transport factories (`routerBridgeTransport`, `localCliBridgeTransport`, `sandboxSdkTransport`), all `AgentRun*` types, `AgentSession*` types, `AgentEvent`, `TextPart`, `ToolPart`, `ToolState`, `TangleToolProvider`, `CapabilityHandler`, `ToolResult`.\n\n### Subpath: `@tangle-network/tcloud-agent/pi-extension`\n\nDrop-in [Pi](https://github.com/mariozechner/pi) extension that registers the agent runner + `TangleToolProvider` into a Pi config. Peer-installable; requires `@mariozechner/pi-coding-agent` and `@mariozechner/pi-tui`.\n\n```ts\nimport tcloudExtension from '@tangle-network/tcloud-agent/pi-extension'\n\nexport default {\n  extensions: [tcloudExtension],\n}\n```\n\n---\n\n## Architecture\n\n```\n                \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n                \u2502  Agent  /  agent()          \u2502\n                \u2502  - iteration counter        \u2502\n                \u2502  - criteria evaluation      \u2502\n                \u2502  - budget tracker           \u2502\n                \u2502  - event emitter            \u2502\n                \u2514\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n                   \u2502\n                   \u25bc\n        \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n        \u2502  AgentSessionTransport      \u2502\n        \u2502  - router bridge            \u2502\n        \u2502  - local cli-bridge         \u2502\n        \u2502  - Sandbox SDK runtime      \u2502\n        \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n                       \u2502\n                       \u25bc\n        \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n        \u2502 Tangle Router / cli-bridge / Sandbox   \u2502\n        \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\nThe runner owns the loop, not the runtime. The runtime is an `AgentSessionTransport`: router-mediated sandbox bridge for hosted/operator routing, direct cli-bridge for local shim usage, or the Sandbox SDK for first-class sandbox execution. Want operator rotation? Use [`TCloudClient.rotating()`](https://www.npmjs.com/package/@tangle-network/tcloud) for stateless inference; sandbox sessions intentionally bind to one runtime.\n\n---\n\n## Comparison vs alternatives\n\n| | tcloud-agent | LangChain agent | Vercel AI SDK | Claude Agent SDK |\n|---|---|---|---|---|\n| Loop primitive | \u2705 minimal | heavy framework | none (DIY loop) | subprocess runtime |\n| Streaming events | \u2705 typed union | yes | yes | yes |\n| Criterion gates | \u2705 first-class | manual | manual | manual |\n| Budget caps | \u2705 first-class | manual | manual | manual |\n| Workspace policy | transport-scoped | manual | manual | implicit |\n| Verdict shape | typed enum | string | string | string |\n| Browser-runnable | partial (Node 20+ today) | yes | \u2705 | \u274c subprocess |\n| Tangle routing / sandbox | \u2705 native | adapter | adapter | n/a |\n\n**Use `tcloud-agent` when:** you want a small, opinionated run-loop primitive over Tangle infrastructure with built-in criterion + budget gates. **Skip it when:** you only need a single chat call (use the TCloud SDK directly) or you want a full agent framework with planners / memory / tool registries (LangChain or Mastra).\n\n---\n\n## FAQ\n\n**Q: How does this differ from `@tangle-network/tcloud`?**\nA: TCloud is the SDK \u2014 single chat / completion / embedding calls, `.bridge()` for bridge sessions, `.sandbox()` / `TCloudSandbox` for Sandbox SDK access, and `.rotating()` for operator rotation. tcloud-agent adds the *iteration* / *verification* / *budget* loop on top of a sandbox-capable transport.\n\n**Q: What is \"the bridge\"?**\nA: `TCloudClient.bridge(options)` opens a `BridgeSession`. On a normal TCloud client it routes through the Tangle Router. On `TCloudClient.fromCliBridge(...)` it talks directly to a local cli-bridge and maps `resume` to cli-bridge's `session_id`.\n\n**Q: Can I use this without the bridge / sandbox?**\nA: Yes. Pass an explicit transport: `sandboxSdkTransport({ sandbox })`, `localCliBridgeTransport(...)`, or your own `AgentSessionTransport`. Existing `agent(client, opts)` calls still use the router bridge adapter by default.\n\n**Q: Are tool calls supported?**\nA: Not as first-class `AgentEvent`s yet. Standard OpenAI-shaped output flows through `message.delta` until the upstream bridge/runtime protocol exposes tool parts as stable stream events.\n\n---\n\n## Contributing\n\nCode lives in [tangle-network/tcloud](https://github.com/tangle-network/tcloud) under `packages/tcloud-agent/`.\n\n```bash\ngit clone https://github.com/tangle-network/tcloud\ncd tcloud\npnpm install\npnpm --filter @tangle-network/tcloud-agent build\npnpm --filter @tangle-network/tcloud-agent test\n```\n\n---\n\n## License\n\nDual-licensed under either:\n\n- [MIT License](./LICENSE-MIT)\n- [Apache License 2.0](./LICENSE-APACHE)\n\nat your option.\n",
+  "keywords": [
+    "ai",
+    "agent",
+    "agent-runner",
+    "agent-loop",
+    "llm",
+    "tangle",
+    "sandbox",
+    "bridge",
+    "tool-use",
+    "pi-package"
+  ],
+  "author": {
+    "name": "Tangle Network"
+  },
+  "license": "(MIT OR Apache-2.0)",
+  "homepage": "https://github.com/tangle-network/tcloud/tree/main/packages/tcloud-agent#readme",
+  "repository": {
+    "url": "git+https://github.com/tangle-network/tcloud.git",
+    "type": "git",
+    "directory": "packages/tcloud-agent"
+  },
+  "pi": {
+    "extensions": [
+      "./src/pi-extension.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-26T01:12:26.713Z",
+    "modified": "2026-06-18T17:49:03.095Z",
+    "0.1.0": "2026-04-26T01:12:26.965Z",
+    "0.3.0": "2026-04-26T05:04:24.419Z",
+    "0.3.1": "2026-05-28T20:52:44.279Z",
+    "0.3.2": "2026-05-28T20:57:31.319Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 186,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 258
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 103
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 92
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 40
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 292
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 50
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 20
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 147
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 41
+    }
+  ]
+}

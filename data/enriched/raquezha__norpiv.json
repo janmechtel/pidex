@@ -1,0 +1,45 @@
+{
+  "name": "@raquezha/norpiv",
+  "latest_version": "0.0.6",
+  "description": "Bundled RPIV workflow skills for Pi, Claude, and Codex-style coding agents",
+  "readme": "# norpiv (Lean RPIV Workflow Engine)\n\nRPIV: a gated workflow for reliable AI coding agents.\n\n## \ud83d\udd01 The Lifecycle\n\nThe RPIV engine splits task execution into separate, focused phases:\n\n| Phase | Command | Purpose | Input / Output Files |\n| :--- | :--- | :--- | :--- |\n| **1. Ingest** | `/triage [source]:[id]` | Initial task verification and workspace setup. | Creates `.workflow/tasks/[source-id]/WORK.md` & `metadata.json` |\n| **2. Scoping** | `/frame` | Author a clear, structured task brief. | Populates `WORK.md` \u2794 `[BRIEF]` section |\n| **3. Interrogate**| `/grill-with-docs` | Stress-test brief against rules and docs. | Records decisions in `WORK.md` \u2794 `[GRILL]` |\n| **4. Strategy** | `/plan` | Draft thin, independently testable slices. | Writes checkbox items in `WORK.md` \u2794 `[PLAN]` |\n| **5. Coding** | `/implement` | Execute one approved plan slice (needs permission). | Modifies code; records updates in `WORK.md` \u2794 `[LOG]` |\n| **6. Truth Test** | `/verify` | Run tests, lint, and verify quality. | Appends results to `[LOG]` |\n| **7. Close** | `/sync` | Bridge local progress with external trackers. | Posts summary updates to Jira, GitHub, or GitLab |\n\nAuxiliary hygiene:\n\n| Command | Purpose | Input / Output Files |\n| :--- | :--- | :--- |\n| `/post-merge-prune` | Delete stale local branches after a PR/MR is merged, prune remote refs, and clean completed task folders. | Post-merge branch cleanup plus safe task-folder cleanup |\n\n---\n\n## notrace relationship\n\nnotrace is an optional retrospective layer around RPIV.\n\nRules:\n\n- **RPIV must work without notrace**.\n- **notrace may attach to RPIV when task state exists**.\n- `WORK.md` remains the RPIV source of truth whether notrace is installed or not.\n- `.notrace/` owns notrace artifacts.\n- `.workflow/` owns RPIV task state.\n- notrace artifacts and reviews may be referenced from `WORK.md [LOG]`, but RPIV phases must not depend on those files being present.\n\n## \ud83d\udee1\ufe0f Critical Guardrails\n\n- **Measure Twice, Cut Once**: Never implement code during scoping or planning. The agent will wait for an explicit `EXECUTE` statement before modifying files.\n- **One Source of Truth**: All task state belongs in `.workflow/tasks/[source-id]/WORK.md`. Avoid creating separate `PROBLEM.md` or `PLAN.md` files.\n- **Safe Branching**: Triage and planning happen on the main branch. Create the feature branch (`feat/*` or `fix/*`) only when starting `/implement`.\n\n## \ud83d\udce6 Install as a skill bundle\n\n### From GitHub with `npx skills add`\n\nBest for trying or handing off RPIV skills without installing the full `nothing` setup:\n\n```bash\nnpx -y skills add raquezha/nothing --full-depth -g -a pi \\\n  -s triage frame grill-with-docs plan implement verify sync post-merge-prune update-docs distill \\\n  -y\n```\n\n### From npm\n\n```bash\nnpm install -g @raquezha/norpiv\n```\n\nInstall the bundled skills for your agent runtime:\n\n```bash\n# Pi default: ~/.pi/agent/skills/{triage,frame,plan,...}\nnorpiv-install\n\n# Other adapters\nnorpiv-install --target claude\nnorpiv-install --target codex\nnorpiv-install --target all\n```\n\nTargets:\n- `pi` links skills into `~/.pi/agent/skills`.\n- `claude` links skills into `~/.claude/skills`.\n- `codex` installs the skill docs under `~/.codex/skills/norpiv` and writes an `AGENTS.md` adapter because Codex-style environments do not universally auto-load `SKILL.md` bundles.\n\n`norpiv-install` also installs the shared helper scripts under a sibling `scripts/` directory so skill references like `../scripts/triage_helper.sh` resolve after installation.\n\n## \ud83e\udde2 Hats\n\n| Hat | Purpose |\n| :--- | :--- |\n| `pi --rpiv` | Full RPIV workflow. Loads triage, frame, grill-with-docs, plan, implement, verify, sync, post-merge-prune, and update-docs. |\n| `pi --notes` | Conversation distiller. Saves useful thinking to Obsidian without RPIV ceremony. |\n\n## \ud83d\udcdd Pre-RPIV note capture\n\n### distill\n\nConverts the current conversation into a durable Obsidian-ready markdown note.\n\n**Trigger:** `/distill`, \"distill this\", \"save the useful parts\", \"save this as a note\"\n\n**Output:** A single `.md` file written to `$OBSIDIAN_VAULT/distilled/` or `~/notes/distilled/`\n\n**Use when:** The conversation produced useful thinking that should survive outside chat \u2014 an idea, a research thread, a decision, a concept \u2014 but is not yet ready for RPIV or a PRD.\n\n**Does not:** Create PRDs, start RPIV, require a ticket, or ask the user to classify their idea.\n\n---\n\n**Relationship to RPIV:**\n\n```text\nconversation \u2192 /distill \u2192 Obsidian note    (pre-commitment)\nObsidian note \u2192 /triage \u2192 RPIV             (only when ready to commit)\n```\n\n`distill` is the missing layer before RPIV. Use `pi --notes` to load it.\n\n## \ud83d\ude80 Quick Start Example\n\n1. **Activate the RPIV Hat** from the full `nothing` setup:\n   ```bash\n   pi --rpiv\n   ```\n\n   If installed via `npx skills add` or `norpiv-install`, invoke the skills directly in your agent instead.\n\n2. **Triage an Issue**:\n   ```text\n   /triage github:45\n   ```\n\n3. **Frame the Work**:\n   ```text\n   /frame\n   ```\n\n4. **Verify Constraints**:\n   ```text\n   /grill-with-docs\n   ```\n\n5. **Write the Plan Slices**:\n   ```text\n   /plan\n   ```\n\n6. **Authorize Execution**:\n   Provide the agent explicit permission to implement:\n   ```text\n   EXECUTE\n   /implement\n   ```\n\n7. **Verify & Close**:\n   ```text\n   /verify\n   /sync\n   /post-merge-prune\n   ```\n\n## \ud83e\udded Shared helper scripts\n\nThe bundle includes helper scripts used by the workflow skills:\n\n- `scripts/triage_helper.sh`\n- `scripts/validate_active_task.sh`\n- `scripts/reposcry-bootstrap.sh`\n- `scripts/reposcry-task-context.sh`\n- `scripts/reposcry-refresh.sh`\n\nWhen skills are loaded directly from this package, relative references like `../scripts/...` resolve against the package root. When skills are installed with `norpiv-install`, the same layout is recreated under the target runtime.\n\n## \ud83d\udd0e Optional RepoScry integration\n\nRepoScry is an optional repo-memory layer for RPIV. norpiv does **not** require it.\n\nIf `reposcry` is installed:\n\n```bash\n./scripts/reposcry-bootstrap.sh\n./scripts/reposcry-task-context.sh \"fix dependency graph rebuild\"\n# edit code\n./scripts/reposcry-refresh.sh main\nreposcry validate main HEAD\n```\n\nTypical usage by phase:\n\n- `/triage`: optionally seed `.reposcry/` with `scripts/reposcry-bootstrap.sh`\n- `/frame`: optionally generate `.reposcry/AI_CONTEXT.md` with `scripts/reposcry-task-context.sh`\n- `/grill-with-docs`: optionally use `reposcry query_graph`, `get_architecture_overview`, and `get_impact_radius`\n- `/implement`: optionally run `scripts/reposcry-refresh.sh` after edit batches\n- `/verify`: optionally add `reposcry validate main HEAD` and affected-flow output as extra evidence\n\nIf RepoScry is absent, the helpers no-op and RPIV continues with normal repo reading, grep, and tests.\n\nRepoScry guardrails:\n\n- `.reposcry/` is generated local cache and must not be committed.\n- `scripts/reposcry-bootstrap.sh` automatically adds `.reposcry/` to the project `.gitignore` before initializing RepoScry.\n- If `.reposcry/` is already tracked or staged, bootstrap stops and tells you to remove it from the index.\n- `.reposcryignore` is indexing policy, not cache. Review and commit it when you want stable RepoScry behavior across machines.\n",
+  "keywords": [
+    "agent-skills",
+    "pi-agent",
+    "claude-skills",
+    "codex",
+    "workflow",
+    "rpiv",
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "skills": [
+      "triage",
+      "frame",
+      "grill-with-docs",
+      "plan",
+      "implement",
+      "verify",
+      "sync",
+      "update-docs",
+      "post-merge-prune",
+      "distill"
+    ]
+  },
+  "time": {
+    "created": "2026-06-08T17:15:52.020Z",
+    "modified": "2026-06-20T07:50:36.487Z",
+    "0.0.2": "2026-06-08T17:15:52.382Z",
+    "0.0.3": "2026-06-13T17:32:31.151Z",
+    "0.0.4": "2026-06-15T16:59:21.645Z",
+    "0.0.5": "2026-06-18T01:41:49.919Z",
+    "0.0.6": "2026-06-20T07:50:36.326Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 331,
+  "download_trend": []
+}

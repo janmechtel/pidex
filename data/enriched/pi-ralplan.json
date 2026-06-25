@@ -1,0 +1,357 @@
+{
+  "name": "pi-ralplan",
+  "latest_version": "0.1.8",
+  "description": "Consensus-driven planning extension for Pi",
+  "readme": "# pi-ralplan\n\n[![npm](https://img.shields.io/npm/v/pi-ralplan?label=npm)](https://npmjs.com/package/pi-ralplan) [![GitHub](https://img.shields.io/github/v/tag/lmn451/pi-ralplan?label=github)](https://github.com/lmn451/pi-ralplan)\n\n> **Note:** The `docs/` folder is managed by the [`pi-docs`](https://github.com/lmn451/pi-docs) package.\n> **Best with pi-subagentura:** Works better when paired with the `pi-subagentura` package for spawning sub-agents.\n\nConsensus-driven planning extension for [Pi](https://pi.dev). Brings the RALPLAN pipeline from oh-my-claudecode to Pi as an extension + skill package.\n\n## Features\n\n- **Consensus Planning** \u2014 Planner \u2192 Architect \u2192 Critic iteration loop\n- **Configurable Pipeline** \u2014 RALPLAN \u2192 Execution \u2192 Verification \u2192 QA\n- **Stage Prompt Injection** \u2014 Automatic stage-specific prompts via `before_agent_start`\n- **Signal-Based Advancement** \u2014 Detects `PIPELINE_*_COMPLETE` signals to auto-advance\n- **Session Persistence** \u2014 Dual persistence: session entries (branch-safe) + file state (resume)\n- **UI Integration** \u2014 Status line and progress widget\n- **Deliberate Mode** \u2014 Enhanced scrutiny for high-risk work (auth, migrations, production)\n\n## Installation\n\n### As a Pi package\n\n```bash\npi install npm:pi-ralplan\n```\n\nOr for local development:\n\n```bash\ncd ~/dev/pi-ralplan\npi install -l .\n```\n\n### Manual (copy files)\n\nCopy the extension and skill to your Pi directories:\n\n```bash\nmkdir -p ~/.pi/agent/extensions/ralplan\nmkdir -p ~/.pi/agent/skills/ralplan\ncp -r pi/extensions/ralplan/* ~/.pi/agent/extensions/ralplan/\ncp -r pi/skills/ralplan/* ~/.pi/agent/skills/ralplan/\n```\n\nThen reload Pi with `/reload`.\n\n## Usage\n\n### Start a planning session\n\n```\n/ralplan build me a todo app\n```\n\nOr start Pi with the flag:\n\n```bash\npi --ralplan \"build me a todo app\"\n```\n\n> **Auto-start is slash-only.** The pipeline auto-starts ONLY when the prompt\n> begins with `/ralplan` or `/brainstorm` (or when `--ralplan` / `--brainstorm`\n> flags are used). Bare mentions of `ralplan` or `brainstorm` in prose \u2014\n> including action verbs like `use ralplan to plan this` or start-of-prompt\n> directives like `ralplan: build auth` \u2014 do NOT trigger auto-start. This\n> prevents the planner/architect/critic role prompts (which all mention\n> `ralplan` naturally in their role descriptions) from accidentally\n> re-triggering a fresh pipeline for each consensus round. To start a pipeline\n> from prose, prefix the prompt with `/`:\n>\n> ```\n> /ralplan build me a todo app\n> ```\n\n### Worktrees\n\nEach pipeline run creates a single Git worktree under `<repo>-worktrees/`.\nFollow-up sessions launched from inside that worktree **reuse the same\nworktree** instead of creating a sibling \u2014 one worktree per pipeline run,\nregardless of how many consensus rounds are run. This is detected via\n`git rev-parse --git-dir` vs `--git-common-dir` and works automatically; no\nconfiguration required.\n\n### Commands\n\n| Command              | Description              |\n| -------------------- | ------------------------ |\n| `/ralplan [idea]`    | Start consensus planning |\n| `/ralplan:status`    | Show pipeline status     |\n| `/ralplan:cancel`    | Cancel active session    |\n| `/ralplan:skip`      | Skip current stage       |\n| `/ralplan:artifacts` | List planning artifacts  |\n\n### Tools (callable by LLM)\n\n| Tool                      | Description              |\n| ------------------------- | ------------------------ |\n| `ralplan_advance`         | Advance to next stage    |\n| `ralplan_submit_artifact` | Save spec/plan/test-spec |\n| `ralplan_set_config`      | Modify pipeline config   |\n\n### Pipeline Stages\n\n1. **RALPLAN** \u2014 Consensus planning (spec + plan creation)\n2. **Execution** \u2014 Implement the approved plan\n3. **Verification (RALPH)** \u2014 Review implementation quality\n4. **QA** \u2014 Build / lint / test cycling\n\n### Completion Signals\n\nThe LLM emits these signals to advance stages:\n\n- `PIPELINE_RALPLAN_COMPLETE`\n- `PIPELINE_EXECUTION_COMPLETE`\n- `PIPELINE_RALPH_COMPLETE`\n- `PIPELINE_QA_COMPLETE`\n\n### Configuration\n\nAdd to `.pi/settings.json`:\n\n```json\n{\n  \"ralplan\": {\n    \"planning\": \"ralplan\",\n    \"execution\": \"solo\",\n    \"verification\": {\n      \"engine\": \"ralph\",\n      \"maxIterations\": 100\n    },\n    \"qa\": true\n  }\n}\n```\n\n| Option         | Values                                           | Description                      |\n| -------------- | ------------------------------------------------ | -------------------------------- |\n| `planning`     | `\"ralplan\"`, `\"direct\"`, `false`                 | Planning mode or skip            |\n| `execution`    | `\"solo\"`, `\"team\"`                               | Sequential or parallel execution |\n| `verification` | `{ engine: \"ralph\", maxIterations: n }`, `false` | Verification settings            |\n| `qa`           | `true`, `false`                                  | Enable QA stage                  |\n\n## Architecture\n\n```\nUser Input \u2192 /ralplan Command \u2192 Pipeline Init \u2192 Stage Machine\n                                      \u2193\nAgent Loop \u2190 Signal Detection \u2190 Agent Response \u2190 Stage Prompt\n```\n\n```\npi/extensions/ralplan/\n\u251c\u2500\u2500 index.ts          # Main extension entry point\n\u251c\u2500\u2500 pipeline.ts       # Stage machine + config\n\u251c\u2500\u2500 adapters.ts       # Stage prompt generators\n\u251c\u2500\u2500 prompts.ts        # Prompt templates\n\u251c\u2500\u2500 state.ts          # Session + file persistence\n\u251c\u2500\u2500 signals.ts        # Signal detection\n\u251c\u2500\u2500 artifacts.ts      # Plan file management\n\u251c\u2500\u2500 worktree.ts       # Git worktree management (with reuse rule)\n\u251c\u2500\u2500 brainstorm.ts     # Brainstorm mode sub-phase logic\n\u251c\u2500\u2500 naming.ts         # Filename generation helpers\n\u2514\u2500\u2500 utils.ts          # Shared helpers\n\npi/skills/ralplan/\n\u251c\u2500\u2500 SKILL.md                      # Skill definition\n\u251c\u2500\u2500 prompts/\n\u2502   \u251c\u2500\u2500 planner.md\n\u2502   \u251c\u2500\u2500 architect.md\n\u2502   \u2514\u2500\u2500 critic.md\n\u2514\u2500\u2500 references/\n    \u2514\u2500\u2500 consensus-workflow.md\n```\n\n## Troubleshooting\n\n| Issue                    | Solution                                                          |\n| ------------------------ | ----------------------------------------------------------------- |\n| Signal not detected      | Ensure the exact signal text appears in the assistant response    |\n| State lost after `/tree` | State is branch-safe; check `/.pi/ralplan/state.json` as fallback |\n| Pipeline stuck           | Use `/ralplan:skip` to skip the current stage                     |\n| Extension not loading    | Verify paths in `package.json` `pi.extensions` and run `/reload`  |\n\n## Testing\n\n```bash\nnpm test\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "ralplan",
+    "planning",
+    "consensus"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/lmn451/pi-ralplan#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lmn451/pi-ralplan.git"
+  },
+  "pi": {
+    "extensions": [
+      "./pi/extensions/ralplan"
+    ],
+    "skills": [
+      "./pi/skills/ralplan",
+      "./pi/skills/deep-interview"
+    ]
+  },
+  "time": {
+    "created": "2026-04-28T18:48:57.427Z",
+    "modified": "2026-06-18T18:42:45.589Z",
+    "0.1.0": "2026-04-28T18:48:57.630Z",
+    "0.1.1": "2026-04-28T20:19:53.953Z",
+    "0.1.2": "2026-04-28T20:23:48.613Z",
+    "0.1.3": "2026-05-03T15:02:57.881Z",
+    "0.1.4": "2026-05-31T17:52:04.101Z",
+    "0.1.5": "2026-06-18T06:49:10.081Z",
+    "0.1.6": "2026-06-18T10:01:14.076Z",
+    "0.1.7": "2026-06-18T17:36:06.719Z",
+    "0.1.8": "2026-06-18T18:42:45.332Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": 577,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 301
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 230
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 25
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 174
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 22
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 577
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

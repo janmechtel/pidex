@@ -1,0 +1,52 @@
+{
+  "name": "@khimaros/pi-omni",
+  "latest_version": "0.21.0",
+  "description": "realtime voice chat with pi.dev",
+  "readme": "# pi-omni\n\nstandalone **web voice server** for [pi.dev](https://pi.dev): a browser-based\nvoice chat UI backed by a real pi-coding-agent session, wired to a local\nOpenAI-compatible STT/LLM/TTS stack (e.g. [llama-swap](https://github.com/mostlygeek/llama-swap)\nserving whisper.cpp + llama.cpp + a TTS model).\n\nspeak in the browser; pi-omni transcribes (STT), runs the turn through pi's\nagent loop and tools (LLM), and speaks the reply back (TTS). each browser tab\ngets its own pi session.\n\n> in-TUI voice (push-to-talk and continuous voice rendered inside the pi\n> terminal, no browser) lives in the separate **pi-live** package.\n\n## getting started\n\nprerequisites:\n\n- node.js 20+ (the server compiles to dist/ via tsc; the extension stays .ts)\n- a working pi installation\n- an OpenAI-compatible endpoint exposing STT, LLM, and TTS\n\ninstall as a pi extension:\n\n```bash\npi install npm:@khimaros/pi-omni\n```\n\ncontrol the web voice server from the pi tui:\n\n```bash\n> /omni              # interactive picker (start / status / stop / open)\n> /omni start        # start the server (optionally: /omni start <host:port>)\n> /omni status       # show the listen address\n> /omni stop         # stop the server\n> /omni open         # open the web voice app in a browser\n```\n\nor auto-start when pi launches (owned by pi, terminated when pi exits):\n\n```bash\npi --omni                       # start on launch\npi --omni-listen 0.0.0.0:4962   # custom bind address (implies --omni)\n```\n\nrun the server standalone (no pi tui, outlives pi). pi-coding-agent is an\noptional peer (the pi tui already provides it), so install it alongside for the\nstandalone path, or `make install` to put the `pi-omni` command on PATH:\n\n```bash\nnpm install -g @earendil-works/pi-coding-agent @khimaros/pi-omni\nPI_VOICE_LLM_MODEL=qwen3-32b pi-omni --listen 127.0.0.1:4962\n```\n\nthe server prints `base_url=http://host:port` once listening; open that URL.\n\n### pwa installation\n\nthe web UI is a Progressive Web App (PWA). open the URL in a supported browser\nand choose \"Install\" / \"Add to Home Screen\" for a native-like experience.\n\n### from a source checkout\n\n```bash\nmake            # install deps + compile the server to dist/ (tsc)\nmake start      # run the server\nmake test       # build + run tests\nmake test-integration  # black-box python e2e against fake-openai\nmake wasm       # rebuild wasm/apm (after touching wasm/apm/src/)\n```\n\n## configuration\n\nthe OpenAI-compatible endpoint and STT/TTS models come from env vars (overriding\nthe saved `~/.pi/extensions/omni.json`):\n\n| variable | default | purpose |\n| --- | --- | --- |\n| `PI_VOICE_BASE_URL` | `http://localhost:8080/v1` | OpenAI-compatible endpoint (STT + TTS) |\n| `PI_VOICE_API_KEY` | `sk-no-key` | llama-swap usually ignores it |\n| `PI_VOICE_STT_MODEL` | `whisper-1` | as exposed by your server |\n| `PI_VOICE_TTS_MODEL` | `tts-1` | |\n| `PI_VOICE_TTS_VOICE` | `alloy` | |\n| `PI_VOICE_LLM_MODEL` | _(none)_ | default model for the standalone server |\n| `PI_OMNI_LISTEN` | `127.0.0.1:4962` | http bind address (`host:port`, `:port`, or `port`) |\n\nthe LLM runs through pi-coding-agent (and any installed pi extensions), so it\nuses pi's configured providers/models; the OpenAI-compatible endpoint above is\nused only for STT and TTS.\n\ncli flags:\n\n| flag | purpose |\n| --- | --- |\n| `--listen <host:port>` | bind address; takes precedence over `PI_OMNI_LISTEN` |\n| `-h`, `--help` | usage |\n\n## echo cancellation & barge-in\n\nthe browser client can keep the mic open during TTS and cut in on speech\n(barge-in), using an acoustic echo canceller -- a Rust port of WebRTC AEC3\ncompiled to WASM, depended on as a `file:` package at `wasm/apm/pkg/`. rebuild\nafter touching `wasm/apm/src/`:\n\n```bash\nmake wasm\n# or directly:\ncd wasm/apm && wasm-pack build --target nodejs --release\n```\n\nbuild deps: `rustup` (e.g. via `mise use -g rust@latest`) with the\n`wasm32-unknown-unknown` target, plus `wasm-pack`.\n\n## architecture\n\n```\nsrc/\n  extension/   pi extension entry -- spawns the bin, handshakes on base_url=; .ts\n  server/      HTTP + WS voice server hosting the pi sdk runtime, compiled to dist/\n                 index.ts (standalone entrypoint), http.ts, session.ts,\n                 turn-lifecycle.ts\n  audio/       STT, TTS, VAD, AEC, sentence chunker, sanitizer (shared with\n                 pi-live, which keeps its own copy)\n  config.ts    shared config + env-var overrides\npublic/        browser client (vanilla js, no build step)\nwasm/apm/      WebRTC AEC3 -> WASM (rust)\ntest/          node --test files (.mjs) + python e2e (fake_openai_test.py)\n```\n\nthe server compiles to `dist/` (the bin runs under plain node, which will not\ntype-strip `.ts` under `node_modules/`); the extension stays `.ts` and is loaded by\npi's jiti loader.\n\n## development\n\n```bash\nmake            # install deps + compile the server to dist/ (tsc)\nmake start      # run the server\nmake test       # build + run tests\nmake test-integration  # black-box python e2e against fake-openai\nmake lint       # type-check (tsc --noEmit)\nmake precommit  # lint + test + test-integration\nmake install    # install the pi-omni command globally (onto PATH)\nmake wasm       # rebuild wasm/apm\nmake pack       # npm pack into build/\nmake publish    # npm publish --access public\nmake clean      # rm -rf build\n```\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "GPL-3.0-or-later",
+  "homepage": "https://github.com/khimaros/pi-omni#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khimaros/pi-omni.git"
+  },
+  "pi": {
+    "extensions": [
+      "src/extension/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-17T16:46:12.155Z",
+    "modified": "2026-06-18T18:20:58.736Z",
+    "0.1.0": "2026-05-17T16:46:12.462Z",
+    "0.2.0": "2026-05-18T03:18:33.603Z",
+    "0.3.0": "2026-05-18T03:44:24.176Z",
+    "0.4.0": "2026-05-18T04:13:35.126Z",
+    "0.5.0": "2026-05-18T21:08:06.642Z",
+    "0.6.0": "2026-05-18T23:47:11.176Z",
+    "0.7.0": "2026-05-19T00:20:50.738Z",
+    "0.8.0": "2026-05-19T00:48:31.515Z",
+    "0.9.0": "2026-05-19T02:45:39.301Z",
+    "0.10.0": "2026-05-19T06:51:01.860Z",
+    "0.11.0": "2026-05-19T07:28:46.731Z",
+    "0.12.0": "2026-05-20T03:46:27.372Z",
+    "0.12.1": "2026-05-20T03:56:31.657Z",
+    "0.12.2": "2026-05-20T04:15:02.865Z",
+    "0.12.3": "2026-05-20T04:27:59.223Z",
+    "0.14.0": "2026-05-20T06:44:41.288Z",
+    "0.15.0": "2026-05-21T04:07:58.132Z",
+    "0.16.0": "2026-05-21T20:12:02.435Z",
+    "0.17.0": "2026-05-21T22:27:05.889Z",
+    "0.18.0": "2026-05-24T05:52:21.675Z",
+    "0.19.0": "2026-05-24T20:02:45.857Z",
+    "0.20.0": "2026-05-26T19:13:18.352Z",
+    "0.20.1": "2026-06-17T20:13:19.654Z",
+    "0.21.0": "2026-06-18T18:20:58.622Z"
+  },
+  "versions_count": 24,
+  "downloads_last_week": 252,
+  "download_trend": []
+}

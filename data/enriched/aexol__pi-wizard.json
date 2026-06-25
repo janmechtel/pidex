@@ -1,0 +1,48 @@
+{
+  "name": "@aexol/pi-wizard",
+  "latest_version": "0.6.0",
+  "description": "Independent Pi package that exposes backend-backed Wizard tools and prompt context.",
+  "readme": "# Pi Wizard\n\nIndependent Pi package for the backend-backed Wizard catalog.\n\n## Relationship to other plugin packages\n\n- `plugins/pi-wizard` is an independent Pi package with its own runtime implementation.\n- It does not declare a runtime dependency on, import from, or delegate to the OpenCode plugin package.\n- The packages can be released independently.\n\n## Install\n\n```sh\nnpm install @aexol/pi-wizard\n```\n\nFor local development from this repository:\n\n```sh\nnpm --prefix plugins/pi-wizard install\nnpm --prefix plugins/pi-wizard run build\n```\n\n## Release\n\n`@aexol/pi-wizard` is released separately and does not require another Wizard plugin package at runtime.\n\nRun the package release check before tagging:\n\n```sh\nnpm run pi-wizard:release:check\n```\n\nUse tag format `pi-wizard-v<version>` and the GitLab manual `publish pi wizard` job for npm publication.\n\nThe package metadata declares Pi extension resources through:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./dist/extensions\"]\n  }\n}\n```\n\n## Tools\n\nThe extension registers Pi-native tool names that call backend auth/workspace/catalog/preference APIs directly:\n\n- `wizard_status`\n- `wizard_catalog_fetch`\n- `wizard_artifact_fetch`\n- `wizard_artifact_preference_set`\n- `wizard_published_skills_fetch`\n- `wizard_published_skill_preference_set`\n- `wizard_report_issue`\n\nCatalog/status metadata is discovery-only; fetch artifact or skill bodies before treating Wizard instructions as authoritative.\n\nUse `wizard_report_issue` for authenticated Wizard BUG/FEATURE reports. Required args are `reportType` (`BUG` or `FEATURE`), `title`, and `description`; optional safe fields include `severity`/`priority`, reproduction steps, expected/actual behavior, impact, labels, related tool, directory override, and a repo-relative path. The tool sends `source: PI`, safe workspace/repository/directory context, and bounded metadata only; it does not capture transcripts, prompts, env, secrets, tokens, raw logs, or unbounded local absolute paths.\n\n## Auth and config\n\nThe Pi runtime resolves backend settings and auth directly, without importing or delegating to another Wizard package:\n\n- backend origin default `https://opencode-wizard.aexol.work`\n- `PI_WIZARD_BACKEND_ORIGIN` override\n- `OPENCODE_WIZARD_BACKEND_ORIGIN` override\n- GraphQL `/graphql` endpoint\n- optional `PI_WIZARD_SESSION_TOKEN`\n- optional `PI_WIZARD_AUTH_STATE_PATH`, defaulting to `~/.config/pi-wizard/config.json`\n- browser OAuth bootstrap through the same backend session endpoint used by the OpenCode package\n- workspace resolution from directory/git metadata\n\nAuth behavior mirrors the OpenCode package without importing it: when auth is missing or rejected, `wizard_status` and catalog startup paths start a localhost browser login on `http://localhost:24953/oauth/callback`, exchange the OAuth code for a backend plugin session, and store it in `~/.config/pi-wizard/config.json` (or `PI_WIZARD_AUTH_STATE_PATH`) under `{ \"auth\": { ... } }`. Tools expose login state and browser URL, never tokens.\n\nStored auth uses this Pi-owned shape:\n\n```json\n{\n  \"auth\": {\n    \"pluginId\": \"pi-wizard\",\n    \"sessionToken\": \"<redacted>\",\n    \"expiresAt\": \"2026-05-20T00:00:00.000Z\",\n    \"authenticatedAt\": \"2026-05-20T00:00:00.000Z\",\n    \"userId\": \"user-id\",\n    \"email\": \"user@example.com\",\n    \"role\": \"EDITOR\"\n  }\n}\n```\n\nIf backend access is missing after auth bootstrap, tools return `request_failed` or related operational state instead of a fake local catalog.\n\n## Prompt context\n\nOn Pi `before_agent_start`, the extension fetches the backend SKILL catalog when auth is available and appends a Pi Wizard system note listing available skills plus Pi-native fetch rules.\n\nIf auth is missing, startup context triggers the same Pi-owned browser bootstrap as `wizard_status` and includes degraded guidance plus the login URL when available; no hardcoded degraded catalog is injected.\n",
+  "keywords": [
+    "aexol",
+    "pi",
+    "pi-package",
+    "opencode",
+    "wizard",
+    "skills"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://gitlab.com/aexol/open-source/opencode-wizard#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitlab.com/aexol/open-source/opencode-wizard.git",
+    "directory": "plugins/pi-wizard"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/extensions"
+    ],
+    "skills": [],
+    "prompts": [],
+    "themes": []
+  },
+  "time": {
+    "created": "2026-05-20T13:21:53.342Z",
+    "modified": "2026-06-03T15:12:02.323Z",
+    "0.4.7": "2026-05-20T13:21:53.623Z",
+    "0.4.8": "2026-05-20T13:57:03.281Z",
+    "0.5.0": "2026-05-20T14:35:32.433Z",
+    "0.5.1": "2026-05-20T15:33:37.225Z",
+    "0.5.3": "2026-05-21T05:30:44.621Z",
+    "0.5.4": "2026-05-21T11:32:54.419Z",
+    "0.5.5": "2026-05-22T08:07:27.238Z",
+    "0.5.6": "2026-05-27T06:06:41.442Z",
+    "0.5.7": "2026-06-02T08:12:26.519Z",
+    "0.5.10": "2026-06-03T06:02:57.785Z",
+    "0.6.0": "2026-06-03T15:12:02.157Z"
+  },
+  "versions_count": 11,
+  "downloads_last_week": 35,
+  "download_trend": []
+}

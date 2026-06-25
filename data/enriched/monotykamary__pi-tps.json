@@ -1,0 +1,345 @@
+{
+  "name": "@monotykamary/pi-tps",
+  "latest_version": "1.3.2",
+  "description": "Tokens-per-second tracker for pi \u2014 see your LLM generation speed after every agent turn",
+  "readme": "<div align=\"center\">\n\n# \ud83d\udcca pi-tps\n\n**Tokens-per-second tracker for [pi](https://github.com/earendil-works/pi-coding-agent)**\n\n_Generation speed, TTFT, stall detection, and cost \u2014 after every agent turn._\n\n[![pi extension](https://img.shields.io/badge/pi-extension-blueviolet)](https://github.com/earendil-works/pi-coding-agent)\n[![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)\n\n</div>\n\n---\n\n_Originally from [badlogic/pi-mono](https://github.com/badlogic/pi-mono/blob/main/.pi/extensions/tps.ts). Packaged as an installable pi extension._\n\n---\n\n## Quick start\n\n```bash\npi install npm:@monotykamary/pi-tps\n```\n\n## What's included\n\n|               |                                                                        |\n| ------------- | ---------------------------------------------------------------------- |\n| **Extension** | Tracks TPS, TTFT, stall time, token usage, and cost after each turn    |\n| **Export**    | `/tps-export` command \u2014 dump telemetry as JSONL with session structure |\n\n### Features\n\n- **Accurate TPS**: Uses `performance.now()` sub-millisecond timing; excludes TTFT, tool-execution gaps, and network latency from generation speed\n- **Stall detection**: Detects inference pauses (GPU queuing, request queuing) and subtracts them from generation TPS \u2014 no inflated rates\n- **Burst discrimination**: Distinguishes genuine streaming from buffer-flush dispatch; shows `\u2014` when the rate is structurally unidentifiable\n- **Multi-message turns**: Aggregates tokens and timing across tool-call chains within one turn\n- **Notification banner**: Shows a transient popup with TPS, TTFT, total time, tokens, and stalls\n- **Persisted notifications**: Restored on session resume and `/tree` navigation (structured + legacy backward compatible)\n- **Export command**: Dump telemetry as JSONL with automatic tree re-chaining for web inspectors\n- **Extensible**: Emits `tps:telemetry` events so other extensions can react to telemetry\n\n## Install\n\n```bash\npi install npm:@monotykamary/pi-tps\n```\n\nOr install from GitHub:\n\n```bash\npi install https://github.com/monotykamary/pi-tps\n```\n\n<details>\n<summary>Manual install</summary>\n\n```bash\ncp -r extensions/pi-tps ~/.pi/agent/extensions/\n```\n\nThen `/reload` in pi.\n\n</details>\n\n---\n\n## Output format\n\n```\nTPS 42.5 tok/s \u00b7 TTFT 1.2s \u00b7 29.7s \u00b7 in 567 \u00b7 out 1.2K \u00b7 stall 4.3s\u00d71 \u00b7 $3.60/M\n```\n\n| Field   | Description                                                                              |\n| ------- | ---------------------------------------------------------------------------------------- |\n| `TPS`   | Tokens per second (generation speed, excludes TTFT & stalls)                             |\n| `TTFT`  | Time to first token (seconds, 1 decimal)                                                 |\n| `s`     | Total wall-clock time from request to completion                                         |\n| `in`    | Input tokens (human-readable: K/M/B)                                                     |\n| `out`   | Output tokens (human-readable: K/M/B)                                                    |\n| `stall` | Accumulated stall time \u00d7 stall count (shown only when stalls exist)                      |\n| `$/M`   | Blended $/million-tokens rate for this turn (shown only when a cost source is available) |\n\nWhen TPS can't be determined (burst delivery, too few chunks), the field shows `\u2014`:\n\n```\nTPS \u2014 \u00b7 TTFT 0.8s \u00b7 1.3s \u00b7 in 291 \u00b7 out 46 \u00b7 $2.59/M\n```\n\n### $/M-tokens rate\n\nThe trailing `$/M` segment is a blended per-turn rate: `effectiveCost / (totalTokens / 1_000_000)`, shown to two decimals. Only one cost source contributes per turn (no double-counting):\n\n- When [pi-neuralwatt-provider](https://github.com/monotykamary/pi-neuralwatt-provider) reports the **energy-billed cost** for the turn (what you're actually invoiced), that wins outright.\n- Otherwise the **list-price compute cost** from `message.usage.cost.total` (derived from the model's pricing table via pi-ai) is used.\n- When neither is available (no pricing, zero tokens), the segment is omitted.\n\nThe cross-extension handoff is event-based: pi-neuralwatt-provider emits `neuralwatt:turn-energy` with `{ costUsd, energyJoules, turnIndex }` in its own `turn_end`; pi-tps subscribes at load and stashes `costUsd` keyed by `turnIndex`. pi dispatches `turn_end` handlers sequentially, so if the neuralwatt provider was registered before pi-tps the value is already cached when pi-tps's `turn_end` runs; if not, pi-tps falls back to the list-price rate for that one turn (the neuralwatt widget still shows billing separately). No latency is added \u2014 pi-tps reads the cache synchronously, never awaits.\n\nHuman-readable scaling (for token counts):\n\n- `< 1K`: raw integer (`567`)\n- `\u2265 1K`: one decimal, drops `.0` (`1.2K`, `2K`, `15.3K`)\n- `\u2265 1M`: same pattern (`1.5M`)\n- `\u2265 1B`: same pattern (`1.2B`)\n\nDuration formatting:\n\n- `< 60s`: one decimal (`2.3s`, `45.0s`)\n- `\u2265 60s`: up to two units with no decimals (`1m 30s`, `2h 15m`, `3d 12h`, `1w 3d`, `1mo 0d`, `1y 0d`)\n\n---\n\n## How it works\n\nThe extension hooks into pi's lifecycle events. The critical detail: `message_start` fires at stream creation (before any tokens), so **TTFT is measured at the first `message_update`**, which carries the first real token content.\n\n### Event sequence\n\n```\nturn_start         \u2192  request sent to LLM, timer starts\nmessage_start      \u2192  stream created, stall-tracking reset for this message\nmessage_update (1) \u2192  first token arrives \u2192 TTFT captured\nmessage_update (N) \u2192  streaming tokens arrive \u2192 inter-update span & stall detection\nmessage_end        \u2192  message complete, generation time accumulated\nturn_end           \u2192  telemetry computed and displayed\n```\n\n### Timing breakdown\n\n| Phase           | Measured by                                                                                  |\n| --------------- | -------------------------------------------------------------------------------------------- |\n| **TTFT**        | `turn_start` \u2192 first `message_update`                                                        |\n| **Generation**  | per-message wall clock (`message_start` \u2192 `message_end`), summed across messages in the turn |\n| **Stream span** | first `message_update` (post-TTFT) \u2192 last `message_update` \u2014 the pure streaming window       |\n| **Total**       | `turn_start` \u2192 last `message_end` in the turn                                                |\n\nThis approach excludes:\n\n- **Network latency** (included in TTFT)\n- **Tool-execution gaps** between messages (stall clock resets on each `message_start`)\n- **Server queue time** (included in TTFT)\n\n### Stall detection\n\nEvery `message_update` (after TTFT) measures the gap since the last update. Gaps \u2265 500ms are classified as inference stalls:\n\n- The full gap is accumulated as `stallMs`\n- Consecutive stalled updates count as one stall event\n- Stalls are subtracted from the streaming window when computing generation TPS\n- The stall clock resets at each `message_start`, so tool-execution gaps between messages are never counted as stalls\n\nWhen a stall occurs **before** the first stream update (common in request-queuing scenarios), the TPS algorithm detects the artifact and falls back to a conservative estimate rather than producing an inflated rate.\n\n### TPS algorithm (three-branch gate)\n\nThe extension uses a defense-in-depth strategy to produce reliable TPS:\n\n1. **Primary** \u2014 Requires \u22655 streaming updates with \u22651ms average inter-chunk gap and stall time < active generation time. Subtracts stalls from the streaming window for pure generation speed.\n\n2. **Fallback** \u2014 When primary conditions fail but \u22652 updates exist and total generation time \u226550ms. Uses the full generation window (includes TTFT, so it underestimates \u2014 safe by design). Applies partial stall reduction when stalls dominate.\n\n3. **Null** \u2014 Returns `null` (displayed as `\u2014`) when the timing is structurally unidentifiable: burst delivery (all tokens arrive in the same tick), too few chunks, or generation time too short for a reliable rate.\n\n---\n\n## Rehydration\n\nWhen you resume a session (or navigate branches with `/tree`), pi-tps restores the most recent TPS notification \u2014 so you can see your last turn's stats after a reload.\n\nSupports both the current structured `TurnTelemetry` format and legacy `{ message, timestamp }` entries for backward compatibility with session files created by earlier versions.\n\n---\n\n## Export command\n\nDump telemetry as JSONL for inspection or analysis:\n\n```bash\n/tps-export             # current branch, all custom entries\n/tps-export --full      # all branches in the session\n/tps-export tps         # current branch, filter by customType \"tps\"\n/tps-export tps --full  # all branches, filter by customType \"tps\"\n```\n\nEach exported file is written to `~/.cache/pi-telemetry/pi-telemetry-{scope}-{sessionId}-{timestamp}.jsonl`.\n\nThe exporter includes **structural entries** (model_change, branch_summary) alongside telemetry entries so the exported tree is fully resolvable \u2014 the web inspector can show model switches and branch points. Parent IDs are automatically re-chained to point to the nearest ancestor that's included in the export, producing a self-contained tree.\n\n---\n\n## Telemetry event\n\nAfter each turn, pi-tps emits a `tps:telemetry` event on pi's shared event bus. Other extensions can listen to build custom widgets, dashboards, or cost trackers.\n\n```typescript\npi.events.on('tps:telemetry', (data) => {\n  // data matches the TurnTelemetry structure below\n  console.log(data.tps, data.tokens, data.timing);\n});\n```\n\nThe event payload:\n\n| Field                 | Type             | Description                                                                                                                                                           |\n| --------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |\n| `tps`                 | `number \\| null` | Tokens per second, or null when unidentifiable                                                                                                                        |\n| `model.provider`      | `string`         | Provider name (e.g. `openai`)                                                                                                                                         |\n| `model.modelId`       | `string`         | Model identifier (e.g. `gpt-4`)                                                                                                                                       |\n| `tokens.input`        | `number`         | Input tokens (summed across all assistant messages)                                                                                                                   |\n| `tokens.output`       | `number`         | Output tokens generated by the LLM                                                                                                                                    |\n| `tokens.cacheRead`    | `number`         | Cache-read tokens (provider-dependent)                                                                                                                                |\n| `tokens.cacheWrite`   | `number`         | Cache-write tokens (provider-dependent)                                                                                                                               |\n| `tokens.total`        | `number`         | Total tokens (input + output + cache)                                                                                                                                 |\n| `timing.ttftMs`       | `number \\| null` | Time to first token in milliseconds                                                                                                                                   |\n| `timing.totalMs`      | `number`         | Total wall-clock time from request to completion                                                                                                                      |\n| `timing.generationMs` | `number`         | Streaming wall clock (message_start \u2192 message_end)                                                                                                                    |\n| `timing.streamMs`     | `number \\| null` | Inter-update span: first \u2192 last streaming update                                                                                                                      |\n| `timing.stallMs`      | `number`         | Accumulated inference stall time in ms                                                                                                                                |\n| `timing.stallCount`   | `number`         | Number of discrete stall events                                                                                                                                       |\n| `timing.messageCount` | `number`         | Assistant messages in this turn                                                                                                                                       |\n| `cost.input`          | `number \\| null` | Input token cost                                                                                                                                                      |\n| `cost.output`         | `number \\| null` | Output token cost                                                                                                                                                     |\n| `cost.cacheRead`      | `number \\| null` | Cache-read token cost                                                                                                                                                 |\n| `cost.cacheWrite`     | `number \\| null` | Cache-write token cost                                                                                                                                                |\n| `cost.total`          | `number \\| null` | Total cost for this turn                                                                                                                                              |\n| `timestamp`           | `number`         | Unix timestamp (ms) when telemetry was computed                                                                                                                       |\n| `rateUsdPerMTokens`   | `number \\| null` | Blended $/M-tokens rate for this turn (Neuralwatt billed cost when available, else list-price compute cost). `null` when no cost source is usable or tokens are zero. |\n\nWhen `cost` is unavailable (provider doesn't report it), the entire `cost` object is `null`.\n\n---\n\n## Testing\n\n```bash\n# Install dependencies\nnpm install\n\n# Run tests\nnpm test\n\n# Run tests with coverage\nnpm run test:coverage\n\n# Type check\nnpm run typecheck\n```\n\n---\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-04T13:28:23.989Z",
+    "modified": "2026-06-20T16:35:01.328Z",
+    "1.0.0": "2026-06-04T13:28:24.290Z",
+    "1.1.0": "2026-06-08T06:49:46.409Z",
+    "1.1.1": "2026-06-08T09:07:06.307Z",
+    "1.2.0": "2026-06-10T02:20:02.919Z",
+    "1.3.0": "2026-06-19T00:50:30.587Z",
+    "1.3.1": "2026-06-20T09:43:03.155Z",
+    "1.3.2": "2026-06-20T16:35:01.203Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 558,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 348
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 58
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 550
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 16
+    }
+  ]
+}

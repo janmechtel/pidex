@@ -1,0 +1,49 @@
+{
+  "name": "@hypabolic/crossbar",
+  "latest_version": "0.5.1",
+  "description": "Connect the Pi coding agent to local & self-hosted LLMs \u2014 Ollama, LM Studio, llama.cpp, llama-swap, vLLM, and any OpenAI-compatible server. Auto-discovery, model switching, and zero-JSON in-TUI onboarding.",
+  "readme": "# Crossbar\n\n[![CI](https://github.com/Hypabolic/Crossbar/actions/workflows/ci.yml/badge.svg)](https://github.com/Hypabolic/Crossbar/actions/workflows/ci.yml)\n[![npm](https://img.shields.io/npm/v/@hypabolic/crossbar)](https://www.npmjs.com/package/@hypabolic/crossbar)\n\n**Effortless local & self-hosted model backends for the Pi coding agent.**\n\nCrossbar is an extension for the [Pi coding agent](https://github.com/earendil-works/pi) that makes\nwiring Pi to *any* local or self-hosted model backend effortless \u2014 zero hand-edited JSON, all setup\ninside Pi's TUI, with auto-discovery, multi-server support, live \"currently loaded\" indicators, and\nin-place model switching.\n\n> Built by [Hypabolic](https://hypabolic.com).\n\n![Crossbar onboarding: discover a server, open the manage menu, switch the active model](docs/onboarding.gif)\n\n---\n\n## Why Crossbar\n\nExisting connectors stop short: manual config files, a single server at a time, Ollama-only discovery,\nor hardcoded model lists. Crossbar beats them on three axes:\n\n1. **Widest backend support** \u2014 Ollama, LM Studio, llama.cpp, llama-swap, vLLM, OpenAI, Anthropic, plus\n   a generic adapter for the OpenAI-compatible long tail (TabbyAPI, KoboldCpp, text-generation-webui,\n   Jan, llamafile, \u2026).\n2. **Easiest onboarding** \u2014 `/crossbar` auto-discovers running servers on localhost and registers them.\n   No JSON. API-key *and* no-auth endpoints, with a connection test before you commit.\n3. **Highest-fidelity UX** \u2014 multiple simultaneous servers, a live loaded-model widget, and capability-\n   driven model switching that gracefully hides what a backend can't do.\n\n## Supported backends\n\n| Backend | Discover | Loaded indicator | Switch model | Load/Unload | Auth |\n|---|:--:|:--:|:--:|:--:|---|\n| **Ollama** | \u2705 | \u2705 live | \u2705 implicit | \u2705 | none (local) |\n| **LM Studio** | \u2705 | \u2705 live | \u2705 JIT | \u2705 | optional key |\n| **llama.cpp** (`llama-server`) | \u2705 | \u2705 (single) | \u274c\u00b9 | \u274c | optional key |\n| **llama-swap** | \u2705 | \u2705 live | \u2705 proxy swap | \u2705 | optional key |\n| **vLLM** | \u2705 | last-known | \u274c\u00b9 | \u274c | optional key |\n| **OpenAI** | configured | \u2014 | pick model | \u2014 | API key |\n| **Anthropic** | configured | last-known | pick model | \u2014 | API key |\n| **Generic OpenAI-compatible** | \u2705 (fallback) | last-known | \u274c | \u274c | optional key |\n\n\u00b9 Single model per instance. Run **llama-swap** in front of `llama-server`/vLLM to unlock switching \u2014\nCrossbar detects it automatically and prefers it.\n\nFull endpoint-level detail is in [`CAPABILITY-MATRIX.md`](./CAPABILITY-MATRIX.md); research notes and\nPi-integration citations are in [`RESEARCH.md`](./RESEARCH.md) and [`ARCHITECTURE.md`](./ARCHITECTURE.md).\n\n## Install\n\n```bash\n# from npm\npi install npm:@hypabolic/crossbar\n\n# or from git\npi install git:github.com/hypabolic/crossbar\n\n# or a local checkout\npi install /path/to/crossbar\n```\n\nThen start Pi and run `/crossbar`.\n\n## Usage\n\n- **`/crossbar`** (alias **`/local`**) \u2014 open the server manager. Discover/rescan servers, add one\n  manually, enable/disable or remove saved servers, switch/load/unload models where supported, and\n  inspect a server's currently loaded models. Esc/Back from a server returns to the server list.\n- Adding a server registers its chat models immediately. Choosing **Select model to use in Pi**\n  also makes that model current; Esc skips selection while keeping the server registered.\n- **Auto-discovery** runs on session start: reachable no-auth servers on localhost are registered\n  automatically; keyed servers are surfaced with a prompt to add them.\n- Registered models appear in Pi's standard **`/model`** picker and `/login` provider list.\n- The **loaded-model widget** shows what's currently resident (`\u25cf` live via introspection, `\u25f7` with a\n  `(last-known)` suffix where a backend can't report live state).\n\nLAN discovery (beyond localhost) is **off by default** \u2014 no backend advertises over mDNS, so Crossbar\nnever touches your network unless you opt in. Toggle it (and edit the LAN host / probe-port lists)\nfrom **`/crossbar` \u2192 \u2699 Discovery settings**; changes are saved to `crossbar.json` and apply on the\nnext scan. When enabled with no explicit hosts, Crossbar **auto-detects your machine's own private\nsubnet** (e.g. `10.0.0.0/24`, derived at runtime from the system's network interfaces \u2014 never\nhardcoded) and sweeps it. You can override that by entering specific hosts, a CIDR (`10.0.1.0/24`),\nor a range (`10.0.1.10-50`); the expansion is capped at 1024 addresses. A full `/24` sweep is a few\nseconds to ~20s depending on how many `probePorts` are set \u2014 narrow the port list to your backend's\nport to make it fast.\n\n## How it works\n\n- **Discovery** probes localhost ports and fingerprints each server by response shape (e.g. Ollama's\n  `GET /` banner, LM Studio's `/api/v0/models` state, vLLM's `/version` + `owned_by`), preferring the\n  most specific match. The generic adapter is the low-confidence fallback.\n- **Registration** maps discovered models onto Pi's built-in `openai-completions` / `anthropic-messages`\n  providers via `pi.registerProvider` \u2014 Crossbar writes no streaming code for OpenAI-compatible servers.\n- **Two-phase startup**: the async extension factory runs *before* Pi resolves models and preloads\n  any enabled servers that have a persisted `lastKnownModels` catalogue (see `src/preload.ts` +\n  `registerCachedServer`). This makes saved models available to `--list-models`, print/JSON/RPC,\n  CLI `--model` selection, and `--offline` runs with zero network or UI. `session_start` still\n  performs live refresh, auto-discovery, polling, and widget installation.\n- **Persistence** keeps non-secret server metadata (including `lastKnownModels`) in\n  `~/.pi/agent/crossbar.json`; **API keys live only in Pi's `auth.json`** (mode `0600`), keyed by\n  the server's provider id. A brand-new server with no cached catalogue cannot be selected\n  programmatically until an interactive `/crossbar` add or discovery persists its models (inherent\n  cold-start limitation).\n\n## Security\n\n- API keys are **never** written to `crossbar.json`, never logged, and never inlined into a provider\n  config \u2014 Pi resolves them from `auth.json` at request time.\n- Discovery is localhost-only by default.\n- Crossbar adds no telemetry.\n\n## Development\n\n```bash\nnpm install\nnpm run check   # tsc --noEmit\nnpm test        # vitest (conformance + unit + live-socket integration)\n```\n\nThe `BackendAdapter` contract (`src/core/`) is the frozen boundary every adapter implements; the\nconformance suite (`tests/conformance/`) validates every adapter against it, and\n`tests/integration/` exercises the real discovery path over live sockets.\n\n### CI\n\nCI (`.github/workflows/ci.yml`) runs `tsc --noEmit` + the full test suite on every push and PR\n(Node 22 & 24).\n\n## License\n\n[MIT](./LICENSE) \u00a9 Hypabolic\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "llm",
+    "local-llm",
+    "ollama",
+    "lm-studio",
+    "llama.cpp",
+    "llama-swap",
+    "vllm",
+    "openai-compatible"
+  ],
+  "author": {
+    "name": "Hypabolic"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Hypabolic/Crossbar#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hypabolic/Crossbar.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/Hypabolic/Crossbar/main/docs/onboarding.gif"
+  },
+  "time": {
+    "created": "2026-06-21T10:12:00.244Z",
+    "modified": "2026-06-23T04:59:10.202Z",
+    "0.1.0": "2026-06-21T10:12:00.586Z",
+    "0.1.1": "2026-06-21T10:24:06.953Z",
+    "0.2.0": "2026-06-21T15:54:45.987Z",
+    "0.3.0": "2026-06-21T17:27:26.878Z",
+    "0.4.0": "2026-06-22T04:24:38.971Z",
+    "0.4.1": "2026-06-22T04:53:32.844Z",
+    "0.5.0": "2026-06-22T05:46:30.578Z",
+    "0.5.1": "2026-06-23T04:59:09.913Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 1084,
+  "download_trend": []
+}

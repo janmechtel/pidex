@@ -1,0 +1,43 @@
+{
+  "name": "@cuzfrog/pi-module-gates",
+  "latest_version": "0.15.0",
+  "description": "pi extension that controls the entropy of the codebase by enforcing code module boundaries.",
+  "readme": "# pi-module-gates - Constraints liberate, liberties constrain.\n\nExpirimental pi cli extension that controls the entropy of the codebase by enforcing code module boundaries.\nIt helps combat slop generation and code architecture degradation.\n\n## Problem\n\nAI coding agents produce edits with limited context knowledge (myopia) \u2014 their changes may leak implementation details, and break architectural contracts (slop).\n\n### Approach\n\n**Module contracts as guardrails.** Each directory can contain a descriptor file that declares:\n\n- `readonly` \u2014 files and directories the agent must not touch\n- `frozen` \u2014 files where no new exports are allowed\n- `visible` \u2014 the set of exports allowed to be added or modified in that module\n\nThe extension intercepts agent `write`/`edit` operations and enforces these contracts. Violations are blocked with a clear reason.\n\nThe attempt to add 2 public helper functions is blocked, forcing the agent to re-think the design.\n![Module Gate denial example](doc/module_gates_block.png)\n\n### How it works\n\n1. **Indexing** \u2014 On session start, scans the project tree for descriptor files and builds a module index.\n2. **System prompt** \u2014 Injects a hint so the agent knows to respect descriptor file conventions.\n3. **Gating** \u2014 On every write/edit, checks:\n   - **Readonly gate** \u2014 is the target file locked?\n     **Fronzen gate** \u2014 is there any surface change to the target file?\n   - **Export gate** \u2014 would the change introduce an export not in the `visible` list?\n   - **Module interface import gate** \u2014 external files can only import from the module not internal files, i.e. re-exports from `index.ts` or `mod.rs`. A child module may import from a parent module's internal files (not recommended but allowed). (Only Typescript/JavaScript and Rust are supported)\n   - **Import gate** (not implemented yet) \u2014 would the change introduce an import violating visibility scope?\n\n- System prompt: [system-prompt.md](src/context/system-prompt.template.md)\n- Currently [supported languages](src/gates/checkers/index.ts): **TypeScript/JavaScript**, **Rust**, **Java**, **Go**, **Kotlin**, **Scala**\n\n## Installation\n```bash\npi install npm:@cuzfrog/pi-module-gates\n```\nOr load directly for a single session:\n```bash\npi -e npm:@cuzfrog/pi-module-gates\n```\n\n## Module Descriptor Semantics\n\nA module descriptor is a Markdown file (default name: `MODULE.md`) placed in a directory. You can piggy-back on your module context file for example `CONTEXT.md`.\n\n### Readonly constraints\n\n```markdown\n---\nreadonly: [mod.rs]\n---\n\nAny prose for the agent to better understand the module.\n```\n\n### Frozen constraints\n\n```yaml\nfrozen: [mod.rs]\n```\nFrozen files cannot change their surface size: no new exports or public entries are allowed.\n\nA skill [module-freeze-all](src/skills/module-freeze-all) has been included to auto-freeze modules.\n\n### Visibility whitelist (under redesign)\n\n```yaml\nvisible:\n  - greet # equivalent to `path: ./greet`\n  - sub/mod1/Foo\n```\nor:\n```yaml\nvisible:\n  - path: my_function\n    modifier: pub(crate) # (optional) demands an exact match\n```\n\n| Scenario | Behavior |\n|----------|----------|\n| `visible` key absent or no `MODULE.md` | Module is unconstrained \u2014 exports are not gated. Equivalent to `null` internally. |\n| `visible: []` | Module is fully closed \u2014 no new exports may be added. Editing existing exports is still allowed. |\n| Malformed YAML frontmatter | The module is left unguarded and an info notification is emitted. |\n\n### Export gating\n\n```\nproject/\n  MODULE.md          visible: [Foo, Bar]\n  src/\n    MODULE.md        visible: [Bar, Baz]\n    app.ts           \u2190 checked against `src/MODULE.md` only\n```\nA `MODULE.md` only enforces exports within its immediate directory.\n\n### Import gating (not implemented yet)\n\n```yaml\n# parent/MODULE.md\nvisible:\n  - sub/Tool # type Tool is allowed to be imported from parent\n\n# parent/sub/MODULE.md (before complement pass)\nvisible:\n  - Bar # type Bar is allowed to be imported from parent/sub within parent, but not outside parent\n```\nA `MODULE.md` semantically gates exposures at the module level it resides.\n\n## Configuration\n\nAdd a `module-gates` entry to `.pi/settings.json`:\n\n```json\n{\n  \"module-gates\": {\n    \"moduleDescriptorFileName\": \"MODULE.md\",\n    \"moduleDescriptorReadonly\": true,\n    \"sourceRoot\": \"src/\"\n  }\n}\n```\n\n| Option | Default | Description |\n|--------|---------|-------------|\n| `moduleDescriptorFileName` | `MODULE.md` | File name used for module descriptors (case-insensitive) |\n| `moduleDescriptorReadonly` | `true` | When `true`, descriptor files are readonly.|\n| `sourceRoot` | `\"src/\"` | Directory to scan for descriptor files and enforce gates. Set to `\"\"` to scan from project root. |\n| `disableModuleInterfaceImportGate` | `false` | When `true`, imports will not be forced to be from module interface. |\n| `disableSystemPrompt` | `false` | When `true`, skip injecting the module-gates hint into the agent's system prompt. |\n\nWhen no settings file exists or no `module-gates` key is present, defaults apply.\n\n## License\n\nMIT\n\n## Author\nCause Chung (cuzfrog@gmail.com)\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "Cause Chung",
+    "url": "cuzfrog@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/cuzfrog/pi-module-gates#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cuzfrog/pi-module-gates.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-23T23:02:59.754Z",
+    "modified": "2026-06-21T03:25:35.941Z",
+    "0.6.0": "2026-05-23T23:03:00.042Z",
+    "0.8.0": "2026-05-24T14:01:16.197Z",
+    "0.10.0": "2026-05-24T15:49:53.880Z",
+    "0.12.0": "2026-06-17T04:01:27.087Z",
+    "0.13.0": "2026-06-18T23:59:57.239Z",
+    "0.13.1": "2026-06-19T03:45:42.902Z",
+    "0.13.2": "2026-06-20T15:06:37.327Z",
+    "0.13.3": "2026-06-20T20:29:12.043Z",
+    "0.15.0": "2026-06-21T03:25:35.646Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": 792,
+  "download_trend": []
+}

@@ -1,0 +1,28 @@
+{
+  "name": "mira-pi",
+  "latest_version": "0.2.0",
+  "description": "Pi extension for Discord project threads",
+  "readme": "# mira-pi\n\na pi extension that connects a pi agent to discord via project threads. it uses\ndiscord.js to listen for messages and registers tools so the agent can interact\nwith threads.\n\ninstall with `pi install npm:mira-pi`\n\n## how it works\n\nthe extension runs inside the pi runtime. on startup it:\n\n1. loads config from env vars, `.pi/discord.json`, and `~/.pi/discord.json`\n2. restores the thread registry from `~/.mira/registry.json`\n3. connects to discord via discord.js (listening for `messageCreate` events)\n4. registers five tools that the agent can call\n\nwhen a message arrives in a project thread, the extension either passes it to a\nwaiting `wait_for_message` call, queues it, or pushes it to the agent via\n`pi.sendUserMessage()`.\n\n## config\n\nconfig is loaded from three sources, highest priority first:\n\n| priority | source | notes |\n|----------|--------|-------|\n| 1 | env vars | `DISCORD_TOKEN`, `DISCORD_CHANNEL_ID`, `MIRA_PROJECT` |\n| 2 | `.pi/discord.json` | project-local override |\n| 3 | `~/.pi/discord.json` | global fallback |\n\n```json\n{\n  \"token\": \"your-bot-token\",\n  \"channelId\": \"parent-channel-id\",\n  \"project\": \"optional-override\"\n}\n```\n\n`project` defaults to the basename of the current working directory. set\n`MIRA_PROJECT` or the json key to override it. placeholder values like\n`\"your-bot-token\"` are treated as empty so example configs don't break things.\n\n## message flow\n\n```\ndiscord message arrives (messageCreate)\n  \u2502\n  \u251c\u2500 not a thread? \u2192 ignore\n  \u251c\u2500 thread name \u2260 project? \u2192 ignore\n  \u251c\u2500 author is a bot? \u2192 ignore\n  \u2502\n  \u251c\u2500 wait_for_message is waiting? \u2192 resolve the promise, wake the agent\n  \u251c\u2500 queue is empty, agent is in session? \u2192 pi.sendUserMessage() to push it\n  \u2514\u2500 otherwise \u2192 queue it for later\n```\n\nthe `wait_for_message` tool blocks until a message comes in or the timeout\nexpires. the queue drains into `wait_for_message` first \u2014 if there's a queued\nmessage when the tool is called, it returns immediately.\n\n## registry\n\nthread metadata is persisted to `~/.mira/registry.json`:\n\n```json\n{\n  \"threads\": {\n    \"my-project\": {\n      \"threadId\": \"1513348392011694264\",\n      \"project\": \"my-project\",\n      \"name\": \"my-project\",\n      \"parentChannelId\": \"1513094027011166279\",\n      \"createdAt\": \"2026-06-08T00:00:00.000Z\"\n    }\n  }\n}\n```\n\nthis survives restarts so `find_or_create_thread` can return existing threads\nwithout hitting the discord api.\n\n## tools\n\nthe extension registers these tools with the pi runtime:\n\n| tool | description |\n|------|-------------|\n| `find_or_create_thread` | look up a thread in the registry or create a new one. posts a link in the parent channel on creation |\n| `send_message` | send a message to a thread by id |\n| `read_messages` | fetch recent messages (default 20, chronological). includes the agent's own messages |\n| `list_threads` | list all tracked project threads from the registry |\n| `wait_for_message` | block until a message arrives. timeout in seconds (default 300) |\n\n## install\n\n```bash\nmkdir -p ~/.pi/agent/extensions/mira\ncp index.ts package.json ~/.pi/agent/extensions/mira/\nnpm --prefix ~/.pi/agent/extensions/mira install --omit=dev\n```\n\n## dependencies\n\n- `discord.js` ^14 \u2014 discord gateway client\n- `@earendil-works/pi-coding-agent` (peer) \u2014 pi extension api types\n- `typebox` (peer) \u2014 runtime tool parameter validation\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-08T05:09:29.657Z",
+    "modified": "2026-06-08T22:02:41.968Z",
+    "0.1.0": "2026-06-08T05:09:29.869Z",
+    "0.1.1": "2026-06-08T05:31:03.440Z",
+    "0.2.0": "2026-06-08T22:02:41.859Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,353 @@
+{
+  "name": "@kky42/pi-flow",
+  "latest_version": "1.0.11",
+  "description": "Multi-backend subagents and dynamic workflow orchestration for pi.",
+  "readme": "# pi-flow\n\n[![CI](https://github.com/kky42/pi-flow/actions/workflows/ci.yml/badge.svg)](https://github.com/kky42/pi-flow/actions/workflows/ci.yml)\n[![npm version](https://img.shields.io/npm/v/%40kky42%2Fpi-flow?label=npm)](https://www.npmjs.com/package/@kky42/pi-flow)\n\nMulti-backend subagents and dynamic workflow orchestration for [pi](https://github.com/earendil-works/pi).\n\n`pi-flow` gives pi two coordination primitives:\n\n- **`Agent`** \u2014 launch one fresh subagent for a scoped task.\n- **`workflow`** \u2014 run a small trusted JavaScript workflow that fans work out through many subagents, optionally across different agent harnesses.\n\nSupported subagent backends:\n\n- **Pi** child sessions\n- **Codex CLI** via `codex exec`\n- **Claude Code** via `claude -p`\n\n```bash\npi install npm:@kky42/pi-flow\n```\n\n![pi-flow screenshot](./assets/pi-flow.png)\n\n## Why pi-flow?\n\nA single agent harness is good at many tasks, but hard problems often benefit from **parallel context gathering**, **adversarial review**, and **model diversity**. `pi-flow` lets the pi main agent route each lane to the backend that fits best.\n\n```text\n                         user request\n                             \u2502\n                             \u25bc\n                    \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n                    \u2502  pi main agent   \u2502\n                    \u2502  coordinator     \u2502\n                    \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n                            \u2502 Agent / workflow\n        \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n        \u25bc                   \u25bc                   \u25bc\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510   \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510   \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 Pi subagent   \u2502   \u2502 Codex subagent\u2502   \u2502 Claude subagent\u2502\n\u2502 local tools   \u2502   \u2502 codex exec    \u2502   \u2502 claude -p      \u2502\n\u2502 cheap summary \u2502   \u2502 broad search  \u2502   \u2502 UI/frontend    \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n        \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n                            \u25bc\n                    \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n                    \u2502 synthesis in pi  \u2502\n                    \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\nUse it when you want to:\n\n1. **Add subagents and dynamic workflows to pi.** Delegate repository exploration, broad search, review, and synthesis to fresh isolated child agents.\n2. **Mix Pi, Codex, and Claude Code backends.** Different harnesses and models have different tool behavior, prompts, strengths, and blind spots. Combining them can improve adversarial review, idea generation, and complex problem solving.\n3. **Scale wide fan-out without losing inspectability.** Large audits and research tasks can be split into many bounded subagent lanes. The extension queues lanes under a shared concurrency cap and surfaces progress in the TUI.\n4. **Use each subscription/model where it shines.** Example routing:\n   - internet/resource-heavy search \u2192 Codex + a fast GPT model\n   - frontend or product UI work \u2192 Claude Code + Opus/Sonnet\n   - local file summarization \u2192 Pi + DeepSeek V4 Flash\n   - backend implementation \u2192 Pi + a stronger coding model\n\n## Define subagents\n\n`pi-flow` ships two profiles:\n\n- `general-purpose` \u2014 broad research, code search, and multi-step investigation.\n- `explorer` \u2014 fast read-only repository mapping and reference search.\n\nAdd your own profiles as Markdown files in `~/.pi/agent/subagents/<name>.md`. The filename becomes the `subagent_type` used by `Agent` and workflow `agent()` calls.\n\n```md\n---\ndescription: Reviews backend changes with local pi tools.\nbackend: pi\ntools: read, grep, find, bash\nmodel: inherit\nthinking: high\n---\n\nYou are a careful backend reviewer. Focus on correctness, tests, and regressions.\n```\n\nFrontmatter fields:\n\n- `description` \u2014 required; shown in pi's available-agent roster.\n- `backend` \u2014 `pi` (default), `codex`, or `claude`.\n- `tools` \u2014 pi backend only; child-session tool allowlist. `Agent` and `workflow` are always removed from pi-backed children.\n- `model` / `thinking` \u2014 optional; use `inherit` or a backend-supported value.\n- Markdown body \u2014 profile prompt appended to the selected backend.\n\nExternal backend examples:\n\n```md\n---\ndescription: Broad code review through Codex CLI.\nbackend: codex\nmodel: gpt-5.4-mini\nthinking: high\n---\n\nReview the diff for correctness, missed edge cases, and test gaps.\n```\n\n```md\n---\ndescription: UI and product review through Claude Code.\nbackend: claude\nmodel: opus\nthinking: high\n---\n\nReview frontend changes for UX, accessibility, and architecture regressions.\n```\n\nExternal profiles run local CLI commands in no-approval mode (`codex exec ... --dangerously-bypass-approvals-and-sandbox`, `claude ... --dangerously-skip-permissions`). Use them only in trusted repositories.\n\n## Use subagents\n\nAsk pi naturally:\n\n```text\nExplore this repo with the explorer subagent, then summarize the important files.\n```\n\nOr call the tool shape directly from an agent/tooling context:\n\n```ts\nAgent({\n  description: \"Explore repo\",\n  subagent_type: \"explorer\",\n  prompt: \"Map the project purpose, key directories, scripts, tests, and caveats. Do not edit files.\",\n});\n```\n\nSubagents start fresh in the same working directory. Parent messages and tool results are not inherited, so prompts should be self-contained.\n\n## Use workflows\n\nUse `workflow` when a task should fan out to several subagents, use different backends, or synthesize multiple independent findings.\n\nYou normally do **not** write workflow files by hand. Ask pi in natural language and the main agent can create the workflow, run it, and summarize the result:\n\n```text\nRun a workflow to review this PR from several independent angles and synthesize the findings.\n```\n\nIf you want to reuse a workflow, ask pi to save it:\n\n```text\nCreate and save a reusable workflow for release review, then run it on this repo.\n```\n\nSaved workflows are trusted JavaScript under the hood. Global workflows live in `~/.pi/agent/workflows/*.js`; trusted project workflows live in `.pi/workflows/*.js`. After a workflow is saved, invoke it by name in natural language. Inline workflow runs can also be resumed by replay from the returned `scriptPath` and `runId`.\n\n## Runtime guardrails\n\nDirect `Agent` calls and workflow `agent()` calls share one global concurrency cap and one wall-clock timeout guardrail:\n\n```bash\npi --max-concurrent-subagents 4 --subagent-timeout-ms 600000\n```\n\nSet `--subagent-timeout-ms` to `0` to disable the timeout. Values are milliseconds.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "subagent",
+    "workflow",
+    "multi-agent",
+    "codex",
+    "claude"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/kky42/pi-flow#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kky42/pi-flow.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/kky42/pi-flow/main/assets/subagents.png"
+  },
+  "time": {
+    "created": "2026-06-19T11:58:58.768Z",
+    "modified": "2026-06-21T12:24:29.218Z",
+    "1.0.7": "2026-06-19T11:58:59.088Z",
+    "1.0.8": "2026-06-19T18:15:50.801Z",
+    "1.0.9": "2026-06-20T16:05:10.464Z",
+    "1.0.10": "2026-06-20T17:51:32.067Z",
+    "1.0.11": "2026-06-21T12:24:29.120Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 754,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 741
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 13
+    }
+  ]
+}

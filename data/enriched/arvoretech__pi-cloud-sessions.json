@@ -1,0 +1,355 @@
+{
+  "name": "@arvoretech/pi-cloud-sessions",
+  "latest_version": "0.2.2",
+  "description": "PI extension that syncs your pi sessions to a cloud backend (private Git repo or iCloud Drive) so you can resume them from any machine",
+  "readme": "# @arvoretech/pi-cloud-sessions\n\nSync your pi sessions to a cloud backend so you can start a conversation on one\nmachine and resume it on another. The full session is synced \u2014 messages, tree,\nlabels, and the session name \u2014 by mirroring the JSONL files pi stores under\n`~/.pi/agent/sessions/`.\n\nTwo backends are supported:\n\n- **git** \u2014 a private Git repo you own (versioned history, free, works anywhere).\n- **icloud** \u2014 a folder inside iCloud Drive (zero infra, Macs on the same Apple ID).\n\n## How it works\n\npi stores each session as a JSONL file under\n`<agent-dir>/sessions/--<project-path>--/<timestamp>_<uuid>.jsonl`. This\nextension mirrors that tree to the chosen backend:\n\n- On startup it **pulls** newer sessions from the backend into your local store.\n- Every `pollIntervalMs` (default 60s) it **pulls in the background**, so sessions created on another machine show up in `/resume` even while pi is open.\n- Before resuming/switching to a session it **pulls** so the loaded session is the freshest version.\n- After each turn it **pushes** the current state (debounced).\n- On shutdown it flushes a final sync.\n\nConflict resolution is **last-write-wins per file** by modification time. File\nmtimes are preserved across machines so the newest edit wins regardless of which\nmachine synced last. Sessions are append-only/branching, so concurrent edits to\nthe same file are rare.\n\n## Setup\n\nRun the setup command inside pi:\n\n```bash\n/cloud-sessions-setup\n```\n\nIt asks for the backend and writes `~/.config/pi/cloud-sessions.json`.\n\n### Git backend\n\nCreate an **empty private repo** (e.g. `git@github.com:you/pi-sessions.git`) and\nmake sure your local `git` can push to it (SSH key or `gh auth`). Then:\n\n```jsonc\n// ~/.config/pi/cloud-sessions.json\n{\n  \"provider\": \"git\",\n  \"git\": { \"repo\": \"git@github.com:you/pi-sessions.git\", \"branch\": \"main\" }\n}\n```\n\nThe repo is cloned to `~/.config/pi/cloud-sessions/repo` and kept in sync.\n\n### iCloud backend\n\n```jsonc\n{\n  \"provider\": \"icloud\",\n  \"icloud\": {\n    \"dir\": \"~/Library/Mobile Documents/com~apple~CloudDocs/pi-sessions\"\n  }\n}\n```\n\n## Resuming on another machine\n\nEverything is automatic \u2014 you never have to run a sync command:\n\n1. Use pi on machine A. Sessions push after each turn.\n2. Open pi on machine B (same project path). Startup pull brings A's sessions; background polling keeps them coming even if B was already open.\n3. Run `/resume` \u2014 A's session is listed. Pick it and continue.\n\n**Caveat \u2014 session must share the same `cwd`.** Sessions are stored per working\ndirectory (`--<project-path>--`). For a session to appear in `/resume` on machine\nB, B must be in the same absolute project path as A. If your username/home path\ndiffers between machines, the paths won't match.\n\n**Caveat \u2014 no live two-way editing.** The sync is serial: finish on one machine,\ncontinue on the other. A session already loaded in memory is not hot-reloaded\nwhen a newer version is pulled.\n\n## Commands\n\n- `/cloud-sessions-sync` \u2014 pull + push now (optional; sync is automatic).\n- `/cloud-sessions-status` \u2014 show config and current state.\n- `/cloud-sessions-setup` \u2014 configure the backend interactively.\n\n## Configuration\n\nAll options can be set in `~/.config/pi/cloud-sessions.json` or via env vars:\n\n| Setting        | JSON key         | Env var                            | Default                |\n| -------------- | ---------------- | ---------------------------------- | ---------------------- |\n| Backend        | `provider`       | `PI_CLOUD_SESSIONS_PROVIDER`       | `git`                  |\n| Auto push      | `autoPush`       | `PI_CLOUD_SESSIONS_AUTO_PUSH`      | `true`                 |\n| Pull on start  | `pullOnStart`    | `PI_CLOUD_SESSIONS_PULL_ON_START`  | `true`                 |\n| Push debounce  | `pushDebounceMs` | `PI_CLOUD_SESSIONS_DEBOUNCE_MS`    | `4000`                 |\n| Poll interval  | `pollIntervalMs` | `PI_CLOUD_SESSIONS_POLL_MS`        | `60000` (0 disables)   |\n| Machine label  | `machineId`      | `PI_CLOUD_SESSIONS_MACHINE_ID`     | hostname               |\n| Git repo       | `git.repo`       | `PI_CLOUD_SESSIONS_GIT_REPO`       | \u2014                      |\n| Git branch     | `git.branch`     | `PI_CLOUD_SESSIONS_GIT_BRANCH`     | `main`                 |\n| iCloud folder  | `icloud.dir`     | `PI_CLOUD_SESSIONS_ICLOUD_DIR`     | iCloud Drive/pi-sessions |\n\n## Privacy\n\nSessions can contain anything you typed or any file content the agent read.\nUse a **private** repo and treat the backend as sensitive. There is no\nencryption layer \u2014 the JSONL is stored as-is.\n\n## Install\n\nPlace the built extension under a trusted pi extensions directory, or load it\ndirectly:\n\n```bash\npi -e ./packages/cloud-sessions/dist/index.js\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "sessions",
+    "sync",
+    "cloud",
+    "git",
+    "icloud"
+  ],
+  "author": {
+    "name": "Arvore"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/arvoreeducacao/arvore-pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arvoreeducacao/arvore-pi-extensions.git",
+    "directory": "packages/cloud-sessions"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-06-19T23:18:10.535Z",
+    "modified": "2026-06-24T11:57:14.350Z",
+    "0.1.0": "2026-06-19T23:18:10.881Z",
+    "0.2.0": "2026-06-22T15:10:37.324Z",
+    "0.2.1": "2026-06-23T12:11:33.905Z",
+    "0.2.2": "2026-06-24T11:57:13.960Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 552,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 406
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 146
+    }
+  ]
+}

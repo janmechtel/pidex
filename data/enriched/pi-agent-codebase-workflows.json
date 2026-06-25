@@ -1,0 +1,53 @@
+{
+  "name": "pi-agent-codebase-workflows",
+  "latest_version": "0.6.1",
+  "description": "Pi skills and prompt templates for structured YAML artifact workflows: safe-start, codebase-recon, safe-change, architecture review, structured-doc validation, and legacy docs migration.",
+  "readme": "# pi-agent-codebase-workflows\n\nPi package with agent-first skills and prompt templates for structured codebase understanding, safe greenfield starts, safe changes, architecture-aware review, structured-doc validation, and migration from deprecated prose docs.\n\n## Structured artifact model\n\nLegacy prose-style project-agent docs are deprecated. Current workflows treat `docs/agent/api` as a logical layout under a resolved structured docs root:\n\n```text\n<docs-root>/repo/*.yaml\n<docs-root>/scopes/by-path/<repo-relative-path>/*.yaml\n<docs-root>/scopes/by-domain/<slug>/*.yaml\n```\n\nResolution rules:\n- resolve `workspace_root` with `git rev-parse --show-toplevel 2>/dev/null` or fallback to `pwd`\n- canonicalize `workspace_root` before fingerprinting when possible (`realpath`, `pwd -P`, `Path(...).resolve()`, or equivalent)\n- `safe-start` creates and uses the initial repo-local root at `<workspace_root>/docs/agent/api`\n- other skills use repo-local only when that root already exists\n- otherwise use the global overlay root `~/.pi/agent/workspaces/<workspace-fingerprint>/docs/agent/api`\n- compute `<workspace-fingerprint>` exactly from canonical `workspace_root`: strip one leading slash/backslash, replace every slash, backslash, and colon with `-`, then wrap with `--`\n- example: `/data/data/com.termux/files/home/CodeProjects/pi-mono` -> `--data-data-com.termux-files-home-CodeProjects-pi-mono--`\n\nNo workflow generates `docs/agent/*.md`, scoped Markdown docs, or README files as project-agent artifacts. Structured YAML is the API for further transformation and agent ingestion. Root `AGENTS.md` remains a compact harness interoperability file generated from `agent-operating-guide.yaml`, because not every coding harness consumes these skills/prompts directly.\n\nAll skills follow a Structured Artifact Write/Update Protocol: resolve scope and owner artifact first, read before write, preserve stable IDs, upsert by ID/source-of-truth fields, mark unsupported records stale/deprecated instead of deleting, require evidence, validate references, format YAML deterministically, and report validation.\n\n## Included skills\n\n- `safe-start` \u2014 create new projects with structured intent, prioritized quality attributes, data, architecture, contracts, validation, and handoff artifacts.\n- `codebase-recon` \u2014 reconstruct existing codebases into structured YAML artifacts under the resolved structured docs root, including inferred intent/quality/risk context when evidence exists.\n- `safe-change` \u2014 make documented-codebase changes using structured artifacts and update owner YAML only when durable semantics change, treating schema gaps in older artifacts as blockers or repair work when needed.\n- `arch-code-review` \u2014 review diffs against structured architecture, data, invariant, dependency, risk, contract, and test artifacts from the resolved structured docs root.\n- `structured-doc-validate` \u2014 validate structured YAML docs for schema shape, shared schema coverage, reference integrity, evidence quality, coverage, and granularity.\n- `structured-docs-migration` \u2014 migrate deprecated prose-style docs into canonical structured YAML artifacts under the resolved structured docs root.\n\n## Included prompt templates\n\nReconstruction:\n\n- `/recon-all`\n- `/recon-01-inventory`\n- `/recon-02-architecture`\n- `/recon-03-data-invariants`\n- `/recon-04-dependency-rules`\n- `/recon-05-risk-register`\n- `/recon-06-agents` \u2014 writes `agent-operating-guide.yaml` and root `AGENTS.md`\n- `/recon-07-change-guide`\n- `/recon-08-consolidate`\n- `/recon-09-adr`\n- `/recon-10-risk-tests`\n\nSafe start:\n\n- `/safe-start-all`\n- `/safe-start-01-intent`\n- `/safe-start-02-data-flow`\n- `/safe-start-03-architecture`\n- `/safe-start-04-contract-docs`\n- `/safe-start-05-scaffold-plan`\n- `/safe-start-06-validation`\n- `/safe-start-07-vertical-slice`\n- `/safe-start-08-handoff`\n\nSafe change / review / validation / migration:\n\n- `/preflight`\n- `/bug-diagnose`\n- `/bug-implement`\n- `/feature-design`\n- `/feature-implement`\n- `/refactor-design`\n- `/refactor-implement`\n- `/risk-fix`\n- `/review-arch`\n- `/validate-structured-docs`\n- `/migrate-structured-docs`\n\n## Install\n\nFrom git after repository is published:\n\n```bash\npi install git:github.com/PriNova/pi-agent-codebase-workflows\n```\n\nFrom npm after package is published:\n\n```bash\npi install npm:pi-agent-codebase-workflows\n```\n\nLocal development/test:\n\n```bash\npi install /absolute/path/to/pi-agent-codebase-workflows\n# or one-off\npi -e /absolute/path/to/pi-agent-codebase-workflows\n```\n\n## Scope/focus arguments\n\nPrompts accept optional focus/scope arguments. Path-like focus writes under:\n\n```text\n<docs-root>/scopes/by-path/<focus>/\n```\n\nDomain-like focus writes under:\n\n```text\n<docs-root>/scopes/by-domain/<slug>/\n```\n\n`<docs-root>/repo/scopes.yaml` is the canonical scope registry. Path scopes match by longest prefix. Domain scopes require explicit task/domain/contract refs.\n\n## Artifact ownership\n\n- `scopes.yaml`: scope routing and ownership.\n- `repo-inventory.yaml`: structure, entry points, command index, boundaries.\n- `validation-baseline.yaml`: command status, blockers, validation order.\n- `project-intent.yaml`: goals, users, journeys, constraints, prioritized quality attributes, operating constraints.\n- `architecture.yaml`: components, style, style rationale, alternatives, side-effect boundaries, reliability/observability/security expectations.\n- `data-flow.yaml`: typed flow graph, trust boundaries, sensitive-data handling, error states.\n- `data-model.yaml`: entities, IDs, schemas, lifecycles, serialized formats, retention/compliance notes.\n- `invariants.yaml`: rules, forbidden states, enforcement.\n- `dependency-rules.yaml`: layers, allowed/forbidden dependencies, violations.\n- `design-issues.yaml`: drift, deferred decisions, ownership gaps.\n- `risk-register.yaml`: failure modes, affected refs, recommended actions, and suggested tests/fixes.\n- `contracts.yaml`: APIs, schemas, events, generated clients, persistence/deployment/env/auth/telemetry contracts.\n- `testing-strategy.yaml`: test topology, quality-attribute coverage, gaps, risk-to-test priorities.\n- `change-guide.yaml`: workflow routing and checklists.\n- `adr.yaml`: structured ADR records.\n- `agent-operating-guide.yaml`: structured operational rules for agents; root `AGENTS.md` mirrors compact harness-facing guidance.\n\n## Runtime schemas and validation\n\nRuntime schema assets are shared under `skills/_shared/references/`. Skills load `../_shared/references/artifact-api.md`, `../_shared/references/schemas/common.schema.json`, and the matching artifact schema(s) for files they write. `_shared` has no `SKILL.md`, so Pi does not discover it as a skill.\n\nProject docs outside the shared runtime refs may exist in the source repo, but are not runtime instructions for installed extension users.\n\nValidation is best-effort by agent inspection and re-read. The `structured-doc-validate` skill gives a read-only four-layer audit workflow for schema validity, shared schema coverage, references, evidence, coverage, and granularity. Shared schemas are user-facing contracts too, so older artifacts missing newly required fields should fail validation until repaired or migrated.\n\n## Package structure\n\n```text\nskills/\n  _shared/references/artifact-api.md\n  _shared/references/schemas/*.schema.json\n  */SKILL.md\nprompts/\n  *.md\n```\n\nPi discovers skills and prompts through the `pi.skills` and `pi.prompts` entries in `package.json`.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "agent-skills",
+    "codebase-recon",
+    "safe-start",
+    "greenfield",
+    "code-review",
+    "architecture",
+    "safe-change",
+    "validation",
+    "structured-docs"
+  ],
+  "author": {
+    "name": "PriNova"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/PriNova/pi-agent-codebase-workflows#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PriNova/pi-agent-codebase-workflows.git"
+  },
+  "pi": {
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-14T08:38:11.123Z",
+    "modified": "2026-06-14T11:09:32.199Z",
+    "0.1.0": "2026-05-14T08:38:11.325Z",
+    "0.1.1": "2026-05-14T21:58:03.138Z",
+    "0.2.0": "2026-05-15T12:48:02.566Z",
+    "0.3.0": "2026-05-17T18:54:10.877Z",
+    "0.3.1": "2026-05-18T07:47:48.868Z",
+    "0.3.2": "2026-05-19T14:43:14.162Z",
+    "0.5.0": "2026-05-24T20:55:27.250Z",
+    "0.5.1": "2026-05-24T22:08:05.198Z",
+    "0.6.0": "2026-06-06T14:41:25.293Z",
+    "0.6.1": "2026-06-14T11:09:32.082Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,60 @@
+{
+  "name": "@feniix/pi-code-reasoning",
+  "latest_version": "5.0.0",
+  "description": "Code Reasoning tools for pi and MCP \u2014 reflective sequential thinking with branching and revision support",
+  "readme": "# @feniix/pi-code-reasoning\n\n[Code Reasoning](https://github.com/mettamatt/code-reasoning) tools for [pi](https://pi.dev/) and MCP \u2014 reflective problem-solving through sequential thinking with branching and revision support.\n\nBased on the MCP server by Matt Westgate, this package defines its tools once with [BridgeKit](https://www.npmjs.com/package/@feniix/bridgekit) and exposes the same implementation through both pi and MCP adapters.\n\n## Features\n\n- **Sequential Thinking** \u2014 Break down complex problems into structured, revisable steps\n- **Branching** \u2014 Explore alternative approaches from any thought (\ud83c\udf3f)\n- **Revision** \u2014 Correct earlier thinking when new insights emerge (\ud83d\udd04)\n- **Progress Tracking** \u2014 Track thought count and branches\n- **Configurable Output** \u2014 Client-side byte and line truncation\n\n## Install\n\n```bash\npi install npm:@feniix/pi-code-reasoning\n```\n\nEphemeral (one-off) use:\n\n```bash\npi -e npm:@feniix/pi-code-reasoning\n```\n\n## MCP usage\n\nRun the stdio MCP server with `npx`:\n\n```bash\nnpx -y @feniix/pi-code-reasoning\n```\n\nExample MCP client configuration:\n\n```json\n{\n  \"mcpServers\": {\n    \"code-reasoning\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"@feniix/pi-code-reasoning\"]\n    }\n  }\n}\n```\n\nUse the MCP adapter entrypoint when wiring the same tools into a custom host:\n\n```ts\nimport { createMcpServerOptions, runServer } from \"@feniix/pi-code-reasoning/mcp\";\n\n// For tests or custom hosts:\nconst options = createMcpServerOptions();\n\n// For a stdio MCP server entrypoint:\nawait runServer();\n```\n\nThe shared portable tool definitions are available from `@feniix/pi-code-reasoning/tools` for advanced adapters.\n\n### Package entrypoints\n\n| Entry point | Purpose |\n|-------------|---------|\n| `@feniix/pi-code-reasoning/mcp` | compiled MCP server helpers |\n| `@feniix/pi-code-reasoning/tools` | compiled BridgeKit portable tools |\n| `@feniix/pi-code-reasoning/extensions/*` | compiled compatibility deep imports for extension internals |\n\nThe pi extension entrypoint remains source-loaded through the package `pi.extensions` metadata.\n\n## Tools\n\n### `code_reasoning`\n\nRecord and process a thought with metadata.\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `thought` | string | yes | Your reasoning content |\n| `thought_number` | integer | yes | Position in sequence |\n| `total_thoughts` | integer | yes | Estimated total thoughts |\n| `next_thought_needed` | boolean | yes | Set FALSE when done |\n| `is_revision` | boolean | no | When correcting earlier thought (\ud83d\udd04) |\n| `revises_thought` | integer | no | Which thought# you're revising |\n| `branch_from_thought` | integer | no | When exploring alternatives (\ud83c\udf3f) |\n| `branch_id` | string | no | Identifier for the branch |\n| `needs_more_thoughts` | boolean | no | If more thoughts needed |\n| `piMaxBytes` | integer | no | Per-call output byte limit, clamped by configured max |\n| `piMaxLines` | integer | no | Per-call output line limit, clamped by configured max |\n\n### `code_reasoning_status`\n\nGet current session status: branches and thought count.\n\nOptional parameters:\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `piMaxBytes` | integer | no | Per-call output byte limit, clamped by configured max |\n| `piMaxLines` | integer | no | Per-call output line limit, clamped by configured max |\n\n### `code_reasoning_reset`\n\nReset the session, clearing all thoughts and branches.\n\n## Thinking Patterns\n\n### Sequential Thinking (Basic)\n\n```json\n{\n  \"thought\": \"Initial exploration of the problem...\",\n  \"thought_number\": 1,\n  \"total_thoughts\": 5,\n  \"next_thought_needed\": true\n}\n```\n\n### Branching (Explore Alternatives) \ud83c\udf3f\n\n```json\n{\n  \"thought\": \"Exploring alternative approach...\",\n  \"thought_number\": 3,\n  \"total_thoughts\": 7,\n  \"next_thought_needed\": true,\n  \"branch_from_thought\": 2,\n  \"branch_id\": \"alternative-algo-x\"\n}\n```\n\n### Revision (Correct Earlier Thinking) \ud83d\udd04\n\n```json\n{\n  \"thought\": \"Revisiting earlier point: Assumption Y was flawed...\",\n  \"thought_number\": 4,\n  \"total_thoughts\": 6,\n  \"next_thought_needed\": true,\n  \"is_revision\": true,\n  \"revises_thought\": 2\n}\n```\n\n## Checklist (Review Every 3 Thoughts)\n\n1. Need to explore alternatives? \u2192 Use **BRANCH** (\ud83c\udf3f)\n2. Need to correct earlier thinking? \u2192 Use **REVISION** (\ud83d\udd04)\n3. Scope changed? \u2192 Adjust **total_thoughts**\n4. Done? \u2192 Set **next_thought_needed = false**\n\n## Limits\n\n- Thought text is limited to 20,000 characters.\n- A session keeps at most 20 thoughts before reset.\n- Output limit values must be positive integers.\n- When output is truncated, the full output is saved to a temp file when possible. If the temp file cannot be written, the tool output includes a warning instead.\n\n## Configuration\n\n### CLI Flags\n\nCLI flags apply when running as a pi extension:\n\n```bash\npi --code-reasoning-max-bytes=102400 --code-reasoning-max-lines=5000\n```\n\n### Environment Variables\n\nEnvironment variables apply to both pi and MCP runtimes:\n\n```bash\nexport CODE_REASONING_MAX_BYTES=102400\nexport CODE_REASONING_MAX_LINES=5000\nexport CODE_REASONING_CONFIG_FILE=/path/to/code-reasoning.json\n```\n\n### Settings File\n\nUse pi's standard settings locations for non-secret configuration:\n\n- project: `.pi/settings.json`\n- global: `~/.pi/agent/settings.json`\n\nUnder the `pi-code-reasoning` key:\n\n```json\n{\n  \"pi-code-reasoning\": {\n    \"maxBytes\": 51200,\n    \"maxLines\": 2000\n  }\n}\n```\n\n> Best practice: use `settings.json` for non-secret defaults only.\n> If you need a separate private override file, use `--code-reasoning-config-file` or `CODE_REASONING_CONFIG_FILE` to point to a custom JSON config file.\n> Legacy aliases `--code-reasoning-config` and `CODE_REASONING_CONFIG` are still accepted but deprecated.\n\n## CLI Flags\n\n| Flag | Env Variable | Default | Description |\n|------|-------------|---------|-------------|\n| `--code-reasoning-config-file` | `CODE_REASONING_CONFIG_FILE` | \u2014 | Custom JSON config file path (overrides settings.json lookup) |\n| `--code-reasoning-config` | `CODE_REASONING_CONFIG` | \u2014 | Deprecated alias for the config file path |\n| `--code-reasoning-max-bytes` | `CODE_REASONING_MAX_BYTES` | `51200` | Max output bytes |\n| `--code-reasoning-max-lines` | `CODE_REASONING_MAX_LINES` | `2000` | Max output lines |\n\n## Development\n\nBuild the compiled MCP entrypoint locally:\n\n```bash\nnpm run build:mcp --workspace packages/pi-code-reasoning\n```\n\nRun the built stdio server directly:\n\n```bash\nnode packages/pi-code-reasoning/dist/extensions/mcp-server.js\n```\n\n## Requirements\n\n- Node.js 22.19.0 or later\n- pi v0.51.0 or later when using the pi extension\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "ai",
+    "code-reasoning",
+    "sequential-thinking",
+    "branching",
+    "revision",
+    "problem-solving",
+    "mcp",
+    "model-context-protocol",
+    "bridgekit",
+    "portable-tools"
+  ],
+  "author": {
+    "name": "Sebastian Otaegui",
+    "url": "https://github.com/feniix"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/feniix/pi-extensions/tree/main/packages/pi-code-reasoning#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/feniix/pi-extensions.git",
+    "directory": "packages/pi-code-reasoning"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-06T13:27:45.083Z",
+    "modified": "2026-05-28T03:55:50.716Z",
+    "1.0.0": "2026-04-06T13:27:45.346Z",
+    "1.0.1": "2026-04-06T13:36:04.640Z",
+    "1.0.2": "2026-04-06T23:12:09.270Z",
+    "1.0.3": "2026-04-07T02:58:05.186Z",
+    "2.0.0": "2026-04-15T20:47:22.655Z",
+    "2.0.1": "2026-04-17T18:11:13.622Z",
+    "2.0.2": "2026-04-19T00:24:53.214Z",
+    "2.1.0": "2026-04-19T23:52:39.169Z",
+    "2.1.1": "2026-04-22T22:15:55.411Z",
+    "3.0.0": "2026-05-11T03:39:11.597Z",
+    "3.0.1": "2026-05-15T17:22:49.611Z",
+    "4.0.0": "2026-05-23T06:54:15.962Z",
+    "4.0.1": "2026-05-23T07:36:06.849Z",
+    "4.0.2": "2026-05-23T12:06:11.657Z",
+    "5.0.0": "2026-05-28T03:55:50.453Z"
+  },
+  "versions_count": 15,
+  "downloads_last_week": null,
+  "download_trend": []
+}

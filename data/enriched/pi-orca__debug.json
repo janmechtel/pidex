@@ -1,0 +1,39 @@
+{
+  "name": "@pi-orca/debug",
+  "latest_version": "0.0.5",
+  "description": "Debug log viewer and diagnostics overlay",
+  "readme": "# pi-orca-debug\n\n**Debug log viewer overlay and logging control**\n\nVersion: 0.0.3-dev  \nLicense: MIT\n\n## Overview\n\nA diagnostic extension for Pi Orca that controls the shared structured JSONL logger from `@pi-orca/core` and provides an interactive full-screen overlay for browsing live log entries. Use the `/debug` slash command to open the log viewer, enable or disable logging, set the minimum log level, and toggle logging on and off. All other Pi Orca extensions use the shared logger instead of `console.log`, funneling all diagnostic data into a single append-only log file.\n\n## Features\n\n### Debug Log Viewer Overlay\n\nRun `/orca-debug` (no arguments) or `/orca-debug view` to open a full-screen interactive overlay:\n\n- **Scrollable log entry list** \u2014 `SelectList` with fuzzy search\n- **Live polling** \u2014 Refreshes every 2 seconds to show new entries in real time\n- **Sort toggle** \u2014 Press `R` to toggle between newest-first (default) and oldest-first\n- **Metadata expand/collapse** \u2014 Press `Enter` on any entry to expand its metadata block\n- **Selection persistence** \u2014 Cursor position is preserved across overlay rebuilds (sort toggles, live polls)\n- **Keybindings:**\n  | Key | Action |\n  |-----|--------|\n  | `\u2191` / `\u2193` | Navigate entries |\n  | `Enter` | Expand/collapse metadata |\n  | `R` | Toggle sort order |\n  | `Esc` | Close overlay |\n\n### Logging Control\n\n- **Enable/disable logging** \u2014 Toggle logging on and off via `/debug on` and `/debug off`\n- **Configurable log levels** \u2014 Set minimum log level (`debug`, `info`, `warn`, `error`) via `/debug set <level>`\n- **Autocomplete** \u2014 Full autocomplete for subcommands and log levels\n- **Structured JSONL log** \u2014 All entries include timestamp, level, source, message, and optional metadata\n- **Log rotation** \u2014 10 MB default, keeps 3 rotated files (configurable via `config.yaml`)\n\n## Defaults\n\n| Setting | Default |\n|---------|---------|\n| `enabled` | `false` (logging disabled) |\n| `logLevel` | `info` |\n\nWhen logging is **disabled**, all `log*()` calls are no-ops \u2014 nothing is written to disk.\n\nWhen logging is **enabled**, only entries at or above the configured log level are written:\n\n| Level | Writes when logLevel is... |\n|-------|---------------------------|\n| `debug` | `debug`, `info`, `warn`, `error` |\n| `info` | `info`, `warn`, `error` |\n| `warn` | `warn`, `error` |\n| `error` | `error` only |\n\n## Log File\n\n**Location:** `~/.pi/agent/orca/log.jsonl`\n\n**Entry format:**\n```jsonl\n{\"ts\":\"2026-04-24T10:00:00.000Z\",\"level\":\"info\",\"source\":\"pi-orca-tasks\",\"message\":\"Ready\"}\n{\"ts\":\"2026-04-24T10:00:01.000Z\",\"level\":\"debug\",\"source\":\"pi-orca-models\",\"message\":\"Resolved alias\",\"meta\":{\"alias\":\"fast\",\"resolved\":\"anthropic/claude-haiku-4-5\"}}\n```\n\n**Rotation:** When the log exceeds 10 MB (configurable), it is rotated to `log.jsonl.<ISO-timestamp>`. Up to 3 rotated files are kept (configurable).\n\n## Configuration\n\nAdd to `~/.pi/agent/orca/config.yaml` or `<project>/.pi/orca/config.yaml`:\n\n```yaml\nlogging:\n  enabled: false                 # disable all logging (default)\n  logLevel: info                 # minimum level: debug, info, warn, error\n  maxFileSizeBytes: 10485760    # 10 MB (default)\n  maxRotatedFiles: 3            # keep 3 rotated files (default)\n```\n\n## Slash Commands\n\n| Command | Description |\n|---------|-------------|\n| `/orca-debug` | Open the debug log viewer overlay |\n| `/orca-debug view` | Open the debug log viewer overlay (alias) |\n| `/orca-debug on` | Enable debug logging |\n| `/orca-debug off` | Disable debug logging |\n| `/orca-debug set <level>` | Set minimum log level (`debug`, `info`, `warn`, `error`) |\n\n### Autocomplete\n\nAll subcommands and log levels are autocompleted via tab completion:\n\n- `/orca-debug ` \u2192 suggests `on`, `off`, `set`, `view`\n- `/orca-debug set ` \u2192 suggests `debug`, `info`, `warn`, `error`\n\n## Architecture\n\n```\nsrc/\n\u251c\u2500\u2500 index.ts    # Extension entry: command registration, autocomplete, handlers\n\u2514\u2500\u2500 overlay.ts  # Full-screen debug log viewer overlay with live polling\n```\n\n## Logger API\n\nExtensions use the logger from `@pi-orca/core` instead of `console.log`:\n\n```typescript\nimport { logInfo, logWarn, logError, logDebug, getLogFile } from \"@pi-orca/core\";\n\nlogInfo(\"pi-orca-tasks\", \"Ready\");\nlogWarn(\"pi-orca-models\", \"Alias not found\", { alias: \"fast\" });\nlogError(\"pi-orca-cleanup\", \"Failed to sweep\", { error: \"permission denied\" });\nlogDebug(\"pi-orca-debug\", \"Loaded 150 entries\");\n```\n\n## Dependencies\n\n- `@pi-orca/core` \u2014 Logger utility, debug config, autocomplete helpers, path resolution, selection persistence\n- `@earendil-works/pi-coding-agent` \u2014 DynamicBorder for overlay framing\n- `@earendil-works/pi-tui` \u2014 SelectList, Container, Text, Spacer for overlay UI\n\n## License\n\nMIT License \u2014 see [LICENSE](../../LICENSE) for details.\n",
+  "keywords": [
+    "pi-package",
+    "pi-orca",
+    "pi-agent",
+    "pi-extension"
+  ],
+  "author": {
+    "name": "Bindu / Ba"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/binduwavell/pi-orca#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/binduwavell/pi-orca.git",
+    "directory": "packages/debug"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-05-17T21:43:47.424Z",
+    "modified": "2026-05-27T04:09:39.814Z",
+    "0.0.3-dev.20260517154318": "2026-05-17T21:43:47.661Z",
+    "0.0.3-dev.20260526215119": "2026-05-27T03:52:23.329Z",
+    "0.0.3": "2026-05-27T03:54:11.300Z",
+    "0.0.4": "2026-05-27T04:03:14.211Z",
+    "0.0.5": "2026-05-27T04:09:39.673Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": null,
+  "download_trend": []
+}

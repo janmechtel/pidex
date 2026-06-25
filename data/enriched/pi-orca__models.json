@@ -1,0 +1,51 @@
+{
+  "name": "@pi-orca/models",
+  "latest_version": "0.0.5",
+  "description": "Model alias management",
+  "readme": "# @pi-orca/models\n\nModel alias management for Pi Orca. Defines semantic model tiers (`fast`, `balanced`, `thinker`, `coder`) that map to provider-qualified model IDs, resolved through a four-level override cascade.\n\n## Overview\n\nModel aliases let you reference models by intent rather than provider-specific IDs. Agent templates use aliases like `fast` or `thinker`, and the resolution layer maps them to concrete models (e.g., `anthropic/claude-haiku-4-5`). This decouples agent definitions from provider lock-in and lets users tune cost/quality trade-offs per-project.\n\nThe extension also injects aliases into Pi's built-in `/model` selector as a synthetic provider, so users can switch to alias-backed models via the standard Ctrl+L picker.\n\n## Installation\n\nThe package is part of the Pi Orca monorepo and loaded as a Pi extension:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./dist/index.js\"]\n  }\n}\n```\n\n## Alias Resolution Cascade\n\nAliases resolve through four levels (highest priority wins):\n\n| Level | Source | Location |\n|-------|--------|----------|\n| 4 | Session override | In-memory (set via `/models set`) |\n| 3 | CLI environment | `PI_MODEL_ALIAS_<NAME>` env vars |\n| 2 | Project override | `<project>/.pi/orca/models.yaml` |\n| 1 | User defaults | `~/.pi/agent/orca/models.yaml` |\n\n## Default Aliases\n\nBootstrapped on first run to `~/.pi/agent/orca/models.yaml`:\n\n| Alias | Default Model | Description |\n|-------|---------------|-------------|\n| `fast` | `anthropic/claude-haiku-4-5` | Lowest latency, lowest cost |\n| `balanced` | `anthropic/claude-sonnet-4-6` | Good all-rounder |\n| `thinker` | `anthropic/claude-opus-4-6` | Deep reasoning, higher cost |\n| `coder` | `anthropic/claude-sonnet-4-6` | Best available for code generation |\n\n## Slash Commands\n\n### `/models` (no args)\n\nOpens an interactive TUI overlay showing all configured aliases.\n\n**Keybindings:**\n- `Enter` \u2014 Select the highlighted alias as the active model\n- `e` \u2014 Reassign what the alias points to (opens model picker with type-to-filter)\n- `Esc` \u2014 Close\n\nReassignments persist to the appropriate `models.yaml` file (project-level if the alias is defined there, otherwise user-level).\n\n### `/models select <alias>`\n\nActivate an alias as the current model without opening the interactive UI. Supports tab-completion for alias names.\n\n```\n/models select fast\n```\n\n### `/models set <alias> <provider>/<model>`\n\nReassign an alias to a different model. Persists to `models.yaml`.\n\n```\n/models set fast openai/gpt-4o-mini\n```\n\n### `/models reset`\n\nClear all session-level overrides, reverting to config-based resolution.\n\n### `/models setup`\n\nBootstrap the default `models.yaml` if missing, or display current alias configuration.\n\n### `/models debug`\n\nDiagnostic dump of registry state \u2014 shows how many models are registered, which are visible in the selector, and whether the synthetic provider entries match correctly.\n\n## Agent Tool\n\nThe extension registers a `model_alias` tool that agents can invoke programmatically:\n\n```typescript\n// Resolve an alias to its provider/model-id\n{ action: \"resolve\", alias: \"fast\" }\n// \u2192 { provider: \"anthropic\", model: \"claude-haiku-4-5\", modelId: \"anthropic/claude-haiku-4-5\" }\n\n// Set a session override\n{ action: \"set\", alias: \"coder\", provider: \"anthropic\", model: \"claude-opus-4-6\" }\n```\n\n## Synthetic Provider Integration\n\nThe extension registers a synthetic provider (`pi-orca-models`) with Pi's model registry. Each alias appears as a selectable model in the `/model` picker. When selected, the `model_select` event handler resolves the alias and calls `pi.setModel()` with the real model entry, preserving streaming protocol, context window, and cost metadata from the original model.\n\n## Alias Persistence in settings.json\n\nWhen an alias is activated (via `/models select`, the interactive overlay, the `/model` picker, or session startup self-apply), the extension writes the alias reference back to `settings.json` as `defaultProvider: \"pi-orca-models\"` / `defaultModel: \"<alias>\"`. This prevents the harness from overwriting the alias with the resolved real provider/model, ensuring the next session starts with the same alias as the default. Non-alias model selections via `/model` are unaffected.\n\n### CLI flag precedence\n\nWhen the process is launched with both `--provider <name>` and `--model <id>` on the command line, the `session_start` self-apply is **skipped** \u2014 explicit CLI intent always wins over `settings.json` defaults. This is what allows `@pi-orca/agents` to spawn a child (`--isolation process|tmux`) on a different model than the user's default, and it also handles the manual `pi --provider X --model Y` case.\n\n## Cross-extension API\n\nOther extensions resolve aliases without taking a package-level dependency on `@pi-orca/models`. The pattern (spec \u00a78.6) lives in `@pi-orca/core`:\n\n```typescript\nimport { resolveAlias, resolveModel } from \"@pi-orca/core\";\n\nresolveAlias(\"fast\");                   // \"anthropic/claude-haiku-4-5\" or null\nresolveAlias(\"pi-orca-models/fast\");    // same \u2014 strips the synthetic-provider prefix\nresolveModel(\"fast\");                   // alias \u2192 provider/model-id cascade (\u00a78.6.1)\nresolveModel(\"claude-haiku-4-5\");       // bare id \u2192 resolved through the SDK lookup adapter\nresolveModel(\"anthropic/foo\");          // literal passthrough when nothing else matches\n```\n\nAt `session_start`, this extension registers a synchronous `AliasResolver` that reads from session overrides (Level 4), env-backed CLI flags (Level 3), and an in-memory snapshot of the project + user YAMLs (Levels 1+2). The snapshot refreshes after every `persistAlias` write, so `/models set` changes are visible to the next spawn without a session restart.\n\nThe `pi-orca-models/<alias>` form is supported so template authors can disambiguate \"this is an alias\" when the underlying model registry also offers a model with the same id.\n\n## Configuration Format\n\n```yaml\n# ~/.pi/agent/orca/models.yaml\naliases:\n  fast:\n    provider: anthropic\n    model: claude-haiku-4-5\n    description: \"Lowest latency, lowest cost\"\n  balanced:\n    provider: anthropic\n    model: claude-sonnet-4-6\n    description: \"Good all-rounder\"\n```\n\n## Architecture\n\n```\nsrc/\n\u251c\u2500\u2500 index.ts        # Extension entry point, TUI widget, slash command handler\n\u251c\u2500\u2500 resolver.ts     # Four-level cascade resolution, persistence\n\u251c\u2500\u2500 commands.ts     # Slash command implementations (set, reset, setup)\n\u251c\u2500\u2500 tool.ts         # Agent tool dispatcher\n\u251c\u2500\u2500 widget.ts       # Simple text widget renderer (non-interactive)\n\u2514\u2500\u2500 types.ts        # ModelAlias, ModelAliasConfig, ResolvedAlias\ndefaults/\n\u2514\u2500\u2500 models.yaml     # Bundled default aliases (copied on first run)\n```\n\n## Dependencies\n\n- `@pi-orca/core` \u2014 Path utilities, completion tree resolution, settings I/O (`readPiSettings`, `writePiSettings`)\n- `yaml` \u2014 YAML parse/stringify for config files\n- `@earendil-works/pi-tui` \u2014 TUI components (provided by Pi runtime)\n- `@earendil-works/pi-coding-agent` \u2014 DynamicBorder component (provided by Pi runtime)\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-orca",
+    "pi-agent",
+    "pi-extension"
+  ],
+  "author": {
+    "name": "Bindu / Ba"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/binduwavell/pi-orca#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/binduwavell/pi-orca.git",
+    "directory": "packages/models"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-04-13T22:23:55.072Z",
+    "modified": "2026-05-27T04:09:32.099Z",
+    "0.0.1": "2026-04-13T22:11:30.738Z",
+    "0.0.2-dev.20260413161640": "2026-04-13T22:16:48.730Z",
+    "0.0.2-dev.20260413162335": "2026-04-13T22:23:55.642Z",
+    "0.0.2-dev.20260414090345": "2026-04-14T15:03:54.967Z",
+    "0.0.2-dev.20260414091409": "2026-04-14T15:14:18.301Z",
+    "0.0.2-dev.20260414093420": "2026-04-14T15:34:28.308Z",
+    "0.0.2-dev.20260421080334": "2026-04-21T14:04:04.575Z",
+    "0.0.2-dev.20260422150519": "2026-04-22T21:06:47.394Z",
+    "0.0.2-dev.20260422214056": "2026-04-23T03:41:30.917Z",
+    "0.0.2-dev.20260517151352": "2026-05-17T21:15:04.077Z",
+    "0.0.2": "2026-05-17T21:16:33.267Z",
+    "0.1.0-dev.20260517151644": "2026-05-17T21:16:56.051Z",
+    "0.0.3-dev.20260517154318": "2026-05-17T21:43:39.741Z",
+    "0.0.3-dev.20260526215119": "2026-05-27T03:52:14.891Z",
+    "0.0.3": "2026-05-27T03:54:04.711Z",
+    "0.0.4": "2026-05-27T04:03:06.896Z",
+    "0.0.5": "2026-05-27T04:09:31.966Z"
+  },
+  "versions_count": 15,
+  "downloads_last_week": null,
+  "download_trend": []
+}

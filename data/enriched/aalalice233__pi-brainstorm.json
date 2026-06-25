@@ -1,0 +1,33 @@
+{
+  "name": "@aalalice233/pi-brainstorm",
+  "latest_version": "0.3.2",
+  "description": "A conversation-only brainstorm mode extension for pi, with dynamic tool detection (grep, ask_user_question, subagent)",
+  "readme": "# pi-brainstorm\r\n\r\n> Fork of [@paulmupeters/pi-brainstorm](https://github.com/paulmupeters/pi-brainstorm) with expanded read-only tool support.\r\n\r\nA pi extension that adds a read-only `/brainstorm` mode with dynamic tool detection. During brainstorm, the agent can use `read`, `find`, and any of the following optional tools if registered in the environment:\r\n- `grep` \u2014 for pattern search within files\r\n- `ask_user_question` \u2014 for structured clarifying questions\r\n- `subagent` / `get_subagent_result` \u2014 for deep codebase exploration\r\n\r\n## What it does\r\n\r\nWhen brainstorm mode is active:\r\n- allows `read`, `find` and any detected optional tools (`grep`, `ask_user_question`, `subagent`, `get_subagent_result`)\r\n- blocks shell commands and file edits/writes\r\n- keeps the conversation exploratory\r\n- avoids unsolicited \"you should do X next\" suggestions\r\n- gives a clear recommendation when you ask for the best option\r\n- shows a visible reminder in the UI\r\n- drafts a decision-oriented markdown brief when you finish\r\n- can replace the brainstorm transcript with the reviewed brief in LLM context when you finish without saving or when you save and choose the context-preserving option\r\n\r\n## Key difference from upstream\r\n\r\nThe original extension blocks all non-read tools during brainstorm mode. This fork:\r\n- dynamically detects which tools are available in the current pi environment (`grep`, `ask_user_question`, `subagent`, `get_subagent_result`)\r\n- allows all detected tools alongside `read` and `find`, giving the agent richer capabilities during brainstorm (e.g. searching code, asking structured questions, exploring codebases in background)\r\n- silently omits tools that are not registered \u2014 no configuration needed\r\n- shows a dynamic allowed-tool list in the system prompt so the agent knows exactly what it can use\r\n\r\n## UX\r\n\r\n- `/brainstorm` starts brainstorm mode\r\n- `/brainstorm` again opens a small menu:\r\n  - Continue brainstorming\r\n  - Finish and summarize\r\n  - Cancel and discard\r\n- `/brainstorm finish` finishes directly\r\n- `/brainstorm cancel` exits immediately without a summary\r\n- `/brainstorm-summary-model` configures an optional dedicated summary model\r\n- `Ctrl+Alt+B` is a shortcut for the same flow\r\n\r\nWhile active, the footer/widget reminds you how to finish or cancel.\r\n\r\n## Install / test\r\n\r\n### Quick test\r\n\r\n```bash\r\npi --no-extensions -e /path/to/brainstorm.ts\r\n```\r\n\r\n### Use from your normal pi setup\r\n\r\nInstall from npm:\r\n\r\n```bash\r\npi install npm:@aalalice233/pi-brainstorm\r\n```\r\n\r\nOr copy `extensions/brainstorm.ts` into `~/.pi/agent/extensions/`.\r\n\r\n### Optional: enable additional brainstorm tools\r\n\r\nThe extension detects these optional tools at runtime \u2014 install any of the packages below and the tool is automatically available in brainstorm mode:\r\n\r\n| Tool | Package |\r\n|---|---|\r\n| `grep` | Built-in to pi, no extra install needed |\r\n| `ask_user_question` | `@juicesharp/rpiv-ask-user-question` |\r\n| `subagent` / `get_subagent_result` | Built-in to pi, no extra install needed |\r\n\r\nFor example:\r\n\r\n```bash\r\npi install npm:@juicesharp/rpiv-ask-user-question\r\n```\r\n\r\nAll tool detection is automatic \u2014 no config needed.\r\n\r\n## Brief export\r\n\r\nWhen you finish a brainstorm, the extension:\r\n1. collects the conversation since brainstorm mode started\r\n2. asks the current model, or an optional dedicated summary-model override, to draft a concise decision brief\r\n3. opens that brief in an editor so you can tweak it\r\n4. then offers:\r\n   - `Brief to context`\r\n   - `Brief to markdown`\r\n   - `Brief to markdown and context`\r\n   - `Continue brainstorming`\r\n   - `Exit`\r\n\r\nThe generated brief uses `# Decision Brief: <topic>` when the session reached a clear decision, recommendation, or strong preference. If no firm conclusion emerged, it uses `# Brainstorm Brief: <topic>` and calls out the strongest current leaning without inventing certainty. It leads with the recommendation/current leaning, then covers rationale, alternatives, risks/open questions, and a transcript summary capped at 5 sentences.\r\n\r\nDefault save path:\r\n\r\n```text\r\nbrainstorms/YYYY-MM-DD-topic.md\r\n```\r\n\r\n### Optional summary model override\r\n\r\nBy default, brainstorm summaries use the currently active Pi model.\r\n\r\nYou can persist a separate user-level summary model with:\r\n\r\n```text\r\n/brainstorm-summary-model\r\n```\r\n\r\nOr set it directly:\r\n\r\n```text\r\n/brainstorm-summary-model google/gemini-2.5-flash\r\n/brainstorm-summary-model clear\r\n```\r\n\r\nThe preference is stored globally in `~/.pi/agent/settings.json` under `piBrainstorm.summaryModel` and falls back to the active model when unset or unavailable.\r\n\r\nIf you choose **Brief to context** or **Brief to markdown and context**, the brainstorm transcript stays in session history, but future LLM context uses the reviewed brief instead of the full brainstorm exchange.\r\n\r\n## Notes\r\n\r\n- During brainstorm mode, `read` and `find` are always enabled; `grep`, `ask_user_question`, `subagent`, and `get_subagent_result` are enabled when their respective packages/tools are registered.\r\n- The extension restores your previously active tools after finishing/canceling.\r\n- If model-based brief generation is unavailable, the extension falls back to a simple markdown transcript.\r\n- Tool detection happens at runtime \u2014 no config or restart needed when installing/removing packages or when tools become available/unavailable.\r\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/Aaalice233/pi-brainstorm#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aaalice233/pi-brainstorm.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-08T08:51:17.706Z",
+    "modified": "2026-06-09T07:21:06.609Z",
+    "0.2.0": "2026-06-08T08:51:17.940Z",
+    "0.2.1": "2026-06-08T08:52:02.729Z",
+    "0.3.0": "2026-06-09T07:16:24.519Z",
+    "0.3.1": "2026-06-09T07:18:19.491Z",
+    "0.3.2": "2026-06-09T07:21:06.478Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 82,
+  "download_trend": []
+}

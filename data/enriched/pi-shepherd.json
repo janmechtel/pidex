@@ -1,0 +1,31 @@
+{
+  "name": "pi-shepherd",
+  "latest_version": "0.1.2",
+  "description": "Line count guard and behavior rules extension for pi-coding-agent",
+  "readme": "[English](README.en.md) | \u7a0b\u5e8f\u4e2d\u6587\u6587\u6863\n\n> \ud83d\udcd6 **[pi-atelier \u5b9e\u6218\u6307\u5357](https://catlain.github.io/pi-atelier/)** \u2014 \u4ece\u96f6\u6559\u4f1a\u4f60\u4f7f\u7528 pi-atelier \u6269\u5c55\u751f\u6001\uff0c\u8ba9 AI \u7f16\u7a0b\u52a9\u624b\u4ece\u300c\u4f1a\u5199\u4ee3\u7801\u300d\u8fdb\u5316\u5230\u300c\u4f1a\u7ba1\u7406\u9879\u76ee\u300d\n\n# pi-shepherd\n\n[\u6e90\u7801\u4ed3\u5e93](https://github.com/catlain/pi-shepherd) | [npm](https://www.npmjs.com/package/pi-shepherd)\n\nLine count guard and behavior rules extension for [pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) \u2014 rule-driven hooks for tool calls, agent end, and session events.\n\n## What It Does\n\nAI agents can go off the rails \u2014 generate too much code, forget to commit, ignore coding standards, or produce outputs that are too large. pi-shepherd acts as a **guardrail system** that monitors and enforces behavioral rules:\n\n- **Tool call interception** \u2014 Inspect and modify tool calls before execution (e.g., enforce line limits)\n- **Tool result inspection** \u2014 Check tool results after execution (e.g., flag overly large outputs)\n- **Agent end hooks** \u2014 Enforce commit/message rules when the agent finishes\n- **Session lifecycle** \u2014 Reset state between sessions\n\n## Installation\n\n```bash\npi install git:github.com/catlain/pi-shepherd\n```\n\n## How It Works\n\npi-shepherd uses a **rules engine** that evaluates configurable patterns against tool calls and results:\n\n```\nTool Call \u2192 Rules Engine \u2192 Pass/Block/Modify\nTool Result \u2192 Rules Engine \u2192 Pass/Flag/Truncate\nAgent End \u2192 Rules Engine \u2192 Enforce (commit, summarize, etc.)\n```\n\n### Rules Format\n\nRules are defined in `rules.json` (or the `shepherd` section of settings):\n\n```json\n[\n  {\n    \"name\": \"block-grep-for-code-graph\",\n    \"pattern\": \"^grep\\\\s+.*\\\\b[A-Z][a-zA-Z]+\\\\(\",\n    \"type\": \"tool_call\",\n    \"action\": \"block\",\n    \"message\": \"Use code-graph search_symbols instead of grep for symbol names\"\n  },\n  {\n    \"name\": \"warn-large-edit\",\n    \"pattern\": \"edit\",\n    \"type\": \"tool_result\",\n    \"maxLines\": 500,\n    \"action\": \"warn\",\n    \"message\": \"Edit result is large, consider breaking into smaller changes\"\n  }\n]\n```\n\n### Rule Types\n\n| Type | When Evaluated | Actions |\n|------|---------------|---------|\n| `tool_call` | Before tool execution | `pass`, `block`, `modify` |\n| `tool_result` | After tool execution | `pass`, `warn`, `truncate` |\n| `agent_end` | When agent finishes | `enforce` |\n\n## Built-in Rules\n\npi-shepherd ships with default rules for common anti-patterns:\n\n- Redirect `grep` to `code-graph` for symbol searches\n- Warn on overly large tool results\n- Enforce git commit on agent end\n- Block redundant file reads\n\n## Configuration\n\n```json\n{\n  \"shepherd\": {\n    \"enabled\": true,\n    \"rulesDir\": \"~/.pi/agent/shepherd-rules\"\n  }\n}\n```\n\n## Use Cases\n\n| Scenario | Rule Type | Action |\n|----------|-----------|--------|\n| **Enforce coding standards** | `tool_call` | Block tools that don't follow conventions |\n| **Prevent context bloat** | `tool_result` | Truncate large results |\n| **Git discipline** | `agent_end` | Force commit at session end |\n| **Redirect to better tools** | `tool_call` | Block grep, suggest code-graph |\n| **Custom team rules** | All types | Project-specific guardrails |\n\n## Best Practices\n\n### \u2705 Recommended\n- Start with built-in rules, then add project-specific ones\n- Use `warn` before `block` \u2014 give the agent a chance to learn\n- Keep rule patterns simple and specific \u2014 regex is evaluated on every tool call\n- Put project rules in `.pi/shepherd-rules/` for version control\n\n### \u274c Not Recommended\n- Don't use overly broad patterns \u2014 they'll match too many calls and slow things down\n- Don't create contradictory rules (block + allow the same pattern)\n- Don't rely on shepherd for security \u2014 it's a guide, not a sandbox\n\n## Limitations\n\n| Limitation | Detail |\n|------------|--------|\n| Regex only | Patterns use regex, not semantic understanding |\n| No async rules | Rules must evaluate synchronously |\n| Agent can bypass | Determined agents can ignore warnings |\n| No persistence | Rule state resets between sessions |\n\n## Architecture\n\n```\npi-shepherd/\n\u251c\u2500\u2500 index.ts          # Entry: register hooks + rules engine\n\u251c\u2500\u2500 rules-engine.ts   # Pattern matching + action dispatch\n\u251c\u2500\u2500 rules/            # Built-in rule definitions\n\u2502   \u251c\u2500\u2500 grep.ts       # Redirect grep \u2192 code-graph\n\u2502   \u251c\u2500\u2500 line-limit.ts # Warn on large outputs\n\u2502   \u2514\u2500\u2500 agent-end.ts  # Enforce git commit\n\u251c\u2500\u2500 types.ts          # Rule type definitions\n\u2514\u2500\u2500 package.json\n```\n\n**Dependencies**:\n- `@pi-atelier/shared-utils` (bundled) \u2014 settings management\n- `@earendil-works/pi-coding-agent` \u2014 ExtensionAPI (peer)\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://catlain.github.io/pi-atelier/",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/catlain/pi-shepherd.git"
+  },
+  "pi": {
+    "extensions": [
+      "."
+    ]
+  },
+  "time": {
+    "created": "2026-05-29T09:09:46.071Z",
+    "modified": "2026-06-01T10:13:00.615Z",
+    "0.1.0": "2026-05-29T09:09:46.350Z",
+    "0.1.1": "2026-05-29T09:14:46.224Z",
+    "0.1.2": "2026-06-01T10:13:00.510Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

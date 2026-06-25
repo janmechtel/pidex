@@ -1,0 +1,40 @@
+{
+  "name": "pi-permission-gate",
+  "latest_version": "0.1.4",
+  "description": "Config-driven permission system for Pi agents. Deny-by-default tool restriction with glob matching, path normalization, self-protection, and structured logging.",
+  "readme": "# pi-permission-gate\n\nConfig-driven permission system for [Pi](https://pi.dev) agents. Deny-by-default tool restriction with glob matching, path normalization, self-protection, and structured logging.\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:pi-permission-gate\n```\n\nFrom git:\n\n```bash\npi install git+https://github.com/juanje/pi-permission-gate.git\n```\n\nOr load directly without installing:\n\n```bash\npi -e /path/to/pi-permission-gate/extensions/permission-gate.ts\n```\n\n## Quick start\n\nCreate `.pi/permissions.json` in your project:\n\n```json\n{\n  \"defaultMode\": \"deny\",\n  \"permissions\": {\n    \"tools\": {\n      \"read\": { \"paths\": { \"allow\": [\"**\"] }, \"default\": \"allow\" },\n      \"write\": { \"paths\": { \"allow\": [\"tmp/*\"] }, \"default\": \"deny\" },\n      \"bash\": {\n        \"allow\": [\"date\", \"date *\", \"git *\", \"bin/*\"],\n        \"deny\": [\"rm *\", \"curl *\", \"wget *\", \"*.env*\"],\n        \"default\": \"deny\"\n      }\n    }\n  }\n}\n```\n\nOptional local overrides in `.pi/permissions.local.json` (gitignored).\n\n## How it works\n\nThe extension hooks into three Pi events:\n\n1. **`session_start`** \u2014 loads and merges policy files, initializes the permission log\n2. **`before_agent_start`** \u2014 hides tools blocked at session level via `setActiveTools()`\n3. **`tool_call`** \u2014 enforces granular rules before each tool executes\n\n### Evaluation order\n\nFor each tool call:\n\n1. **Self-protection** \u2014 blocks operations on `.pi/permissions.json`, `.pi/permissions.local.json`, and `.pi/extensions/` (hardcoded, cannot be overridden)\n2. **Simple rules** \u2014 `\"allow\"` or `\"deny\"` for the entire tool\n3. **Deny patterns** \u2014 command/path glob patterns (deny always wins)\n4. **Allow patterns** \u2014 command/path glob patterns\n5. **Tool default** \u2014 per-tool `default` mode\n6. **Policy default** \u2014 global `defaultMode`\n\n### Glob matching\n\nPatterns use `*` (any sequence) and `?` (single character). Tilde expansion is supported in patterns (`~/.ssh/*`). Paths are normalized (`~`, `./`, `../`, absolute \u2192 relative) before matching.\n\n### Secret redaction\n\nLogged inputs and reasons are automatically scanned for credentials before writing. Two layers of detection:\n\n1. **Vendor prefixes** (via [secret-sniff](https://github.com/p-vbordei/secret-sniff)) \u2014 AWS `AKIA*`, GitHub `ghp_*`, GitLab `glpat-*`, Anthropic `sk-ant-*`, OpenAI `sk-proj-*`, Slack `xoxp-*`, Stripe, JWT, PEM, and more\n2. **Variable name patterns** \u2014 catches `SECRET=`, `_KEY=`, `_TOKEN=`, `PASSWORD=`, `CREDENTIAL=`, `AUTH=`, `DATABASE_URL=`, `REDIS_URL=`, and `Bearer` headers regardless of value format\n\n### Structured log\n\nEach decision is appended to `.pi/logs/permission-gate_{timestamp}.jsonl` (secrets redacted):\n\n```json\n{\"ts\":\"2026-06-09T00:05:16.733Z\",\"tool\":\"bash\",\"input\":\"cat .env\",\"decision\":\"deny\",\"reason\":\"'cat .env' matches deny pattern for bash\"}\n```\n\nCustom log directory via `logPath` in the policy:\n\n```json\n{\n  \"defaultMode\": \"deny\",\n  \"logPath\": \"var/audit\",\n  \"permissions\": { \"tools\": {} }\n}\n```\n\n## Policy format\n\n```typescript\ninterface Policy {\n  defaultMode: \"allow\" | \"deny\";\n  logPath?: string; // optional, relative to project root\n  permissions: {\n    tools: Record<string, \"allow\" | \"deny\" | ToolRule>;\n  };\n}\n\ninterface ToolRule {\n  default?: \"allow\" | \"deny\";\n  allow?: string[];   // glob patterns (bash commands, etc.)\n  deny?: string[];\n  paths?: {\n    allow?: string[];\n    deny?: string[];\n  };\n}\n```\n\n### Merge strategy\n\nWhen both `.pi/permissions.json` and `.pi/permissions.local.json` exist:\n\n- `defaultMode` \u2014 local wins\n- Tool rules \u2014 deep merged (arrays concatenated)\n- Local string rule (`\"allow\"` / `\"deny\"`) \u2014 overrides base entirely\n\n## Development\n\n```bash\ngit clone https://github.com/juanje/pi-permission-gate.git\ncd pi-permission-gate\nnpm install\nnpm run check    # typecheck + lint + test\n```\n\n## License\n\nMIT \u2014 see [LICENSE](LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "permissions",
+    "security",
+    "guardrails"
+  ],
+  "author": {
+    "name": "Juanje Ojeda"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/juanje/pi-permission-gate#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juanje/pi-permission-gate.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-09T02:25:22.324Z",
+    "modified": "2026-06-20T17:11:14.172Z",
+    "0.1.0": "2026-06-09T02:25:22.626Z",
+    "0.1.1": "2026-06-09T02:42:32.797Z",
+    "0.1.2": "2026-06-10T00:01:37.707Z",
+    "0.1.3": "2026-06-12T17:35:20.741Z",
+    "0.1.4": "2026-06-20T17:11:14.067Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 210,
+  "download_trend": []
+}

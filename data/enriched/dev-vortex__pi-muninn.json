@@ -1,0 +1,354 @@
+{
+  "name": "@dev-vortex/pi-muninn",
+  "latest_version": "0.4.0",
+  "description": "Pi Muninn: project-aware memory extension architecture built on top of pi-mempalace.",
+  "readme": "<p align=\"center\">\n  <img alt=\"Pi Muninn memory layers diagram\" src=\"./doc/images/muninn.png\" style=\"max-width: 100%; width: 720px;\">\n</p>\n\n# <div align=\"center\" style=\"text-shadow: -1px -1px 1px #FFF, 1px 1px 1px #FFF;\"><span style=\"color: #666;\">Pi-</span>Muninn</div>\n\n\n\nPi Muninn is project memory for [`\u03c0`](https://github.com/mariozechner/pi): it helps your coding assistant remember useful project facts without making you repeat the same instructions in every chat.\n\nThis package is built with deep respect for MemPalace and the upstream `pi-mempalace` extension.\n\n## The name\n\nThe package name combines `pi`, the host coding agent, with **Muninn** (pronounced \u201cMOO-nin\u201d), one of Odin's two ravens in Norse mythology. Huginn and Muninn are commonly associated with thought and memory; they are said to travel across the nine worlds and bring what they learn back to Odin. This package uses Muninn because its job is to help Pi carry useful project memory across sessions, users, and team members, then bring it back when it matters.\n\n## Why this exists\n\nCoding assistants are helpful, but they forget things when a chat gets long, resets, or is summarized. That creates real problems:\n\n- you repeat the same project rules again and again,\n- decisions get lost between sessions,\n- personal preferences get mixed up with project-specific facts,\n- teammates cannot easily share important project context,\n- the assistant may search too much or not search at all,\n- long chats send more text to the model than necessary.\n\nThat last point matters for cost. Most hosted AI providers charge based on tokens, which are small pieces of text sent to and returned by the model. Re-sending the same background information, long transcripts, or oversized search results can directly increase your bill. Even when using a local model, unnecessary text makes responses slower and uses more computer resources.\n\n`@dev-vortex/pi-muninn` aims to reduce that waste. It keeps useful notes in the right place and gives the assistant a short, relevant briefing before it answers. When that short briefing is not enough, the assistant can do a focused lookup instead of dumping everything into the chat.\n\nIn simple terms: better memory should mean fewer repeated explanations, fewer wasted tokens, lower cost, and smoother long-running project work.\n\n## Appreciation and lineage\n\nThis project is intentionally built on the shoulders of prior work.\n\n### MemPalace\n\nMemPalace helped popularize the idea that an assistant should have durable, searchable memory instead of relying only on the current chat window. That idea is valuable because important knowledge should survive beyond one conversation.\n\n### `pi-mempalace`\n\nPi Muninn especially appreciates the upstream [`pi-mempalace`](https://github.com/Jabbslad/pi-mempalace) extension. The upstream project provides the original `pi` memory workflow, command inspiration, and compatible memory behavior that this package builds around.\n\nThis package keeps compatible global-memory behavior available and adds project-focused memory and handoff behavior around it. It should be understood as an extension of the `pi-mempalace` idea, not as an attempt to erase its authorship.\n\nSee `ACKNOWLEDGEMENTS.md` for upstream snapshot and license details.\n\n## What this package does\n\n`@dev-vortex/pi-muninn` adds one `pi` command root: `/memory`.\n\nIt helps with three kinds of information:\n\n1. **Personal memory** \u2014 reusable preferences and facts about you.\n   - Example: \u201cI prefer TypeScript for web projects.\u201d\n2. **Project memory** \u2014 facts that only apply to the current repository.\n   - Example: \u201cThis project uses Docker for validation.\u201d\n3. **Project handoff notes** \u2014 current work state, decisions, and next steps.\n   - Example: \u201cThe README update is done; package smoke tests passed.\u201d\n\nThe assistant can use these notes to avoid rediscovering the same information every time.\n\n### Memory layers at a glance\n\n<p align=\"center\">\n  <img alt=\"Pi Muninn memory layers diagram\" src=\"./doc/images/muninn-diagram.png\" style=\"max-width: 100%; width: 720px;\">\n</p>\n\n## How it works\n\n### Short automatic briefings\n\nBefore the assistant answers, the extension can add a short memory briefing to the conversation. This briefing is intentionally limited so it does not flood the model with unnecessary text.\n\nIf the briefing already has enough information, the assistant can answer directly. If it may be incomplete, the assistant is told to perform one focused lookup.\n\n### Local project storage\n\nProject memory is stored inside the repository under:\n\n```text\n.agent/memory/\n```\n\nThe important idea is simple:\n\n- your project facts stay with the project,\n- your personal reusable preferences stay in your personal memory,\n- temporary handoff notes stay separate from durable facts,\n- rebuildable search/cache files are not treated as the source of truth.\n\n## Install\n\n```bash\npi install npm:@dev-vortex/pi-muninn\n```\n\nThen open a project workspace and run:\n\n```text\n/memory project on\n/memory project status\n```\n\n## Quick start\n\n1. Check memory status:\n   ```text\n   /memory status\n   ```\n2. Enable project memory in the current repository:\n   ```text\n   /memory project on\n   ```\n3. Check who you are recorded as for project memory:\n   ```text\n   /memory project user status\n   ```\n4. Work normally. The assistant receives short project briefings automatically.\n5. If project memory search looks stale, refresh it:\n   ```text\n   /memory project index rebuild\n   ```\n\n## Command reference\n\nThis README lists commands intended for normal package users. Maintainer-only and test-only controls are intentionally not documented here.\n\n### Everyday commands\n\n| Command | What it does |\n|---|---|\n| `/memory status` | Shows whether memory is available and whether project memory is active. |\n| `/memory on` | Turns memory on. |\n| `/memory off` | Turns memory off. |\n| `/memory search <what you want to find>` | Searches saved memory. When project memory is active, project results are included. |\n| `/memory stats` | Shows basic memory counts and status information. |\n\n### Project memory commands\n\n| Command | What it does |\n|---|---|\n| `/memory project` | Shows project-memory status and a short help summary. |\n| `/memory project help` | Lists available public project commands. |\n| `/memory project on` | Enables project memory for the current repository. |\n| `/memory project off` | Disables project memory for the current repository. Existing files are kept. |\n| `/memory project status` | Shows project memory health, storage, and handoff-note status. |\n| `/memory project set <project name>` | Sets the project name used by memory. |\n| `/memory project search <what you want to find>` | Searches only the current project memory. |\n\n### User identity commands\n\nProject memory is stored per user. This helps teammates share project context without overwriting each other.\n\n| Command | What it does |\n|---|---|\n| `/memory project user status` | Shows which user identity is being used for project memory. |\n| `/memory project user set <your name or email>` | Sets a stable identity for this project. Recommended when you plan to commit project memory files. |\n| `/memory project user auto` | Returns to automatic identity detection. |\n\n### Refresh and maintenance commands\n\n| Command | What it does |\n|---|---|\n| `/memory project index status` | Shows whether the project search data looks healthy. |\n| `/memory project index rebuild` | Rebuilds project search data from saved project memory. Use this if search results look stale. |\n\n### Promotion commands\n\nPromotion means copying a useful project lesson into your reusable personal memory when it is no longer only project-specific.\n\n| Command | What it does |\n|---|---|\n| `/memory project promote status` | Shows whether there are reusable lessons ready to review. |\n| `/memory project promote dry-run` | Previews what would be promoted without changing memory. |\n| `/memory project promote run` | Applies accepted promotions into reusable personal memory. |\n| `/memory project promote validate` | Checks promotion state and reports issues. |\n\n### Other inherited memory commands\n\nThese commands come from the compatible memory workflow and are available for users who want deeper inspection.\n\n| Command | What it does |\n|---|---|\n| `/memory rooms [project]` | Lists memory topics. |\n| `/memory taxonomy` | Shows memory organized by project and topic. |\n| `/memory graph` | Shows relationships between memory topics/projects. |\n| `/memory knowledge <entity>` | Looks up saved facts about a person, tool, project, or other entity. |\n| `/memory timeline [entity]` | Shows saved facts over time. |\n| `/memory diary [query]` | Reads or searches diary-style notes. |\n\n## What the assistant may do automatically\n\nYou usually do not need to type special tool names. During normal work, the assistant may:\n\n- save a project-specific fact to project memory,\n- save a reusable preference to personal memory,\n- record a project handoff note when work changes direction,\n- search memory when the automatic briefing says more evidence is needed.\n\nA good rule of thumb:\n\n- project decisions belong in project memory,\n- reusable personal preferences belong in personal memory,\n- current work status belongs in handoff notes.\n\n## Git and storage safety\n\nProject memory files live under:\n\n```text\n.agent/memory/\n```\n\nCommon files:\n\n| Path | Meaning | Commit guidance |\n|---|---|---|\n| `.agent/memory/<your-user-id>.db` | Your project memory and handoff notes. | Commit only when your identity is stable and your team intentionally shares project memory files. |\n| `.agent/memory/<your-user-id>.db-wal` / `.db-shm` | SQLite helper files for the same database. | Follow the same rule as the matching `.db` file. |\n| `.agent/memory/cache.db` | Rebuildable project search data. | Do not commit. |\n| `.agent/memory/pi-muninn.config.json` | Local project memory settings. It can contain your user id. | Do not commit. If teammates share this file, they can accidentally write to the same DB file and create Git conflicts. |\n| `.agent/memory/.gitignore` | Local safety rules generated by the extension. | Do not commit. It is meant to protect each local workspace. |\n\nIf you are unsure whether a memory file should be committed, stay inside Pi and run:\n\n```text\n/memory project user status\n/memory project status\n```\n\n## Environment setting for identity\n\nMost users do not need environment variables. If automatic identity detection is not enough, you can set:\n\n| Variable | Purpose |\n|---|---|\n| `PI_MEMORY_USER_ID` | Forces the user identity seed used for project memory. |\n\n## What to expect in daily use\n\n- The assistant should remember important project facts more often.\n- You should need to repeat fewer instructions.\n- The assistant should use shorter relevant briefings instead of large memory dumps.\n- Lower repeated context can reduce hosted model cost and improve response speed.\n- If the assistant does not have enough evidence, it should perform a focused lookup.\n- Rebuildable cache/search files should not become the source of truth.\n\n## License\n\nMIT. See `ACKNOWLEDGEMENTS.md` for upstream credit and vendored snapshot provenance.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "memory",
+    "project-memory",
+    "mempalace",
+    "muninn",
+    "pi-muninn"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/dev-vortex/pi-muninn",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dev-vortex/pi-muninn.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/pi-muninn/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-25T20:04:53.627Z",
+    "modified": "2026-05-28T19:32:06.812Z",
+    "0.1.0": "2026-05-25T20:04:54.017Z",
+    "0.2.0": "2026-05-26T10:39:13.243Z",
+    "0.3.0": "2026-05-26T18:14:52.209Z",
+    "0.4.0": "2026-05-28T19:32:06.576Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 36,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 332
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 228
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 46
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 19
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "name": "pi-comfyui-paint",
+  "latest_version": "0.0.9",
+  "description": "ComfyUI image/video generation extension for pi coding agent",
+  "readme": "# pi-comfyui-paint\n\n[![npm version](https://img.shields.io/npm/v/pi-comfyui-paint)](https://www.npmjs.com/package/pi-comfyui-paint)\n\nComfyUI image/video generation extension for [pi](https://github.com/earendil-works/pi-coding-agent).\n\n## Install\n\n```bash\npi install npm:pi-comfyui-paint\n```\n\nOr install a pinned version:\n\n```bash\npi install npm:pi-comfyui-paint@0.0.8\n```\n\nDevelopment/git install:\n\n```bash\npi install git:github.com/MacroSony/pi-comfyui-paint@v0.0.8\n```\n\n## Configuration\n\n| Env var | Default | Description |\n|---------|---------|-------------|\n| `COMFYUI_URL` | `127.0.0.1:8188` | ComfyUI server address |\n| `COMFYUI_WORKFLOW_DIR` | (auto) | Custom workflow directory |\n| `COMFYUI_INTERRUPT_ON_ABORT` | off | Set to `1`, `true`, `yes`, or `on` to call ComfyUI `/interrupt` when a `paint` tool call is cancelled. By default, cancellation only stops Pi from polling; ComfyUI may continue running. |\n| `COMFYUI_IMAGE_QUALITY` | `85` | JPEG quality (1\u2013100) for images sent to the LLM provider. Set to `0` to send raw PNG with no compression. Original files on disk are never modified. |\n| `COMFYUI_IMAGE_MAX_DIMENSION` | `2048` | Resize images so the longest side \u2264 this many pixels before sending to the LLM. Set to `0` to skip resizing. Original files on disk are never modified. |\n\n## Workflow Resolution\n\nWorkflows are resolved in this order:\n\n1. `COMFYUI_WORKFLOW_DIR` env var (if set)\n2. `.pi/comfyui_workflows/` in your project root\n3. `workflows/` bundled with this package (fallback)\n\nPlace your own `.json` workflow files in any of these locations. To customize the bundled workflows, call `paint_copy_workflow_to_project` first and edit the copied files in `.pi/comfyui_workflows/`.\n\n## Tools\n\n| Tool | Description |\n|------|-------------|\n| `paint_list_workflows` | List available workflow JSON files |\n| `paint_get_details` | Inspect a workflow's variables and notes |\n| `paint_validate_workflow` | Validate a workflow's JSON structure and pi-comfyui-paint annotations |\n| `paint_copy_workflow_to_project` | Copy bundled workflows into `.pi/comfyui_workflows/` for project customization |\n| `paint_server_status` | Check ComfyUI connectivity and effective extension configuration |\n| `paint_get_models` | Query ComfyUI server for available models (checkpoints, LoRAs, etc.) |\n| `paint_queue_status` | Check the current generation queue (running + pending) |\n| `paint_interrupt` | Cancel the currently running generation |\n| `paint` | Generate images/videos from a prompt, with optional workflow variables and input files |\n| `paint_search_danbooru_tags` | Search Danbooru to confirm tags and find related tags (supports multiple queries) |\n\n## ComfyUI Custom Node Dependencies\n\nMost bundled workflows only require standard ComfyUI nodes plus the models listed in `paint_get_details`. LoRA-enabled workflows that use `Power Lora Loader (rgthree)` require [`rgthree/rgthree-comfy`](https://github.com/rgthree/rgthree-comfy) to be installed in your ComfyUI `custom_nodes/` directory.\n\n`Power Lora Loader (rgthree)` is preferred for LoRA workflows because it can load multiple LoRAs in one node, avoiding the need to manually edit workflows when combining style, character, detail, or concept LoRAs.\n\n## Workflow Format\n\nWorkflow JSONs use `_meta.title` annotations:\n\n- `[VAR] Name` \u2014 Customizable variable (exposed as a prompt parameter)\n- `[NOTE]` \u2014 Documentation shown in `paint_get_details`\n- `[OUTPUT:type]` \u2014 Tagged output node\n- `[FILE:type:order]` \u2014 Input file slot for `paint.input_files`\n- `[LORA:slot]` \u2014 LoRA loader slot for `paint.loras` overrides. Intended for `Power Lora Loader (rgthree)` nodes.\n\nFor workflows with `[FILE:type:order]` nodes, pass local image paths to `paint` as `input_files` in slot order. Relative paths are resolved from the current project directory, uploaded to ComfyUI as input files, and inserted into the annotated workflow nodes.\n\n## LoRA Workflows\n\nLoRA-enabled workflows should use [`Power Lora Loader (rgthree)`](https://github.com/rgthree/rgthree-comfy) and annotate each loader with a simple slot name:\n\n```txt\n[LORA:base_style] Power Lora Loader (rgthree)\n[LORA:hires_detail] Power Lora Loader (rgthree)\n[LORA:inpaint_character] Power Lora Loader (rgthree)\n```\n\n`paint_get_details` detects these slots and returns LoRA slot info together with workflow variables, notes, outputs, and sidecar metadata.\n\nOptional LoRA metadata can be stored next to a workflow:\n\n```txt\n.pi/comfyui_workflows/T2I_Anime_Anima_lora.json\n.pi/comfyui_workflows/T2I_Anime_Anima_lora.loras.json\n```\n\nExample sidecar entry:\n\n```json\n{\n  \"file\": \"anima/[Style]saio_ga_ushi_v1.safetensors\",\n  \"displayName\": \"Saio ga Ushi Style\",\n  \"activationPrompt\": \"@saio ga ushi\",\n  \"defaultStrength\": 0.7,\n  \"description\": \"Artist/style LoRA for Anima. Add the activation tag to the prompt when you want this style.\"\n}\n```\n\nUse LoRA overrides in `paint` like this:\n\n```json\n{\n  \"workflow\": \"T2I_Anime_Anima_lora.json\",\n  \"prompt\": \"masterpiece, best quality, score_7, safe, 1girl, @saio ga ushi, smile\",\n  \"loras\": {\n    \"base_style\": {\n      \"file\": \"anima/[Style]saio_ga_ushi_v1.safetensors\",\n      \"strength\": 0.7\n    }\n  }\n}\n```\n\nTo load multiple LoRAs into one Power Lora Loader slot, use an array:\n\n```json\n{\n  \"loras\": {\n    \"base_style\": [\n      { \"file\": \"anima/[Style]saio_ga_ushi_v1.safetensors\", \"strength\": 0.7 },\n      { \"file\": \"anima/[Detail]some_detail_lora.safetensors\", \"strength\": 0.35 }\n    ]\n  }\n}\n```\n\nLoRA overrides replace the contents of the named slot. Activation tags are not added automatically; put them in `prompt` yourself based on `paint_get_details` metadata.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "comfyui",
+    "image-generation",
+    "video-generation"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/MacroSony/pi-comfyui-paint#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MacroSony/pi-comfyui-paint.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-12T20:41:00.967Z",
+    "modified": "2026-06-14T05:43:26.561Z",
+    "0.0.5": "2026-06-12T20:41:01.191Z",
+    "0.0.6": "2026-06-13T16:34:17.710Z",
+    "0.0.7": "2026-06-13T16:40:33.133Z",
+    "0.0.8": "2026-06-13T18:56:36.103Z",
+    "0.0.9": "2026-06-14T05:43:26.449Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": null,
+  "download_trend": []
+}

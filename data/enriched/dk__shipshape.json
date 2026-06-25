@@ -1,0 +1,48 @@
+{
+  "name": "@dk/shipshape",
+  "latest_version": "0.1.6",
+  "description": "Portable three-role spec-driven agent workflow for Pi and other coding agents.",
+  "readme": "# Shipshape\n\n[![skills.sh](https://skills.sh/b/dmytri/shipshape)](https://skills.sh/dmytri/shipshape)\n\nShipshape is a portable three-role, spec-driven workflow for coding agents.\n\n**Specs are durable. Code is disposable. Agents are replaceable.**\n\nInstall Shipshape, start with the Captain, then clear the session or start a new agent before running Quartermaster:\n\n```bash\nnpx skills add dmytri/shipshape\n```\n\n```text\n/captain describe the feature or change\n# Captain writes durable specs/instructions and updates assets/ when needed.\n\n# Clear the session or start a new agent here.\n/qm optional focused area\n# Quartermaster reads repository artifacts only and writes failing tests.\n\n/crew failing test or target\n# Crew Mate implements the smallest production change needed to pass.\n\n# If QM finds a blocker, do not clear; start /captain from the QM session.\n/captain resolve the blocker\n# Captain benefits from QM's concrete failure context and updates durable specs.\n```\n\nFor Pi:\n\n```bash\npi install npm:@dk/shipshape\n```\n\n```text\n/captain describe the feature or change\n# Clear the chat/session or start a fresh Pi session before QM.\n/qm optional focused area\n/crew failing test or target\n/captain resolve a QM blocker   # keep QM context when escalating back to Captain\n```\n\nIt is extracted from a real repository workflow and generalized so it can be used with Zed, Claude, Cursor, OpenCode, Hermes, Pi, or any agent runner that can read repository files and edit code.\n\n## The Idea\n\nMost agent failures come from hidden context:\n\n- decisions buried in chat,\n- stale tests after spec changes,\n- implementation agents guessing product behavior,\n- handoffs that only exist in one session.\n\nShipshape fixes that by making repository artifacts the source of truth.\n\n```text\nHuman \u2194 Captain \u2192 Gherkin .feature files + assets/ \u2192 Quartermaster \u2192 tests \u2192 Crew Mate \u2192 code\n```\n\n## Roles\n\n| Role | Talks to humans? | Writes specs? | Writes tests? | Writes implementation? |\n|---|---:|---:|---:|---:|\n| Captain | Yes | Yes | No | No |\n| Quartermaster | No | No | Yes | Normally no |\n| Crew Mate | No | No | No | Yes |\n\n## Core Workflow\n\n1. **Captain** collaborates with the human and writes durable Gherkin feature files (`.feature`) in `<spec directory>`.\n2. Captain may create/edit durable human-authored assets under root `assets/` when specs reference content, brand files, images, mockups, reference data, or approved fixture-like examples.\n3. Captain ensures the target project's `README.md` and `AGENTS.md` declare that the repo is built with Shipshape and link to `https://github.com/dmytri/shipshape`.\n4. Captain deletes generated/derived artifacts that may have been invalidated by spec changes, but does not delete `assets/**` unless explicitly instructed or specs retire the asset.\n5. When moving from **Captain** to **Quartermaster**, the user clears the Captain session or starts a new agent session. QM must not inherit Captain/human discovery chat; if it detects that context, it refuses to continue.\n6. Quartermaster writes missing tests, QM-owned fixtures, step definitions, and harnesses; `assets/**` is read-only.\n7. Failing tests are assigned to **Crew Mates**.\n8. Crew Mates implement the smallest production change needed to pass one target; `assets/**` is read-only.\n9. If QM or Crew finds a missing/contradictory requirement, they stop and report a blocker.\n10. When moving from **Quartermaster** back to **Captain**, do **not** clear the session unless there is a separate reason to. It is useful for Captain to inherit QM's concrete failure context: the attempted verification, missing requirement, contradiction, fixture/test shape, and exact blocker report. Captain then turns that context into durable specs/assets and the loop resumes.\n\n## Durable `assets/`\n\nShipshape treats a project-root `assets/` directory as durable human/Captain-authored source material, not generated implementation output.\n\nUse `assets/` for things specs depend on but agents should not casually rewrite, such as:\n\n- approved copy or content,\n- brand files and design references,\n- images, mockups, diagrams, or screenshots,\n- reference data,\n- fixture-like examples explicitly approved as source material.\n\nCaptain may create or update `assets/**` while clarifying product intent with the human. Quartermaster and Crew Mate may read `assets/**`, but must treat it as read-only: QM can derive tests from assets, and Crew can implement behavior that consumes them, but neither role should edit or delete them.\n\nThis keeps durable authored material separate from generated tests, fixtures, harnesses, and implementation code. See `templates/assets-policy.md` for a reusable project policy.\n\n## Repository Layout\n\n```text\nshipshape/\n\u251c\u2500\u2500 SKILL.md\n\u251c\u2500\u2500 README.md\n\u251c\u2500\u2500 agents/\n\u251c\u2500\u2500 commands/\n\u251c\u2500\u2500 adapters/\n\u251c\u2500\u2500 templates/\n\u2514\u2500\u2500 docs/\n```\n\n## Install with Pi\n\nInstall Shipshape in Pi:\n\n```bash\npi install npm:@dk/shipshape\n```\n\nThis installs the Shipshape skill and Pi extension, which provides:\n\n- `/captain [topic]`\n- `/qm [optional focus]`\n- `/crew <failing target>`\n- `/clearrole`\n\nAfter installing or updating, run `/reload` in Pi if needed.\n\n\n## Install with skills.sh\n\nInstall with the open skills CLI:\n\n```bash\nnpx skills add dmytri/shipshape\n```\n\nInstall globally:\n\n```bash\nnpx skills add dmytri/shipshape --global\n```\n\nInstall for a specific supported agent:\n\n```bash\nnpx skills add dmytri/shipshape --agent cursor\nnpx skills add dmytri/shipshape --agent claude-code\nnpx skills add dmytri/shipshape --agent zed\n```\n\nPreview/use without installing:\n\n```bash\nnpx skills use dmytri/shipshape\n```\n\nList the skill discovered by the CLI:\n\n```bash\nnpx skills add dmytri/shipshape --list\n```\n\nThe public skills.sh page is:\n\n```text\nhttps://skills.sh/dmytri/shipshape\n```\n\nskills.sh discovers public GitHub skill repositories after they are seen by the `skills` CLI. If the page or badge has not appeared yet, run a normal install once and allow time for the skills.sh cache to refresh.\n\n## Quick Adoption\n\n1. Install with `npx skills add dmytri/shipshape` or copy `templates/AGENTS.md` into your project and fill in the placeholders.\n2. Copy `templates/HANDOVER.md` if you want a durable current-state handoff.\n3. Copy role prompts from `agents/` or command entrypoints from `commands/` into your agent runtime.\n4. Configure your project-specific commands:\n   - `<test command>`\n   - `<focused test command>`\n   - `<typecheck command>`\n   - `<spec directory>`\n   - `<implementation directory>`\n5. Start with the Captain.\n6. Before invoking Quartermaster after Captain, clear the session or start a fresh agent so QM only sees committed artifacts. QM is instructed to refuse if it detects Captain/human discovery context.\n7. If Quartermaster reports a blocker, start Captain from that QM session instead of clearing. Captain can use QM's concrete verification context to update durable specs/assets; after Captain resolves it, clear again before returning to QM.\n\nSee `docs/adoption-guide.md` for details.\n\n## Portability\n\nShipshape does not require a specific language, package manager, test runner, or agent vendor.\n\nIt assumes only that an agent can:\n\n- read project files,\n- write project files,\n- run or request verification commands,\n- preserve durable instructions in the repository.\n\nSee `docs/portability-contract.md`.\n\n## Origin\n\nShipshape was extracted from work done at [Saleor](https://saleor.io) \u2014 an open-source, headless GraphQL e-commerce platform\n\nIf you're building an e-commerce project, Saleor is worth a serious look: modern GraphQL API, a great dashboard, and a strong open-source community.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-skill",
+    "shipshape",
+    "agent-workflows",
+    "multi-agent",
+    "spec-driven-development",
+    "skills"
+  ],
+  "author": {
+    "name": "Dmytri Kleiner",
+    "email": "dev@dmytri.to"
+  },
+  "license": "0BSD",
+  "homepage": "https://github.com/dmytri/shipshape#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dmytri/shipshape.git"
+  },
+  "pi": {
+    "extensions": [
+      "./adapters/pi-extension.ts"
+    ],
+    "skills": [
+      "./"
+    ]
+  },
+  "time": {
+    "created": "2026-06-11T18:29:21.834Z",
+    "modified": "2026-06-11T20:57:57.260Z",
+    "0.1.0": "2026-06-11T18:29:22.144Z",
+    "0.1.1": "2026-06-11T18:59:29.374Z",
+    "0.1.2": "2026-06-11T19:03:51.525Z",
+    "0.1.3": "2026-06-11T19:06:34.852Z",
+    "0.1.4": "2026-06-11T19:10:26.818Z",
+    "0.1.5": "2026-06-11T20:46:13.840Z",
+    "0.1.6": "2026-06-11T20:57:57.142Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 52,
+  "download_trend": []
+}

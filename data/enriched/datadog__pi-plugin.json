@@ -1,0 +1,39 @@
+{
+  "name": "@datadog/pi-plugin",
+  "latest_version": "0.1.4",
+  "description": "Use Datadog directly in the Pi coding agent through a preconfigured Datadog MCP server. Query logs, metrics, traces, dashboards, and more through natural conversation. This plugin is in preview.",
+  "readme": "**This plugin is currently in Preview.**\n\n# Datadog Pi Plugin\n\nQuery your Datadog data directly from the [Pi coding agent](https://pi.dev/) using natural language. Ask about logs, metrics, traces, dashboards, monitors, and more.\n\n## What you need\n\n- A [Datadog](https://www.datadoghq.com/) account\n- [Pi](https://pi.dev/) installed (`npm i -g @earendil-works/pi-coding-agent`)\n\n## Why this plugin looks different\n\nPi does not have built-in MCP support \u2014 it is intentionally minimal. This plugin ships as a Pi **extension** that talks directly to the Datadog MCP server, using the official [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk) for the wire protocol and OAuth. The extension registers:\n\n- `datadog` \u2014 proxy tool the agent uses to list and invoke Datadog MCP tools on demand (token-efficient: one tool definition regardless of how many Datadog tools exist server-side)\n- `/datadog` \u2014 slash command for direct setup and configuration (`/datadog setup`, `/datadog configure`, `/datadog toolsets`)\n- `ddsetup`, `ddconfig`, `ddtoolsets` \u2014 model-callable management tools so the agent can recover automatically when setup is needed\n\n## Getting started\n\n**1. Install the plugin** with Pi's package manager:\n\n```bash\npi install npm:@datadog/pi-plugin\n```\n\nThis adds the package to Pi's global settings and installs the plugin plus its runtime dependencies (including the MCP SDK) into Pi's npm package cache. Restart Pi after install.\n\n**2. Start Pi** in your project:\n\n```bash\npi\n```\n\n**3. Configure your Datadog site** by asking any Datadog question \u2014 the agent can run the `ddsetup` tool automatically \u2014 or invoke the slash command directly:\n\n```\n/datadog setup us1\n```\n\n**4. Sign in to Datadog.** If you ran `/datadog setup`, your browser opens during setup. If setup happened automatically through the agent, the browser opens when the agent next calls the `datadog` tool. Once you authorize, control returns to Pi and your tokens are cached globally at `~/.pi/agent/datadog/datadog-oauth/<domain>/`. The plugin creates that cache with owner-only permissions. Sign-in is shared across all your projects (per domain), so you authorize once. Subsequent calls reuse the cached tokens and refresh automatically when they expire.\n\n## Using the plugin\n\nJust ask the agent anything about your Datadog data:\n\n```\nShow me error logs from the last hour\n```\n\n```\nWhat monitors are currently alerting?\n```\n\n```\nFind traces for service \"api-gateway\" with latency > 500ms\n```\n\n```\nList my dashboards\n```\n\nThe agent will call the `datadog` tool with `{ \"list\": true }` first to discover available tools, then invoke the right one with arguments.\n\n## Can't connect?\n\n**Never connected before?** Run `/datadog setup`. It will configure the Datadog MCP domain globally at `~/.pi/agent/datadog/datadog.json`.\n\n**Was working before but stopped?** Ask the agent to troubleshoot the Datadog connection. The most common cause is an expired sign-in \u2014 call the `datadog` tool with `{ \"list\": true }` to trigger a fresh sign-in flow.\n\n## Changing settings\n\nThe plugin provides a single `/datadog` slash command for direct configuration:\n\n- `/datadog setup` \u2014 configure your Datadog MCP site\n- `/datadog configure` \u2014 change your Datadog MCP site\n- `/datadog toolsets` \u2014 open the Datadog toolset picker\n\nIn Pi TUI mode, omit the site when running `/datadog setup` or `/datadog configure` to choose from the known Datadog sites interactively. The toolset picker supports the `all` meta-toolset, which enables every generally available Datadog MCP toolset; preview toolsets still need to be selected explicitly.\n\nThe same management flows remain available as model-callable tools (`ddsetup`, `ddconfig`, and `ddtoolsets`) so the agent can recover automatically when a Datadog request needs setup first.\n\n## Advanced usage\n\n### API key authentication (for headless / SSH / CI)\n\nIf your terminal can't open a browser, you can skip OAuth by setting both Datadog credentials in your shell before starting Pi:\n\n```bash\nexport DD_API_KEY=your-api-key\nexport DD_APPLICATION_KEY=your-application-key\npi\n```\n\nWhen both are set, the plugin uses them as request headers and skips the OAuth flow entirely. Ask the agent to check the Datadog config if you need to see which auth mode is active in your current session.\n\n### Callback port\n\nBy default OAuth callbacks come back on `http://localhost:19876/callback`. Override the port with `DD_OAUTH_CALLBACK_PORT` if `19876` conflicts with another tool.\n\n### Configuration storage and per-project overrides\n\n`pi install npm:@datadog/pi-plugin` writes the package entry to Pi's global settings (`~/.pi/agent/settings.json`) and installs the npm package under Pi's package cache (`~/.pi/agent/npm/`). By default the plugin keeps its config (`datadog.json`) and OAuth tokens (`datadog-oauth/<domain>/`) under `~/.pi/agent/datadog/`, so your setup and sign-in follow you across every project \u2014 you configure and authorize once. The agent dir honors `PI_CODING_AGENT_DIR` if you've overridden it.\n\nIf a single repo needs a different Datadog site than your global default, create a project override: run `/datadog setup --project` (or place a `.pi/datadog.json` in the repo). When that file is present it wins for that directory. OAuth tokens remain global per domain regardless of scope, so a project override never forces a re-login.\n\n### Reloading after changes\n\nAfter updates (`pi install npm:@datadog/pi-plugin@latest` or local edits), run `/reload` inside Pi to pick up the changes without a full restart.\n\n## Good to know\n\n- Authentication is via OAuth 2.1 + PKCE by default. The MCP SDK handles RFC 9728 discovery, RFC 7591 dynamic client registration, the callback flow, and token refresh.\n- Pi does not currently expose a secure extension credential store, so OAuth persistence is file-backed. The plugin stores OAuth artifacts under `~/.pi/agent/datadog/datadog-oauth/`, creates OAuth directories with `0700` permissions, and writes artifact files with `0600` permissions.\n- No Datadog credentials are sent to the AI model provider \u2014 they are only sent in Datadog MCP HTTP request headers.\n\n## Support\n\n- [Datadog MCP Server Documentation](https://docs.datadoghq.com/mcp_server/)\n- [Pi Documentation](https://pi.dev/docs)\n\n## Legal\n\nSee the [NOTICE](NOTICE) and [LICENSE-3rdparty.csv](LICENSE-3rdparty.csv) files included with this plugin.\n\nFor details on how Datadog handles your data, see the [Datadog Privacy Policy](https://www.datadoghq.com/legal/privacy).\n",
+  "keywords": [
+    "datadog",
+    "infrastructure",
+    "mcp",
+    "observability",
+    "productivity",
+    "pi",
+    "pi-package"
+  ],
+  "author": {
+    "name": "Datadog"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/datadog-labs/pi-plugin#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/datadog-labs/pi-plugin.git"
+  },
+  "pi": {
+    "extensions": [
+      "datadog.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-11T17:02:09.315Z",
+    "modified": "2026-06-17T16:19:56.821Z",
+    "0.1.2": "2026-06-11T17:02:09.650Z",
+    "0.1.3": "2026-06-16T16:44:09.910Z",
+    "0.1.4": "2026-06-17T16:19:56.541Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 63,
+  "download_trend": []
+}

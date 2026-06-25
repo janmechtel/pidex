@@ -1,0 +1,360 @@
+{
+  "name": "@zgltyq/pi-provider-claude",
+  "latest_version": "1.3.0",
+  "description": "Claude (Anthropic OAuth/subscription) compatibility layer for pi-coding-agent \u2014 keeps ALL extension tools usable under the Claude subscription by mapping unknown flat tool names to mcp__pi__<name> on the wire instead of dropping them, plus optional multi-",
+  "readme": "# @zgltyq/pi-provider-claude\n\nClaude (Anthropic **OAuth / subscription**) compatibility layer for\n[pi-coding-agent](https://pi.dev). Keeps **all** your extension tools usable\nunder the Claude subscription.\n\nIt is a self-contained fork of the tool-handling half of\n[`@benvargas/pi-claude-code-use`](https://www.npmjs.com/package/@benvargas/pi-claude-code-use)\n(MIT) \u2014 credit to Ben Vargas for the original approach.\n\n## Problem\n\nAnthropic's OAuth (subscription) request path appears to fingerprint tool names.\nTools that are **not** part of the Claude Code core set and are **not** prefixed\n`mcp__` can be classified as *extra usage*. The upstream extension defends against\nthis by **dropping every unknown flat-named tool** before the request is sent \u2014\nwhich silently hides legitimate extension tools from Claude:\n\n`ask_user_question`, `todo`, `subagent`, `ast_grep_search`, `lsp_diagnostics`,\n`ctx_*`, `web_search`, `ralph_*`, `preview_export`, \u2026 all disappear, even though\nthey work fine for non-Anthropic models.\n\n## What this does\n\nInstead of dropping unknown flat tools, it **renames them in place on the wire**\nto `mcp__pi__<name>`:\n\n- \u2705 `mcp__*` shape passes Anthropic's classifier \u2192 **no extra-usage charge**\n- \u2705 the tool stays **visible to Claude** \u2192 it can actually call it\n- \u2705 on the way back, calls to `mcp__pi__*` are rewritten to the original flat\n  name **before Pi executes them**, so the real tool (and its closure-bound\n  state) runs unchanged\n\nUntouched: native Anthropic tools (objects with a `type` field, e.g.\n`web_search`), anything already `mcp__`-prefixed, and the Claude Code core tools.\nThe extension only activates for **Anthropic + OAuth** \u2014 API-key auth and\nnon-Anthropic providers pass through completely unchanged.\n\nIt also applies the upstream system-prompt rewrite (`pi itself` \u2192 `the cli\nitself`, etc.) on the OAuth path.\n\n## Why it's lightweight\n\nThe tool's full JSON schema already rides inside the outbound payload, so the fix\nis a pure rename \u2014 **no jiti capture, no tool re-registration, no typebox**. The\nonly import is a TypeScript type (erased at runtime), so the extension has **zero\nruntime dependencies**.\n\n## Install\n\n```bash\npi install npm:@zgltyq/pi-provider-claude\n```\n\nThen remove the upstream one so they don't both transform the payload:\n\n```bash\npi remove npm:@benvargas/pi-claude-code-use\n```\n\nRestart Pi (or `/reload`) and continue using the normal `anthropic` provider with\nyour OAuth login.\n\n## Verify\n\n```bash\nPI_CLAUDE_PROVIDER_DEBUG_LOG=/tmp/claude-provider.log pi\n# send one message, then quit\n```\n\nIn `/tmp/claude-provider.log`, the `\"after\"` payload's `tools[]` should show your\nextension tools as `mcp__pi__<name>` and **nothing dropped**.\n\n## Multi-account failover (opt-in)\n\nIf you have **two subscription accounts** (e.g. personal + work), the extension can\nfail over between them: when the active account hits its rate / usage cap (429/529),\nit's put on cooldown and the next turn transparently continues on the other account.\nSubscription billing is preserved (Pi detects the OAuth path from the token shape).\n\n**Priority:** array order in `claude-pool.json` IS the priority. `accounts[0]` is the\nprimary \u2014 failover is non-sticky, so as soon as the primary's cooldown expires the\npool returns to it automatically. Put your preferred account first.\n\n**Detection (v1.2.0):** pi-ai's anthropic transport only emits\n`after_provider_response` for *successful* requests \u2014 the Anthropic SDK throws on\n429/529 before that callback runs, so header-based detection alone never fires.\nSince v1.2.0 the primary detector pattern-matches the provider error that lands on\nthe assistant message (`stopReason: \"error\"`) via `message_end`, including Claude's\n`\"usage limit reached|<epoch>\"` reset timestamps for accurate cooldowns. When a cap\nis hit, the turn errors once, the pool flips (with a UI notification), and you just\nresend your message to continue on the other account.\n\n**Background token refresh (v1.3.0):** OAuth access tokens are short-lived. An\naccount that sat idle (e.g. your fallback) would have a dead access token by the\ntime failover switched to it \u2014 producing a `401 authentication_error`. v1.3.0 adds:\n\n- A `setInterval` keep-warm loop that refreshes **every** pooled account before it\n  expires, even when idle and not the active account (the timer is `unref()`'d so\n  it never blocks CLI commands like `pi update` from exiting).\n- A wider 5-minute pre-expiry refresh buffer, and a full-pool refresh on\n  `session_start` / `before_agent_start` (not just the active account).\n- Reactive 401 handling: if the server rejects the active token anyway, it is\n  force-refreshed in place (no account switch) so the resend succeeds. If the\n  refresh token itself was revoked, you're told to re-run `/login` +\n  `/claude-pool-add <label>`.\n\nIt is **inert** unless `<agentDir>/claude-pool.json` exists with \u22652 accounts and\n`\"enabled\" !== false`.\n\n### Enroll accounts with the native `/login` (recommended)\n\n`/login anthropic` only keeps ONE credential (a second login overwrites the first),\nso the extension adds a command to snapshot each login into the pool:\n\n```\n/login anthropic          \u2192 sign in with account A\n/claude-pool-add personal \u2192 stash account A in the pool\n/login anthropic          \u2192 sign in with account B (overwrites auth.json \u2014 fine)\n/claude-pool-add work      \u2192 stash account B in the pool\n/claude-pool-status        \u2192 verify both are present\n```\n\nRestart, and failover activates. `/claude-pool-add <label>` only writes\n`claude-pool.json` (it never touches the request path).\n\n### Alternative: harvest via separate profiles\n\n```bash\nPI_CODING_AGENT_DIR=~/.pi-personal pi    # /login anthropic  (personal)\nPI_CODING_AGENT_DIR=~/.pi-work     pi    # /login anthropic  (work)\n./harvest-claude-pool.sh                 # writes ~/.pi/agent/claude-pool.json\n```\n\n`claude-pool.json` shape:\n\n```json\n{ \"enabled\": true, \"accounts\": [\n  { \"label\": \"personal\", \"refresh\": \"...\", \"access\": \"...\", \"expires\": 0 },\n  { \"label\": \"work\",     \"refresh\": \"...\", \"access\": \"...\", \"expires\": 0 }\n] }\n```\n\nKill switch: `PI_CLAUDE_PROVIDER_POOL_DISABLE=1` (or `\"enabled\": false`).\n\n## Environment variables\n\n| Variable | Effect |\n|---|---|\n| `PI_CLAUDE_PROVIDER_DEBUG_LOG=/path` | Append `before`/`after`/`pool` events for debugging. |\n| `PI_CLAUDE_PROVIDER_DISABLE=1` | Pass all tools through with flat names (no renaming). Debug escape hatch. |\n| `PI_CLAUDE_PROVIDER_POOL_DISABLE=1` | Disable multi-account failover even if `claude-pool.json` exists. |\n\n## How it differs from `@benvargas/pi-claude-code-use`\n\n| | upstream | this fork |\n|---|---|---|\n| Unknown flat tools | **dropped** | **renamed** `mcp__pi__<name>` (kept) |\n| Alias scheme | per-tool config + jiti capture + re-registration | generic in-place rename (deterministic prefix) |\n| Runtime deps | `@mariozechner/jiti` | none |\n| Scope | tool filtering + companion aliases + system-prompt rewrite | tool renaming + system-prompt rewrite |\n\n## License\n\nMIT. Based on `@benvargas/pi-claude-code-use` (MIT).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-provider",
+    "pi",
+    "pi-coding-agent",
+    "pi-mono",
+    "coding-agent",
+    "anthropic",
+    "claude",
+    "claude-code",
+    "oauth",
+    "subscription",
+    "tools",
+    "fork"
+  ],
+  "author": {
+    "name": "Leechael"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ZGltYQ/pi-provider-claude#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZGltYQ/pi-provider-claude.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-03T18:48:42.003Z",
+    "modified": "2026-06-17T15:51:09.048Z",
+    "1.0.0": "2026-06-03T18:48:42.299Z",
+    "1.1.0": "2026-06-03T19:40:21.268Z",
+    "1.2.0": "2026-06-11T13:38:59.025Z",
+    "1.3.0": "2026-06-17T15:51:08.937Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 42,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 100
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 223
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 168
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 3
+    }
+  ]
+}

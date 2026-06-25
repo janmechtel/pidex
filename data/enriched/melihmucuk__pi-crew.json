@@ -1,0 +1,62 @@
+{
+  "name": "@melihmucuk/pi-crew",
+  "latest_version": "1.0.22",
+  "description": "Non-blocking subagent orchestration for pi coding agent",
+  "readme": "# pi-crew\n\nNon-blocking subagent orchestration for [pi](https://pi.dev). Spawn isolated subagents that work in parallel while your current session stays interactive. Results are delivered back to the session that spawned them as steering messages when done.\n\n## Demo - Watch the Video\n\n[![Demo](https://raw.githubusercontent.com/melihmucuk/pi-crew/main/assets/demo-thumbnail.png)](https://monkeys-team.ams3.cdn.digitaloceanspaces.com/pi-crew-demo.mp4)\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:@melihmucuk/pi-crew\n```\n\nFrom git:\n\n```bash\npi install git:github.com/melihmucuk/pi-crew\n```\n\nThis installs the extension and all bundled resources. Subagent definitions are automatically discovered and ready to use without any extra setup.\n\n## How It Works\n\nOnce installed, pi-crew exposes these capabilities in your pi session:\n\n### Tools\n\n#### `crew_list`\n\nLists available subagent definitions and active subagents owned by the current session. For each definition it shows the `name`, `description`, `interactive` flag, and the resolved `tools` and `skills` (`all built-in`, `none`, or an explicit list).\n\n#### `crew_spawn`\n\nSpawns a subagent in an isolated session. Each spawn includes a concise `brief` label for session lists and a full self-contained `task`. The subagent runs in the background with its own context window, tools, and skills. When it finishes, the result is delivered to the session that spawned it as a steering message that triggers a new turn. If that session is not active, the result is queued until you switch back to it.\n\n```\n\"spawn scout and find all API endpoints and their authentication methods\"\n```\n\n#### `crew_abort`\n\nAborts one, many, or all active subagents owned by the current session.\n\nSupported modes:\n\n- single: `subagent_id`\n- multiple: `subagent_ids`\n- all active in current session: `all: true`\n\n```\n\"abort scout-a1b2\"\n\"abort scout-a1b2 and worker-c3d4\"\n\"abort all active subagents\"\n```\n\nTool-triggered aborts are reported back as steering messages with the reason `Aborted by tool request`. Shutdown-triggered aborts use a distinct reason.\n\n#### `crew_respond`\n\nSends a follow-up message to an interactive subagent owned by the current session that is waiting for a response. Interactive subagents stay alive after their initial response, allowing multi-turn conversations.\n\n```\n\"respond to planner-a1b2 with: yes, use the existing auth middleware\"\n```\n\n#### `crew_done`\n\nCloses an interactive subagent session owned by the current session when you no longer need it. This disposes the session and frees memory.\n\n```\n\"close planner-a1b2, the plan looks good\"\n```\n\n### Prompt Templates\n\n#### `/pi-crew-plan`\n\nExpands a bundled prompt template that orchestrates discovery and planning for implementation tasks.\nUse it to spawn scout subagents to investigate the codebase, then delegate to a planner subagent to produce a step-by-step implementation plan.\n\nNote: This prompt requires the `scout` and `planner` subagent definitions. These are included as bundled subagents and work out of the box.\n\n#### `/pi-crew-review`\n\nExpands a bundled prompt template that orchestrates parallel code and quality reviews.\nUse it to review provided or default changed-code scope with `code-reviewer` and `quality-reviewer`, using compact task-specific briefs focused on intent, expected behavior, and relevant references, then merge both results into one report.\n\nNote: This prompt requires the `code-reviewer` and `quality-reviewer` subagent definitions. These are included as bundled subagents and work out of the box.\n\n### Skills\n\n#### `pi-crew`\n\nA bundled orchestration skill that provides best practices for delegating work to subagents, handling asynchronous results, and managing interactive subagent lifecycle. It also guides compact, task-specific subagent briefs that avoid repeating role boilerplate or mechanical repo/Git state. It loads automatically when you coordinate work with pi-crew tools.\n\n## Bundled Subagents\n\npi-crew ships with six subagent definitions that cover common workflows:\n\n| Subagent             | Purpose                                                                                                                  | Tools                      | Model                       | Thinking |\n| -------------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------- | --------------------------- | -------- |\n| **scout**            | Investigates codebase and returns structured findings. Read-only.                                                        | read, grep, find, ls, bash | openai-codex/gpt-5.5        | off      |\n| **planner**          | Produces deterministic implementation plans. Read-only. Does not write code.                                             | read, grep, find, ls, bash | openai-codex/gpt-5.5        | high     |\n| **oracle**           | Evaluates critical decisions, surfaces blind spots, and challenges assumptions. Read-only.                               | read, grep, find, ls, bash | openai-codex/gpt-5.5        | xhigh    |\n| **code-reviewer**    | Reviews scoped code for actionable bugs. Does not modify files; may run typecheck and tests.                             | read, grep, find, ls, bash | openai-codex/gpt-5.5        | high     |\n| **quality-reviewer** | Reviews scoped code for maintainability, duplication, and complexity. Read-only.                                         | read, grep, find, ls, bash | openai-codex/gpt-5.5        | high     |\n| **worker**           | Implements scoped code changes safely and verifies them.                                                                 | all                        | openai-codex/gpt-5.5        | low      |\n\nRead-only bundled subagents still keep `bash` for inspection workflows like `git` and `ast-grep`. This is an instruction-level contract, not a sandbox boundary.\n\n## Subagent Discovery\n\nSubagent definitions are discovered from three locations, in priority order:\n\n1. **Project**: `<cwd>/<CONFIG_DIR_NAME>/agents/*.md` (default: `<cwd>/.pi/agents/*.md`)\n2. **User global**: `<agentDir>/agents/*.md` (default: `~/.pi/agent/agents/*.md`)\n3. **Bundled**: shipped with this package\n\nWhen multiple sources define a subagent with the same `name`, the higher-priority source wins. This lets you override any bundled subagent by placing a file with the same name in your project or user directory.\n\n## Custom Subagents\n\nCreate `.md` files in Pi's project config agents directory (default `<cwd>/.pi/agents/`) or global agent directory (default `~/.pi/agent/agents/`) with YAML frontmatter:\n\n```markdown\n---\nname: my-subagent\ndescription: What this subagent does\nmodel: anthropic/claude-haiku-4-5\nthinking: medium\ntools: read, grep, find, ls, bash\nskills: skill-1, skill-2\n---\n\nYour system prompt goes here. This is the body of the markdown file.\n\nThe subagent will follow these instructions when executing tasks.\n```\n\n### Frontmatter Fields\n\n| Field         | Required | Description                                                                                                          |\n| ------------- | -------- | -------------------------------------------------------------------------------------------------------------------- |\n| `name`        | yes      | Subagent identifier. No whitespace, use hyphens.                                                                     |\n| `description` | yes      | Shown in `crew_list` output.                                                                                         |\n| `model`       | no       | `provider/model-id` format (e.g., `anthropic/claude-haiku-4-5`). Falls back to session default.                      |\n| `thinking`    | no       | Thinking level: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`.                                                  |\n| `tools`       | no       | Comma-separated list: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`. Omit for all, use empty value for none. |\n| `skills`      | no       | Comma-separated skill names (e.g., `ast-grep`). Omit for all, use empty value for none.                              |\n| `compaction`  | no       | Enable context compaction. Defaults to `true`.                                                                       |\n| `interactive` | no       | Keep session alive after response for multi-turn conversations. Defaults to `false`.                                 |\n\n## Subagent Overrides via JSON\n\nYou can override selected frontmatter fields without editing the `.md` definition files.\n\nConfig locations:\n\n- Global: `<agentDir>/pi-crew.json` (default `~/.pi/agent/pi-crew.json`)\n- Project: `<cwd>/<CONFIG_DIR_NAME>/pi-crew.json` (default `<cwd>/.pi/pi-crew.json`)\n\nProject config overrides global config. Only these fields are overridable:\n\n- `model`\n- `thinking`\n- `tools`\n- `skills`\n- `compaction`\n- `interactive`\n\n`name` and `description` cannot be overridden.\n\nExample:\n\n```json\n{\n  \"agents\": {\n    \"scout\": {\n      \"model\": \"anthropic/claude-haiku-4-5\",\n      \"tools\": [\"read\", \"bash\"],\n      \"interactive\": false\n    },\n    \"planner\": {\n      \"thinking\": \"high\"\n    }\n  }\n}\n```\n\nOverride values replace the matching frontmatter fields for the named subagent after discovery. Unknown subagent names and invalid override values are ignored with warnings in `crew_list` output.\n\n## Status Widget\n\nWhen the current session owns active subagents, a live status widget appears in the TUI for that session, showing each subagent's ID, model, turn count, and context token usage.\n\nOn session replacement paths such as `/new`, `/resume`, `/fork`, and `/reload`, subagents keep running and reconnect to the owner session when it becomes active again. On real quit, pi-crew aborts running subagents during shutdown.\n\n```\n\u2839 scout-a1b2 (claude-haiku-4-5) \u00b7 turn 3 \u00b7 12.5k ctx\n\u2838 worker-c3d4 (claude-sonnet-4-6) \u00b7 turn 7 \u00b7 45.2k ctx\n\u23f3 planner-e5f6 (gpt-5.4) \u00b7 turn 2 \u00b7 8.3k ctx\n```\n\nInteractive subagents waiting for a response show a \u23f3 icon instead of a spinner.\n\n## Acknowledgments\n\nInspired by these projects:\n\n- [pi-subagents](https://github.com/nicobailon/pi-subagents) by [@nicobailon](https://github.com/nicobailon)\n- [pi-interactive-subagents](https://github.com/HazAT/pi-interactive-subagents) by [@HazAT](https://github.com/HazAT)\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "ai",
+    "agents",
+    "subagent",
+    "orchestration",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "Melih Mucuk"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extension/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ],
+    "video": "https://monkeys-team.ams3.cdn.digitaloceanspaces.com/pi-crew-demo.mp4"
+  },
+  "time": {
+    "created": "2026-03-30T13:24:01.656Z",
+    "modified": "2026-06-24T07:41:48.554Z",
+    "1.0.0": "2026-03-30T13:24:01.993Z",
+    "1.0.1": "2026-03-30T15:03:27.737Z",
+    "1.0.2": "2026-03-31T13:36:06.577Z",
+    "1.0.3": "2026-03-31T15:05:12.505Z",
+    "1.0.4": "2026-04-01T17:47:19.225Z",
+    "1.0.5": "2026-04-03T07:17:37.477Z",
+    "1.0.6": "2026-04-03T14:14:30.029Z",
+    "1.0.7": "2026-04-03T20:36:50.385Z",
+    "1.0.8": "2026-04-06T07:15:38.670Z",
+    "1.0.9": "2026-04-15T14:13:06.889Z",
+    "1.0.10": "2026-04-20T07:59:46.870Z",
+    "1.0.11": "2026-04-20T18:30:26.297Z",
+    "1.0.12": "2026-04-21T08:26:42.065Z",
+    "1.0.13": "2026-04-24T08:15:24.922Z",
+    "1.0.14": "2026-04-24T14:56:43.174Z",
+    "1.0.15": "2026-05-05T11:22:45.387Z",
+    "1.0.16": "2026-05-13T10:57:41.244Z",
+    "1.0.17": "2026-05-22T20:52:46.368Z",
+    "1.0.18": "2026-05-23T09:58:27.799Z",
+    "1.0.19": "2026-05-28T22:24:53.594Z",
+    "1.0.20": "2026-06-05T12:30:41.105Z",
+    "1.0.21": "2026-06-17T16:34:08.785Z",
+    "1.0.22": "2026-06-24T07:41:48.419Z"
+  },
+  "versions_count": 23,
+  "downloads_last_week": 202,
+  "download_trend": []
+}

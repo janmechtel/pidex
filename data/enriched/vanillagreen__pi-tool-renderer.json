@@ -1,0 +1,54 @@
+{
+  "name": "@vanillagreen/pi-tool-renderer",
+  "latest_version": "1.6.1",
+  "description": "Compact Claude/opencode-style renderers for Pi tools with rich diffs, apply_patch, generic/MCP rendering, and optional global chrome.",
+  "readme": "# pi-tool-renderer\n\n![tool_batch composite result with Read/grep/Bash rows](https://raw.githubusercontent.com/vanillagreencom/vstack/main/pi-extensions/pi-tool-renderer/assets/tool-batch.png)\n![Edit tool with side-by-side diff renderer](https://raw.githubusercontent.com/vanillagreencom/vstack/main/pi-extensions/pi-tool-renderer/assets/edit-diff.png)\n\nCompact renderers for Pi tools. Optional `tool_batch` composite tool. Optional rich diff UI for edits, writes, and bash patches.\n\n## Highlights\n\n- Compact one-line tool rows for `read`, `bash`, `grep`, `find`, `ls`; file paths in compact rows use OSC 8 `file://` hyperlinks when the terminal supports them.\n- Delayed live bash tails avoid fast-command output flashes; long-running commands show/preserve the last few lines flush-left so copied output has no gutter characters.\n- `tool_batch` runs multiple independent read/search/list/diagnostic bash calls and renders one combined result.\n- Optional rich Shiki diffs for `edit`/`write` with side-by-side previews, hunk counts, and inline word highlights.\n- Compact user-message cards with a green border and red \u03c0 marker.\n- Compaction summaries and skill invocations render with the same compact chrome.\n- Generic renderers for OpenAI-style tools (`web_search`, `webfetch`, `Agent`, `Task*`) and MCP tools.\n- `apply_patch` call/result preview when the tool is present.\n\nDefaults leave `edit`/`write` on Pi's built-in renderers. Enable **Render edits/writes compactly** to opt in.\n\n## Install\n\nVia [npm](https://www.npmjs.com/package/@vanillagreen/pi-tool-renderer):\n\n```bash\npi install npm:@vanillagreen/pi-tool-renderer\n```\n\nVia [vstack](https://github.com/vanillagreencom/vstack):\n\n```bash\ncargo install --git https://github.com/vanillagreencom/vstack.git vstack\nvstack add vanillagreencom/vstack --pi-extension pi-tool-renderer --harness pi -y\n```\n\nRestart Pi after installation.\n\n## `tool_batch`\n\n```json\n{\n  \"calls\": [\n    { \"tool\": \"read\", \"path\": \"README.md\" },\n    { \"tool\": \"grep\", \"pattern\": \"registerCommand\", \"path\": \"pi-extensions\" }\n  ]\n}\n```\n\nAccepts `read`, `grep`, `find`, `ls`, and diagnostic `bash`. Per-call arguments can be flat or wrapped in `args`.\n\nPrefer it for independent inspection calls. **Don't** use it for mutating commands, order-dependent commands, streaming output, or anything you want to inspect separately.\n\nIf the combined output would exceed Pi's normal tool-result budget, child outputs are capped to fit (head + tail preserved). Use separate calls or `read` `offset`/`limit` for the full budget per call.\n\n## Settings\n\nOpen `/extensions:settings`; settings appear under the **Tool Renderer** tab.\n\nProject settings in `.pi/settings.json` apply only after Pi marks the workspace trusted; before trust, vstack Pi extensions read user/global settings only.\n\nGlyph style: each package exposes `glyphStyle` (`unicode` default, `ascii` for terminal-safe chrome). `@vanillagreen/pi-tool-renderer.globalGlyphStyleOverride=ascii` forces ASCII chrome across vstack Pi extensions while leaving tool/model/user content unchanged.\n\n### General\n\n| Setting | What it does |\n| --- | --- |\n| Enable compact renderers | Override built-in read/bash/search renderers. |\n| Tree connector style | `unicode` or `ascii`. |\n| Stack separate native tool calls | Legacy renderer for consecutive native tool calls. Prefer `tool_batch`. |\n| Stack child display | `rows`, `headline`, or `anchor-list` when stacking is on. |\n\n### Batch tool\n\n| Setting | What it does |\n| --- | --- |\n| Register tool_batch | Add the composite tool. |\n| Batch max calls | Max calls per `tool_batch` invocation. |\n| Batch per-call timeout (ms) | Max time any one child call may run before `tool_batch` reports that child as timed out. |\n\n### Messages\n\n| Setting | What it does |\n| --- | --- |\n| Compact user messages | Green border + red \u03c0 marker instead of filled background; preserves Pi's prompt-zone markers around the full framed card. |\n| User message trailing blank line | Extra blank line after user messages. |\n| Compact compaction summaries | Compact bullet style instead of Pi's padded box. |\n| Compact skill invocation messages | Compact `/skill:name` rows. |\n| Align assistant messages | Remove Pi's one-column left padding from assistant text. |\n| Styled markdown code blocks | Render fenced code blocks with syntax highlighting and background, flush-left with no copy gutter/prefix. |\n\n### Read / Search / Bash output\n\n| Setting | What it does |\n| --- | --- |\n| Read output mode | `preview`, `summary`, or `hidden`. |\n| Search output mode | `preview`, `count`, or `hidden`. |\n| Bash output mode | `opencode`, `preview`, `summary`, or `hidden`. |\n| Live bash output delay (ms) | Wait this long before showing a running bash output tail. |\n| Live bash tail lines | Tail lines shown for long-running bash output and kept after completion. |\n| Expanded read/search/bash preview lines | Per-tool expand-time line caps. |\n| Command preview characters | Max command chars in collapsed bash rows. |\n| Collapsed bash preview lines | Tail lines shown when `bashOutputMode=preview`. |\n\n### Bash diffs\n\n| Setting | What it does |\n| --- | --- |\n| Render bash diffs | Detect diff output from read-only bash and render rich diff UI. Off by default. |\n| Render git diff command diffs | Show rich diff UI for explicit `git diff` commands. Off by default. |\n\n### Mutation (edit/write)\n\n| Setting | What it does |\n| --- | --- |\n| Render edits/writes compactly | Override Pi's built-in edit/write renderers. Off by default. |\n| Split diff view | Side-by-side rich diffs on wide terminals. |\n| Collapsed / expanded diff preview lines | Line budgets for collapsed and expanded rows. |\n| Edit/write call preview | Show safe call-phase diff previews before execution completes. |\n| Edit/write call preview lines | Line budget for call-phase previews. |\n| Syntax-highlight diffs | Use Shiki when a language can be detected. |\n| Inline word diff highlights | Highlight changed words in paired removed/added lines. |\n| Diff line backgrounds | Fill added/removed lines with success/error backgrounds. |\n| Show diff hunk metadata | Include hunk counts and truncation hints. |\n\n### Generic tools\n\n| Setting | What it does |\n| --- | --- |\n| Generic external tool renderers | Render `web_search`, `webfetch`, `Agent`, `Task*` and similar. |\n| Render apply_patch | Install `apply_patch` call/result renderers without changing execution. |\n| apply_patch call preview | Parse arguments and render diff previews during the call phase. |\n| apply_patch preview lines | Line budget for collapsed `apply_patch` diffs. |\n| MCP output mode | `preview`, `summary`, or `hidden`. |\n| MCP preview lines | Line budget for MCP/generic tool previews. |\n\n### Chrome\n\n| Setting | What it does |\n| --- | --- |\n| Global tool chrome | `off`, `transparent`, or `outlines` (muted horizontal rules above/below), including tools that render their own shell. |\n| Guard terminal right margin | Render one column short to avoid auto-wrap flashes in tmux. |\n| Animate pending tool status | Blink pending bullets. Off for stable streaming. |\n| Working indicator | `default`, `pulse`, or `hidden`. |\n\n### Safety\n\n| Setting | What it does |\n| --- | --- |\n| Max renderer line width | Hard cap for single rendered lines. |\n\n## Notes\n\nThis package mostly changes rendering, not tool execution. `tool_batch` is one tool result, so it caps combined child output if needed; individual built-in tools still apply their own truncation first.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "coding-agent",
+    "tools",
+    "renderer",
+    "shiki",
+    "diff",
+    "mcp",
+    "apply-patch"
+  ],
+  "author": {
+    "name": "vanillagreen"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/vanillagreencom/vstack/tree/main/pi-extensions/pi-tool-renderer",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vanillagreencom/vstack.git",
+    "directory": "pi-extensions/pi-tool-renderer"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/tool-renderer.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/vanillagreencom/vstack/main/pi-extensions/pi-tool-renderer/assets/tool-batch.png"
+  },
+  "time": {
+    "created": "2026-05-06T17:17:20.402Z",
+    "modified": "2026-06-12T16:06:52.699Z",
+    "1.0.0": "2026-05-06T17:17:20.664Z",
+    "1.0.1": "2026-05-06T21:51:25.301Z",
+    "1.0.2": "2026-05-06T22:30:50.340Z",
+    "1.0.3": "2026-05-07T00:21:12.654Z",
+    "1.0.4": "2026-05-07T22:33:49.911Z",
+    "1.1.0": "2026-05-08T06:46:37.353Z",
+    "1.1.1": "2026-05-09T01:31:48.692Z",
+    "1.1.2": "2026-05-14T09:38:33.874Z",
+    "1.2.0": "2026-05-15T05:45:59.544Z",
+    "1.3.0": "2026-05-19T07:05:25.390Z",
+    "1.4.0": "2026-05-24T03:43:08.383Z",
+    "1.5.0": "2026-06-01T05:25:07.861Z",
+    "1.6.0": "2026-06-05T05:04:26.765Z",
+    "1.6.1": "2026-06-12T16:06:52.567Z"
+  },
+  "versions_count": 14,
+  "downloads_last_week": null,
+  "download_trend": []
+}

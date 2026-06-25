@@ -1,0 +1,38 @@
+{
+  "name": "pi-codex-token",
+  "latest_version": "1.1.0",
+  "description": "pi provider plugin: use gpt-5.5 on the OpenAI Codex backend via a personal access token (PAT), non-interactively.",
+  "readme": "# pi-codex-token\n\nA [pi](https://github.com/earendil-works/pi) provider extension that registers a\n`codex-token` provider so pi can use **`gpt-5.5` on the OpenAI Codex backend**\n(`chatgpt.com/backend-api/codex`), authenticated **non-interactively with a Codex\npersonal/enterprise access token (PAT)**.\n\nIt lets you run Codex with a long-lived access token instead of an interactive\nChatGPT OAuth login \u2014 which is what makes it usable for headless/CI automation.\n\nWhy a separate provider: pi's built-in `openai-codex` reads the `chatgpt-account-id`\nby JWT-decoding the credential, which an opaque PAT can't satisfy. This provider\nfetches that id out-of-band (the codex `whoami` endpoint) instead, so a plain PAT\nworks.\n\n> **Codex access tokens are an OpenAI Codex _enterprise_ feature.** A workspace admin\n> mints a long-lived personal/enterprise access token (`at-\u2026`) for non-interactive use;\n> see OpenAI's docs:\n> [Codex enterprise \u2014 access tokens](https://developers.openai.com/codex/enterprise/access-tokens).\n> Without an enterprise plan you won't have a PAT \u2014 use pi's built-in `openai-codex`\n> provider (interactive OAuth) instead.\n>\n> **This needs a PAT (`at-\u2026`), not an OpenAI API key (`sk-\u2026`).** The Codex backend is a\n> different auth domain \u2014 `sk-\u2026` keys are rejected (401). For `sk-\u2026` keys, use pi's plain\n> `openai` provider.\n\n## Install / local dev\n\nThis is a no-build, single-file-style pi extension. Run it straight from a clone:\n\n```bash\nnpm install                 # installs dev deps + the pi host packages (peer deps)\npi -e . --provider codex-token --model gpt-5.5 -p \"Reply with exactly: SPIKE_OK\"\n```\n\n`pi` resolves the extension's `@earendil-works/pi-*` imports from its own install at\nruntime; `npm install` provides the same packages for local typecheck/test.\n\n## Production use\n\n`pi -e .` is the dev loop. In production you **install** the extension into the\nenvironment where pi runs (a worker image, CI runner, server) and configure it via env:\n\n1. **Distribute** \u2014 publish to npm, or pin a git tag/SHA for an internal build:\n   ```bash\n   pi install npm:pi-codex-token                # from npm\n   # or, pinned to an immutable ref:\n   pi install <git-url>#<tag-or-sha>\n   ```\n   `pi install` records the source in pi's settings, so the extension loads automatically\n   on every subsequent pi run (no `-e` needed). In a Docker/image build, run the install\n   step at build time so it's baked in.\n\n2. **Configure** (env in the runtime):\n   ```bash\n   export CODEX_ACCESS_TOKEN=at-...     # the enterprise PAT (see above)\n   export CODEX_ACCOUNT_ID=<uuid>       # optional but recommended headless \u2014 skips the whoami call\n   ```\n\n3. **Select the provider/model** \u2014 either per invocation\n   (`pi --provider codex-token --model gpt-5.5 \u2026`) or via pi's default provider/model config.\n\nAt startup pi loads the extension, the async factory discovers the account's models with\nthe PAT, and the `codex-token` provider is ready. Pin a tag/SHA (not a moving branch) for a\nreproducible deploy, and gate upgrades on the `npm run smoke` contract test.\n\n## Credentials\n\nPAT precedence (first non-empty wins):\n\n1. the provider `apiKey` (pi resolves `$ENV` / `!command` / `--api-key`)\n2. `CODEX_ACCESS_TOKEN` env, then `CODEX_PAT` (first non-empty wins)\n3. `~/.codex/auth.json` `.personal_access_token` (from `codex login --with-access-token`)\n\n`sk-\u2026` API keys are rejected \u2014 the codex backend is a different auth domain (use\npi's plain `openai` provider for those).\n\n### Account-id (headless)\n\nThe `chatgpt-account-id` is a stable workspace UUID resolved in this order:\n\n1. `CODEX_ACCOUNT_ID` env override (**recommended for headless/CI** \u2014 no network)\n2. in-memory cache (keyed by `SHA-256(PAT)`)\n3. on-disk cache `~/.pi/agent/codex-token-accountid.json` (mode 0600, keyed by `SHA-256(PAT)`)\n4. codex `whoami` (`Authorization: Bearer <PAT>`)\n5. `~/.codex/auth.json` `.tokens.account_id` (local dev only)\n\nFor headless use, set **both** `CODEX_ACCESS_TOKEN` and `CODEX_ACCOUNT_ID` so resolution\nis fully synchronous with no network round-trip.\n\nPATs are **not** auto-refreshable. On a 401 (whoami or backend), the error tells you\nto mint a new PAT.\n\n## Models\n\nThe provider **discovers the account's available models** at registration by calling the\ncodex `/models` endpoint with the PAT, and registers the ones the account exposes\n(`visibility: list`, API-supported). No PAT at registration, a `/models` error, or an\nempty result falls back to a static `gpt-5.5` entry.\n\n- Set **`CODEX_MODELS`** (comma-separated ids, e.g. `gpt-5.5,gpt-5.4`) to skip discovery\n  and pin an explicit list.\n- `contextWindow` comes from `/models`; **`maxTokens` is a default** (not returned by the\n  endpoint) and is unverified. The static fallback declares `input: [\"text\"]` (the proven\n  path); discovered entries use the modalities the backend reports.\n\n## Config knobs (env)\n\n| Env var | Purpose |\n|---|---|\n| `CODEX_ACCESS_TOKEN` / `CODEX_PAT` | PAT source (first non-empty wins) |\n| `CODEX_ACCOUNT_ID` | workspace UUID override (skips whoami) |\n| `CODEX_MODELS` | comma-separated model-id list; skips live model discovery |\n| `CODEX_HOME` | dir for `auth.json` (default `~/.codex`) |\n| `CODEX_BASE_URL` | codex inference base URL override |\n| `CODEX_WHOAMI_URL` / `CODEX_AUTHAPI_BASE_URL` | whoami URL override (testing) |\n| `PI_AGENT_HOME` | dir for the on-disk account-id cache |\n\n## Testing\n\n```bash\nnpm test            # vitest unit suite + coverage (\u226599% on src/**)\nnpm run smoke       # live request to the real codex endpoint (needs CODEX_ACCESS_TOKEN)\nnpm run check-exports\n```\n\n## How it works\n\nThe codex backend is an **undocumented** contract. The provider reuses pi-ai's\nexported `streamSimpleOpenAIResponses` for the HTTP/SSE transport + parsing, injects\nthe codex auth headers, and reshapes the request body (top-level `instructions`,\n`store:false`) to satisfy the backend's gates. When the contract drifts, the change\nis confined to `src/codex-envelope.ts` + `src/config.ts`, and the smoke test is the\nearly-warning. See [`AGENTS.md`](./AGENTS.md) for the full architecture.\n\n## Contributing\n\nSee [`AGENTS.md`](./AGENTS.md) (architecture + conventions) and\n[`CONTRIBUTING.md`](./CONTRIBUTING.md).\n\n## License\n\n[MIT](./LICENSE).\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "codex",
+    "openai",
+    "gpt-5.5",
+    "provider",
+    "personal-access-token"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-14T22:48:03.298Z",
+    "modified": "2026-06-24T22:40:54.472Z",
+    "1.0.0": "2026-06-14T22:48:03.627Z",
+    "1.0.1": "2026-06-14T23:17:06.526Z",
+    "1.0.2": "2026-06-15T00:28:11.493Z",
+    "1.0.3": "2026-06-15T01:05:12.490Z",
+    "1.0.4": "2026-06-15T02:47:29.635Z",
+    "1.1.0": "2026-06-24T22:40:54.377Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 191,
+  "download_trend": []
+}

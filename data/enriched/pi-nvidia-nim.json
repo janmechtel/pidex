@@ -1,0 +1,52 @@
+{
+  "name": "pi-nvidia-nim",
+  "latest_version": "1.1.22",
+  "description": "NVIDIA NIM API provider extension for pi coding agent \u2014 access 100+ models from build.nvidia.com",
+  "readme": "# pi-nvidia-nim\n\nNVIDIA NIM API provider extension for [pi coding agent](https://github.com/earendil-works/pi-mono) - access 100+ models from [build.nvidia.com](https://build.nvidia.com) including DeepSeek V4 Flash/Pro, DeepSeek V3.2, Kimi K2.6, MiniMax M2.1, GLM-5, GLM-4.7, Qwen3, Llama 4, and many more.\n\nhttps://github.com/user-attachments/assets/f44773e4-9bf8-4bb5-a9c0-d5938030701c\n\n\n## Setup\n\n### 1. Get an NVIDIA NIM API Key\n\n1. Go to [build.nvidia.com](https://build.nvidia.com)\n2. Sign in or create an account\n3. Navigate to any model page and click \"Get API Key\"\n4. Copy your key (starts with `nvapi-`)\n\n### 2. Set Your API Key\n\n```bash\n# Preferred by this extension\nexport NVIDIA_NIM_API_KEY=nvapi-your-key-here\n\n# Also supported, matching NVIDIA's website examples\nexport NVIDIA_API_KEY=nvapi-your-key-here\n```\n\nAdd one of these to your `~/.bashrc`, `~/.zshrc`, or shell profile to persist it.\n\n### 3. Install the Extension\n\n**As a pi package (recommended):**\n\n```bash\npi install git:github.com/xRyul/pi-nvidia-nim\n```\n\n**Or load directly:**\n\n```bash\npi -e /path/to/pi-nvidia-nim\n```\n\n**Or copy to your extensions directory:**\n\n```bash\ncp -r pi-nvidia-nim ~/.pi/agent/extensions/pi-nvidia-nim\n```\n\n## Usage\n\nOnce loaded, NVIDIA NIM models appear in the `/model` selector under the `nvidia-nim` provider. You can also:\n\n- Press **Ctrl+L** to open the model selector and search for `nvidia-nim`\n- Use `/scoped-models` to pin your favourite NIM models for quick switching\n\n### CLI\n\n```bash\n# Use a specific NIM model directly\npi --provider nvidia-nim --model \"deepseek-ai/deepseek-v4-flash\"\n\n# With thinking enabled\npi --provider nvidia-nim --model \"deepseek-ai/deepseek-v4-flash\" --thinking high\n\n# Limit model cycling to NIM models\npi --models \"nvidia-nim/*\"\n```\n\n## Reasoning / Thinking\n\nNVIDIA NIM models use a non-standard `chat_template_kwargs` parameter to enable thinking, rather than the standard OpenAI `reasoning_effort`. This extension handles this automatically via a custom streaming wrapper that injects the correct per-model parameters.\n\n### How it works\n\nWhen you change the thinking level in pi (`Shift+Tab` to cycle), the extension:\n\n1. **Maps thinking levels** to values each NIM model accepts. For DeepSeek V4, `xhigh` maps to `max`; lower enabled levels use `high`.\n2. **Injects `chat_template_kwargs`** per model to actually enable thinking:\n   - DeepSeek V4: `{ thinking: true, reasoning_effort: \"high\" | \"max\" }`\n   - DeepSeek V3.x, R1 distills: `{ thinking: true }`\n   - GLM-5, GLM-4.7: `{ enable_thinking: true, clear_thinking: false }`\n   - Kimi K2.6, K2-thinking: `{ thinking: true }`\n   - Qwen3, QwQ: `{ enable_thinking: true }`\n3. **Explicitly disables thinking** when the level is \"off\" for models that think by default (e.g., GLM-5, GLM-4.7).\n4. **Uses `system` role** instead of `developer` for all NIM models - the `developer` role combined with `chat_template_kwargs` causes 500 errors on NIM.\n\n### Supported thinking levels\n\n| pi Level | NIM Mapping | Effect |\n|----------|-------------|--------|\n| off | No kwargs (or explicit disable) | No reasoning output |\n| minimal | low, or high for DeepSeek V4 | Thinking enabled |\n| low | low, or high for DeepSeek V4 | Thinking enabled |\n| medium | medium, or high for DeepSeek V4 | Thinking enabled |\n| high | high | Thinking enabled |\n| xhigh | high, or max for DeepSeek V4 | Maximum supported thinking |\n\n## Available Models\n\nThe extension ships with curated metadata for 42 featured models. At startup, it also queries the NVIDIA NIM API to discover additional models automatically.\n\n### Featured Models\n\n| Model | Reasoning | Vision | Context |\n|-------|-----------|--------|---------|\n| `deepseek-ai/deepseek-v4-flash` | \u2705 | | 1M |\n| `deepseek-ai/deepseek-v4-pro` | \u2705 | | 1M |\n| `deepseek-ai/deepseek-v3.2` | \u2705 | | 128K |\n| `deepseek-ai/deepseek-v3.1` | \u2705 | | 128K |\n| `moonshotai/kimi-k2.6` | \u2705 | | 256K |\n| `moonshotai/kimi-k2-thinking` | \u2705 | | 128K |\n| `minimaxai/minimax-m2.1` | | | 1M |\n| `z-ai/glm5` | \u2705 | | 128K |\n| `z-ai/glm4.7` | \u2705 | | 128K |\n| `openai/gpt-oss-120b` | | | 128K |\n| `qwen/qwen3-coder-480b-a35b-instruct` | \u2705 | | 256K |\n| `qwen/qwen3-235b-a22b` | \u2705 | | 128K |\n| `meta/llama-4-maverick-17b-128e-instruct` | | | 1M |\n| `meta/llama-3.1-405b-instruct` | | | 128K |\n| `meta/llama-3.2-90b-vision-instruct` | | \u2705 | 128K |\n| `mistralai/mistral-large-3-675b-instruct-2512` | | | 128K |\n| `mistralai/devstral-2-123b-instruct-2512` | | | 128K |\n| `nvidia/llama-3.1-nemotron-ultra-253b-v1` | \u2705 | | 128K |\n| `nvidia/llama-3.3-nemotron-super-49b-v1.5` | \u2705 | | 128K |\n| `microsoft/phi-4-mini-flash-reasoning` | \u2705 | | 128K |\n| `ibm/granite-3.3-8b-instruct` | | | 128K |\n\n...and 20+ more curated models, plus automatic discovery of new models from the API.\n\n### Tool Calling\n\nAll major models support OpenAI-compatible tool calling. Tested and confirmed working with DeepSeek V4/V3.2, GLM-5, GLM-4.7, Qwen3, Kimi K2.6, and others.\n\n## How It Works\n\nThis extension uses `pi.registerProvider()` to register NVIDIA NIM as a custom provider with a custom `streamSimple` wrapper around pi's built-in `openai-completions` streamer.\n\nThe custom streamer:\n1. Intercepts the request payload via `onPayload` callback\n2. Injects `chat_template_kwargs` for models that need it to enable thinking\n3. Maps unsupported thinking levels to NIM-compatible values (`minimal` \u2192 `low`; `xhigh` \u2192 `high` or DeepSeek V4 `max`)\n4. Suppresses `reasoning_effort` for models that don't respond to it (e.g., DeepSeek without kwargs)\n5. Uses the standard OpenAI SSE streaming format - pi already parses `reasoning_content` and `reasoning` fields from streaming deltas\n\n## Configuration\n\nThe only configuration needed is either the `NVIDIA_NIM_API_KEY` or `NVIDIA_API_KEY` environment variable. All models on NVIDIA NIM are free during the preview period (with rate limits).\n\n## Notes\n\n- All costs are set to `$0` since NVIDIA NIM preview models are free (rate-limited)\n- Context windows and max tokens are best-effort estimates; some may differ from actual API limits\n- If a model isn't in the curated list, it gets a conservative 32K context window and 8K max output tokens\n- The extension filters out embedding, reward, safety, and other non-chat models automatically\n- Rate limits on free preview keys are relatively strict; you may encounter 429 errors during heavy usage\n- MiniMax models use `<think>` tags inline in content rather than the `reasoning_content` field\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/xRyul/pi-nvidia-nim",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xRyul/pi-nvidia-nim.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "video": "https://raw.githubusercontent.com/xRyul/pi-nvidia-nim/main/video_demo_psnr.mp4"
+  },
+  "time": {
+    "created": "2026-02-10T23:50:49.886Z",
+    "modified": "2026-06-02T11:02:21.911Z",
+    "1.1.0": "2026-02-10T23:50:50.171Z",
+    "1.1.1": "2026-02-10T23:55:06.859Z",
+    "1.1.2": "2026-02-11T00:04:20.738Z",
+    "1.1.3": "2026-02-11T08:53:32.494Z",
+    "1.1.4": "2026-02-11T09:02:59.909Z",
+    "1.1.5": "2026-02-11T09:11:11.792Z",
+    "1.1.6": "2026-02-11T09:27:01.187Z",
+    "1.1.7": "2026-02-11T09:34:32.171Z",
+    "1.1.8": "2026-02-11T09:40:26.477Z",
+    "1.1.9": "2026-02-11T09:44:20.049Z",
+    "1.1.10": "2026-02-11T10:27:31.025Z",
+    "1.1.11": "2026-02-11T11:12:58.776Z",
+    "1.1.12": "2026-02-11T11:19:03.632Z",
+    "1.1.13": "2026-02-11T11:21:36.618Z",
+    "1.1.14": "2026-02-11T11:41:07.993Z",
+    "1.1.15": "2026-02-11T11:42:08.896Z",
+    "1.1.16": "2026-02-14T14:14:14.165Z",
+    "1.1.17": "2026-04-25T07:30:24.058Z",
+    "1.1.18": "2026-05-01T21:14:57.390Z",
+    "1.1.19": "2026-05-01T22:27:21.816Z",
+    "1.1.20": "2026-05-01T22:44:31.347Z",
+    "1.1.21": "2026-05-10T20:52:53.541Z",
+    "1.1.22": "2026-06-02T11:02:21.782Z"
+  },
+  "versions_count": 23,
+  "downloads_last_week": 84,
+  "download_trend": []
+}

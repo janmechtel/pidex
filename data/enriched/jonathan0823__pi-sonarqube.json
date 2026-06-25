@@ -1,0 +1,43 @@
+{
+  "name": "@jonathan0823/pi-sonarqube",
+  "latest_version": "0.4.0",
+  "description": "SonarQube extension for Pi \u2014 run local analysis and browse issues.",
+  "readme": "# pi-sonarqube\n\nA Pi extension to run local SonarQube analysis and browse the resulting issues \u2014 all from within Pi.\n\n## Requirements\n\n- [Pi](https://github.com/earendil-works/pi) installed\n- A running SonarQube server (e.g. `http://localhost:9000`)\n- `sonar-scanner` available in `$PATH`\n\n## Install\n\n```bash\npi install npm:@jonathan0823/pi-sonarqube\n```\n\nOr add it to your `settings.json`:\n\n```json\n{\n  \"packages\": [\"npm:@jonathan0823/pi-sonarqube\"]\n}\n```\n\nThen `/reload` in Pi.\n\n## Quick start\n\n### 1. Init project config\n\nInside a project directory, run:\n\n```\n/sonarqube init\n```\n\nFor monorepos, you can point at a path directly:\n\n```\n/sonarqube init apps/web\n/sonarqube init apps/api\n```\n\nPi will ask you for:\n\n- **SonarQube server URL** (prefilled with `http://localhost:9000`)\n- **Project key** (default: derived from directory name)\n- **Token** (optional, used when your server requires auth)\n\nThe config is saved to `<project>/.pi/sonarqube.json`.\n\n### 2. Run analysis\n\n```\n/sonarqube analyze\n/sonarqube analyze apps/web\n/sonarqube analyze apps/api\n```\n\nPi will:\n\n1. Run `sonar-scanner` against your server\n2. Wait for the analysis to complete\n3. Fetch the latest issues\n4. Return a concise summary with issues and duplication metrics\n\n### 3. Browse issues\n\n```\n/sonarqube issues\n/sonarqube issues apps/web\n```\n\nUse **Up/Down** to move, **Enter** to preview the affected source code, and **Esc** to close.\n\nTip: Tab-complete `/sonarqube` subcommands and filters in the editor.\n\n### 4. View project metrics\n\n```\n/sonarqube metrics\n/sonarqube metrics apps/web\n```\n\nShows coverage percentage, duplicated lines, and issue severity breakdown \u2014 no scanner needed.\n\n### 5. Browse duplicated files\n\n```\n/sonarqube duplications\n/sonarqube duplications apps/web\n```\n\nUse **Up/Down** to move, **Enter** for block locations and line ranges. Pass a file number directly to skip the browser: `/sonarqube duplications 1`.\n\n### 6. Open a specific issue\n\n```\n/sonarqube open 3\n/sonarqube open apps/web 3\n```\n\n## Commands\n\n| Command                          | Description                                     |\n| -------------------------------- | ----------------------------------------------- |\n| `/sonarqube init [path]`         | Set up project config for a path               |\n| `/sonarqube analyze [target]`    | Run analysis and show issues + duplication metrics |\n| `/sonarqube issues [target]`     | Browse the latest analysis results for a target |\n| `/sonarqube metrics [target]`    | Show project metrics (coverage %, duplication %, issue counts, no scanner) |\n| `/sonarqube duplications [target]` | Browse duplicated files and blocks with drill-down         |\n| `/sonarqube open [target] <n>`   | Preview source at issue #n                     |\n\n## Tool (for the LLM)\n\nThe extension also registers a `sonarqube` tool that the LLM can call with actions:\n\n- `analyze` \u2014 run analysis\n- `issues` \u2014 list issues\n- `metrics` \u2014 show project-level coverage, duplication & issue counts\n- `duplications` \u2014 list duplicated files and block details\n- `open` \u2014 open an issue with its index\n\nThe tool accepts optional issue filters (`severities`, `statuses`, `types`, `rules`, `softwareQualities`, `impactSeverities`) so the agent can fetch just the most relevant issues.\n\n### Filter families\n\nSonarQube supports two filter families depending on the server mode:\n\n- **Standard Experience** (legacy): `type` (BUG, VULNERABILITY, CODE_SMELL) and `severity` (BLOCKER, CRITICAL, MAJOR, MINOR, INFO)\n- **MQR mode**: `quality` (MAINTAINABILITY, RELIABILITY, SECURITY) and `impactSeverity` (BLOCKER, HIGH, MEDIUM, LOW, INFO)\n\nBoth families can be used from the `/sonarqube issues` command:\n\n```\n/sonarqube issues type:BUG\n/sonarqube issues severity:CRITICAL status:OPEN\n/sonarqube issues quality:RELIABILITY\n/sonarqube issues quality:SECURITY impactSeverity:HIGH\n```\n\n**Important:** Legacy filters and MQR filters cannot be combined in the same query. If you mix them (e.g., `type:BUG quality:SECURITY`), you'll see an error telling you to pick one family.\n\nThe server mode is auto-detected via the `api/v2/clean-code-policy/mode` endpoint and cached per session.\n\nUse paths directly.\n\n## Configuration sources (precedence order)\n\n1. **Environment variables** (highest)\n   - `SONARQUBE_URL` / `SONAR_HOST_URL`\n   - `SONARQUBE_TOKEN` / `SONAR_TOKEN`\n   - `SONAR_PROJECT_KEY`\n2. **Project config** \u2014 `.pi/sonarqube.json` (set via `/sonarqube init`)\n3. **Scan properties** \u2014 `sonar-project.properties`\n4. **Defaults** \u2014 `http://localhost:9000`, project key from directory slug\n\n## Project structure\n\n```\npackages/pi-sonarqube/\n\u251c\u2500\u2500 src/\n\u2502   \u2514\u2500\u2500 index.ts          # Extension source + init command + config\n\u251c\u2500\u2500 dist/\n\u2502   \u251c\u2500\u2500 index.js          # Compiled output\n\u2502   \u251c\u2500\u2500 index.d.ts        # Type declarations\n\u2502   \u2514\u2500\u2500 index.js.map      # Source map\n\u251c\u2500\u2500 fixtures/\n\u2502   \u251c\u2500\u2500 issue-project/    # Test project with known issues\n\u2502   \u2514\u2500\u2500 clean-project/    # Test project with no issues\n\u251c\u2500\u2500 README.md\n\u251c\u2500\u2500 LICENSE\n\u251c\u2500\u2500 package.json\n\u2514\u2500\u2500 tsconfig.json\n```\n\n## Contributing\n\nSee [CONTRIBUTING.md](CONTRIBUTING.md).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "extension",
+    "sonarqube",
+    "code-quality",
+    "pi-package"
+  ],
+  "author": {
+    "name": "Jonathan0823"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Jonathan0823/pi-sonarqube#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jonathan0823/pi-sonarqube.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-06-19T07:54:06.643Z",
+    "modified": "2026-06-23T09:33:21.644Z",
+    "0.1.0": "2026-06-19T07:54:06.929Z",
+    "0.1.1": "2026-06-19T08:00:06.559Z",
+    "0.1.2": "2026-06-19T08:14:50.867Z",
+    "0.1.3": "2026-06-19T12:36:05.578Z",
+    "0.1.4": "2026-06-20T09:10:30.309Z",
+    "0.2.0": "2026-06-21T11:24:36.242Z",
+    "0.3.1": "2026-06-22T05:30:03.202Z",
+    "0.3.2": "2026-06-23T06:03:00.063Z",
+    "0.4.0": "2026-06-23T09:33:21.352Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": 1177,
+  "download_trend": []
+}

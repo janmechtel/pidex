@@ -1,0 +1,46 @@
+{
+  "name": "pi-trust-defer",
+  "latest_version": "1.2.2",
+  "description": "Skip the startup trust prompt in pi \u2014 auto-decline project trust so you're immediately interactive, then /trust + /reload when ready",
+  "readme": "<div align=\"center\">\n\n# \ud83d\udeab\u23e9 pi-trust-defer\n\n**Skip the startup trust prompt in [pi](https://github.com/earendil-works/pi-coding-agent)**\n\n_Auto-decline project trust at startup so you're immediately interactive. Use `/trust` + `/reload` when you're ready._\n\n[![pi extension](https://img.shields.io/badge/pi-extension-blueviolet)](https://github.com/earendil-works/pi-coding-agent)\n[![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)\n\n</div>\n\n---\n\n## The Problem\n\nWhen you start pi in a project that contains `AGENTS.md`, `CLAUDE.md`, a `.pi/` directory, or other project-local inputs, pi shows a trust prompt **before** you can interact:\n\n```\n Trust project folder?\n /Users/you/my-project\n\n This allows pi to read project instructions (AGENTS.md/CLAUDE.md)...\n\n \u2192 Trust\n   Trust (this session only)\n   Do not trust\n   Do not trust (this session only)\n```\n\nYou're blocked until you choose. Every. Single. Time. Even in projects you've never needed project instructions for.\n\n---\n\n## The Solution\n\n**pi-trust-defer** intercepts the `project_trust` event and auto-declines, so pi starts immediately. Pi's built-in untrusted notification still appears, and the existing `/trust` + `/reload` applies the decision without a restart.\n\n| Step | Before | After |\n|------|--------|-------|\n| Startup | **Blocked** by trust prompt | **Immediate** \u2014 no prompt |\n| Trust later | `/trust` \u2192 \"restart pi\" | `/trust` \u2192 `/reload` \u2014 no restart |\n\n---\n\n## How It Works\n\n```\npi starts\n  \u2192 project_trust event fires\n  \u2192 Extension returns { trusted: \"no\" }\n  \u2192 pi is immediately interactive (no startup selector)\n\nUser types \"/trust\" (builtin)\n  \u2192 Saves \"trusted: true\" to ~/.pi/agent/trust.json\n\nUser types \"/reload\" (builtin)\n  \u2192 SettingsManager.prototype.reload is patched to check trust.json\n  \u2192 Detects projectTrusted=false but trust.json=true \u2192 flips flag\n  \u2192 Project-local resources load \u2014 no restart\n```\n\nThe `SettingsManager` patch checks trust.json on each reload when `projectTrusted` is `false`. This is fine because `/reload` is user-initiated and infrequent \u2014 the single `proper-lockfile` acquisition per reload is negligible.\n\n---\n\n## Why not `defaultProjectTrust: \"never\"`?\n\nPi 0.79.1 added the `defaultProjectTrust` setting (`\"ask\"` / `\"always\"` / `\"never\"`), which has partial overlap with this extension. Here's the difference:\n\n| | `defaultProjectTrust: \"never\"` | pi-trust-defer |\n|---|---|---|\n| Auto-declines trust | \u2713 | \u2713 |\n| No startup prompt | \u2713 \u2014 `\"never\"` returns immediately, no selector shown | \u2713 \u2014 `project_trust` returns `{ trusted: \"no\" }` |\n| Per-session only | \u2717 \u2014 it's a global fallback, not a per-session decision | \u2713 \u2014 declines in-memory, no persisted decision |\n| `/trust` overrides per-project | \u2713 \u2014 `/trust` saves per-project, overriding the fallback | \u2713 \u2014 `/trust` saves per-project \"yes\" |\n| `/reload` picks up `/trust` | \u2717 \u2014 `reload()` keeps the initial `projectTrusted` flag; needs a restart | \u2713 \u2014 patched `reload()` re-checks trust.json |\n\nApplied per-project vs. globally is the first real difference: `defaultProjectTrust` is a single global setting, so `\"never\"` auto-declines trust in *every* project. pi-trust-defer is loaded as an extension, leaving the global default untouched and declining per-session without writing a decision to trust.json \u2014 so `/trust` + `/reload` still works the way you'd expect.\n\nThe bigger difference is `/reload`. Pi's `SettingsManager.prototype.reload()` preserves `projectTrusted` from the initial session and never re-reads the trust store, so even after `/trust` writes a `true` decision, `/reload` will not load project-local resources \u2014 you have to restart pi. This extension patches `reload()` to re-check trust.json, so `/trust` \u2192 `/reload` applies without a restart.\n\n`defaultProjectTrust: \"never\"` is a good fit if you want to globally auto-decline and don't mind restarting after `/trust`. pi-trust-defer is for the common case where you *sometimes* want to trust projects after verifying them and want `/trust` + `/reload` to work in place.\n\n---\n\n## Installation\n\n### Option 1: Install via pi package (Recommended)\n\n```bash\npi install npm:pi-trust-defer\n```\n\nOr add to your `settings.json`:\n\n```json\n{\n  \"packages\": [\n    \"npm:pi-trust-defer\"\n  ]\n}\n```\n\nOr install from GitHub:\n\n```bash\npi install https://github.com/monotykamary/pi-trust-defer\n```\n\n### Option 2: Global Installation\n\n```bash\ncp trust-defer.ts ~/.pi/agent/extensions/\n```\n\n### Option 3: Project-Local Installation\n\n```bash\nmkdir -p .pi/extensions\ncp trust-defer.ts .pi/extensions/\n```\n\n### Option 4: Quick Test\n\n```bash\npi -e ./trust-defer.ts\n```\n\n## Usage\n\nOnce loaded, the extension works automatically \u2014 no new commands to learn. Just use the built-in `/trust` and `/reload`:\n\n| Step | What you type |\n|-------|--------------|\n| 1 | (pi starts immediately \u2014 no trust prompt) |\n| 2 | `/trust` \u2014 save trust decision |\n| 3 | `/reload` \u2014 apply without restart |\n\n### What about non-interactive modes?\n\nIn `--mode json`, `--mode rpc`, and `-p` modes, the `project_trust` event fires but the extension has no UI. It returns `{ trusted: \"no\" }` \u2014 consistent with the existing non-interactive behavior of declining trust by default.\n\nPass `--approve` / `-a` to trust the project in non-interactive modes, just like without the extension.\n\n---\n\n## Architecture\n\n| Component | Purpose |\n|-----------|---------|\n| `project_trust` handler | Intercepts the trust event, returns `{ trusted: \"no\" }` |\n| `SettingsManager.prototype.reload` patch | On reload, if `projectTrusted` is `false` but trust.json says `true`, flips the flag |\n\nThe extension uses the `project_trust` event and `ctx.isProjectTrusted()` \u2014 supported extension APIs, not hacks.\n\nThe `SettingsManager` prototype patch is the only \"internal\" touch. It's needed because the built-in `/reload` preserves `projectTrusted=false` from the initial session, and the extension API doesn't expose a way to flip it. The patch is minimal: on each `reload()`, if `isProjectTrusted()` is `false` and the trust store says `true`, call `setProjectTrusted(true)`. Since `/reload` is user-initiated and infrequent, the trust store read is fine \u2014 a single `proper-lockfile` acquisition, not a hot loop.\n\n---\n\n## Development\n\n```bash\nnpm install          # install dev dependencies\nnpm run typecheck   # type check\nnpm run lint:dead   # check for unused exports\nnpm test            # run tests\nnpm test:coverage   # run tests with coverage\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "trust",
+    "defer",
+    "startup",
+    "prompt",
+    "interactive",
+    "auto-trust"
+  ],
+  "author": {
+    "name": "Tom X Nguyen"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/monotykamary/pi-trust-defer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/monotykamary/pi-trust-defer.git"
+  },
+  "pi": {
+    "extensions": [
+      "./trust-defer.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-09T02:00:29.667Z",
+    "modified": "2026-06-19T15:01:46.222Z",
+    "1.0.0": "2026-06-09T02:00:30.084Z",
+    "1.0.1": "2026-06-09T02:03:08.896Z",
+    "1.0.2": "2026-06-09T02:06:26.294Z",
+    "1.1.0": "2026-06-10T00:30:38.480Z",
+    "1.2.0": "2026-06-10T02:11:11.426Z",
+    "1.2.1": "2026-06-15T19:56:56.260Z",
+    "1.2.2": "2026-06-19T15:01:46.103Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 174,
+  "download_trend": []
+}

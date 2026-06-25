@@ -1,0 +1,379 @@
+{
+  "name": "@tianhai/pi-workflow-kit",
+  "latest_version": "0.18.1",
+  "description": "Enforce structured brainstorm\u2192plan\u2192execute\u2192finalize workflow with TDD discipline in AI coding agents",
+  "readme": "# pi-workflow-kit\n\n> Stop AI agents from rushing to code. Enforce a structured brainstorm\u2192plan\u2192execute\u2192verify\u2192finalize workflow with TDD discipline.\n\nAI coding agents tend to skip design and jump straight into implementation, producing over-engineered or misaligned code. **pi-workflow-kit** solves this by hard-blocking write operations during brainstorm and planning phases \u2014 the agent *literally cannot modify your source files* until you approve the design.\n\n[pi](https://github.com/badlogic/pi-mono) package. Zero configuration required.\n\n## Install\n\n```bash\npi install npm:@tianhai/pi-workflow-kit\n```\n\nNo setup needed \u2014 skills and guards activate automatically after install.\n\n**Want to try before committing?**\n\n```bash\npi -e npm:@tianhai/pi-workflow-kit\n```\n\n## What You Get\n\n### \ud83d\udee1\ufe0f Workflow Guard (extension)\n\nEnforces phase-appropriate tool access \u2014 not just guidelines, but hard blocks:\n\n| Phase | `write` / `edit` | `bash` |\n|-------|:-:|:-:|\n| **Brainstorm** / **Plan** / **Verify** | \ud83d\udd12 Blocked outside `docs/plans/` | \ud83d\udd12 Read-only only (grep, find, cat, git status, curl\u2026) |\n| **Execute** / **Finalize** | \u2705 Full access | \u2705 Full access |\n\nThe agent can read code and discuss design with you during brainstorm/plan, but it physically cannot modify source files or run mutating commands.\n\n### \ud83e\udde0 7 Workflow Skills\n\nGuide the agent through a disciplined development process:\n\nbrainstorm \u2192 plan \u2192 [design-review?] \u2192 execute \u2192 [verify?] \u2192 finalize\n                \u2195\n             diagnose (anytime)\n\nFor multi-feature designs, the plan\u2192execute loop repeats per feature.\n\n| Phase | Trigger | What Happens |\n|-------|---------|--------------|\n| **Brainstorm** | `/skill:pwk-brainstorming` | Explore approaches, debate tradeoffs, produce a design doc with a Features table |\n| **Design Review** | `/skill:pwk-design-review` | Audit plan and design for production risks (security, scalability, fault tolerance) |\n| **Plan** | `/skill:pwk-writing-plans` | Plan one feature at a time from the Features table \u2014 bite-sized TDD tasks with acceptance criteria |\n| **Execute** | `/skill:pwk-executing-tasks` | Implement tasks one-by-one with TDD discipline and pre-commit checkpoint review gates |\n| **Verify** | `/skill:pwk-verify` | Three expert review passes (security, optimization, traceability) on implemented code |\n| **Finalize** | `/skill:pwk-finalizing` | Archive plan docs, update README/CHANGELOG, create PR |\n| **Diagnose** | `/skill:pwk-diagnose` | 6-phase debugging loop: reproduce \u2192 hypothesize \u2192 instrument \u2192 fix \u2192 verify |\n\n## The Workflow in Detail\n\n### Phase Control\n\nYou control each phase \u2014 the agent never advances on its own. Invoke a skill to move forward:\n\n/skill:pwk-brainstorming   \u2192  discuss and design (names features)\n/skill:pwk-writing-plans   \u2192  plan next feature from the Features table\n/skill:pwk-design-review   \u2192  audit for production risks (on demand)\n/skill:pwk-executing-tasks \u2192  implement with TDD\n/skill:pwk-verify           \u2192  review code for security, optimization, and traceability\n/skill:pwk-finalizing       \u2192  ship it\n\n### Feature-Based Planning\n\nDesign docs include a `## Features` table that tracks each feature's status:\n\n| # | Feature | Status | Notes |\n|---|---------|--------|-------|\n| 1 | User signup | \u2705 done | |\n| 2 | Email verification | \ud83d\udd04 planned | Plan: docs/plans/...-email-verification-implementation.md |\n| 3 | Password reset | \u2b1c pending | |\n\nThis enables incremental development \u2014 plan and execute one feature at a time, then loop back for the next.\n\n### TDD Three-Scenario Model\n\nEach task is labeled with its TDD scenario during planning:\n\n| Scenario | When | Rule |\n|----------|------|------|\n| **New feature** | Adding new behavior | Write failing test \u2192 implement \u2192 pass |\n| **Modifying tested code** | Changing existing behavior | Run existing tests first \u2192 modify \u2192 verify |\n| **Trivial** | Config, docs, naming | Use judgment |\n\n### Lessons Learned\n\nA persistent rules file (`docs/lessons.md`) helps the agent learn from repeat mistakes across sessions. When the agent catches itself making the same error \u2014 like forgetting to run `make lint` \u2014 it writes a rule immediately. Future sessions (even after `/new`) pick it up automatically.\n\n```\nbrainstorm \u2192 reads lessons (design context)\nplan        \u2192 reads lessons (task breakdown)\nexecute     \u2192 reads lessons per task, writes new ones on repeat mistakes\nfinalize    \u2192 reviews and retires stale rules\n```\n\nRules are simple imperative bullets:\n\n- After completing each task, run `make lint && make fmt` before committing\n- Never import `testify` in this project\n- Always check for existing test helpers before writing new ones\n\nNo configuration needed \u2014 the file is created automatically when the first lesson is written.\n\n### Checkpoint Review Gates\n\nOptionally label tasks with a `checkpoint` to pause for human review. At each checkpoint the agent stops and waits for your feedback \u2014 you can approve, ask for changes, or send it back to rethink. Only when you're satisfied does it move on to the next task.\n\n| Checkpoint | When to Use | What Happens |\n|---|---|---|\n| *(none)* | Trivial tasks, well-understood changes | Auto-advance, no pause |\n| `checkpoint: test` | Test design matters | Agent writes the failing test, then pauses for your review. Verify the test covers the right cases before the agent implements. |\n| `checkpoint: done` | Implementation review matters | Agent implements and passes tests, then pauses for your review. Verify the implementation is correct before committing. |\n\n## Quick Start\n\n```bash\n# Install\npi install npm:@tianhai/pi-workflow-kit\n\n# Start a new feature\n> /skill:pwk-brainstorming\n> I want to add OAuth2 login to our API\n\n# (agent explores approaches, writes design doc with Features table)\n# (write/edit are blocked \u2014 your code is safe)\n\n> /skill:pwk-writing-plans\n\n# (agent picks next feature, breaks into TDD tasks)\n# (triggers design review for non-trivial features)\n> /skill:pwk-executing-tasks\n\n# (agent implements with TDD, cognitive persona shifts, all tools unlocked)\n> /skill:pwk-verify\n\n# (agent runs security, optimization, and traceability reviews on implemented code)\n> /skill:pwk-finalizing\n\n# (agent archives docs, curates lessons, creates PR)\n```\n\n## Why?\n\n- **AI agents skip design.** Left unchecked, they jump to code and over-engineer. This forces a think-first workflow.\n- **TDD needs structure.** The three-scenario model gives the agent clear rules for when to write tests first.\n- **You stay in control.** Checkpoint review gates let you approve test designs and implementations before the agent commits.\n- **Enforced, not suggested.** Hard blocks mean the agent can't ignore the rules \u2014 not even accidentally.\n\n## Project\n\n```\npi-workflow-kit/\n\u251c\u2500\u2500 extensions/\n\u2502   \u2514\u2500\u2500 workflow-guard.ts      # Write blocker during brainstorm/plan/verify\n\u251c\u2500\u2500 skills/\n\u2502   \u251c\u2500\u2500 pwk-brainstorming/SKILL.md\n\u2502   \u251c\u2500\u2500 pwk-design-review/SKILL.md\n\u2502   \u251c\u2500\u2500 pwk-writing-plans/SKILL.md\n\u2502   \u251c\u2500\u2500 pwk-executing-tasks/SKILL.md\n\u2502   \u251c\u2500\u2500 pwk-verify/SKILL.md\n\u2502   \u251c\u2500\u2500 pwk-finalizing/SKILL.md\n\u2502   \u2514\u2500\u2500 pwk-diagnose/SKILL.md\n\u251c\u2500\u2500 tests/\n\u2502   \u2514\u2500\u2500 workflow-guard.test.ts\n\u251c\u2500\u2500 package.json\n\u2514\u2500\u2500 README.md\n```\n\n## Development\n\n```bash\nnpm test\n```\n\n## License\n\n[MIT](LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "ai-coding-agent",
+    "workflow",
+    "tdd",
+    "guard-rails",
+    "code-review",
+    "pi-extension",
+    "brainstorm",
+    "test-driven-development"
+  ],
+  "author": {
+    "name": "yinloo-ola"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/yinloo-ola/pi-workflow-kit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yinloo-ola/pi-workflow-kit.git"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/workflow-guard.ts"
+    ],
+    "skills": [
+      "skills"
+    ]
+  },
+  "time": {
+    "created": "2026-04-09T10:48:37.142Z",
+    "modified": "2026-06-09T15:19:46.399Z",
+    "0.4.1": "2026-04-09T10:48:37.442Z",
+    "0.5.0": "2026-04-09T14:09:30.544Z",
+    "0.5.1": "2026-04-09T15:37:01.133Z",
+    "0.5.3": "2026-04-10T03:32:31.309Z",
+    "0.6.0": "2026-04-10T04:54:30.852Z",
+    "0.7.0": "2026-04-11T01:13:37.347Z",
+    "0.7.1": "2026-04-12T01:44:56.711Z",
+    "0.8.0": "2026-04-15T23:52:50.575Z",
+    "0.8.1": "2026-04-20T15:28:09.747Z",
+    "0.8.2": "2026-04-21T01:42:16.446Z",
+    "0.8.3": "2026-04-22T03:23:47.279Z",
+    "0.8.4": "2026-04-22T04:51:26.666Z",
+    "0.9.0": "2026-04-28T02:20:33.988Z",
+    "0.10.0": "2026-05-01T16:13:29.384Z",
+    "0.10.1": "2026-05-01T16:42:11.595Z",
+    "0.11.0": "2026-05-04T06:11:09.665Z",
+    "0.11.1": "2026-05-05T01:06:40.717Z",
+    "0.12.0": "2026-05-08T02:10:16.290Z",
+    "0.13.1": "2026-05-08T04:41:18.484Z",
+    "0.13.2": "2026-05-08T05:01:07.046Z",
+    "0.14.0": "2026-05-08T17:31:34.312Z",
+    "0.15.0": "2026-05-20T03:55:54.376Z",
+    "0.16.0": "2026-05-25T10:45:39.295Z",
+    "0.17.1": "2026-06-03T09:34:53.782Z",
+    "0.18.1": "2026-06-09T15:19:46.280Z"
+  },
+  "versions_count": 25,
+  "downloads_last_week": 113,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 759
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 407
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 411
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 531
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 600
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 63
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 404
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 66
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 379
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 80
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 112
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 15
+    }
+  ]
+}

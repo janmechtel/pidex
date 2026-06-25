@@ -1,0 +1,55 @@
+{
+  "name": "@aliou/pi-toolchain",
+  "latest_version": "0.9.0",
+  "description": "![banner](https://assets.aliou.me/github/aliou/pi-toolchain/banner.png)",
+  "readme": "![banner](https://assets.aliou.me/github/aliou/pi-toolchain/banner.png)\n\n# Toolchain\n\nOpinionated toolchain enforcement for pi. Transparently mutates commands to use preferred tools or blocks mismatched commands.\n\n## Installation\n\n```bash\npi install npm:@aliou/pi-toolchain\n```\n\nOr from git:\n\n```bash\npi install git:github.com/aliou/pi-toolchain\n```\n\n## Features\n\nEach feature is independently set to one of three modes:\n\n- `\"disabled\"`: no action taken\n- `\"mutate\"`: transparently mutate matching commands before shell execution\n- `\"block\"`: block matching commands via tool_call hook\n\n### nodePackageManager\n\nMutates or blocks `npm`/`yarn`/`bun` commands to use the selected package manager. Also handles `npx` -> `pnpm dlx`/`bunx`.\n\n### pythonToUv\n\nMutates or blocks `python`/`python3` to `uv run python` and `pip`/`pip3` to `uv pip`.\n\n### nonInteractiveGitRebase\n\nInjects `GIT_EDITOR=true` and `GIT_SEQUENCE_EDITOR=:` env vars for `git rebase` commands so they run non-interactively. Only supports `\"disabled\"` and `\"mutate\"` modes (block is not applicable).\n\n## Settings Command\n\nRun `/toolchain:settings` to open an interactive settings UI with two tabs:\n- **Local**: edit project-scoped config (`.pi/extensions/toolchain.json`)\n- **Global**: edit global config (`~/.pi/agent/extensions/toolchain.json`)\n\nUse `Tab` / `Shift+Tab` to switch tabs. Feature modes and the package manager can be changed directly. Configure mutation notification visibility in JSON for now.\n\n## Configuration\n\nConfiguration is loaded from two optional JSON files, merged in order (project overrides global):\n\n- **Global**: `~/.pi/agent/extensions/toolchain.json`\n- **Project**: `.pi/extensions/toolchain.json`\n\n### Configuration Schema\n\n```json\n{\n  \"enabled\": true,\n  \"features\": {\n    \"nodePackageManager\": \"disabled\",\n    \"pythonToUv\": \"disabled\",\n    \"nonInteractiveGitRebase\": \"mutate\"\n  },\n  \"nodePackageManager\": {\n    \"selected\": \"pnpm\"\n  },\n  \"ui\": {\n    \"showMutationNotifications\": false\n  }\n}\n```\n\nAll fields are optional. Missing fields use the defaults shown above.\n\n### Feature Defaults\n\n| Feature | Default | Description |\n|---|---|---|\n| `nodePackageManager` | `\"disabled\"` | Opt-in. Mutates or blocks package-manager commands. |\n| `pythonToUv` | `\"disabled\"` | Opt-in. Mutates or blocks python/pip commands to uv equivalents. |\n| `nonInteractiveGitRebase` | `\"mutate\"` | On by default. Injects non-interactive env vars for git rebase. |\n| `ui.showMutationNotifications` | `false` | Show a Pi notification each time a mutation happens. |\n\n### Examples\n\nEnforce pnpm, mutate python commands, and show mutation notifications:\n\n```json\n{\n  \"features\": {\n    \"nodePackageManager\": \"mutate\",\n    \"pythonToUv\": \"mutate\"\n  },\n  \"nodePackageManager\": {\n    \"selected\": \"pnpm\"\n  },\n  \"ui\": {\n    \"showMutationNotifications\": true\n  }\n}\n```\n\nBlock package-manager mismatches instead of mutating them:\n\n```json\n{\n  \"features\": {\n    \"nodePackageManager\": \"block\"\n  },\n  \"nodePackageManager\": {\n    \"selected\": \"pnpm\"\n  }\n}\n```\n\n## How It Works\n\n### Mutations vs Blockers\n\nThe extension uses pi's tool_call event hook:\n\n1. **Blockers**: Commands that match a feature set to `\"block\"` are rejected with a reason. The agent sees the block reason and retries with the correct command.\n2. **Mutations**: Commands that match a feature set to `\"mutate\"` are transparently rewritten before shell execution. The agent sees the original command in the tool call UI but gets the output of the mutated command.\n3. **Mutation notifications**: When `ui.showMutationNotifications` is enabled, a warning-level Pi notification is shown for each mutation.\n\n### AST-Based Rewriting\n\nAll rewriters use structural shell parsing via `@aliou/sh` to identify command names in the AST. This avoids false positives where tool names appear in URLs, file paths, or strings. If the parser fails, the command passes through unchanged -- a missed mutation is safe, a false positive mutation corrupts the command.\n\n## Migration from Guardrails\n\nIf you were using `preventBrew`, `preventPython`, or `enforcePackageManager` in your guardrails config:\n\n1. Install `@aliou/pi-toolchain`\n2. Create `.pi/extensions/toolchain.json` with the equivalent config\n3. Remove the deprecated features from your guardrails config\n\nThe guardrails extension will continue to honor these features with a deprecation warning until they are removed in a future version.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "toolchain"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/aliou/pi-toolchain#readme",
+  "repository": {
+    "url": "git+https://github.com/aliou/pi-toolchain.git",
+    "type": "git"
+  },
+  "pi": {
+    "video": "https://assets.aliou.me/github/aliou/pi-toolchain/demo.mp4",
+    "extensions": [
+      "./extensions/toolchain/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-04T11:45:10.083Z",
+    "modified": "2026-06-21T11:12:39.547Z",
+    "0.0.1": "2026-02-04T11:45:10.290Z",
+    "0.1.0": "2026-02-04T11:52:10.223Z",
+    "0.1.1": "2026-02-05T00:25:41.834Z",
+    "0.2.0": "2026-02-05T19:45:24.743Z",
+    "0.3.0": "2026-02-07T13:50:45.087Z",
+    "0.3.1": "2026-02-08T20:16:15.689Z",
+    "0.3.2": "2026-02-11T14:18:04.921Z",
+    "0.3.3": "2026-02-17T18:01:28.053Z",
+    "0.3.4": "2026-02-18T16:12:27.383Z",
+    "0.3.5": "2026-02-19T21:27:59.494Z",
+    "0.3.6": "2026-02-21T16:54:25.008Z",
+    "0.3.7": "2026-03-06T17:11:07.281Z",
+    "0.4.0": "2026-03-10T15:15:31.654Z",
+    "0.5.0": "2026-03-11T13:35:48.492Z",
+    "0.5.1": "2026-03-20T12:26:13.433Z",
+    "0.5.2": "2026-03-29T20:31:18.038Z",
+    "0.6.0": "2026-03-31T10:42:44.317Z",
+    "0.6.1": "2026-04-03T09:53:54.742Z",
+    "0.6.2": "2026-04-17T19:16:45.218Z",
+    "0.7.0": "2026-05-08T08:16:40.201Z",
+    "0.8.0": "2026-06-19T15:45:26.946Z",
+    "0.8.1": "2026-06-19T15:59:04.676Z",
+    "0.9.0": "2026-06-21T11:12:39.277Z"
+  },
+  "versions_count": 23,
+  "downloads_last_week": 526,
+  "download_trend": []
+}

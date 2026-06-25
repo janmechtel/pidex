@@ -1,0 +1,52 @@
+{
+  "name": "pi-gitnexus",
+  "latest_version": "0.6.4",
+  "description": "GitNexus knowledge graph integration for pi \u2014 enriches searches with call chains, execution flows, and blast radius",
+  "readme": "# pi-gitnexus\n\n[GitNexus](https://github.com/abhigyanpatwari/GitNexus) knowledge graph integration for [pi](https://github.com/mariozechner/pi). Enriches every search, file read, and symbol lookup with call chains, callers/callees, and execution flows \u2014 automatically.\n\n<img height=\"298\" alt=\"pi-gitnexus screenshot\" src=\"https://github.com/tintinweb/pi-gitnexus/raw/master/media/screenshot.png\" />\n\n\nhttps://github.com/user-attachments/assets/49e61667-f508-4d22-abad-05241e414664\n\n> The graph view in the demo is from [gitnexus-web](https://github.com/abhigyanpatwari/GitNexus) and is not part of this extension.\n\n## What it does\n\nWhen the agent reads a file or runs a search (grep, find, bash, read_many), the extension appends graph context from the knowledge graph inline with the results. The agent sees both together and can follow call chains without additional queries.\n\n```\nAgent reads auth/session.ts\n  \u2192 file content returned normally\n  \u2192 [GitNexus] appended: callers of the module, what it imports, related tests\n\nAgent runs grep(\"validateUser\")\n  \u2192 grep results returned normally\n  \u2192 [GitNexus] appended: Called by: login, signup / Calls: checkPermissions, getUser\n  \u2192 filenames in the grep output are also looked up in parallel\n\nAgent calls read_many([api.ts, db.ts, router.ts])\n  \u2192 file contents returned normally\n  \u2192 [GitNexus] appended with per-file labeled sections:\n      ### api.ts\n      <call graph context for api>\n      ### db.ts\n      <call graph context for db>\n```\n\nSeven tools are also registered directly in pi \u2014 the agent can use them explicitly for deeper analysis without any setup.\n\n## Requirements\n\n- [gitnexus](https://github.com/abhigyanpatwari/GitNexus) >= 1.4.8 available as `gitnexus` on PATH (e.g. `npm i -g gitnexus`)\n- A GitNexus index in your project: run `/gitnexus analyze`\n\nThe extension never installs anything automatically. It assumes `gitnexus` is on PATH. If your setup differs, use `/gitnexus settings` to set a custom command (e.g. `npx gitnexus@latest`).\n\n## Getting started\n\n1. Install the extension: `pi install npm:pi-gitnexus`\n2. Install gitnexus: `npm i -g gitnexus`\n3. Open your project in pi\n4. Run `/gitnexus analyze` to build the knowledge graph\n5. Done \u2014 file reads and searches are now enriched automatically\n\n## What triggers augmentation\n\n| Tool | Pattern used |\n|---|---|\n| `grep` | Longest identifier literal extracted from the search pattern |\n| `bash` with grep/rg | First non-flag argument after `grep`/`rg` (quote-aware, pipe-safe) |\n| `bash` with cat/head/tail | Filename of the target file (quote-aware) |\n| `bash` with find | Value of `-name`/`-iname` |\n| `find` | Glob pattern basename |\n| `read` | Filename of the file being read (indexed code/docs files only) |\n| `read_many` | Each indexed code/docs file in the batch (up to 5), labeled per-file in output |\n| Any grep/bash result | Filenames extracted from result lines (`path/file.ts:line:`) |\n\nEach tool result augments up to 3 patterns in parallel (up to 5 for `read_many`). Patterns already augmented this session are skipped.\n\n## Commands\n\n| Command | Description |\n|---|---|\n| `/gitnexus` | Open the main menu (status, Analyze, Settings, Help) |\n| `/gitnexus status` | Show index status and session enrichment count |\n| `/gitnexus analyze` | Build or rebuild the knowledge graph |\n| `/gitnexus on` / `/gitnexus off` | Enable/disable auto-augment (tools unaffected) |\n| `/gitnexus settings` | Open the settings panel (auto-augment, timeout, limits, command) |\n| `/gitnexus <pattern>` | Manual graph lookup for a symbol or pattern |\n| `/gitnexus query <text>` | Search execution flows |\n| `/gitnexus context <name>` | 360\u00b0 view of a symbol: callers, callees, processes |\n| `/gitnexus impact <name>` | Upstream blast radius of a change |\n| `/gitnexus help` | Show command reference |\n\n## Agent tools\n\nThe following tools are registered in pi and always available to the agent:\n\n| Tool | Description |\n|---|---|\n| `gitnexus_list_repos` | List all indexed repositories |\n| `gitnexus_query` | Search the knowledge graph for execution flows |\n| `gitnexus_context` | 360\u00b0 view of a symbol: callers, callees, processes |\n| `gitnexus_impact` | Blast radius analysis for a symbol |\n| `gitnexus_detect_changes` | Analyze staged/unstaged/all/compare git changes and affected execution flows |\n| `gitnexus_rename` | Coordinated multi-file rename preview/apply through the knowledge graph |\n| `gitnexus_cypher` | Execute raw Cypher queries against the graph |\n\n## Skills\n\nThe extension bundles 5 workflow skills that guide the agent through common tasks:\n\n| Skill | When to use |\n|---|---|\n| `/skill:gitnexus-exploring` | Understand architecture, trace execution flows, explore unfamiliar code |\n| `/skill:gitnexus-debugging` | Debug a bug, trace an error, find why something fails |\n| `/skill:gitnexus-pr-review` | Review a PR, assess merge risk, check blast radius |\n| `/skill:gitnexus-refactoring` | Rename, extract, split, or restructure code safely |\n| `/skill:gitnexus-impact-analysis` | Know what breaks before changing something |\n\nSkills are loaded on-demand \u2014 only the description is in context until the agent or user invokes one.\n\n## How it works\n\n**Auto-augment hook** \u2014 fires after every grep/find/bash/read/read_many tool result. Extracts up to 3 patterns (primary from input, secondary filenames from result content) and calls `gitnexus augment` for each in parallel. Regex patterns are parsed to extract the longest identifier-like literal; bash commands are tokenized with quote and pipe boundary awareness. Results are wrapped in `---` delimiters and appended to the tool result. For `read_many`, each file in the batch gets its own labeled section so the agent knows exactly which context belongs to which file.\n\n**Session dedup cache** \u2014 each symbol or filename is augmented at most once per session (case-insensitive). Patterns with results are cached in `augmentedCache`; patterns that returned empty are tracked in a separate `emptyCache` to prevent unbounded retries while still allowing retries after an index rebuild (both caches clear on session reset and after a successful `/gitnexus analyze`).\n\n**MCP client** \u2014 tools (list_repos, query, context, impact, detect_changes, rename, cypher) communicate with `gitnexus mcp` over a stdio pipe. The process is spawned lazily on the first tool call and stopped after 10 minutes of inactivity (configurable via `/gitnexus settings \u2192 MCP idle timeout`; set to `off` to keep it alive for the whole session). No network socket, no port.\n\n**Session lifecycle** \u2014 on session start/switch, the extension resolves the full shell PATH through `/bin/sh` (picking up nvm/fnm/volta without depending on a user shell like nushell), probes the binary, checks for an index, and notifies accordingly. The MCP process is restarted with the new working directory.\n\n**Auto-augment toggle** \u2014 `/gitnexus off` disables the hook without affecting tools. Useful when the graph output is noisy for a particular task. Resets to enabled on session switch.\n\n**Analyze guard** \u2014 auto-augment is paused during `/gitnexus analyze` to avoid injecting stale or partially-built index results.\n\n## License note\n\nThis extension (pi-gitnexus) is MIT licensed. [GitNexus](https://github.com/abhigyanpatwari/GitNexus) itself is published under the [PolyForm Noncommercial License](https://polyformproject.org/licenses/noncommercial/1.0.0/) \u2014 commercial use requires a separate agreement with its author. Install and use gitnexus in accordance with its license terms.\n\n## Notes\n\n- Tested with gitnexus 1.4.8. Older versions may have incompatible MCP schemas.\n- The extension never runs `gitnexus analyze` automatically \u2014 indexing is always user-initiated via `/gitnexus analyze`.\n- The index is a static snapshot. Re-run `/gitnexus analyze` after significant code changes. The agent will suggest this when the index appears stale.\n- In multi-repo GitNexus setups the extension automatically passes the current repo root path to MCP tools, but every tool also accepts an explicit `repo` override.\n- `gitnexus_detect_changes` follows the current MCP API: use `scope` (`unstaged`, `staged`, `all`, or `compare`) and optional `base_ref` instead of pasting raw diffs.\n- Markdown files (`.md`, `.mdx`) participate in augmentation alongside code files when GitNexus has indexed them.\n- `gitnexus_rename` and `gitnexus_cypher` are exposed intentionally; use `gitnexus_rename` with `dry_run` first because it can propose multi-file edits.\n- The enrichment is appended to the tool result the agent receives \u2014 files on disk and raw tool outputs are never modified.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "gitnexus",
+    "knowledge-graph",
+    "code-intelligence",
+    "call-graph",
+    "agent"
+  ],
+  "author": {
+    "name": "tintinweb"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/tintinweb/pi-gitnexus#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tintinweb/pi-gitnexus.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "image": "https://github.com/tintinweb/pi-gitnexus/raw/master/media/screenshot.png"
+  },
+  "time": {
+    "created": "2026-02-23T22:59:49.651Z",
+    "modified": "2026-06-23T11:46:05.896Z",
+    "0.2.1": "2026-02-23T22:59:49.882Z",
+    "0.3.0": "2026-02-23T23:26:00.120Z",
+    "0.3.1": "2026-02-23T23:31:44.748Z",
+    "0.4.0": "2026-02-25T00:44:40.456Z",
+    "0.5.0": "2026-03-24T23:55:04.841Z",
+    "0.5.1": "2026-03-25T13:58:57.998Z",
+    "0.6.0": "2026-04-28T13:33:00.463Z",
+    "0.6.1": "2026-05-02T20:53:36.676Z",
+    "0.6.2": "2026-05-08T19:47:22.267Z",
+    "0.6.3": "2026-05-08T21:12:12.289Z",
+    "0.6.4": "2026-06-23T11:46:05.791Z"
+  },
+  "versions_count": 11,
+  "downloads_last_week": 420,
+  "download_trend": []
+}

@@ -1,0 +1,42 @@
+{
+  "name": "pi-kiro-provider",
+  "latest_version": "0.2.1",
+  "description": "Pi extension provider for Kiro's AWS CodeWhisperer streaming API.",
+  "readme": "# pi-kiro-provider\r\n\r\n[![npm version](https://img.shields.io/npm/v/pi-kiro-provider?style=flat-square)](https://www.npmjs.com/package/pi-kiro-provider) [![License](https://img.shields.io/github/license/MasuRii/pi-kiro-provider?style=flat-square)](LICENSE)\r\n\r\n`pi-kiro-provider` is a Pi extension that registers Kiro as a streaming AI provider backed by Kiro's AWS CodeWhisperer-compatible API and OAuth flow.\r\n\r\n- **Provider ID:** `kiro`\r\n- **npm:** https://www.npmjs.com/package/pi-kiro-provider\r\n- **GitHub:** https://github.com/MasuRii/pi-kiro-provider\r\n\r\n## Features\r\n\r\n- Registers the Kiro provider through Pi's provider API with `authHeader: false` so credentials stay managed by the OAuth provider path.\r\n- Registers a Kiro OAuth provider with Builder ID, Google, and GitHub sign-in method labels.\r\n- Replays runtime provider registration events for `pi-multi-auth` readiness and Pi session lifecycle events.\r\n- Provides configurable model metadata, thinking-level mappings, prompt-caching metadata, request timeout, headers, and optional Kiro profile ARN support.\r\n- Drops static `Authorization` header overrides so managed OAuth credentials cannot be bypassed by config.\r\n- Writes optional debug logs only under the extension-local `debug/` directory when `debug` is enabled.\r\n\r\n## Installation\r\n\r\n### npm package\r\n\r\n```bash\r\npi install npm:pi-kiro-provider\r\n```\r\n\r\n### Git repository\r\n\r\n```bash\r\npi install git:github.com/MasuRii/pi-kiro-provider\r\n```\r\n\r\n### Local extension folder\r\n\r\nPlace this folder in one of Pi's extension discovery paths:\r\n\r\n| Scope | Path |\r\n|-------|------|\r\n| Global default | `~/.pi/agent/extensions/pi-kiro-provider` (respects `PI_CODING_AGENT_DIR`) |\r\n| Project | `.pi/extensions/pi-kiro-provider` |\r\n\r\nPi discovers the extension through the root `index.ts` entry listed in `package.json`.\r\n\r\n## Configuration\r\n\r\nRuntime configuration lives in `config.json` at the extension root. The file is user-local, gitignored, and excluded from npm package contents. A starter template is included at `config/config.example.json`.\r\n\r\nCopy the template before customizing local settings:\r\n\r\n```bash\r\ncp config/config.example.json config.json\r\n```\r\n\r\nMinimal default-compatible configuration:\r\n\r\n```json\r\n{\r\n  \"enabled\": true,\r\n  \"debug\": false,\r\n  \"providerId\": \"kiro\",\r\n  \"displayName\": \"Kiro\",\r\n  \"upstreamUrl\": \"https://codewhisperer.us-east-1.amazonaws.com/generateAssistantResponse\",\r\n  \"endpoint\": \"codewhisperer\",\r\n  \"apiKey\": \"$KIRO_ACCESS_TOKEN\",\r\n  \"requestTimeoutMs\": 600000,\r\n  \"profileArn\": \"\",\r\n  \"headers\": {},\r\n  \"oauth\": {\r\n    \"region\": \"us-east-1\",\r\n    \"startUrl\": \"https://view.awsapps.com/start\",\r\n    \"clientName\": \"kiro-oauth-client\",\r\n    \"clientType\": \"public\",\r\n    \"scopes\": [\r\n      \"codewhisperer:completions\",\r\n      \"codewhisperer:analysis\",\r\n      \"codewhisperer:conversations\"\r\n    ],\r\n    \"grantTypes\": [\r\n      \"urn:ietf:params:oauth:grant-type:device_code\",\r\n      \"refresh_token\"\r\n    ],\r\n    \"issuerUrl\": \"https://identitycenter.amazonaws.com/ssoins-722374e8c3c8e6c6\",\r\n    \"skipIssuerUrlForRegistration\": false,\r\n    \"socialPortalUrl\": \"https://app.kiro.dev/signin\",\r\n    \"socialPortalRedirectUri\": \"http://localhost:3128\",\r\n    \"socialCallbackPath\": \"/oauth/callback\",\r\n    \"socialAuthorizeUrl\": \"https://prod.us-east-1.auth.desktop.kiro.dev/login\",\r\n    \"socialTokenUrl\": \"https://prod.us-east-1.auth.desktop.kiro.dev/oauth/token\",\r\n    \"socialRefreshUrl\": \"https://prod.us-east-1.auth.desktop.kiro.dev/refreshToken\",\r\n    \"socialRedirectUri\": \"kiro://kiro.kiroAgent/authenticate-success\",\r\n    \"methodLabels\": {\r\n      \"builder-id\": \"AWS Builder ID\",\r\n      \"google\": \"Google\",\r\n      \"github\": \"GitHub\"\r\n    }\r\n  }\r\n}\r\n```\r\n\r\n### Configuration options\r\n\r\n| Option | Type | Default | Description |\r\n|--------|------|---------|-------------|\r\n| `enabled` | boolean | `true` | Enables the provider extension. |\r\n| `debug` | boolean | `false` | Enables file-only debug logging under `debug/debug.log`. |\r\n| `providerId` | string | `kiro` | Provider ID registered with Pi. |\r\n| `displayName` | string | `Kiro` | Human-readable provider name shown by Pi. |\r\n| `upstreamUrl` | string | CodeWhisperer generateAssistantResponse endpoint | Streaming API endpoint. |\r\n| `endpoint` | `codewhisperer` \\| `amazonq` | inferred from `upstreamUrl` | Controls upstream request/response formatting. |\r\n| `apiKey` | string | `$KIRO_ACCESS_TOKEN` | Environment variable reference used by provider metadata. |\r\n| `requestTimeoutMs` | number | `600000` | Request timeout for streaming and OAuth calls. |\r\n| `profileArn` | string | empty | Optional Kiro profile ARN sent as `x-kiro-profile-arn`. |\r\n| `headers` | object | `{}` | Additional non-authorization headers sent upstream. |\r\n| `oauth` | object | Kiro OAuth defaults | OAuth device/social sign-in endpoint configuration. |\r\n| `models` | array | built-in Kiro model list | Optional replacement model list. Omit to use built-in defaults. |\r\n| `modelDefaults` | object | built-in model defaults | Optional defaults applied to configured models. |\r\n\r\n> Authorization headers configured in `headers`, `modelDefaults.headers`, or model-level `headers` are ignored intentionally. Kiro credentials are selected by the provider/OAuth integration.\r\n\r\n## Validation\r\n\r\n```bash\r\nnpm run typecheck\r\nnpm run lint\r\nnpm run test\r\nnpm run check\r\nnpm run package:dry-run\r\n```\r\n\r\n## Publishing\r\n\r\nThe package metadata follows the same publish-ready shape used by established Pi extensions:\r\n\r\n- entrypoint: `index.ts`\r\n- package exports: `.` \u2192 `./index.ts`\r\n- Pi extension manifest: `pi.extensions`\r\n- published files: source, README, changelog, license, and config template\r\n- runtime `config.json`, `debug/`, test artifacts, package lock, and local metadata excluded from npm publication\r\n\r\nDo not publish, push, or tag until the GitHub/npm release review is complete.\r\n\r\n## License\r\n\r\n[MIT](LICENSE)\r\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "pi-coding-agent",
+    "kiro",
+    "provider",
+    "ai-provider",
+    "oauth",
+    "codewhisperer",
+    "amazon-q"
+  ],
+  "author": {
+    "name": "MasuRii"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/MasuRii/pi-kiro-provider#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MasuRii/pi-kiro-provider.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-27T03:30:08.149Z",
+    "modified": "2026-06-16T15:48:22.894Z",
+    "0.1.0": "2026-05-27T03:30:08.503Z",
+    "0.2.0": "2026-06-01T10:44:44.416Z",
+    "0.2.1": "2026-06-16T15:48:22.790Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

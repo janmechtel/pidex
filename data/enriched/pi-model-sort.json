@@ -1,0 +1,46 @@
+{
+  "name": "pi-model-sort",
+  "latest_version": "0.2.2",
+  "description": "Sort models in pi's /model selector by last usage \u2014 most recently used models appear first",
+  "readme": "<div align=\"center\">\n\n# \ud83d\udd04 pi-model-sort\n\n**Sort models by last usage in [pi](https://github.com/earendil-works/pi-coding-agent)**\n\n_Your most-used models appear first \u2014 no more scrolling past providers you never touch._\n\n[![pi extension](https://img.shields.io/badge/pi-extension-blueviolet)](https://github.com/earendil-works/pi-coding-agent)\n[![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)\n\n</div>\n\n---\n\n## The Problem\n\nPi's `/model` selector sorts models alphabetically by provider. If you have Anthropic + OpenAI + Google + Ollama all configured, your most-used model might be buried behind twenty other models. Every time you open the picker, you scroll past providers you haven't touched in weeks. There's no built-in way to say *\"show me what I actually use.\"*\n\n## The Solution\n\n`pi-model-sort` tracks every model selection and reorders the `/model` picker so your most recently used models appear at the top.\n\n- **Automatic tracking** \u2014 every `/model` switch, `Ctrl+P` cycle, and session restore is recorded with a Unix timestamp\n- **Sort order** \u2014 current model first \u2192 most recently used descending \u2192 provider/id alphabetical fallback\n- **MRU on startup** \u2014 new sessions start on your most recently used model instead of `scopedModels[0]` or the hardcoded provider default order\n- **Persistent** \u2014 usage data lives in `~/.pi/agent/extensions/pi-model-sort.json`, survives restarts\n- **No config needed** \u2014 install and forget; the extension starts tracking on first use\n- **Zero setup** \u2014 with no recorded usage, models fall back to the default alphabetical order\n- **Everywhere** \u2014 the sort applies to `/model` (`Ctrl+L`), both \"Scope: all\" and \"Scope: scoped\" views, `--list-models` CLI, and the `/scoped-models` config selector\n\nNo `settings.json` modifications. No manual maintenance. No database.\n\n## Usage\n\nThe extension works automatically \u2014 there are no commands to learn.\n\n```bash\n# Install, then just use pi normally\n/model                    # Most recently used models appear at the top\nCtrl+P / Ctrl+Shift+P     # Cycle through models in last-used order\npi --list-models          # CLI output is also sorted by last usage\n```\n\nOpen `/model` and press `Tab` to switch between \"Scope: all\" and \"Scope: scoped\" \u2014 both views are sorted by recency.\n\n### Config File\n\nThe extension creates `~/.pi/agent/extensions/pi-model-sort.json` automatically on first model switch:\n\n```json\n{\n  \"lastUsed\": {\n    \"anthropic/claude-sonnet-4-20250514\": 1717000000000,\n    \"openai/gpt-4o\": 1716995000000,\n    \"google/gemini-2.5-pro\": 1716000000000\n  }\n}\n```\n\nNo manual editing needed. To clear usage history, delete the file and `/reload`.\n\n## Install\n\n**With `pi install`** (recommended):\n\n```bash\npi install npm:pi-model-sort\n```\n\nOr install from GitHub:\n\n```bash\npi install https://github.com/monotykamary/pi-model-sort\n```\n\n**With npm**:\n\n```bash\nnpm install pi-model-sort\n```\n\nOr in `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\n    \"git:github.com/monotykamary/pi-model-sort\"\n  ]\n}\n```\n\nThen `/reload` or restart pi.\n\nFor quick one-off tests:\n\n```bash\npi -e ./model-sort.ts\n```\n\n## How It Works\n\n```\nmodel_select event fires\n  \u2192 Extension records timestamp\n  \u2192 Writes to pi-model-sort.json\n  \u2192 Next /model opens with updated sort\n\nSession starts (startup / new)\n  \u2192 Extension reads pi-model-sort.json\n  \u2192 Monkey-patches ModelSelectorComponent.prototype:\n      sortModels \u2014 sorts \"Scope: all\" view\n      loadModels \u2014 sorts \"Scope: scoped\" scopedModelItems after load\n  \u2192 Monkey-patches ModelRegistry.prototype.getAvailable/getAll\n  \u2192 Monkey-patches AgentSession.prototype._cycleScopedModel\n  \u2192 Sort order: current model first \u2192 most recent \u2192 provider/id alphabetical\n  \u2192 Patches survive modelRegistry.refresh()\n  \u2192 Overrides initial model to MRU via pi.setModel()\n      if pi core chose a different model (scopedModels[0], defaultModelPerProvider)\n      only on startup and new session starts \u2014 not resume, reload, or fork\n```\n\n**Five patches + MRU startup override, full coverage:**\n\n| Patch | What it affects |\n|-------|----------------|\n| `ModelSelectorComponent.prototype.sortModels` | `/model` TUI picker \u2014 \"Scope: all\" view |\n| `ModelSelectorComponent.prototype.loadModels` | `/model` TUI picker \u2014 \"Scope: scoped\" view (configured cycling models) |\n| `AgentSession.prototype._cycleScopedModel` | `Ctrl+P` / `Ctrl+Shift+P` cycling order (non-destructive swap, cycling does not update last-used to avoid feedback loop) |\n| `ModelRegistry.prototype.getAvailable()` | `/scoped-models` config selector, model resolution |\n| `ModelRegistry.prototype.getAll()` | `--list-models` CLI output |\n| `pi.setModel()` on `session_start` | MRU model selection on startup and `/new` \u2014 overrides pi core's default |\n\nWhen no scoped models are configured, Ctrl+P falls through to `_cycleAvailableModel` which calls `getAvailable()` \u2014 already sorted by the registry patch.\n\n> **Why cycling doesn't update last-used:** Updating timestamps during Ctrl+P cycling creates a feedback loop \u2014 each cycle makes the selected model most-recent, re-sorts it to position 0, and `(currentIndex + 1) % len` always lands on the second model. Models would toggle forever between the top 2. Manual model selection (`/model`, session restore) still updates last-used.\n\nThe SDK doesn't expose a sort order for model lists. Monkey-patching the component and registry methods is the only way to control ordering without rebuilding the entire picker UI.\n\nThe patches survive `modelRegistry.refresh()` because they wrap the original methods. On reload, the extension detects the prototypes are already patched and just updates the last-used data source.\n\n## Comparison with Alternatives\n\n| Approach | Pros | Cons |\n|----------|------|------|\n| **pi-model-sort** (this) | Automatic, zero-config, persistent, applies everywhere | Monkey-patches internal prototypes |\n| `enabledModels` in `settings.json` (manual) | Built-in, no extension needed | Allowlist \u2014 must list models manually; doesn't sort, just scopes |\n| Custom `/model` replacement extension | Full control over UI | Rebuilds the entire picker component from scratch (~400 lines of TUI code) |\n| Manually ordering `models.json` | Controls `--list-models` output | Static, doesn't react to actual usage; doesn't affect `/model` picker |\n\n## Development\n\n```bash\nnpm install\nnpm test          # Vitest unit tests\nnpm run typecheck # TypeScript validation\nnpm run lint:dead # Dead code detection (knip)\n```\n\n### Structure\n\n```\n.\n\u251c\u2500\u2500 model-sort.ts       # Main extension\n\u251c\u2500\u2500 src/\n\u2502   \u2514\u2500\u2500 index.ts        # Sort logic, types, and utilities\n\u251c\u2500\u2500 __tests__/\n\u2502   \u2514\u2500\u2500 sort.test.ts    # Unit tests for sortByLastUsed\n\u251c\u2500\u2500 package.json\n\u251c\u2500\u2500 tsconfig.json\n\u251c\u2500\u2500 vitest.config.ts\n\u2514\u2500\u2500 knip.json\n```\n\n## License\n\nMIT",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "model",
+    "sort",
+    "recent",
+    "last-used",
+    "model-selector"
+  ],
+  "author": {
+    "name": "Tom X Nguyen"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/monotykamary/pi-model-sort#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/monotykamary/pi-model-sort.git"
+  },
+  "pi": {
+    "extensions": [
+      "./model-sort.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-05T22:57:20.746Z",
+    "modified": "2026-06-15T19:56:35.490Z",
+    "0.1.0": "2026-06-05T22:57:21.296Z",
+    "0.1.1": "2026-06-05T23:06:25.671Z",
+    "0.1.2": "2026-06-06T21:24:31.413Z",
+    "0.1.3": "2026-06-06T21:30:07.619Z",
+    "0.1.4": "2026-06-06T21:34:07.580Z",
+    "0.2.0": "2026-06-10T14:47:48.044Z",
+    "0.2.1": "2026-06-14T09:54:27.687Z",
+    "0.2.2": "2026-06-15T19:56:35.380Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 43,
+  "download_trend": []
+}

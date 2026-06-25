@@ -1,0 +1,69 @@
+{
+  "name": "@ersintarhan/pi-toolkit",
+  "latest_version": "0.6.0",
+  "description": "pi extension that registers Kimi, MiniMax, Xiaomi MiMo, and CrofAI providers with cache fix, Anthropic OAuth adapter, and native web search with provider-override support. Search backends include ZAI MCP, Google, OpenAI, xAI, Anthropic, Claude Code, and C",
+  "readme": "# pi-toolkit\n\nAll-in-one pi extension toolkit.\n\nIncludes:\n- **Providers**: `kimi-coding`, `minimax`, `xiaomi-mimo`, `crofai`\n- **Cache optimization** for Anthropic-compatible providers\n- **Claude OAuth adapter** for Anthropic OAuth sessions\n- **Native web search** with multiple backends + provider override\n- **Context management** (`anchor`, `view`, `pivot`, `recall`)\n\n## Install\n\n```bash\npi install npm:@ersintarhan/pi-toolkit\n```\n\nLocal development:\n\n```bash\npi -e /Users/ersin/Projects/pi-extensions/pi-toolkit\n```\n\n## What this package does\n\n### 1. Provider registration\n\nRegisters these providers:\n\n| Provider | API | Notes |\n|---|---|---|\n| `kimi-coding` | Anthropic-compatible or OpenAI mode | OAuth, API key fallback, image/video upload, Kimi-specific payload mutations |\n| `minimax` | Anthropic-compatible | Cache-fixed stream path |\n| `xiaomi-mimo` | Anthropic-compatible | Cache-fixed stream path, MiMo quirks handled |\n| `crofai` | OpenAI-compatible | Dynamic model list, usage support |\n\n### 2. Cache optimization\n\nFor Anthropic-compatible providers (`kimi-coding`, `minimax`, `xiaomi-mimo`), this package uses a custom cached stream implementation derived from the better-messages-cache approach.\n\nIt does three things:\n- marks the last assistant `tool_use` block\n- marks the last user block\n- repairs partial/invalid streaming JSON during tool call parsing\n\nThis keeps cache loss lower across long agentic turns.\n\n### 3. Claude OAuth adapter\n\nWhen using `/model anthropic/...` with **Anthropic OAuth**:\n- strips the Claude Code identity block\n- injects the billing header Claude Code expects\n- shows footer status like `\u2713 Claude OAuth ready/active`\n- docs re-injection is disabled by default\n\n### 4. Native search\n\nAdds:\n- `web_search`\n- `web_fetch`\n- `/search`\n\nSupported native search backends:\n\n| Backend | Search | Fetch | Auth |\n|---|---|---|---|\n| ZAI (GLM) | \u2705 | \u2705 | `ZAI_API_KEY` |\n| Google Gemini | \u2705 | \u274c | `GEMINI_API_KEY` |\n| OpenAI | \u2705 | \u274c | `OPENAI_API_KEY` |\n| xAI | \u2705 | \u274c | `XAI_API_KEY` |\n| Anthropic | \u2705 | \u274c | `ANTHROPIC_API_KEY` |\n| Claude Code bridge | \u2705 | \u2705 | Claude CLI auth |\n| Codex / ChatGPT | \u2705 | \u274c | `codex login` / `~/.codex/auth.json` |\n| Fallback | DuckDuckGo | HTTP fetch | none |\n\nYou can pin search to a provider independently from the active model.\n\nExamples:\n\n```bash\n/search provider zai\n/search provider openai\n/search provider codex\n/search provider auto\n```\n\nOr choose it from the TUI settings panel with `/search`.\n\n### 5. Context management\n\nAdds the `context` tool with:\n- `view`\n- `recall`\n- `anchor`\n- `pivot`\n\nAlso includes:\n- status line (`context=`, `tool=`, `anchor=`)\n- tool-result truncation before the last anchor\n- anchor-aware cache support in the integrated context flow\n\n## Provider usage\n\n### Kimi\n\n```bash\n/model kimi-coding/kimi-for-coding\n```\n\nAuth options:\n- `KIMI_API_KEY`\n- `/login kimi-coding` OAuth\n\nOptional:\n- `KIMI_CODE_PROTOCOL=openai`\n- `KIMI_CODE_MODEL=<model>`\n\n### MiniMax\n\n```bash\n/model minimax/MiniMax-M3\n/model minimax/MiniMax-M2.7\n```\n\nRequires:\n- `MINIMAX_API_KEY`\n\n### Xiaomi MiMo\n\n```bash\n/model xiaomi-mimo/mimo-v2.5\n/model xiaomi-mimo/mimo-v2.5-pro\n```\n\nRequires:\n- `XIAOMI_TOKEN_PLAN_API_KEY`\n\nOptional region override:\n\n```bash\nexport XIAOMI_MIMO_BASE_URL=https://token-plan-ams.xiaomimimo.com/anthropic\n```\n\n### CrofAI\n\n```bash\n/model crofai/openai/gpt-4o\n```\n\nRequires:\n- `CROFAI_API_KEY`\n\nModels are fetched dynamically from:\n- `https://crof.ai/v1/models`\n\n## `/usage` command\n\nShows quota / plan usage for the active provider.\n\nSupported:\n\n| Provider | Endpoint |\n|---|---|\n| `kimi-coding` | `https://api.kimi.com/coding/v1/usages` |\n| `minimax` | `https://api.minimax.io/v1/token_plan/remains` |\n| `xiaomi-mimo` | `https://platform.xiaomimimo.com/api/v1/tokenPlan/usage` |\n| `crofai` | `https://crof.ai/usage_api/` |\n\nExamples:\n\n```bash\n/usage\n```\n\n## `/context` command\n\nShows current context-window usage without adding the generated report to future LLM context.\n\nIt includes:\n\n- total context usage and model window\n- estimated category breakdown\n- active tools and slash commands\n- extension allocation by source/package\n- cache read/write and cost stats\n\nExample:\n\n```bash\n/context\n```\n\n## Search override examples\n\nUse Kimi for coding, but ZAI for search:\n\n```bash\n/model kimi-coding/kimi-for-coding\n/search provider zai\n```\n\nUse any model, but force Codex web search:\n\n```bash\n/search provider codex\n```\n\nReturn to auto-detect:\n\n```bash\n/search provider auto\n```\n\n## Context workflow examples\n\nAnchor after a completed phase:\n\n```text\ncontext(anchor, name=\"crofai-added\", summary=\"CrofAI provider added with dynamic models and usage support.\")\n```\n\nPivot back to a clean checkpoint:\n\n```text\ncontext(pivot, target=\"crofai-added\", carryover=\"Search override added later; CrofAI implementation is stable.\")\n```\n\n## Environment summary\n\nCommon env vars:\n\n```bash\n# Kimi\nexport KIMI_API_KEY=...\nexport KIMI_CODE_PROTOCOL=anthropic\n\n# MiniMax\nexport MINIMAX_API_KEY=...\n\n# Xiaomi MiMo\nexport XIAOMI_TOKEN_PLAN_API_KEY=...\nexport XIAOMI_MIMO_BASE_URL=...\n\n# CrofAI\nexport CROFAI_API_KEY=...\n\n# Search backends\nexport ZAI_API_KEY=...\nexport GEMINI_API_KEY=...\nexport OPENAI_API_KEY=...\nexport XAI_API_KEY=...\nexport ANTHROPIC_API_KEY=...\n```\n\n## Compatibility notes\n\n- Do **not** install older overlapping Kimi provider forks at the same time.\n- Local `pi -e ...` development may behave differently from installed npm packages for skill loading.\n- Codex search requires `codex login` first.\n- Claude OAuth adapter only activates for the `anthropic` provider when OAuth is actually in use.\n\n## Changelog\n\n- **0.5.9** \u2014 Enforce Anthropic cache-control marker budget; lower default anchor-cache budget to 3.\n- **0.5.8** \u2014 Stop copying `cache_control` onto synthetic Claude OAuth prompt block; strip foreign thinking signatures on provider switch.\n- **0.5.7** \u2014 Guard Kimi stream bootstrap; restrict native web fetch to `http`/`https`.\n- **0.5.6** \u2014 Show `toolShare=` only when tool-output share exceeds 50%.\n- **0.5.5** \u2014 Add `/context` command for context-window usage reporting.\n- **0.5.4** \u2014 Initial public release of `@ersintarhan/pi-toolkit`.\n\nFull details: [CHANGELOG.md](./CHANGELOG.md).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-provider",
+    "pi",
+    "pi-coding-agent",
+    "kimi",
+    "kimi-for-coding",
+    "kimi-k2",
+    "moonshot",
+    "minimax",
+    "minimax-m2",
+    "minimax-m3",
+    "xiaomi",
+    "mimo",
+    "mimo-v2.5",
+    "crofai",
+    "openai",
+    "prompt-caching",
+    "cache",
+    "web-search",
+    "web-fetch",
+    "duckduckgo",
+    "search",
+    "anthropic",
+    "codex",
+    "chatgpt"
+  ],
+  "author": {
+    "name": "Ersin Tarhan",
+    "email": "ersintarhan@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ersintarhan/pi-toolkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ersintarhan/pi-toolkit.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-18T03:01:01.100Z",
+    "modified": "2026-06-16T17:36:23.767Z",
+    "0.5.4": "2026-05-18T03:01:01.433Z",
+    "0.5.5": "2026-05-18T05:20:24.350Z",
+    "0.5.6": "2026-05-20T02:57:22.187Z",
+    "0.5.7": "2026-05-20T03:36:27.216Z",
+    "0.5.8": "2026-05-20T04:30:48.599Z",
+    "0.5.9": "2026-05-20T18:14:43.737Z",
+    "0.5.10": "2026-06-04T20:51:33.372Z",
+    "0.5.11": "2026-06-05T23:06:32.746Z",
+    "0.5.12": "2026-06-10T17:08:00.589Z",
+    "0.6.0": "2026-06-16T17:36:23.444Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": 246,
+  "download_trend": []
+}

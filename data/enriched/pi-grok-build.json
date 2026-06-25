@@ -1,0 +1,45 @@
+{
+  "name": "pi-grok-build",
+  "latest_version": "0.1.0",
+  "description": "Use Grok Build from Pi as a managed collaborator for review, research, edits, and media.",
+  "readme": "# Pi Grok Build\n\nUse Grok Build from Pi as a managed collaborator.\n\n`pi-grok-build` is a Pi package that gives Pi one tool, `grok_build`, for delegating review, research, candidate edits, and media work to Grok Build without leaving the Pi session. Pi stays the parent agent: it starts Grok work, waits for results, sends follow-ups, inspects artifacts, cancels stale work, and decides what to accept.\n\nThe package is source-inspectable and deliberately small:\n\n- `grok_build` for model-facing delegation;\n- `/grok-build` for human diagnostics;\n- a fixed widget for active sessions, failures, and diagnostics;\n- retained artifacts for answers, copied inputs, generated media, and edit diffs;\n- explicit consent before prompt-carrying work goes to Grok/xAI.\n\nThe backend runtime is `grok agent stdio` over ACP. No `grok -p`, raw xAI API path, TUI scraping, relay, or fallback runtime is part of the product.\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:pi-grok-build\n```\n\nFrom a local checkout:\n\n```bash\npi install /absolute/path/to/pi-grok-build\n```\n\nReload Pi after installation or source changes before expecting the active tool surface to change.\n\n## Delegate with `grok_build`\n\nModel-facing tool:\n\n```text\ngrok_build\n```\n\nActions:\n\n```text\nstart | send | status | result | changes | cancel | cleanup\n```\n\nUse it when the Pi parent should ask Grok Build to do sidecar work:\n\n- get a second review of a local repository;\n- run grounded research through Grok;\n- prepare candidate edits in an isolated worktree;\n- generate or edit media and return artifact paths;\n- continue the same Grok session with follow-up instructions.\n\n`doctor` and `preflight` are not model-facing actions. They are human diagnostics under `/grok-build`.\n\n## Human command\n\n```text\n/grok-build doctor\n/grok-build preflight\n/grok-build status g1\n/grok-build result g1\n/grok-build changes g1\n/grok-build cancel g1\n/grok-build cleanup g1\n```\n\n`/grok-build start` and `/grok-build send` ask for interactive confirmation before sending prompt-carrying work to Grok/xAI.\n\n## Profiles\n\nChoose the narrowest profile that can do the job.\n\n| Profile | Use for | Writes | Web/current evidence | Media |\n| --- | --- | ---: | ---: | ---: |\n| `local-review` | local source or repo review | no | no | no |\n| `grounded-review` | repo review with current external evidence | no | yes | no |\n| `deep-research` | broader research or decomposition | no | yes | no |\n| `worktree-edit` | candidate edits without web | yes | no | no |\n| `grounded-edit` | candidate edits with current evidence | yes | yes | no |\n| `media` | image/video generation or editing | artifact only | no by default | yes |\n\n## Typical use\n\nDelegate a review:\n\n```json\n{\n  \"action\": \"start\",\n  \"cwd\": \"/absolute/git/workspace\",\n  \"profile\": \"local-review\",\n  \"task\": \"Review this repository for API drift and report the highest-risk findings.\",\n  \"confirm_provider_use\": true\n}\n```\n\nWait for the collaborator's answer:\n\n```json\n{ \"action\": \"result\", \"session\": \"g1\", \"wait_seconds\": 30, \"preview\": true }\n```\n\nSend a follow-up into the same Grok session:\n\n```json\n{\n  \"action\": \"send\",\n  \"session\": \"g1\",\n  \"task\": \"Now focus on the CLI surface and release risks.\",\n  \"confirm_provider_use\": true\n}\n```\n\nInspect candidate edit-session changes:\n\n```json\n{ \"action\": \"changes\", \"session\": \"g1\", \"preview\": true }\n```\n\nStop and remove retained evidence:\n\n```json\n{ \"action\": \"cancel\", \"session\": \"g1\", \"reason\": \"User stopped the run.\" }\n{ \"action\": \"cleanup\", \"session\": \"g1\" }\n```\n\n## Consent\n\n`start` and `send` can send prompts, repository context, local artifacts, and selected tool behavior to Grok/xAI through the locally authenticated Grok CLI. They require `confirm_provider_use:true` after explicit current authorization.\n\nDiagnostics, install checks, and old successful runs do not grant provider-use consent.\n\n## Worktrees\n\nWrite-capable profiles require a clean parent git repository. The package creates a session-owned assigned git worktree under its artifact root and launches Grok there. The parent repository is not the edit target. `changes` reads the assigned worktree and reports files and diff artifacts.\n\nRoot `grok --worktree` is not used as the isolation primitive, and there is no model-facing worktree knob.\n\n## Media\n\nMedia inputs are local image files only:\n\n- accepted: absolute JPG, PNG, or WebP paths under the admitted workspace or a prior package artifact root;\n- denied: URLs, GIF/HEIC/HEIF, inline payloads, credential/control roots, unsupported extensions, and images smaller than 8 px per side or 512 total pixels;\n- transport: copied, hashed, checked, and sent as ACP embedded `resource` blobs after `embeddedContext` proof;\n- output: generated image/video files returned by Grok are copied into package-owned turn media artifacts.\n\n## Widget\n\nThe fixed widget key is `grok-build:fixed`. It shows active sessions, failed sessions that need attention, and diagnostics. Completed and explicitly cancelled sessions are not alerts. The package does not use a footer status or dashboard shell.\n\n## Validation\n\nFor source/package changes run:\n\n```bash\nnpm test\nnpm run check:pack\ngit diff --check\n```\n\nLive/provider proof is separate and requires explicit authorization before any prompt-carrying Grok run.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "pi-coding-agent",
+    "grok-build",
+    "grok",
+    "xai",
+    "coding-agent"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/Tiziano-AI/pi-grok-build#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tiziano-AI/pi-grok-build.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/grok-build/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-25T20:14:59.941Z",
+    "modified": "2026-05-27T15:09:12.343Z",
+    "0.0.1": "2026-05-25T20:15:00.236Z",
+    "0.0.2": "2026-05-25T23:38:21.421Z",
+    "0.0.3": "2026-05-26T00:52:47.290Z",
+    "0.0.4": "2026-05-27T12:32:29.048Z",
+    "0.0.5": "2026-05-27T12:43:46.652Z",
+    "0.0.6": "2026-05-27T13:05:16.085Z",
+    "0.1.0": "2026-05-27T15:09:12.211Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": null,
+  "download_trend": []
+}

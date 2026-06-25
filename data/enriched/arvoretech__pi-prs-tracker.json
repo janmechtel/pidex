@@ -1,0 +1,42 @@
+{
+  "name": "@arvoretech/pi-prs-tracker",
+  "latest_version": "1.5.0",
+  "description": "PI extension that keeps open/recently-merged PRs pinned in the chat as a persistent widget",
+  "readme": "# @arvoretech/pi-prs-tracker\n\nKeeps your open and recently-merged PRs pinned in the chat as a persistent widget \u2014 now with CI and production deploy status. PRs are auto-detected from `gh pr create` calls (and any GitHub PR URL) the agent runs during the session, and their status is refreshed in the background. The current status of every tracked PR is also injected into the AI's context on each LLM call, so the agent always knows whether a PR is merged and how its CI/deploy is doing.\n\n## Install\n\n```bash\npi install npm:@arvoretech/pi-prs-tracker\n```\n\nOr in `.pi/settings.json`:\n\n```json\n{\n  \"packages\": [\"npm:@arvoretech/pi-prs-tracker\"]\n}\n```\n\n## How it works\n\n- Listens to `bash` tool executions. When a command contains `gh pr create` or its output prints a `github.com/<owner>/<repo>/pull/<n>` URL, the PR is captured automatically.\n- For each tracked PR it runs `gh pr view <n> --json ...` to read title, state, merge commit and the status check rollup (CI).\n- When a tracked PR becomes `MERGED`, it looks up the production deploy workflow run triggered by the `push` for that merge commit (`gh run list --commit <sha>`) and tracks it through `queued \u2192 in_progress \u2192 success/failure`.\n- A widget pinned above the editor lists every tracked PR with:\n  - State: `[open]` / `[draft]` / `[merged]` / `[closed]`\n  - CI: `CI passed` / `CI failed` / `CI running` with check counts\n  - Deploy: `deploy queued` / `deploying to main` / `deployed to main` / `deploy failed`\n- The CI and deploy status labels are **clickable links** (OSC 8 terminal hyperlinks). Cmd/Ctrl-click `CI failed` to open the failing check's logs (or the PR `/checks` tab) and `Deploy failed`/`Deployed to main` to open the workflow run. Terminals without OSC 8 support just show the plain label.\n- Background polling (every 60s) refreshes CI and deploy statuses. Merged PRs stay for 24h (and are kept longer if a deploy is still in flight); closed PRs drop off immediately.\n\n## AI context injection\n\nOn every LLM call the extension injects a non-displayed `custom` message (`customType: \"prs-tracker-context\"`) with a fresh snapshot of all tracked PRs \u2014 state (`OPEN`/`MERGED`/`CLOSED`), CI summary and deploy status. The block is rebuilt each call from the latest background poll and the previous one is filtered out, so the history is never polluted and the agent always sees the current state instead of stale info. This lets the agent answer \"is this PR merged / did CI pass / did it deploy?\" without re-running `gh`.\n\n## Deploy detection\n\nThe production deploy run is matched by the `push` event on the merge commit, picking a workflow whose name contains `deploy` but not `staging`. This matches the `Deploy` workflow in `api-arvore`, `frontend-arvore-nextjs`, etc.\n\n## Commands\n\n- `/prs` \u2014 show usage\n- `/prs hide` \u2014 hide the widget\n- `/prs show` \u2014 re-show the widget\n- `/prs refresh` \u2014 force an immediate status refresh\n\n## Requirements\n\n- GitHub CLI (`gh`) authenticated in the working directory.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "pull-request",
+    "github",
+    "widget"
+  ],
+  "author": {
+    "name": "Arvore"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/arvoreeducacao/arvore-pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arvoreeducacao/arvore-pi-extensions.git",
+    "directory": "packages/prs-tracker"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-06-18T18:39:03.979Z",
+    "modified": "2026-06-25T18:13:19.657Z",
+    "1.0.0": "2026-06-18T18:39:04.264Z",
+    "1.1.0": "2026-06-22T22:27:38.393Z",
+    "1.2.0": "2026-06-23T13:55:57.973Z",
+    "1.3.0": "2026-06-24T19:07:58.401Z",
+    "1.4.0": "2026-06-25T17:51:50.569Z",
+    "1.5.0": "2026-06-25T18:13:19.341Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 479,
+  "download_trend": []
+}

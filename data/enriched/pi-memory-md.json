@@ -1,0 +1,383 @@
+{
+  "name": "pi-memory-md",
+  "latest_version": "0.1.38",
+  "description": "Letta-like memory management for pi using structured markdown files in a git repository",
+  "readme": "# pi-memory-md\n\nLetta-like memory management for [pi](https://github.com/badlogic/pi-mono) using git-backed markdown files.\n\n## Features\n\n- **Persistent Memory**: Store context, preferences, and knowledge across sessions\n- **Git-backed**: Version control with full history\n- **Prompt append**: Memory index automatically appended to conversation at session start\n- **On-demand access**: LLM reads full content via tools when needed\n- **Multi-project**: Separate memory spaces per project\n\n## Quick Start\n\n```bash\n# 1. Install\npi install npm:pi-memory-md\n# Or for latest from GitHub:\npi install git:github.com/VandeeFeng/pi-memory-md\n\n# 2. Create a git repository (private recommended)\n\n# 3. Configure pi\n# Add to ~/.pi/agent/settings.json:\n{\n  \"pi-memory-md\": {\n    \"memoryDir\": {\n      \"repoUrl\": \"git@github.com:username/repo.git\", // Or HTTPS format\n      \"localPath\": \"~/.pi/memory-md\",\n      \"globalMemory\": \"global\" // optional, global as default\n    }\n  }\n}\n\n# 4. Start a new pi session\n# type /skill:memory-init slash command to initialize the memory files\n```\n\n> **Security recommendation**\n>\n> Configure `pi-memory-md` in global settings (`~/.pi/agent/settings.json`) instead of project settings (`.pi/settings.json`).\n>\n> If project settings could override these options, a repository could redirect your memory to another local path, point sync at a different remote repo, or enable automatic pull/push behavior you did not intend.\n>\n> For this reason, project-level `.pi/settings.json` does not override these `pi-memory-md` options: `repoUrl`, `localPath`, `memoryDir`, sync hooks, and `tape.tapePath`.\n\n## How It Works\n\n```\nSession Start\n    \u2193\n1. Git pull (sync latest changes)\n    \u2193\n2. Scan all .md files in memory directory\n    \u2193\n3. Build index (descriptions + tags only - NOT full content)\n    \u2193\n4. Deliver memory index via `message-append` or `system-prompt`\n    \u2193\n5. LLM reads full file content when needed\n```\n\n## Usage Examples\n\nSimply talk to pi - the LLM will automatically use memory tools/skills when appropriate:\n\n```\nYou: Save my preference for 2-space indentation in TypeScript files to memory.\n\nPi: [Creates or updates a memory markdown file with the standard file tools]\n```\n\nYou can also explicitly request operations:\n\n```\nYou: List all memory files for this project.\nYou: Search memory for \"typescript\" preferences.\nYou: Read core/USER.md\nYou: Sync my changes to the repository.\n```\n\nThe LLM automatically:\n- Reads memory index at session start (appended to conversation)\n- Creates or updates memory markdown files when you ask to remember something\n- Syncs changes when needed\n\n## Available Capabilities\n\n### Slash Commands In Pi\n\nYou can also use these slash commands directly in pi:\n\n- `/memory-refresh`: Refresh memory context from files (rebuild cache and deliver into current session)\n- `/memory-check [max-lines] [-p|-g|project|global]`: Check memory repository status and folder structure (tree output defaults to 25 lines). Examples: `/memory-check -g 30`, `/memory-check 21 -p`\n\n### Built-in Tools & SKILLs\n\nThe LLM can use these tools and [skills](skills/) to interact with memory:\n\n#### Memory Management Tools\n\n| Tool | Parameters | Description |\n|------|------------|-------------|\n| `memory_sync` | `{action: \"pull\" / \"push\" / \"status\"}` | Git operations |\n| `memory_search` | `{query?, grep?, rg?}` | Search by tags/description and custom grep/ripgrep patterns |\n| `memory_check` | `{directory?: string}` | Check current project memory folder structure or a specific project subdirectory |\n\n#### Memory SKILLs\n\n| Skill | Description |\n|-------|-------------|\n| `memory-init` | Initialize the memory repository, clone/sync git, and create the basic directory structure |\n| `memory-import` | Curate durable memory from URLs, folders, or files after confirming what should be preserved |\n| `memory-write` | Create or update memory markdown files with valid frontmatter using native file tools |\n\nUser can easily extend their own workflows with these skills. Although this sacrifices some stability, it improves flexibility and user autonomy. This is a deliberate tradeoff after my careful consideration.\n\nWhen multiple skills have the same name, pi uses the first one found in this order: project settings, project `.pi/skills/`, user settings, user `~/.pi/agent/skills/`, then packaged skills. This means project or user skills override the built-in packaged skills with the same name.\n\nTo disable packaged `pi-memory-md` skills, configure the package skills filter. Use an empty array to disable all skills, or exclude specific skill paths:\n\n```md\n{\n  \"packages\": [\n    {\n      \"source\": \"npm:pi-memory-md\",\n      \"skills\": [] // or [\"!skills/memory-write/SKILL.md\"]\n    }\n  ]\n}\n```\n\n## Memory Delivery Modes\n\nThe extension supports two base modes for delivering memory into the conversation.\nWhen tape mode is disabled, behavior is exactly as described below.\nWhen tape mode is enabled, the same delivery mode still applies, but tape changes how memory files are selected.\n\n### 1. Message Append (Default)\n\n```\n{\n  \"pi-memory-md\": {\n    ...\n    \"delivery\": \"message-append\"\n  }\n}\n```\n\n- Memory is sent as a custom message delivered only once per session (on first agent turn)\n- Not visible in the TUI (`display: false` in pi-tui)\n  This hidden message is delivered in the same agent turn, so it does not create a second LLM request; it only adds tokens to the current request\n- Persists in the session history\n- **Pros**: Lower token usage, memory persists naturally in conversation\n- **Cons**: Only visible when the model scrolls back to earlier messages\n\n### 2. System Prompt\n\n```\n{\n  \"pi-memory-md\": {\n    ...\n    \"delivery\": \"system-prompt\"\n  }\n}\n```\n\n- Memory is appended to the system prompt delivered on every agent turn\n- **Pros**: Memory always present in system context\n- **Cons**: Higher token usage (repeated on every prompt)\n\n## Hooks\n\n- `sessionStart: [\"pull\"]`: sync from upstream, fresh fetch/pull evidence within 12 hours skips another fetch.\n  This avoids repeated network checks on every new session while still refreshing upstream periodically.\n- `sessionEnd: [\"push\"]`: commit and push memory when the session ends.\n- `beforeAgentStart: [\"sessionBridge\"]`: bridge prompt-relevant context from recent `new`/`resume`/`fork` previous sessions.\n\nMore trigger actions will be added later, even custom hooks.\n\n## Full Configuration\n\n```\n{\n  \"pi-memory-md\": {\n    // \"enabled\": false,\n\n    \"memoryDir\":{\n    // git remote url\n    \"repoUrl\": \"git@github.com:username/repo.git\", // Or HTTPS format\n\n    // Root dir for all memory (cloned from repo) `~/.pi/memory-md` as default\n    \"localPath\": \"~/.pi/memory-md\",\n\n    // Shared memory folder name under localPath.\n    // Only enabled when explicitly configured\n    // \"global\" -> {localPath}/global, \"foo/bar\" -> {localPath}/bar.\n    // \"\" or omitted -> disabled, \"   \" -> {localPath}/global, \"..\" -> {localPath}/global.\n    \"globalMemory\": \"global\"\n    },\n\n    // `injection` is still accepted as a legacy alias for `delivery`.\n    \"delivery\": \"message-append\",\n    \"hooks\": {\n      \"sessionStart\": [\"pull\"],\n      \"sessionEnd\": [\"push\"],\n      \"beforeAgentStart\": [\"sessionBridge\"]\n    }\n  }\n}\n```\n\n| Setting | Default | Description |\n|---------|---------|-------------|\n| `enabled` | `true` | Enable extension |\n| `memoryDir.repoUrl` | Required | Git repository URL |\n| `memoryDir.localPath` | `~/.pi/memory-md` | Local memory clone path |\n| `memoryDir.globalMemory` | disabled | Shared memory folder name (relative to `localPath`), enabled only when explicitly configured |\n| `delivery` | `\"message-append\"` | Memory delivery mode: `\"message-append\"`, `\"system-prompt\"` |\n| `hooks.sessionStart` | `[\"pull\"]` | Actions to run when a session starts, `pull` syncs from upstream and skips another fetch when `FETCH_HEAD` is fresh within 12 hours |\n| `hooks.sessionEnd` | `[]` | Actions to run when a session ends |\n| `hooks.beforeAgentStart` | `[]` | Actions to run before the agent starts; `sessionBridge` bridges relevant context from recent `new`/`resume`/`fork` previous sessions |\n| `tape.enabled` | `false` | Enable tape mode for dynamic context selection |\n| `tape.thread` | `true` | Enable TapeThread tools and `/memory-thread` when tape mode is enabled |\n\nWhen settings change, run `/reload` to apply them.\n\nLegacy config is still supported:\n\n```\n{\n  \"autoSync\": {\n    \"onSessionStart\": true\n  }\n}\n```\n\n```\n{\n  \"localPath\": \"~/.pi/memory-md\",\n  \"repoUrl\": \"git@github.com:username/repo.git\", // Or HTTPS format\n}\n```\n\n## Memory File Format\n\n```markdown\n---\ndescription: \"User identity and background\"\ntags: [\"user\", \"identity\"]\ncreated: \"2026-02-14\"\nupdated: \"2026-02-14\"\n---\n\nMarkdown content...\n```\n\n## Directory Structure\n\n```\n~/.pi/memory-md/\n\u251c\u2500\u2500 global/                 # Optional shared memory when globalMemory is enabled\n\u2502   \u251c\u2500\u2500 USER.md             # Optional shared user profile and preferences\n\u2502   \u251c\u2500\u2500 MEMORY.md           # Optional shared durable notes, conventions, and lessons learned\n\u2502   \u2514\u2500\u2500 TASK.md             # Optional shared task template\n\u2514\u2500\u2500 project-name/           # git rev-parse --show-toplevel\n    \u251c\u2500\u2500 core/\n    \u2502   \u251c\u2500\u2500 USER.md         # Optional project user profile and preferences\n    \u2502   \u251c\u2500\u2500 TASK.md         # Optional project task template\n    \u2502   \u2514\u2500\u2500 project/        # Project memory\n    \u2502       \u2514\u2500\u2500 tech-stack.md\n    \u2514\u2500\u2500 notes/              # Optional other custom directories\n```\n\n## Tape Mode (Dynamic Context Delivery)\n\n> **Experimental**: This mode is under active development. APIs and behavior may change.\n>\n> For the latest, install via GitHub: `pi install git:github.com/VandeeFeng/pi-memory-md`\n>\n> **Note**: This mode may consume more tokens. Adjust parameters based on your model's context window and your API quota.\n\nMore details [tape-design](docs/tape-design.md) / [\u4e2d\u6587\u7248](docs/tape-design.zh.md)\n\nMinimal setting:\n\n```\n{\n  \"pi-memory-md\": {\n    ...\n    \"tape\": {\n      // \"enabled\": false,\n      \"anchor\": {\n        \"keywords\": {\n          \"global\": [\"refactor\", \"migration\"],\n          \"project\": [\"tape\", \"Emacs\"]\n        }\n      }\n    }\n  }\n}\n```\nThen use `/memory-anchor` to create an anchor manually, or let anchors be created automatically when configured keywords are triggered. If `manual` mode is off, capable models may also create anchors autonomously when they judge it useful.\n\nIf you want to jump to the conversation around an anchor and restart from there, `/tree` and the anchors in this session are all there with a customizable anchor label in pi TUI.\n\n> **Note**: pi-memory-md does not create labels through pi's built-in label API. These anchor labels are only displayed in the `/tree` UI. Built-in pi labels are written into session records, and this project intentionally avoids that invasive design.\n>\n> This may cause some unnecessary runtime memory usage, but I consider the tradeoff necessary.\n\n### Tape vs Delivery Modes\n\n**Tape** is an independent feature that can be enabled alongside either delivery mode.\nIt does not change the delivery mechanism; it changes **which memory files** are selected.\n\n| Tape | Delivery mode | Behavior |\n|------|----------------|----------|\n| Disabled | `message-append` | Sends memory once as a hidden custom message on the first agent turn |\n| Disabled | `system-prompt` | Rebuilds memory and appends it to the system prompt on every agent turn |\n| Enabled | `message-append` | Sends tape-selected memory once as a hidden custom message on the first agent turn |\n| Enabled | `system-prompt` | Rebuilds tape-selected memory and appends it to the system prompt on every agent turn |\n\nWith tape enabled, the delivered content is still a memory index/summary for the model, but the file list is chosen by tape-aware selection logic instead of the basic project scan. In smart mode, the delivered list can also include recently active project file paths inferred from tool usage, plus a `recent focus` summary for each selected file showing the most recently attended `read` / `edit` ranges inside the same effective smart-scan window. Stale paths from old tape history are ignored when the file no longer exists.\n\nA delivered tape hidden message looks like:\n\n```xml\n<memory_context mode=\"tape\">\n<instructions>\nTape is enabled for this conversation. Use tape tools when you need anchors or tape history.\nHandoff mode: manual. `tape_handoff` is blocked unless the keyword is triggered or user create manually.\n</instructions>\n<memory_files>\n- path: core/USER.md\n  priority: high\n  description: User profile and preferences\n  tags: user, profile, preferences\n  recent focus: read 12-28\n</memory_files>\n<active_project_files>\n- path: /path/to/project/file\n  priority: high\n  recent focus: read 340-420, read 590-677, edit 340-399\n</active_project_files>\n</memory_context>\n```\n\n### Tape Anchors\n\nAnchors are named checkpoints that correspond to pi session entries, marking important transitions in your conversation. They enable efficient context reconstruction and are mirrored into pi `/tree` labels:\n\n<img src=\"docs/pi-tree.png\" width=\"400\" />\n\nEach line in the tape anchor store is a JSON record:\n```json\n{\"id\":\"1234567890-abc123\",\"timestamp\":\"2026-04-04T12:00:00.000Z\",\"name\":\"task/begin\",\"type\":\"handoff\",\"meta\":{\"summary\":\"Working on feature X\",\"purpose\":\"feature\",\"trigger\":\"manual\"},\"sessionId\":\"019dbd12-90b7-72b1-a88d-843706db32de\",\"sessionEntryId\":\"446b6c33\"}\n```\n\nEach anchor has:\n- **`id`**: A stable unique identifier, auto-generated from `sessionEntryId:timestamp:name`\n- **`name`**: A human-readable label (e.g., `session/new`, `task/begin`)\n- **`type`**: Anchor type - `session` for lifecycle anchors, `handoff` for manual/semantic transitions, `thread` for TapeThread checkpoints\n- **`sessionId`**: The pi session this anchor belongs to\n- **`sessionEntryId`**: The associated session entry ID for tree mirroring\n- **`timestamp`**: ISO timestamp of when the anchor was created\n- **`meta`**: Optional metadata including `summary`, `trigger`, `keywords`, `purpose`. `purpose` is a 1-2 word label (e.g., `feature`, `review`, `deploy`). `trigger` can be `direct` (agent auto), `keyword` (configured keywords matched), or `manual` (explicit user/tool call)\n\nIn short, tape anchors are markers that connect user intent with conversation history.\n\nWhen a user asks the agent to retrieve relevant information from a large memory space, the real query is often not a precise string match. It is more often a vague intention, decision, or task transition.\n\nStored within pi session entries, tape anchors as explicit markers link intent back to the exact place where it appeared in the session history and to the larger body of memory data around it, which can be more useful than only optimizing RAG-style retrieval over raw text or database records.\n\nBeyond context engineering, `tape anchors` is an implementation of text recording and management.\n\nLarge context windows do not remove the need for careful context control. Before relying on RAG, traditional marking, indexing, and search discipline still matter. The quality of text given to the LLM, and the way that information is recorded and managed, directly affect how relevant the model's answers will be.\n\nInstead of asking the LLM to infer the user's intent from vague semantic signals later, it is better to record that intent when the user expresses it.\n\nKeywords make this intent-recording process more practical. When a configured keyword matches, keyword detection sends a hidden message that asks the agent to consider creating a keyword anchor, and the agent can still refuse when the anchor would not be useful. Anchor names are also mirrored into pi `/tree` labels for the session nodes they attach to, with stale labels cleaned up before resync.\n\nLifecycle anchors (`session/*`) are created automatically, handoff anchors can be created manually via `/memory-anchor`, and thread anchors can be created manually via `/memory-thread`.\n\nWhen `mode: \"manual\"` is set, autonomous handoff anchors creation is blocked unless it comes from `/memory-anchor` or a matched keyword instruction. TapeThread content mutations (`create`, `root`, `branch`, `update`, `archive`) are also blocked unless authorized through `/memory-thread`; read/navigation actions such as `status`, `search`, `resume`, and `checkout` remain available. In manual mode, the agent will not proactively create handoff or thread mutation anchors on its own.\n\nThe combination of anchors and keywords closes the loop: intent -> memory data -> intent, while keeping automation under user control.\n\nPrompts should evolve into intent.\n\n### Tape Thread\n\n<img src=\"docs/thread-review.png\" width=\"400\" />\n\nTape Thread is a lightweight memory-thread layer built on top of tape anchors. It turns long-running work into a small tree of resumable checkpoints: a thread has one or more root nodes, branches can split from the current HEAD, and each node can keep its summary, decisions, next steps, relevant files, and memory links.\n\n`thread -> root node -> branch -> node`, each `thread-anchor` is a node, and linking them together forms a thread. A thread represents a specific topic or task the user is working on. Within a thread, you can set multiple key nodes, and each node can grow follow-up branches, forming a thread forest structure. I think it's better than linear management such as TASK.md.\n\nUse `/memory-thread <prompt>` for natural-language thread management. The `tape_thread` tool supports actions such as `create`, `root`, `branch`, `checkout`, `status`, `search`, `update`, `resume`, and `archive`. Thread nodes are stored as `type: \"thread\"` anchors and linked in a project thread JSONL file, so the conversation can resume from compact intent state instead of rereading the whole chat.\n\nIn `mode: \"manual\"`, the agent can still read, search, resume, and checkout threads, but it cannot create or mutate thread anchors unless the user authorizes it through `/memory-thread`.\n\nMore details: [Tape thread design](docs/tape-thread-design.md)\n\n```txt\n                   thread: tape dev\n                          |\n          +---------------+---------------+\n          |                               |\n root node: anchors             root node: workflow\n          |                               |\n   +------+------+              +---------+---------+\n   |      |      |              |         |         |\nbranch: branch: branch:      branch:   branch:   branch:\nsession handoff review       store     manual    docs\n   |      |      |              |         |         |\nnode:   node:  node:         node:     node:     node:\nrecord  gate   browse        HEAD      command   explain\nstart   calls  anchors       state     control   forest\n```\n\n### Tape Review\n\n<img src=\"docs/memory-review.png\" width=\"400\" />\n\n`/memory-review` opens an interactive overlay for browsing tape anchors and threads. Select an anchor or thread node to jump directly to the first assistant entry after it in the session tree.\n\nThe panel provides:\n\n- **Timeline view**: Browse all anchors in the current project chronologically\n- **Threads view**: Browse thread nodes, jump to node anchors, press `c` to checkout a node, or press `a` to archive a thread\n- **Keyword relations**: Visual connections between anchors and their keywords\n- **Stats overview**: Quick summary of anchor counts, types, and distributions\n- **Fuzzy search**: Type `/` to filter anchors and thread nodes \u2014 press `Esc` or `Ctrl+c` to leave search input\n- **Anchor deletion**: Select a non-thread anchor and press `Ctrl+d` to delete it\n\nThe panel helps you land on the right anchor or thread node. After jumping there, any deeper branching or tree operations still belong in Pi's native `/tree` panel. This design is intentionally non-invasive.\n\n### Full Configuration\n\n```\n{\n  \"pi-memory-md\": {\n    ...\n    \"localPath\": \"~/.pi/memory-md\",\n    \"tape\": {\n      // Run tape only inside a Git repository by default\n      // Uses `git rev-parse --show-toplevel`; if it fails, tape is skipped\n      \"onlyGit\": true, // default\n\n      // Absolute directory paths where tape is always disabled\n      // Built-in system/temp directories are also excluded by default\n      \"excludeDirs\": [\n        \"/absolute/path/to/sandbox\"\n      ],\n\n      // TapeThread tools and /memory-thread (default: true)\n      // \"thread\": false,\n\n      \"context\": {\n        // \"smart\": ranks memory files plus recent project file activity from session history (default)\n        //          repeated accesses get diminishing returns, edit/write outrank plain reads,\n        //          recent accesses get a recency bonus, missing/stale paths are ignored,\n        //          and handoff boosts only apply near the latest anchors\n        // \"recent-only\": most recently modified memory files only\n        \"strategy\": \"smart\", // default\n\n        // Max files to deliver into LLM context\n        \"fileLimit\": 10, // default\n\n        // Smart-mode pi session history scan range: [startHours, maxHours]\n        // Scans history incrementally by 24-hour steps, starting from startHours.\n        // Stops and uses the result once the sample reaches MIN_SMART_ACCESS_SAMPLES (5).\n        // Otherwise keeps expanding until maxHours is reached.\n        \"memoryScan\": [72, 168], // default\n\n        // \"alwaysInclude\" is deprecated\n        // Files or directories to always include in context (optional, defaults to empty)\n        \"whitelist\": [\n          \"core/USER.md\",\n          \"docs/tape-design.md\"\n        ],\n\n        // Files or directories to always exclude from context (optional, defaults to empty)\n        // Other paths still go through rg ignore rules first, then the built-in default ignore list.\n        \"blacklist\": [\n          \"node_modules\",\n          \"dist\"\n        ]\n      },\n      \"anchor\": {\n        // \"auto\": LLM may create handoff anchors when it decides they are useful\n        // \"manual\": direct tape_handoff is hard-blocked\n        // hidden keyword instructions and /memory-anchor still work in manual mode\n        \"mode\": \"auto\", // default\n\n        // Prefix mirrored into pi /tree labels for anchor nodes\n        \"labelPrefix\": \"\u2693 \", // default\n\n        \"keywords\": {\n          // Match against user prompts with length in [10, 300]\n          // When matched, send a hidden instruction about the tape_handoff tool call\n          // It stays in the same agent turn: no extra LLM request, only extra tokens in the current request\n          // This gives the agent room to refuse when creating a keyword anchor is not necessary at all\n          // Strongly recommended! Keywords make anchor creation much smarter - customize based on your focus areas\n          \"global\": [\"refactor\", \"migration\"],\n          \"project\": [\"tape\", \"Emacs\"]\n        }\n      },\n\n      // Custom tape path (optional)\n      // If not set, default is {localPath}/TAPE: ~/.pi/memory-md/TAPE\n      // Anchor index files (.jsonl) will be stored directly under this path\n      \"tapePath\": \"/custom/path/to/tape\"\n    }\n  }\n}\n```\n\n### Tape Tools, Skills & Slash Commands\n\n| Name | Parameters | Description |\n|------|------------|-------------|\n| `/memory-anchor` | `<prompt>` | Slash command that asks the LLM to derive and create a manually authorized handoff anchor |\n| `/memory-review` | `[limit]` default: `50`, max: `100` | Slash command that opens an interactive Memory Review overlay for browsing anchors by timeline, keyword relations, stats, and `/` fuzzy search |\n| `memory-digest` | skill | Digest recent tape anchors and session context into proposed durable memory updates |\n| `tape_handoff` | `{name, summary?, purpose?}` | Create a handoff anchor checkpoint in the tape |\n| `tape_delete` | `{id?, ids?}` | Delete anchor checkpoints by exact id only; use `tape_search` first to find ids |\n| `tape_info` | `{}` | Get tape statistics and information |\n| `tape_search` | `{kinds?, types?, limit?, contextLines?, sinceAnchor?, lastAnchor?, betweenAnchors?, betweenDates?, entryScope?, anchorScope?, scan?, anchorName?, anchorType?, anchorSummary?, anchorPurpose?, anchorKeywords?}` | Search tape entries and anchors, including structured anchor filters and optional nearby anchor context |\n| `tape_read` | `{afterAnchor?, lastAnchor?, betweenAnchors?, betweenDates?, scan?, types?, entryScope?, anchorScope?, limit?, maxContentChars?}` | Read tape entries as formatted messages |\n| `tape_reset` | `{archive?: boolean}` | Reset the tape with a new session lifecycle anchor |\n\n> **Note**: Tape tools are registered when a `tape` block exists in config (opt-out: set `\"enabled\": false`). They provide anchor-based context management inspired by [bub](https://bub.build)'s tape mechanism.\n\n## Reference\n- [Introducing Context Repositories: Git-based Memory for Coding Agents | Letta](https://www.letta.com/blog/context-repositories)\n- https://tape.systems\n- https://bub.build/\n- https://github.com/bubbuild/bub/tree/main/src/bub\n\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-skill",
+    "memory",
+    "markdown",
+    "git",
+    "letta",
+    "persistent-memory",
+    "ai-memory",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "VandeePunk"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/VandeeFeng/pi-memory-md#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VandeeFeng/pi-memory-md.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills/memory-import/SKILL.md",
+      "./skills/memory-init/SKILL.md",
+      "./skills/memory-write/SKILL.md",
+      "./skills/memory-digest/SKILL.md"
+    ]
+  },
+  "time": {
+    "created": "2026-02-17T06:09:14.331Z",
+    "modified": "2026-05-25T10:08:18.132Z",
+    "0.0.1": "2026-02-14T15:34:55.712Z",
+    "0.0.2": "2026-02-14T16:47:30.255Z",
+    "0.0.3": "2026-02-14T17:10:22.051Z",
+    "0.1.0": "2026-02-17T06:09:14.485Z",
+    "0.1.1": "2026-02-22T04:10:46.786Z",
+    "0.1.2": "2026-03-21T04:47:09.186Z",
+    "0.1.11": "2026-03-29T09:55:36.974Z",
+    "0.1.21": "2026-03-29T10:10:36.893Z",
+    "0.1.22": "2026-04-02T02:52:34.268Z",
+    "0.1.23": "2026-04-04T05:37:06.945Z",
+    "0.1.24": "2026-04-11T09:23:05.257Z",
+    "0.1.25": "2026-04-14T05:30:06.735Z",
+    "0.1.26": "2026-04-16T16:27:44.307Z",
+    "0.1.27": "2026-04-17T10:53:22.253Z",
+    "0.1.28": "2026-04-21T07:13:03.707Z",
+    "0.1.29": "2026-04-21T08:22:28.216Z",
+    "0.1.30": "2026-04-23T12:42:55.067Z",
+    "0.1.31": "2026-04-25T06:12:06.548Z",
+    "0.1.32": "2026-04-27T03:55:18.409Z",
+    "0.1.33": "2026-04-28T09:48:57.675Z",
+    "0.1.34": "2026-04-29T09:37:44.301Z",
+    "0.1.35": "2026-04-30T04:37:50.107Z",
+    "0.1.36": "2026-05-06T06:55:35.223Z",
+    "0.1.37": "2026-05-25T04:39:01.546Z",
+    "0.1.38": "2026-05-25T10:08:18.037Z"
+  },
+  "versions_count": 22,
+  "downloads_last_week": 159,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 320
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 302
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 401
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 384
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 960
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 1093
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 656
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 438
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 232
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 537
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 198
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 90
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 155
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 162
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 24
+    }
+  ]
+}

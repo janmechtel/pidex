@@ -1,0 +1,341 @@
+{
+  "name": "@petechu/pi-code-wiki",
+  "latest_version": "0.1.2",
+  "description": "Generate and maintain a persistent, compounding codebase wiki inside your repository",
+  "readme": "# Code Wiki\n\n> **\u26a0\ufe0f Beta \u2014 Highly Experimental**\n> This extension is in active development. APIs, behavior, and generated wiki layout may change without notice.\n\nGenerate and maintain a persistent, beginner-friendly codebase wiki inside your repository. The extension guides Pi's agent to build Markdown documentation, keep it current incrementally, and file substantial answers from codebase questions back into the wiki.\n\nThe design is inspired by Karpathy's LLM Wiki pattern: the wiki is a durable, compounding artifact (`index.md` + pages + `log.md` + schema), not a throwaway answer or full regeneration on every run.\n\n## Install\n\n```bash\npi install npm:@petechu/pi-code-wiki\n/reload\n```\n\n## How It Works\n\nThe extension sends focused prompts to Pi's agent for three maintenance operations:\n\n1. **Init** \u2014 survey the codebase, identify core abstractions, write beginner-friendly chapter pages, and create the persistent wiki control files.\n2. **Update** \u2014 read the existing schema/index/log/metadata first, inspect changed or relevant source files, update affected pages and links, append the log, and refresh metadata.\n3. **Query** \u2014 answer a codebase question using the wiki first and source files as needed; file substantial answers under `answers/` so future work compounds.\n\nEverything runs through Pi's native tools \u2014 no Python, no external LLM calls, no GitHub crawling.\n\n## Usage\n\n### Commands\n\n| Command                                 | Description                                               |\n| --------------------------------------- | --------------------------------------------------------- |\n| `/code-wiki init [options]`             | Generate a new persistent wiki for the current repository |\n| `/code-wiki update [options]`           | Incrementally maintain an existing wiki                   |\n| `/code-wiki query \"question\" [options]` | Answer a codebase question and file substantial results   |\n| `/code-wiki doctor`                     | Check if a wiki exists and show its status                |\n| `/code-wiki help`                       | Show usage information                                    |\n\n### Query forms\n\nBoth forms are supported:\n\n```bash\n/code-wiki query --question=\"How does model selection work?\"\n/code-wiki query \"How does model selection work?\"\n```\n\n### Options\n\n| Option                                                 | Description                                   | Default                      |\n| ------------------------------------------------------ | --------------------------------------------- | ---------------------------- |\n| `--target=<path>`                                      | Target subdirectory (narrows scope)           | Repo root                    |\n| `--output=<path>`                                      | Wiki output directory (relative to repo root) | `docs/code-wiki`             |\n| `--exclude=<glob,...>`                                 | File patterns to exclude (strictly enforced)  | tests, deps, build artifacts |\n| `--language=<lang>`                                    | Output language                               | `english`                    |\n| `--format=<standard\\|obsidian>`                        | Output Markdown format                        | `standard`                   |\n| `--detail-level=<summary\\|standard\\|deep\\|exhaustive>` | Durable wiki explanation detail               | `standard`                   |\n| `--question=<text>`                                    | Question for `query`                          | none                         |\n| `--force`                                              | Overwrite existing wiki (init only)           | Prompt before overwrite      |\n\n### Detail Level\n\nUse `--detail-level` to control how much explanation durable wiki content should contain without changing source analysis scope.\n\n```bash\n/code-wiki init --detail-level=summary\n/code-wiki init --detail-level=deep\n/code-wiki update --detail-level=exhaustive\n```\n\n| Detail level | Contract                                                                                                                          | Soft target per chapter/concept page   |\n| ------------ | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |\n| `summary`    | Concise orientation: purpose, main responsibilities, and relationships. Minimal snippets only when essential.                     | ~300\u2013700 words, 0\u20131 short snippets     |\n| `standard`   | Default. Beginner-friendly but not thin: explains why each abstraction exists, how it fits, main flows, and important files.      | ~900\u20131,600 words, 1\u20133 short snippets   |\n| `deep`       | Thorough walkthroughs: lifecycle/data-flow examples, important edge cases, module interactions, and source-grounded explanations. | ~1,800\u20133,500 words, 2\u20135 short snippets |\n| `exhaustive` | Near-reference level: relevant internals, public surfaces, variants, gotchas, and detailed relationships without raw code dumps.  | ~3,500+ words when warranted           |\n\nDetail level applies to durable wiki content: generated pages, maintained pages, index summaries/diagrams, and filed answer pages. `/code-wiki query` chat responses stay concise by default; any durable answer page follows the wiki detail level.\n\nThe selected level is stored in `.code-wiki.json` and reflected in `.code-wiki-schema.md`. `update` and `query` inherit the existing wiki's level unless explicitly overridden. If an override is passed to `update` or `query`, it is persisted for future maintenance. `init --force` behaves like a fresh init and does not preserve the previous wiki's detail level.\n\nPrecedence:\n\n1. Explicit CLI/tool option (`--detail-level` or `detailLevel`)\n2. Existing wiki metadata for `update`/`query`\n3. `codeWiki.defaultDetailLevel` from project/global settings for new wikis\n4. Built-in default: `standard`\n\nInvalid explicit values fail fast. Invalid settings values are warned about and ignored. Existing metadata without `detailLevel` is treated as `standard`.\n\nCode snippets are evidence, not the main content. Generated wiki pages should prefer prose explanations, diagrams, and walkthroughs over long snippets; snippets should be short, cited, introduced, and explained afterward.\n\n### Target Directory (Monorepo Support)\n\nUse `--target=<subdirectory>` to narrow the wiki scope to a specific subdirectory within a monorepo:\n\n```bash\n/code-wiki init --target=packages/backend\n/code-wiki init --target=packages/frontend --output=docs/frontend-wiki\n```\n\nWhen `--target` is set:\n\n- Only files **within** that subdirectory are crawled and analyzed.\n- The **project name** in the wiki uses the target directory's basename (e.g., `backend`).\n- The **default output** path becomes `docs/code-wiki/<target-basename>` (e.g., `docs/code-wiki/backend`).\n- The **read guard** blocks the agent from reading files outside the target directory.\n- Omit `--target` to use the full repo root (default behavior, unchanged).\n\n## Generated Wiki Layout\n\nThe wiki is written to `docs/code-wiki/` by default and includes:\n\n- `index.md` \u2014 content-oriented catalog, project overview, relationship diagram, chapter links, query-answer links, and maintenance links.\n- `01_*.md`, `02_*.md`, etc. \u2014 beginner-friendly pages for core codebase abstractions.\n- `.code-wiki-schema.md` \u2014 durable maintenance rules for future Pi agents: scope, page conventions, index/log maintenance, cross-linking, citations, update workflow, and query-answer filing workflow.\n- `log.md` \u2014 append-only chronological record with parseable headings such as `## [YYYY-MM-DD] update | ...`.\n- `answers/` \u2014 durable answer pages created from substantial `/code-wiki query` results.\n- `.code-wiki.json` \u2014 metadata: settings, layout, git commit, timestamps, last operation, selected format/detail level, and generated file list.\n- `.obsidian/app.json` \u2014 created only for `--format=obsidian` so the output directory can be opened as an Obsidian vault.\n\n## Obsidian Mode\n\nUse `--format=obsidian` to generate Obsidian Flavored Markdown instead of portable standard Markdown:\n\n```bash\n/code-wiki init --format=obsidian --output=my-vault/docs\n```\n\nIn Obsidian mode, the prompt asks the agent to use:\n\n- `[[wikilinks]]` for internal wiki links, including answer pages under `answers/`.\n- YAML frontmatter properties on every page.\n- Obsidian callouts such as `> [!note]` and `> [!warning]`.\n- Inline kebab-case `#tags` for graph/search discovery.\n\nOn init, the extension creates `.obsidian/app.json` in the wiki directory and displays a copyable open URI plus platform command, for example:\n\n```text\nobsidian://open?path=<absolute-wiki-path>\nopen 'obsidian://open?path=<absolute-wiki-path>'      # macOS\nxdg-open 'obsidian://open?path=<absolute-wiki-path>'  # Linux\nstart \"\" \"obsidian://open?path=<absolute-wiki-path>\" # Windows\n```\n\n`/code-wiki doctor` reports the stored format from `.code-wiki.json`. `update` and `query` inherit the stored format automatically, so you do not need to repeat `--format=obsidian` after initialization.\n\nStandard mode remains the default and keeps the current portable Markdown behavior. Invalid `--format` values silently fall back to `standard`.\n\n## Update vs Init\n\n- **`init`** \u2014 generates a fresh persistent codebase wiki. Fails if the output directory already has content unless `--force` is used.\n- **`update`** \u2014 performs incremental maintenance. The agent reads `.code-wiki-schema.md`, `index.md`, `log.md`, and `.code-wiki.json` first, then updates affected pages, links, log, and metadata based on changed or relevant source files.\n\n## Query Behavior\n\n`/code-wiki query` asks the agent to:\n\n1. Read `index.md`, `log.md`, `.code-wiki-schema.md`, and metadata first.\n2. Inspect relevant wiki pages, then source files needed to verify the answer.\n3. Answer with citations to wiki/source paths.\n4. Write a durable page under `answers/` when the answer is substantial.\n5. Link the answer from `index.md`, append `log.md`, and refresh `.code-wiki.json`.\n\nTrivial answers may be logged without creating an answer page.\n\n## Model Selection\n\n`/code-wiki init`, `/code-wiki update`, and `/code-wiki query` select a generation model before sending the wiki prompt:\n\n1. Read `codeWiki.generationModels` from Pi's global settings and project `.pi/settings.json` (project overrides global).\n2. Iterate the list in order, skipping missing models and auth failures; if a candidate switch fails with `setModel`, continue to the next model instead of stopping.\n3. If no configured model can be activated, fall back to the currently selected Pi model.\n4. Switch the active model to the selection before sending the wiki prompt (unless it is already current).\n\n`/code-wiki doctor` does **not** require or switch any model \u2014 it only checks local filesystem and git metadata.\n\n### Default generation models\n\n```json\n[\n  { \"provider\": \"openai-codex\", \"id\": \"gpt-5.4-mini\" },\n  { \"provider\": \"github-copilot\", \"id\": \"gpt-5.4-mini\" },\n  { \"provider\": \"openai-codex\", \"id\": \"gpt-5.3-codex-spark\" },\n  { \"provider\": \"github-copilot\", \"id\": \"gemini-3-flash-preview\" },\n  { \"provider\": \"github-copilot\", \"id\": \"claude-haiku-4.5\" },\n  { \"provider\": \"anthropic\", \"id\": \"claude-haiku-4-5\" }\n]\n```\n\n### Customizing via settings\n\n```json\n{\n  \"codeWiki\": {\n    \"defaultDetailLevel\": \"deep\",\n    \"maxSize\": 100000,\n    \"generationModels\": [\n      { \"provider\": \"openai-codex\", \"id\": \"gpt-5.4-mini\" },\n      { \"provider\": \"github-copilot\", \"id\": \"gpt-5.4-mini\" }\n    ]\n  }\n}\n```\n\nPlace this in `~/.pi/settings.json` (global) or `<project>/.pi/settings.json` (per-project, overrides global). `defaultDetailLevel` applies to new wikis; existing wiki metadata takes precedence during `update` and `query`. `maxSize` is only configured through settings.\n\n## Strict Exclude Enforcement\n\nDuring any code-wiki operation (`init`, `update`, `query`), the extension intercepts built-in `read` tool calls and blocks reads matching the configured exclude patterns. This ensures excluded files cannot be accidentally read even if the agent drifts from the prompt guidance.\n\n**Behavior:**\n\n- **Blocked (exclude):** Any file matching an `--exclude` pattern is blocked with an error: `Blocked by code-wiki exclude pattern: <path>`.\n- **Blocked (target scope):** When `--target=<path>` is set, any file outside the target directory is blocked with an error: `Blocked by code-wiki target scope: ...`.\n- **Allowed:** Wiki artifact files inside the output directory are still readable during `update` and `query` operations (e.g., `index.md`, `log.md`, chapter pages, schema, metadata).\n- **Normal reads unaffected:** When no code-wiki operation is active, the `read` tool works normally without any restrictions.\n- **Defaults applied:** If no `--exclude` is specified, the built-in defaults are used (test directories, build artifacts, `node_modules`, `.git`/`.github`, wiki output, etc.).\n\nThe enforcement is a safety net, not a replacement for prompt guidance. The agent is still strongly encouraged to follow the file map and exclude instructions in the prompt.\n\n## Troubleshooting\n\n| Problem                           | Solution                                                                             |\n| --------------------------------- | ------------------------------------------------------------------------------------ |\n| \"Not inside a Git repository\"     | Run Pi from within a Git working directory                                           |\n| \"Wiki directory already exists\"   | Use `--force` to overwrite, or `/code-wiki update` to maintain it                    |\n| Query requires a question         | Use `--question=\"...\"` or positional text after `/code-wiki query`                   |\n| Invalid detail level              | Use one of `summary`, `standard`, `deep`, or `exhaustive`                            |\n| Agent doesn't write all files     | The prompt may span multiple turns \u2014 the agent will continue until complete          |\n| Wiki includes its own output      | The prompt explicitly excludes the wiki directory from source analysis               |\n| \"Target directory does not exist\" | Ensure the path exists relative to the repo root, e.g. `--target=packages/backend`   |\n| Doctor reports missing schema/log | Run `/code-wiki update`; the prompt will recreate missing control files              |\n| Obsidian vault not recognized     | Copy the `obsidian://open?...` URI from the init output to open in Obsidian manually |\n\n## Acknowledgement & Inspiration\n\nThis extension is inspired by [PocketFlow-Tutorial-Codebase-Knowledge](https://github.com/The-Pocket/PocketFlow-Tutorial-Codebase-Knowledge) and Karpathy's LLM Wiki pattern for persistent, compounding knowledge bases maintained by LLM agents.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/PeteChu/pi-extensions",
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-24T15:14:40.764Z",
+    "modified": "2026-05-26T15:59:14.787Z",
+    "0.1.0": "2026-05-24T15:14:41.051Z",
+    "0.1.1": "2026-05-26T04:31:02.225Z",
+    "0.1.2": "2026-05-26T15:59:14.667Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 9,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 348
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 76
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 27
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

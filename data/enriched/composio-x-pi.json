@@ -1,0 +1,44 @@
+{
+  "name": "composio-x-pi",
+  "latest_version": "0.0.14",
+  "description": "Pi extension that exposes Composio-backed runtime and authoring tools.",
+  "readme": "# Composio x Pi Extension\n\nPi package that installs a Pi extension for Composio-backed runtime and trigger-authoring tools.\n\n## Install\n\nInstall the published npm package with Pi:\n\n```bash\npi install npm:composio-x-pi\n```\n\nFor a pinned version:\n\n```bash\npi install npm:composio-x-pi@0.0.1\n```\n\nDuring development, install from a local checkout:\n\n```bash\ncd /path/to/composio-x-pi\nbun install\npi install /path/to/composio-x-pi\n```\n\nTry the extension for one Pi run without adding it to settings:\n\n```bash\npi -e /path/to/composio-x-pi/src/index.ts\n```\n\nAfter editing an installed local checkout, use `/reload` inside Pi.\n\n## Publishing\n\nThis package is intended to be installed through Pi's npm package source, so releases should be published to npm under the `composio-x-pi` package name:\n\n```bash\nbun run test\nbun run typecheck\nbun run build\nnpm publish\n```\n\n## Setup\n\nNo setup is required by default. The agent provisions a Composio identity for you on first tool use via the `composio_signup` tool. When a Composio tool fails with a missing-credentials error, the model is instructed to call `composio_signup`, which talks to `https://agents.composio.dev/api/signup` and writes the returned credentials to `~/.composio/anonymous_user_data.json` (mode `0600`).\n\nIf you already have a Composio API key, you can override the auto-provisioned signup credentials:\n\n```text\n/composio-init\n```\n\nThe command prompts for your key and stores it in `~/.pi/agent/extensions/composio-x-pi.json` with file mode `0600`. You can also pass the key as an argument (`/composio-init <key>`), but the interactive prompt avoids leaving the key in chat history.\n\nCredential precedence:\n\n1. `COMPOSIO_API_KEY` environment variable\n2. `/composio-init` stored API key\n3. `composio_signup` anonymous credentials\n\nTo later hand the auto-provisioned organization over to a human admin, either run `/composio-claim <email>` or ask the agent to call the `composio_claim` tool. Composio sends a 24-hour single-use invite to that email.\n\nOptional environment variables:\n\n- `COMPOSIO_USER_ID` \u2014 defaults to `default` when omitted.\n\n## Commands\n\n- `/composio-init` \u2014 securely prompt for and store the Composio API key used by this extension.\n- `/composio-claim <email>` \u2014 hand the auto-provisioned Composio org to a human admin (sends a 24-hour invite to the email).\n\n## Tools\n\nAll tools are registered by default:\n\n- `composio_debug_info`\n- `composio_signup`\n- `composio_claim`\n- `composio_search_tools`\n- `composio_get_tool_schemas`\n- `composio_execute_tool`\n- `composio_manage_connections`\n- `composio_multi_execute_tool`\n- `composio_remote_bash_tool`\n- `composio_remote_workbench`\n- `composio_list_trigger_types`\n- `composio_get_trigger_type_schema`\n- `composio_create_trigger`\n- `composio_list_triggers`\n- `composio_delete_trigger`\n- `save_automation_definition`\n\nThe multi-execute and remote-workbench tools are thin meta-tool wrappers: pass the raw JSON arguments expected by the corresponding `COMPOSIO_*` meta tool/schema.\n\n### Automation JSON handoff\n\n`save_automation_definition` writes automation metadata for the host application to read.\n\nBy default it writes to Pi's global Composio automation handoff file:\n\n```text\n~/.config/pi/composio-automations.json\n```\n\nSet `PI_COMPOSIO_AUTOMATIONS_JSON` to override the global handoff path. Passing `filePath` to the tool still writes a specific JSON file for that call.\n\nThe file contains a JSON array of automation definitions and the tool upserts by `triggerId`.\n\n## Local scripts\n\n- `bun test`\n- `bun run test:e2e`\n- `bun run typecheck`\n- `bun run build`\n- `bun run test:integration`\n- `bun run test:e2e:signup`\n- `bun run dev:pi`\n\n`bun run dev:pi` loads the extension from `src/index.ts` through Pi's embedding API.\n\n## Verification\n\nAutomated checks before handoff or release:\n\n```bash\nbun run test\nbun run test:e2e\nbun run typecheck\nbun run build\n```\n\n`bun run test:e2e` is deterministic: it loads `src/index.ts` through Pi's SDK in an isolated HOME sandbox, verifies registered tools/commands, executes non-network tools, and exercises `/composio-init` without contacting Composio.\n\nLive signup e2e (depends on the external `agents.composio.dev` service):\n\n```bash\nbun run test:e2e:signup\n```\n\nIntegration test with real Composio credentials/config:\n\n```bash\nCOMPOSIO_API_KEY_TEST=...\nCOMPOSIO_TEST_TRIGGER_SLUG=...\nCOMPOSIO_TEST_TRIGGER_CONFIG_JSON='...'\n# Optional: bind to a known active connected account/alias/word id.\nCOMPOSIO_TEST_ACCOUNT=ca_...\nbun run test:integration\n```\n\nManual Pi smoke test:\n\n1. Start Pi with the local extension:\n   ```bash\n   pi -e ./src/index.ts\n   ```\n2. Ask the agent to run any Composio tool; it will call `composio_signup` automatically on first use. Or run `/composio-init` to store an existing Composio API key.\n3. Run `composio_debug_info` and confirm runtime plus authoring tools are listed (and `apiKeySource` is `\"signup\"`, `\"stored\"`, or `\"env\"` depending on setup).\n4. Run `composio_list_trigger_types` and `composio_get_trigger_type_schema` for a known trigger.\n5. Create a test trigger with `composio_create_trigger`.\n6. Confirm it appears via `composio_list_triggers`.\n7. Save the automation handoff with `save_automation_definition`.\n8. Confirm `~/.config/pi/composio-automations.json` (or `PI_COMPOSIO_AUTOMATIONS_JSON`) contains the expected automation and the host app can read it.\n9. Clean up with `composio_delete_trigger`.\n\nWebhook/ngrok delivery verification belongs to the host app: start the app receiver, expose it through ngrok, create/configure the Composio trigger for that URL, cause a real event, and confirm the app receives it.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "composio"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/tridha643/composio-x-pi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tridha643/composio-x-pi.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-22T20:56:54.214Z",
+    "modified": "2026-06-03T02:54:17.787Z",
+    "0.0.1": "2026-04-22T20:56:54.463Z",
+    "0.0.2": "2026-04-24T01:23:26.791Z",
+    "0.0.3": "2026-04-24T01:39:58.897Z",
+    "0.0.4": "2026-04-24T02:24:42.617Z",
+    "0.0.5": "2026-04-24T03:19:09.072Z",
+    "0.0.6": "2026-05-09T20:53:30.220Z",
+    "0.0.7": "2026-05-10T14:51:53.783Z",
+    "0.0.8": "2026-05-15T04:23:07.256Z",
+    "0.0.9": "2026-06-01T06:53:08.781Z",
+    "0.0.10": "2026-06-02T15:01:18.659Z",
+    "0.0.11": "2026-06-02T17:20:37.154Z",
+    "0.0.12": "2026-06-02T22:16:23.167Z",
+    "0.0.13": "2026-06-03T02:13:02.177Z",
+    "0.0.14": "2026-06-03T02:54:17.697Z"
+  },
+  "versions_count": 14,
+  "downloads_last_week": null,
+  "download_trend": []
+}

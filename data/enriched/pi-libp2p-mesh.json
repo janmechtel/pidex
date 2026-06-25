@@ -1,0 +1,351 @@
+{
+  "name": "pi-libp2p-mesh",
+  "latest_version": "1.0.1",
+  "description": "P2P mesh network extension for pi agents built on libp2p \u2014 peer discovery, direct messaging, and gossip broadcast.",
+  "readme": "# pi-libp2p-mesh\n\n> **P2P mesh network extension for [pi agents](https://github.com/earendil-works/pi-coding-agent) \u2014 peer discovery, direct messaging, gossip broadcast, and persistent agent memory.**  \n> Built on [libp2p](https://libp2p.io/), the modular peer-to-peer networking stack.\n\n[![npm version](https://img.shields.io/npm/v/pi-libp2p-mesh)](https://www.npmjs.com/package/pi-libp2p-mesh)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)\n\n---\n\n> **\ud83d\udcd6 Full architecture document:** [`ARCHITECTURE.md`](./ARCHITECTURE.md) \u2014 module breakdowns, data flow diagrams, design decisions, and test suite details.\n\n---\n\n## Features\n\n- \ud83d\udd0d **Automatic peer discovery** via mDNS (local network) and optional Kademlia DHT (wide-area)\n- \ud83d\udcac **Direct messaging** between pi agents over libp2p streams (`/pi-agent/0.1.0` protocol)\n- \ud83d\udce2 **GossipSub broadcast** for group announcements and coordination\n- \ud83d\udd10 **End-to-end encryption** via Noise protocol\n- \ud83e\uddf9 **Automatic stale peer pruning** \u2014 old/restarted agents are cleaned up\n- \ud83e\udde0 **Persistent agent memory** via ChromaDB \u2014 vector-backed storage with semantic recall across sessions. One ChromaDB instance serves the whole mesh.\n- \ud83d\udd0c **Auto-start ChromaDB** \u2014 the first node automatically starts and hosts ChromaDB; all other nodes discover and connect to it via the mesh.\n- \ud83d\udd27 **Ten LLM-callable tools:**\n  | Tool | Description |\n  |---|---|\n  | `mesh_list_peers` | List all known peers |\n  | `mesh_send` | Send a direct message to a peer |\n  | `mesh_broadcast` | Broadcast to all peers |\n  | `mesh_discover` | Scan for new peers |\n  | `mesh_prune` | Remove stale/disconnected peers |\n  | `memory_store` | Save a key-value memory entry for a peer |\n  | `memory_recall` | Recall memories for a peer by key |\n  | `memory_search` | Semantic search across stored memories |\n  | `memory_keys` | List memory keys for a peer |\n  | `memory_reconnect` | Reconnect to ChromaDB after restarts |\n\n---\n\n## Installation\n\n```bash\nnpm install pi-libp2p-mesh\n```\n\nThen add the extension to your pi configuration (e.g., `~/.pi/config.json`):\n\n```json\n{\n  \"extensions\": [\"pi-libp2p-mesh\"]\n}\n```\n\nOr install it as a pi package:\n\n```bash\npi install pi-libp2p-mesh\n```\n\n---\n\n## Quick Start\n\nOnce installed, the mesh starts automatically on `session_start`. You'll see:\n\n```\n[pi-libp2p-mesh] info: Mesh node started as \"pi-myhost\" (12D3KooW...)\n```\n\nUse the built-in tools from your pi agent prompts:\n\n### List peers\n```\nmesh_list_peers\n```\n\n### Send a direct message\n```\nmesh_send peerId=\"12D3KooW...\" message=\"Hello from another agent!\"\n```\n\n### Broadcast to all peers\n```\nmesh_broadcast message=\"Attention everyone!\" type=\"announce\"\n```\n\n### Discover new peers\n```\nmesh_discover\n```\n\n### Prune stale peers\n```\nmesh_prune\n```\n\n### Save a memory\n```\nmemory_store peerId=\"12D3KooW...\" key=\"prefs\" value=\"Prefers concise answers\"\n```\n\n### Recall memories\n```\nmemory_recall peerId=\"12D3KooW...\" key=\"prefs\"\n```\n\n### Semantic search across all memories\n```\nmemory_search query=\"what do peers prefer?\"\n```\n\n---\n\n## CLI Flags\n\n| Flag | Type | Default | Description |\n|---|---|---|---|\n| `--agent-name` | string | `pi-<hostname>` | Agent name for the mesh (also from `PI_MESH_NAME` env var) |\n| `--mesh-enable-dht` | boolean | `false` | Enable Kademlia DHT for wide-area peer discovery |\n| `--mesh-gossip-topic` | string | `pi-broadcast` | GossipSub topic for broadcast messages |\n| `--mesh-swarm-key` | string | \u2014 | Path to a `swarm.key` file for private P2P network (PSK) |\n| `--mesh-chroma-host` | string | `localhost` | ChromaDB server hostname (or `CHROMA_HOST` env var) |\n| `--mesh-chroma-port` | number | `8000` | ChromaDB server port (or `CHROMA_PORT` env var) |\n| `--mesh-chroma-token` | string | \u2014 | Auth token for ChromaDB (`x-chroma-token` header) |\n| `--mesh-chroma-data-path` | string | `~/.local/share/chroma` | ChromaDB data directory for persistence (or `CHROMA_DATA_PATH` env var) |\n| `--mesh-memory-preset` | string | `large` | Memory limit preset: `small` (32K), `medium` (128K), `large` (1M) |\n| `--mesh-memory-max-entries` | number | \u2014 | Override hard max entries returned by `memory_recall` |\n| `--mesh-memory-truncate` | number | \u2014 | Override value truncation in chars for memory entries |\n| `--mesh-memory-budget` | number | \u2014 | Override auto-retrieve context budget in chars |\n| `--mesh-memory-exchange-truncate` | number | \u2014 | Override exchange truncation in chars |\n| `--mesh-memory-distance` | float | \u2014 | Override distance threshold for search filtering (default 0.6) |\n\nExample:\n\n```bash\npi --agent-name my-agent --mesh-enable-dht --mesh-memory-preset medium\n```\n\n---\n\n## Environment Variables\n\n| Variable | Description |\n|---|---|\n| `PI_MESH_NAME` | Agent name (overrides `--agent-name` flag) |\n| `PI_COMM_NAME` | Backward-compatible alias for agent name |\n| `PI_SWARM_KEY` | Path to a `swarm.key` file (alternative to `--mesh-swarm-key`) |\n| `CHROMA_HOST` | ChromaDB host (alternative to `--mesh-chroma-host`) |\n| `CHROMA_PORT` | ChromaDB port (alternative to `--mesh-chroma-port`) |\n| `CHROMA_TOKEN` | ChromaDB auth token (alternative to `--mesh-chroma-token`) |\n| `CHROMA_DATA_PATH` | ChromaDB data directory (alternative to `--mesh-chroma-data-path`) |\n| `PI_MEMORY_PRESET` | Memory limit preset: `small`, `medium`, `large` |\n\n**Config priority:** CLI flag \u2192 environment variable \u2192 default\n\n---\n\n## Memory Presets\n\nAll read-side memory limits can be set at once with `--mesh-memory-preset`:\n\n| Preset | Target model | Truncation | Max entries | Context budget | Exchange truncation |\n|---|---|---|---|---|---|\n| `small` | 32K tokens | 2,000 chars | 20 | 12,000 chars | 2,000 chars |\n| `medium` | 128K tokens | 5,000 chars | 30 | 25,000 chars | 3,000 chars |\n| `large` (default) | 1M tokens | 10,000 chars | 50 | 50,000 chars | 5,000 chars |\n\nIndividual flags override specific preset values:\n\n```bash\npi --mesh-memory-preset medium --mesh-memory-budget 50000\n```\n\n---\n\n## Commands\n\n| Command | Description |\n|---|---|\n| `/mesh-auto-reply [on\\|off]` | Toggle auto-reply mode (when on, incoming messages echo without LLM) |\n| `/mesh-list-peers` | List all known peers on the mesh |\n| `/mesh-discover` | Scan for new peers on the network |\n| `/mesh-prune` | Remove all disconnected/stale peers |\n\n---\n\n## Architecture\n\n```\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Mesh Network \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502                                                     \u2502\n\u2502  \u250c\u2500\u2500 Agent A \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510 \u2502\n\u2502  \u2502  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510 \u2502 \u2502\n\u2502  \u2502  \u2502  index.ts    \u2502\u25c4\u2500\u2524tools.ts\u2502  \u2502 memory.ts   \u2502 \u2502 \u2502\n\u2502  \u2502  \u2502  lifecycle,  \u2502  \u2502 9 tools\u2502  \u2502 AgentMemory \u2502 \u2502 \u2502\n\u2502  \u2502  \u2502  FIFO queue, \u2502  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518  \u2502 client      \u2502 \u2502 \u2502\n\u2502  \u2502  \u2502  host elect. \u2502              \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2518 \u2502 \u2502\n\u2502  \u2502  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518                     \u2502        \u2502 \u2502\n\u2502  \u2502         \u2502               \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518        \u2502 \u2502\n\u2502  \u2502  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u25bc\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510      \u2502                      \u2502 \u2502\n\u2502  \u2502  \u2502 MeshProtocols \u2502      \u2502                      \u2502 \u2502\n\u2502  \u2502  \u2502  \u00b7 sendMessage\u2502      \u2502                      \u2502 \u2502\n\u2502  \u2502  \u2502  \u00b7 raw topic  \u2502      \u2502                      \u2502 \u2502\n\u2502  \u2502  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518      \u2502                      \u2502 \u2502\n\u2502  \u2502  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u25bc\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510      \u2502                      \u2502 \u2502\n\u2502  \u2502  \u2502   MeshNode    \u2502      \u2502                      \u2502 \u2502\n\u2502  \u2502  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518      \u2502                      \u2502 \u2502\n\u2502  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518 \u2502\n\u2502                            \u25bc                        \u2502\n\u2502  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 ChromaDB \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510 \u2502\n\u2502  \u2502  (one instance, first node hosts)              \u2502 \u2502\n\u2502  \u2502  pi_memory_* collection \u2014 all agents share     \u2502 \u2502\n\u2502  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518 \u2502\n\u2502                                                     \u2502\n\u2502  \u250c\u2500\u2500 Agent B \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510 \u2502\n\u2502  \u2502  (same structure, connects to Agent A's        \u2502 \u2502\n\u2502  \u2502   ChromaDB via mesh-discovered host)           \u2502 \u2502\n\u2502  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518 \u2502\n\u2502                                                     \u2502\n\u2502              \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                \u2502\n\u2502              \u2502   libp2p overlay    \u2502                \u2502\n\u2502              \u2502  TCP + WebSocket    \u2502                \u2502\n\u2502              \u2502  mDNS + DHT         \u2502                \u2502\n\u2502              \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518                \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\n### Module Structure\n\n| File | Purpose |\n|---|---|\n| `src/types.ts` | Shared TypeScript types and interfaces |\n| `src/node.ts` | `MeshNode` \u2014 libp2p node factory & lifecycle |\n| `src/protocols.ts` | `MeshProtocols` \u2014 direct messaging & GossipSub |\n| `src/tools.ts` | Tool registration (5 mesh + 4 memory) for pi's LLM integration |\n| `src/memory.ts` | `AgentMemory` \u2014 ChromaDB-backed persistent memory, semantic search |\n| `src/chroma-lifecycle.ts` | `ChromaDBLifecycle` \u2014 ChromaDB process management (start/stop/health) |\n| `src/index.ts` | Extension entry point, lifecycle wiring, FIFO request queue, host election, memory hooks |\n\n---\n\n## Protocol Stack\n\n| Layer | Library | Purpose |\n|---|---|---|\n| **Transport** | `@libp2p/tcp` + `@libp2p/websockets` | Connection establishment |\n| **Encryption** | `@chainsafe/libp2p-noise` | End-to-end encryption |\n| **Multiplexing** | `@chainsafe/libp2p-yamux` | Multiple streams per connection |\n| **Discovery** | `@libp2p/mdns` (always on) | Local network peer discovery |\n| | `@libp2p/kad-dht` (optional) | Wide-area Kademlia-based discovery |\n| **Identity** | `@libp2p/identify` | Peer identity exchange (agent name, protocols) |\n| **Pub/Sub** | `@chainsafe/libp2p-gossipsub` | Topic-based broadcast messaging |\n| **Private Network** | `@libp2p/pnet` | Optional swarm key (PSK) for private P2P networks |\n| **Custom** | `/pi-agent/0.1.0` | Direct agent-to-agent CBOR-encoded messaging |\n| | `pi-memory-host` (GossipSub topic) | ChromaDB host discovery \u2014 first node announces, others connect |\n| **Memory** | `chromadb` + `@chroma-core/default-embed` | Persistent agent memory, semantic search |\n\n---\n\n## Development\n\n```bash\n# Clone\ngit clone https://github.com/pldomenici/pi-libp2p-mesh.git\ncd pi-libp2p-mesh\n\n# Install dependencies\nnpm install\n\n# Build TypeScript\nnpm run build\n\n# Run the comprehensive test suite (requires peers on the network)\nnpm test\n\n# Run the rigorous concurrent test suite\nnpm run test:rigorous\n\n# FIFO queue unit tests (no network required)\nnpm run test:fifo\n\n# Stable identity / private key tests (no network required)\nnpm run test:identity\n\n# Memory leak / queue stress tests (no network required)\nnpm run test:leak\n\n# Negative/edge-case input tests (requires peers)\nnpm run test:negative\n\n# Run all tests (non-network + network)\nnpm run test:all\n\n# Run extension import test\nnpm run test:extension\n\n# Watch mode for development\nnpm run watch\n```\n\n### Test Results\n\n| Suite | Tests | Result |\n|---|---|---|\n| Comprehensive (`test-network.mjs`) | 26 tests | \u2705 All passing |\n| Rigorous (`rigorous-concurrent-test.mjs`) | 82 tests (10 phases) | \u2705 All passing |\n| FIFO Queue (`test-fifo-queue.mjs`) | 8 tests | \u2705 All passing |\n| Stable Identity (`test-identity.mjs`) | 9 tests | \u2705 All passing |\n| Memory/Leak (`test-leak.mjs`) | 7 tests | \u2705 All passing |\n| Negative Input (`test-negative.mjs`) | 11 tests | \u2705 All passing |\n\n---\n\n## Configuration\n\n### Stable Peer Identity\n\nPass a persistent Ed25519 private key via `MeshConfig.privateKey` to give an agent a stable PeerId across restarts:\n\n```ts\nimport { MeshNode } from 'pi-libp2p-mesh/node';\n\nconst node = await MeshNode.create({\n  agentName: 'my-agent',\n  privateKey: loadPersistedPrivateKey(), // Uint8Array\n});\n```\n\n### Peer Persistence\n\nThe mesh maintains an in-memory peer store that persists for the duration of the session. Stale peers (disconnected > 60s) are automatically pruned every 30 seconds. Use `mesh_prune` for immediate cleanup.\n\n### Memory Persistence\n\nChromaDB data is stored on disk at `.chroma/`. Memories persist across agent restarts \u2014 on next `session_start`, the extension reconnects to the existing collection and all past memories are immediately available.\n\n---\n\n## Further Reading\n\n- [`ARCHITECTURE.md`](./ARCHITECTURE.md) \u2014 comprehensive module breakdowns, data flow diagrams, design decisions\n- [`AGENT-MEMORY.md`](./AGENT-MEMORY.md) \u2014 LLM usage guide for the memory system\n\n---\n\n## License\n\nMIT \u00a9 [Earendil Works](LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "p2p",
+    "libp2p",
+    "mesh",
+    "gossip"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/pldomenici/pi-libp2p-mesh#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pldomenici/pi-libp2p-mesh.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/libp2p/js-libp2p/main/img/libp2p-logo.png"
+  },
+  "time": {
+    "created": "2026-05-25T04:47:11.641Z",
+    "modified": "2026-06-14T21:36:50.106Z",
+    "0.3.0": "2026-05-25T04:47:12.026Z",
+    "0.3.1": "2026-05-25T05:02:32.519Z",
+    "0.3.2": "2026-05-25T05:21:49.172Z",
+    "0.3.3": "2026-05-25T05:44:52.741Z",
+    "1.0.1": "2026-06-14T21:36:49.945Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 33,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 566
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 44
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 2
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 202
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 39
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

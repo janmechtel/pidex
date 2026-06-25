@@ -1,0 +1,46 @@
+{
+  "name": "@apolosan/unified-process",
+  "latest_version": "1.2.2",
+  "description": "Pi package that bundles the Object-Oriented Unified Process extension and skills for the pi coding agent.",
+  "readme": "# Unified Process pi Extension\n\n**Version:** `1.2.2`\n\nPi package that bundles an Object-Oriented Unified Process workflow for the **pi coding agent**.\n\nIt ships:\n- a custom extension with UP state, commands, and tools\n- the full `up-*` skill chain\n- dependency manifests and bootstrap scripts for the MCP/CLI ecosystem referenced by the skills\n\n## Canonical public package layout\n\nThis repository is organized as a **pi package** for public distribution:\n\n- `extensions/unified-process/` \u2192 pi extension entrypoint and source\n- `skills/up-*/` \u2192 public skills shipped by the package\n- `resources/` \u2192 dependency manifests and MCP template\n- `scripts/` \u2192 dependency scanning/bootstrap helpers\n\nThis is the recommended layout for public sharing. The old project-local `.pi/extensions/...` layout is fine for local development, but **not** ideal as the canonical public/package structure.\n\n## Installation\n\nRecommended npm package install:\n\n```bash\npi install npm:@apolosan/unified-process\n```\n\nAlternative GitHub install:\n\n```bash\npi install git:github.com/apolosan/unified_process_pi_extension\n```\n\n## Package contents\n\n### Extension\n\nMain extension entrypoint:\n\n- `extensions/unified-process/index.ts`\n\nRegistered commands:\n- `/up`\n- `/up-status`\n- `/up-next`\n- `/up-auto`\n- `/up-artifacts`\n\nThe extension footer/status now also shows the effective next UP command in real time (`up:next`). When the orchestrator persists an explicit recommendation, the extension also renders a compact widget above the editor with the recommended command and rationale, varying the label by recommendation type (forward progression, refinement, jump, coordination, risk-aware).\n\n**Integration verification (v1.2.2):** before declaring implementation or deploy ready, the agent receives a mandatory integration checklist. Run stack/API/smoke/Tier 1 e2e commands, then record evidence with `up_record_integration_check`. The tool writes structured JSONL records to `docs/up/14-implementation/smoke.log` and deploy readiness requires all four check types (`stack_up`, `api_health`, `smoke`, `tier1_integrated_e2e`) with `exit_code: 0`.\n\nRegistered tools:\n- `up_save_artifact`\n- `up_load_artifact`\n- `up_update_state`\n- `up_list_artifacts`\n- `up_record_integration_check` \u2014 record check type, command, exit code, and timestamp to `smoke.log`\n- `up_require_paths` \u2014 validate required integration paths (API, tests, matrix, operations, env template)\n\n### Skills\n\nIncluded UP skills:\n\n- `up-orchestrator`\n- `up-5w2h`\n- `up-vision`\n- `up-requirements`\n- `up-use-cases`\n- `up-sequence-diagrams`\n- `up-conceptual-model`\n- `up-contracts`\n- `up-tech-stack`\n- `up-tdd`\n- `up-design-patterns`\n- `up-object-design`\n- `up-interface-design`\n- `up-design-system`\n- `up-data-mapping`\n- `up-implementation`\n- `up-deploy`\n- `up-documentation`\n\n## External dependencies referenced by the skills\n\nThe package itself is a pi package, but several skills explicitly rely on external MCP servers and CLIs.\n\n### MCP servers\n\nRequired/recommended MCPs referenced by the skills:\n- `design-patterns`\n- `shadcn`\n- `radix-mcp-server`\n- `flyonui`\n\n#### Design Patterns MCP (concrete source + config)\n\nThe `design-patterns` MCP expected by `up-design-patterns` is the public repository:\n- `https://github.com/apolosan/design_patterns_mcp`\n\nManual install:\n\n```bash\ngit clone https://github.com/apolosan/design_patterns_mcp.git .up-tools/design_patterns_mcp\ncd .up-tools/design_patterns_mcp\nbun install\nbun run db:setup\n```\n\nRecommended MCP config:\n\n```json\n{\n  \"mcpServers\": {\n    \"design-patterns\": {\n      \"command\": \"node\",\n      \"args\": [\"dist/src/mcp-server.js\"],\n      \"cwd\": \"<INSTALL_PREFIX>/design_patterns_mcp\",\n      \"directTools\": true,\n      \"env\": {\n        \"LOG_LEVEL\": \"info\",\n        \"DATABASE_PATH\": \"./data/design-patterns.db\",\n        \"ENABLE_HYBRID_SEARCH\": \"true\",\n        \"ENABLE_GRAPH_AUGMENTATION\": \"true\",\n        \"EMBEDDING_COMPRESSION\": \"true\",\n        \"ENABLE_FUZZY_LOGIC\": \"true\",\n        \"ENABLE_TELEMETRY\": \"true\",\n        \"ENABLE_MULTI_LEVEL_CACHE\": \"true\"\n      }\n    }\n  }\n}\n```\n\nExample MCP configuration template:\n- `resources/unified-process.mcp.example.json`\n\n### Companion pi skills\n\nReferenced support skills:\n- `context7`\n- `brave-search`\n- `web-search`\n- `web-fetch`\n\n### CLI/tooling\n\nCore CLI/tooling referenced directly by the skills:\n- `npm`\n- `npx`\n- `mmdc` (`@mermaid-js/mermaid-cli`)\n- `docker`\n- `docker-compose`\n\nConditional toolchain candidates also referenced by the skills are listed in:\n- `resources/unified-process-dependencies.json`\n\nThat file includes the broader optional ecosystem mentioned in `up-tech-stack`, such as `jest`, `pytest`, `playwright`, `cypress`, `k6`, `locust`, `semgrep`, `snyk`, `trivy`, `lighthouse`, `pa11y`, `stryker`, `mutmut`, and others.\n\n## Automated dependency procedure\n\nThis repository includes an explicit automation layer to **check**, **bootstrap**, and **template** the MCP/CLI dependencies mentioned by the skills.\n\n### Check dependency status\n\n```bash\nnpm run deps:check\n```\n\nor, after global install:\n\n```bash\nup-deps check\n```\n\n### Scan skill references against the dependency catalog\n\n```bash\nnpm run deps:scan\nnpm run check   # dependency scan + extension syntax + unit tests\nnpm test        # extension unit tests only\n```\n\n## Runtime guarantees\n\n| Capability | The workflow requires | The extension verifies automatically |\n|------------|-----------------------|--------------------------------------|\n| Artifact I/O boundary | Artifacts stay under `docs/up/` | Yes: save/load reject traversal, absolute paths, encoded traversal, and mixed separator escapes |\n| State updates | Only known UP state fields are persisted | Yes: malformed JSON, arrays/primitives, oversized payloads, and unknown fields are rejected |\n| Activity completion | Activities advance only from sufficient artifacts | Partially: recovered state uses explicit completion rules and minimum artifact size; semantic completeness remains a skill/reviewer responsibility |\n| Integration evidence | Stack/API/smoke/Tier 1 e2e evidence before deploy readiness | Partially: structured JSONL is parsed and all four check types are required, but commands are still executed outside the recording tool |\n| Typecheck | Static TypeScript validation | Not yet: `typescript` is not installed in this package, so `npx tsc --noEmit` is a dependency/setup task |\n\n### Install known auto-installable dependencies\n\n```bash\nnpm run deps:install\n```\n\nThis now also bootstraps the public `design_patterns_mcp` server automatically when `git` and `bun` are available, then regenerates the MCP template.\n\nTo also include supported conditional npm/pip-based tools:\n\n```bash\nnode ./scripts/setup-dependencies.mjs install-known --include-conditional\n```\n\n### Generate an MCP template\n\n```bash\nnpm run deps:mcp-template\n```\n\n## Notes on automation scope\n\nNot every dependency can be installed safely or universally in a single cross-platform script.\n\nBecause of that, the automation is intentionally split into:\n- **auto-installable** dependencies: portable npm/pip packages plus the git+bun bootstrap for `design_patterns_mcp`\n- **system/manual** dependencies: tools such as Docker or OS-level/security-sensitive tooling that depend on platform, credentials, or private infrastructure\n\nThis keeps the public package safe, reproducible, and aligned with pi package best practices.\n\n## Publishing notes\n\nRecommended npm package name:\n- `@apolosan/unified-process`\n\nRecommended GitHub repository:\n- `apolosan/unified_process_pi_extension`\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "pi-skills",
+    "unified-process",
+    "object-oriented",
+    "software-engineering"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/apolosan/unified_process_pi_extension#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/apolosan/unified_process_pi_extension.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/unified-process"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-03-31T18:27:54.178Z",
+    "modified": "2026-06-09T15:11:42.047Z",
+    "1.0.0": "2026-03-31T18:27:54.562Z",
+    "1.0.1": "2026-03-31T18:36:42.226Z",
+    "1.1.0": "2026-04-01T03:09:17.605Z",
+    "1.1.1": "2026-04-02T02:06:43.562Z",
+    "1.1.2": "2026-04-04T15:57:32.924Z",
+    "1.1.3": "2026-04-04T20:35:40.612Z",
+    "1.2.0": "2026-05-19T18:59:37.163Z",
+    "1.2.1": "2026-06-09T14:45:42.001Z",
+    "1.2.2": "2026-06-09T15:11:41.932Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": 19,
+  "download_trend": []
+}
