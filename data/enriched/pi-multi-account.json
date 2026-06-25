@@ -1,0 +1,375 @@
+{
+  "name": "pi-multi-account",
+  "latest_version": "1.9.3",
+  "description": "Automatic multi-account failover & rotation for Pi Agent across Anthropic (Claude), OpenAI/ChatGPT Codex, Qwen/Alibaba, and Ollama. Auto-discovers authenticated accounts, grows the rotation on login, and drops accounts on logout, expiry, or quota/rate-lim",
+  "readme": "# pi-multi-account\n\nAutomatic multi-account failover & rotation for [Pi Agent](https://pi.dev/), across **Anthropic (Claude)**, **OpenAI / ChatGPT Codex**, **Qwen / Alibaba**, and **Ollama**.\n\nWhen the account you are using hits a quota or rate limit, `pi-multi-account` transparently switches to the next authenticated account/model and (optionally) resumes the interrupted task \u2014 so a long agent run does not die just because one account ran out of budget.\n\n## What it does\n\n- **Auto-discovers** every authenticated account from `~/.pi/agent/auth.json` (Anthropic Claude Pro/Max, OpenAI/ChatGPT Codex, Qwen/Alibaba, and Ollama) and builds the failover rotation dynamically \u2014 no manual config editing.\n- **Grows the rotation on login.** Run `/login`, choose **Use a subscription**, then select a numbered slot such as `anthropic-account-3` or `openai-codex-account-5`. The next discovery sweep adds it to the rotation automatically.\n- **Handles auth failures without poisoning healthy OAuth accounts.** A generic final 401 briefly cools down a refreshable account and moves the current task forward. Explicit provider verdicts such as `authentication token has been invalidated` force an early refresh; if the refresh token is dead too, the slot is removed and Pi prints the interactive `/login` recovery steps.\n- **Fails over on quota / rate-limit** (429 / 402 / 403 and friends): the exhausted account goes on cooldown (parsed from the provider's own reset metadata when available) and Pi switches to the next available account/model.\n- **Optional auto-continue**: queues a safe continuation prompt after a switch so the agent keeps going from the last safe point.\n- **Session-bound overnight resume**: if every account is cooling down, the live Pi session waits for the earliest recovery and continues automatically. A new user message, `/multi-account stop`, session exit, or Esc during a running turn cancels the chain.\n- **Deduplicates provably identical accounts** so duplicate Codex `accountId` values and identical credentials do not consume multiple rotation slots or get separate cooldowns. New provable duplicate logins are rejected before the redundant slot is saved.\n- **Keeps your thinking level** stable across switches instead of letting it drift downward.\n- **Shows live limits for the active account** in Pi's footer: remaining 5-hour and 7-day allowance plus reset countdowns for Codex and Anthropic OAuth accounts.\n\n## Install\n\n```bash\npi install npm:pi-multi-account\n```\n\nRestart Pi or run `/reload` after installation.\n\n> **Anthropic (Claude Pro/Max) works out of the box.** OAuth login and request\n> shaping for the base `anthropic` provider and every `anthropic-account-*` alias\n> are built in \u2014 no separate `pi-anthropic-auth` install is required. If you\n> already have `pi-anthropic-auth`, the two coexist safely (the shaping is\n> idempotent). OpenAI Codex / ChatGPT and Qwen accounts work as well.\n\n### Recommended setting\n\nSet Pi provider-level retries to zero so the SDK does not keep retrying an exhausted account before failover kicks in. In `~/.pi/agent/settings.json`:\n\n```json\n{ \"retry\": { \"provider\": { \"maxRetries\": 0 } } }\n```\n\n## Usage\n\nAdd accounts by opening the login picker:\n\n```text\n/login\nUse a subscription\nChatGPT Plus/Pro (Codex openai-codex-account-2)\n/multi-account rediscover\n```\n\nPi 0.79.3 does not accept a provider argument after `/login`; select the account\nslot from the interactive provider picker instead.\n\nCheck what's in the rotation at any time:\n\n```text\n/multi-account status\n```\n\nForce-refresh and display detailed limits for the active account:\n\n```text\n/multi-account limits refresh\n```\n\nExample status output:\n\n```text\npi-multi-account: enabled \u00b7 auto-discover ON\nCurrent: anthropic/claude-opus-4-8\nCurrent limits: Claude | 5h 0% left/2h14m | 7d 92% left/1d18h\nRotation (3): anthropic \u2192 openai-codex \u2192 openai-codex-account-2\nRegistered login slots: anthropic-account-2, openai-codex-account-2\nCooldowns: none\nInvalidated (need re-login): none\nPending auto-resume: none\n```\n\n### Commands\n\nAll three names are aliases for the same command: `/multi-account`, `/provider-failover`, `/failover`.\n\n| Subcommand | Description |\n|---|---|\n| `status` (default) | Show enabled state, current model, rotation, login slots, cooldowns, invalidations, pending resume. |\n| `limits [refresh]` | Show active-account 5h/7d limits; `refresh` bypasses the cache. Aliases: `usage`, `quota`. |\n| `rediscover` | Force a re-scan of `auth.json` and rebuild the rotation now. |\n| `add [anthropic\\|codex]` | Print the next free account slot to select from the interactive `/login` picker. |\n| `next` | Manually switch to the next fallback, deliberately overriding recorded cooldowns. |\n| `stop` | Abort and cancel automatic failover/resume for the current task. |\n| `reset` | Clear all cooldowns, invalidations and any pending auto-resume. |\n| `reload` | Reload config from disk and re-discover accounts. |\n| `enable` / `disable` | Turn failover on/off for the current Pi process. |\n\n## How rotation membership works\n\n- **Joins the rotation** when an account has a present, non-expired credential in `auth.json` (after `/login`).\n- **Leaves the rotation** when the credential is logged out / removed, its access token is expired with no refresh token, an API key is rejected, or a refreshable OAuth credential produces three distinct final auth failures without a success in between.\n- **Quota / rate-limit** does not invalidate an account \u2014 it puts it on a temporary cooldown and the account returns once the cooldown expires.\n- **Duplicate identities** share one rotation position and one cooldown, and status/startup identifies the redundant slot. Codex/ChatGPT is matched by stored `accountId`; identical API keys or literal identical tokens are also matched. Separate Anthropic OAuth logins cannot be proven identical because Anthropic's stored credential exposes no stable account identifier.\n\nRotation refresh is triggered by changes to `auth.json` (detected on session/turn start) or on demand with `/multi-account rediscover`.\n\nAfter re-authenticating an invalidated slot, restart any older Pi processes that\nwere already running. Pi keeps a still-unexpired access token in each process's\nmemory, so an old process can continue using the invalidated token even after a\nnew `/login` updates `auth.json`.\n\n## Configuration\n\nA default config is created at `~/.pi/agent/provider-failover.json` on first run. Useful keys:\n\n| Key | Default | Description |\n|---|---|---|\n| `enabled` | `true` | Master switch. |\n| `autoContinue` | `true` | Queue a continuation prompt after a switch. |\n| `autoDiscover` | `true` | Auto-discover accounts from `auth.json`. |\n| `includeQwen` | `true` | Include Qwen / Alibaba accounts. |\n| `includeOllama` | `true` | Include Ollama (local) accounts. |\n| `providerOrder` | `[\"anthropic\",\"openai-codex\",\"qwen\",\"ollama\"]` | Preferred family order in the rotation. |\n| `cooldownMs` | 6 h | Default cooldown when no reset metadata is provided. |\n| `showUsage` | `true` | Show active Codex/Claude limits in Pi's footer. |\n| `usageRefreshMs` | 5 min | Provider usage cache TTL; Anthropic is clamped to at least 10 min to avoid endpoint throttling. |\n| `usageStatusRefreshMs` | 1 min | Re-render the footer countdown periodically; stale caches are refreshed according to `usageRefreshMs`. |\n| `maxAutoContinuesPerPrompt` | `8` | Cap on auto-resume hops per task. |\n| `continuationPrompt` | (built-in) | Template; supports `{from}`, `{to}`, `{reason}`. |\n\nState (cooldowns, invalidations, recent switches, and an in-session pending resume marker) is persisted to `~/.pi/agent/provider-failover-state.json`. Pending work is deliberately discarded when the session closes or a different session starts.\n\n## Privacy & security\n\n`pi-multi-account` **reads** `auth.json` but never writes credentials itself and never stores credentials in its state. Account/token values are reduced to a short irreversible SHA-256 fingerprint for re-login detection and deduplication. To display limits, the active OAuth access token is sent only to its own provider's usage endpoint (`chatgpt.com/backend-api/wham/usage` or `api.anthropic.com/api/oauth/usage`); cached state contains percentages, reset times, plan/credit metadata, and the fingerprint, never the token. Config and state files are written with `0600` permissions.\n\n## License\n\n[MIT](./LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-agent",
+    "pi-coding-agent",
+    "agent-pi",
+    "failover",
+    "fallback",
+    "rotation",
+    "multi-account",
+    "rate-limit",
+    "quota",
+    "anthropic",
+    "claude",
+    "openai",
+    "codex",
+    "chatgpt",
+    "qwen",
+    "alibaba",
+    "ollama",
+    "glm",
+    "glm-5.2",
+    "oauth"
+  ],
+  "author": {
+    "name": "sars267"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Sarrius/pi-multi-account#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sarrius/pi-multi-account.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-09T19:50:48.786Z",
+    "modified": "2026-06-21T15:13:57.218Z",
+    "1.0.0": "2026-06-09T19:50:49.127Z",
+    "1.1.0": "2026-06-10T05:17:46.950Z",
+    "1.2.0": "2026-06-10T05:34:47.788Z",
+    "1.3.0": "2026-06-10T18:38:57.545Z",
+    "1.4.0": "2026-06-10T19:07:13.731Z",
+    "1.7.0": "2026-06-13T16:46:56.345Z",
+    "1.8.0": "2026-06-20T14:22:40.289Z",
+    "1.9.0": "2026-06-21T14:35:49.327Z",
+    "1.9.1": "2026-06-21T15:01:00.013Z",
+    "1.9.2": "2026-06-21T15:07:15.933Z",
+    "1.9.3": "2026-06-21T15:13:57.112Z"
+  },
+  "versions_count": 11,
+  "downloads_last_week": 754,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 121
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 887
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 743
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 23
+    }
+  ]
+}

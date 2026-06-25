@@ -1,0 +1,355 @@
+{
+  "name": "@agwab/pi-subagent",
+  "latest_version": "0.3.6",
+  "description": "Minimal subagent runtime for Pi.",
+  "readme": "# pi-subagent\n\n**Minimal subagent runtime for Pi.**\n\n[![npm](https://img.shields.io/npm/v/@agwab/pi-subagent.svg)](https://www.npmjs.com/package/@agwab/pi-subagent)\n\n`pi-subagent` adds one focused tool: `subagent`. It gives Pi the essentials for isolated worker runs \u2014 parallel fan-out, sandbox/worktree controls, durable artifacts, and async status.\n\nIt is intentionally small, so you can add it to a project when you need subagents and remove it when you do not.\n\nnpm package: [`@agwab/pi-subagent`](https://www.npmjs.com/package/@agwab/pi-subagent)\n\n## Installation\n\n```bash\npi install npm:@agwab/pi-subagent\n```\n\nThen reload Pi.\n\nRequires Node.js `>=22.19.0` on macOS or Linux. Native Windows is not supported (POSIX process groups, tmux, and `which`-based Pi discovery); use WSL2.\n\nFor local development, add this package as a Pi extension source and reload Pi.\n\n## Quick usage\n\nUse it when you want Pi to spin up a separate worker instead of doing everything in the parent session:\n\n```text\nRun three reviewers in parallel for this change.\n```\n\n```text\nRun this check in a sandboxed worker and report the artifact paths.\n```\n\n```text\nStart a background audit and let me inspect it in /subagent panel.\n```\n\n\n## What it does\n\nTool: `subagent`\n\n### Sandbox\n\nRun workers in an isolated local execution boundary.\n\n```json\n{\n  \"sandbox\": true,\n  \"agent\": \"checker\",\n  \"task\": \"Run a local check and report the artifact paths.\"\n}\n```\n\n`sandbox: true` denies all network access. Model-backed sandboxed runs must allow their provider endpoint explicitly:\n\n```json\n{\n  \"sandbox\": { \"allowedDomains\": [\"api.anthropic.com\"] },\n  \"agent\": \"implementer\",\n  \"task\": \"Make the requested local change and run the checks.\"\n}\n```\n\n### Worktree\n\nIsolate parallel or mutating tasks in managed git worktrees. Workspaces default to shared; request `worktree: true` explicitly for tasks that mutate files in parallel.\n\n```json\n{\n  \"worktree\": true,\n  \"agent\": \"implementer\",\n  \"task\": \"Make the requested local change in an isolated worktree.\"\n}\n```\n\n### Agent\n\nInject Pi subagent markdown definitions from global or project agent directories.\n\n```json\n{\n  \"agent\": \"reviewer-security\",\n  \"task\": \"Review the current diff for security risks.\"\n}\n```\n\nAgent markdown can live in `~/.pi/agent/agents/*.md` or `.pi/agents/*.md`. Agent-level `tools` declarations are an authority ceiling; call-level `tools` can narrow them but not expand them. A `systemPrompt` override replaces the agent prompt body, not the agent's frontmatter policy.\n\n### Type\n\nUse one structured schema for single, parallel, async, and existing-run calls. `action` defaults to `run`. Each execution is a run; each launch is an attempt.\n\nSingle:\n\n```json\n{\n  \"agent\": \"reviewer\",\n  \"task\": \"Review the current diff and summarize the highest-risk issues.\"\n}\n```\n\nParallel launches independent runs concurrently:\n\n```json\n{\n  \"tasks\": [\n    { \"agent\": \"reviewer-security\", \"task\": \"Review the current diff for security risks.\" },\n    { \"agent\": \"reviewer-performance\", \"task\": \"Review the current diff for performance risks.\" },\n    { \"agent\": \"reviewer-test-coverage\", \"task\": \"Review the current diff for missing tests.\" }\n  ]\n}\n```\n\nExisting run:\n\n```json\n{ \"action\": \"status\", \"runId\": \"run_...\" }\n```\n\n### Panel\n\nInspect runs, attempts, artifacts, and log tails in a live TUI.\n\nOpen the run monitor:\n\n```text\n/subagent panel\n```\n\n![/subagent panel](./assets/subagent-panel.png)\n\n## Code API\n\nOrchestrators can use the same runtime directly:\n\n```ts\nimport { runSubagent, getSubagentStatus } from \"@agwab/pi-subagent/api\";\n\nconst run = await runSubagent({ agent: \"reviewer\", task: \"Review this diff.\", async: true });\nconst status = await getSubagentStatus({ runId: run.runId });\n```\n\n## Detailed docs\n\n- [`docs/usage.md`](./docs/usage.md) \u2014 full argument reference, code API, `action` behavior, backend selection, sandbox/worktree behavior, artifacts, and validation notes.\n\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "subagent",
+    "agent",
+    "sandbox"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/AgwaB/pi-subagent#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AgwaB/pi-subagent.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/AgwaB/pi-subagent/main/assets/subagent-panel.png"
+  },
+  "time": {
+    "created": "2026-06-08T16:23:22.933Z",
+    "modified": "2026-06-22T12:48:58.692Z",
+    "0.1.0": "2026-06-08T16:23:23.439Z",
+    "0.2.0": "2026-06-08T18:16:56.215Z",
+    "0.3.0": "2026-06-09T03:30:02.388Z",
+    "0.3.1": "2026-06-09T05:49:48.349Z",
+    "0.3.2": "2026-06-10T14:04:34.708Z",
+    "0.3.3": "2026-06-12T05:16:44.419Z",
+    "0.3.4": "2026-06-14T16:04:08.711Z",
+    "0.3.5": "2026-06-18T01:30:56.240Z",
+    "0.3.6": "2026-06-22T12:48:58.420Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": 352,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 540
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 453
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 365
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 13
+    }
+  ]
+}

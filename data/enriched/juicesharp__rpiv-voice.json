@@ -1,0 +1,77 @@
+{
+  "name": "@juicesharp/rpiv-voice",
+  "latest_version": "1.20.0",
+  "description": "Pi extension. Voice dictation via /voice \u2014 local on-device STT with sherpa-onnx Whisper (base multilingual int8), microphone capture via decibri.",
+  "readme": "# rpiv-voice\n\n<div align=\"center\">\n  <a href=\"https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-voice\">\n    <picture>\n      <img src=\"https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-voice/docs/cover.png\" alt=\"rpiv-voice cover\" width=\"50%\">\n    </picture>\n  </a>\n</div>\n\nTalk to [Pi Agent](https://github.com/badlogic/pi-mono) instead of typing. `rpiv-voice` adds the `/voice` slash command \u2014 open the overlay, speak, hit `Enter`, and your transcript drops straight into Pi's editor. Speech-to-text runs **entirely on your machine** via [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) Whisper (base multilingual int8). No cloud, no API keys, no telemetry.\n\n![Voice dictation overlay above the Pi editor](https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-voice/docs/overlay.jpg)\n\n## Features\n\n- **100% on-device** \u2014 audio never leaves your laptop. No accounts, no API keys, no network calls after the first model download.\n- **~99 languages, autodetected** \u2014 Whisper base multilingual handles the full Whisper language set with per-utterance autodetection. Switch languages mid-session without changing settings.\n- **Live transcript** \u2014 committed lines render as you finish phrases, with a dim rolling partial showing the still-active utterance in real time. What you see is what gets pasted (no waiting for a \"proper\" final).\n- **VAD-driven chunking** \u2014 Silero voice-activity detection breaks long monologues at natural pauses, so latency stays bounded even on a 5-minute rant.\n- **Settings screen built-in** \u2014 `Tab` flips to a settings panel showing your active mic, detected language, and a hallucination filter toggle. `Ctrl-S` to save, `Esc` or `Tab` to return to dictation.\n- **Whisper hallucination filter** \u2014 strips spurious \"Thanks for watching\", \"[Music]\", and repeating-token loops that Whisper sometimes emits on silence. Toggle off if you're dictating short single words.\n- **Pause / resume** \u2014 hit `Space` to mute the mic without closing the overlay; great for stepping aside mid-thought.\n- **Localized UI** \u2014 overlay, status bar, and settings render in German, English, Spanish, French, Portuguese (European + Brazilian), Russian, and Ukrainian when [`@juicesharp/rpiv-i18n`](https://www.npmjs.com/package/@juicesharp/rpiv-i18n) is installed. Falls back to English when it isn't.\n- **Honest first-run UX** \u2014 the splash overlay shows download progress (percent + bytes), then `Extracting\u2026`, `Verifying\u2026`, `Loading engine\u2026`, `Initializing mic\u2026` before the dictation overlay opens. Half-loaded states never reach you.\n- **Configurable cancel keybinding** \u2014 bind cancel to whatever your fingers prefer; no longer hardcoded to `Esc`.\n- **Errors persisted, not swallowed** \u2014 recognition failures land in `~/.config/rpiv-voice/errors.log` so you can see why a phrase didn't transcribe.\n\n## Install\n\n`rpiv-voice` is **opt-in** \u2014 it's not part of `/rpiv-setup` because the native deps (sherpa-onnx, decibri) are heavyweight. Install it directly:\n\n```sh\npi install npm:@juicesharp/rpiv-voice\n```\n\nThen restart your Pi session.\n\n### Optional: localized UI\n\nInstall `@juicesharp/rpiv-i18n` alongside it to flip the overlay, status bar, and settings strings to your active locale:\n\n```sh\npi install npm:@juicesharp/rpiv-i18n\n```\n\n`/languages` switches the locale live \u2014 no restart.\n\n## Usage\n\nType `/voice` in Pi's input \u2014 the overlay opens with a recording glyph, a session timer, and `Listening\u2026`.\n\n| Key | Action |\n|---|---|\n| *(speak)* | Equalizer animates; transcript fills in live as Whisper decodes |\n| `Enter` | Close overlay, paste transcript into the Pi editor |\n| `Esc` | Close overlay, paste nothing (configurable \u2014 see below) |\n| `Space` | Pause / resume the mic |\n| `Tab` | Flip between dictation and settings screens |\n| `Ctrl-S` *(in Settings)* | Save settings to disk |\n\nThe dim trailing text after the committed transcript is the rolling partial \u2014 it's already part of what will paste, so you can hit `Enter` the moment you're done.\n\n### First run\n\nThe first time you run `/voice`, the splash overlay downloads the Whisper base multilingual model (~198 MB compressed, ~157 MB on disk) into `~/.pi/models/whisper-base/`. Subsequent runs load directly from disk in under a second. If a previous download was interrupted, the stale model directory is detected and re-downloaded automatically.\n\n## Configuration\n\n`rpiv-voice` works without any config file. To customize, drop a JSON file at `~/.config/rpiv-voice/voice.json`:\n\n```json\n{\n  \"hallucinationFilterEnabled\": false\n}\n```\n\n| Field | Default | Effect |\n|---|---|---|\n| `hallucinationFilterEnabled` | `true` | When `false`, keeps Whisper's \"Thanks for watching\" / \"[Music]\" / repeating-token loops. Useful when dictating short single words that the filter might mistake for noise. |\n\nYou can also flip the toggle interactively from the **Settings** screen (`Tab` from dictation, `Ctrl-S` to save).\n\nThe microphone is the OS default input \u2014 `rpiv-voice` does not expose device selection. The bundled Whisper base multilingual model is loaded from `~/.pi/models/whisper-base/`; alternative models aren't supported today.\n\n## Privacy\n\n- **No cloud STT.** Audio is decoded on your CPU via sherpa-onnx; nothing leaves the machine.\n- **No telemetry.** No usage events, no crash reports, no install pings. Errors are written to a local log only.\n- **No API keys.** Nothing to provision, nothing to revoke.\n- **Network only on first run** \u2014 to download the model. After that, `/voice` works offline.\n\n## Requirements\n\n- [Pi Agent CLI](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)\n- A working microphone reachable by [`decibri`](https://www.npmjs.com/package/decibri) (mic permission granted to your terminal on macOS)\n- ~200 MB free disk under `~/.pi/models/whisper-base/`\n- Network access on first run only\n\n## Troubleshooting\n\n- **\"Microphone init failed\"** on the splash \u2014 grant your terminal app microphone access (System Settings \u2192 Privacy & Security \u2192 Microphone on macOS), then re-run `/voice`.\n- **Transcript looks like \"Thanks for watching\"** \u2014 Whisper hallucinated on near-silence; either speak louder/closer, or leave the hallucination filter on (the default).\n- **`/voice` not found** \u2014 restart your Pi session after install. If it's still missing, confirm the entry exists in `~/.pi/agent/settings.json`.\n- **Recognition errors** \u2014 check `~/.config/rpiv-voice/errors.log` for the underlying sherpa-onnx error.\n\n## Related packages\n\n- [`@juicesharp/rpiv-i18n`](https://www.npmjs.com/package/@juicesharp/rpiv-i18n) \u2014 localizes the `/voice` overlay UI.\n- [`@juicesharp/rpiv-pi`](https://www.npmjs.com/package/@juicesharp/rpiv-pi) \u2014 umbrella + `/rpiv-setup` for the rest of the `rpiv-*` family.\n\n## License\n\n[![npm version](https://img.shields.io/npm/v/@juicesharp/rpiv-voice.svg)](https://www.npmjs.com/package/@juicesharp/rpiv-voice)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)\n\nMIT \u2014 see [LICENSE](./LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "rpiv",
+    "voice",
+    "dictation",
+    "stt",
+    "sherpa-onnx",
+    "overlay"
+  ],
+  "author": {
+    "name": "juicesharp"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-voice#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juicesharp/rpiv-mono.git",
+    "directory": "packages/rpiv-voice"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-11T13:07:31.858Z",
+    "modified": "2026-06-15T12:35:40.791Z",
+    "1.4.2": "2026-05-11T13:07:32.190Z",
+    "1.5.0": "2026-05-12T16:37:39.988Z",
+    "1.5.1": "2026-05-13T00:15:03.689Z",
+    "1.5.2": "2026-05-13T17:02:23.657Z",
+    "1.6.0": "2026-05-14T17:13:38.329Z",
+    "1.6.1": "2026-05-14T20:15:24.402Z",
+    "1.7.0": "2026-05-15T17:47:01.867Z",
+    "1.8.0": "2026-05-16T14:40:50.984Z",
+    "1.8.1": "2026-05-17T17:01:09.074Z",
+    "1.8.2": "2026-05-17T22:12:31.260Z",
+    "1.8.3": "2026-05-18T02:42:42.605Z",
+    "1.9.0": "2026-05-18T18:11:33.199Z",
+    "1.9.1": "2026-05-19T10:45:09.271Z",
+    "1.9.2": "2026-05-19T13:49:12.009Z",
+    "1.10.0": "2026-05-19T21:03:00.705Z",
+    "1.10.1": "2026-05-19T23:29:27.789Z",
+    "1.10.2": "2026-05-20T03:02:10.605Z",
+    "1.11.0": "2026-05-20T21:04:00.172Z",
+    "1.12.0": "2026-05-21T13:16:05.851Z",
+    "1.13.0": "2026-05-25T19:36:54.339Z",
+    "1.14.0": "2026-05-28T01:45:43.014Z",
+    "1.14.1": "2026-05-28T02:02:39.212Z",
+    "1.14.2": "2026-05-28T02:12:30.977Z",
+    "1.14.3": "2026-05-28T02:33:58.011Z",
+    "1.14.4": "2026-05-28T02:45:41.271Z",
+    "1.14.5": "2026-05-28T04:48:02.200Z",
+    "1.14.6": "2026-05-28T10:12:59.442Z",
+    "1.14.7": "2026-05-28T12:16:24.793Z",
+    "1.15.0": "2026-05-28T15:21:46.430Z",
+    "1.16.0": "2026-05-30T14:56:54.543Z",
+    "1.16.1": "2026-05-30T15:03:22.827Z",
+    "1.17.0": "2026-06-01T02:33:16.239Z",
+    "1.17.1": "2026-06-01T13:13:17.718Z",
+    "1.18.0": "2026-06-04T14:56:33.577Z",
+    "1.18.1": "2026-06-04T16:04:04.285Z",
+    "1.18.2": "2026-06-04T16:30:23.456Z",
+    "1.19.0": "2026-06-09T13:23:54.021Z",
+    "1.19.1": "2026-06-10T03:41:36.125Z",
+    "1.20.0": "2026-06-15T12:35:40.698Z"
+  },
+  "versions_count": 39,
+  "downloads_last_week": 237,
+  "download_trend": []
+}

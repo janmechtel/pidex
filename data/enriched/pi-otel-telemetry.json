@@ -1,0 +1,36 @@
+{
+  "name": "pi-otel-telemetry",
+  "latest_version": "1.0.0",
+  "description": "OpenTelemetry traces & metrics extension for pi coding agent",
+  "readme": "# Pi OTEL Telemetry Extension\n\nOpenTelemetry tracing and metrics for [pi coding agent](https://github.com/badlogic/pi-mono). Exports spans and counters for sessions, agent prompts, LLM turns, and tool executions.\n\n## Trace Structure\n\n```\nsession                          (root span, entire session lifecycle)\n\u251c\u2500\u2500 agent.prompt                 (one per user message)\n\u2502   \u2514\u2500\u2500 agent.turn               (one per LLM call + tool execution cycle)\n\u2502       \u251c\u2500\u2500 llm.request          (span event: before provider API call)\n\u2502       \u251c\u2500\u2500 tool.bash            (tool execution span)\n\u2502       \u251c\u2500\u2500 tool.read            (tool execution span)\n\u2502       \u2514\u2500\u2500 tool.edit            (tool execution span)\n\u251c\u2500\u2500 model.changed                (span event on model switch)\n\u2514\u2500\u2500 session.compacted            (span event on compaction)\n```\n\n## Metrics\n\n| Metric | Type | Labels | Description |\n|--------|------|--------|-------------|\n| `pi.tokens.input` | Counter | `llm.model` | Total input tokens consumed |\n| `pi.tokens.output` | Counter | `llm.model` | Total output tokens produced |\n| `pi.tool.calls` | Counter | `tool.name` | Total tool invocations |\n| `pi.tool.errors` | Counter | `tool.name` | Total failed tool invocations |\n| `pi.tool.duration` | Histogram (ms) | `tool.name` | Tool execution time |\n| `pi.turns` | Counter | `llm.model` | Total LLM turns |\n| `pi.prompts` | Counter | `llm.model` | Total user prompts |\n| `pi.session.duration` | Histogram (s) | `llm.model` | Session duration |\n\n## Trace Attributes\n\n### Session span\n| Attribute | Description |\n|-----------|-------------|\n| `session.id` | Session file path or \"ephemeral\" |\n| `session.cwd` | Working directory |\n| `session.turns` | Total turn count |\n| `session.tool_calls` | Total tool calls |\n| `session.tokens.input` | Total input tokens |\n| `session.tokens.output` | Total output tokens |\n| `llm.model` | Current model (provider/id) |\n\n### Turn span\n| Attribute | Description |\n|-----------|-------------|\n| `turn.index` | Turn index within agent prompt |\n| `turn.number` | Global turn number in session |\n| `turn.tool_results` | Number of tool results |\n| `llm.usage.input_tokens` | Tokens consumed (input) |\n| `llm.usage.output_tokens` | Tokens produced (output) |\n\n### Tool span\n| Attribute | Description |\n|-----------|-------------|\n| `tool.name` | Tool name (bash, read, edit, write, etc.) |\n| `tool.call_id` | Unique tool call ID |\n| `tool.args_summary` | Brief summary of arguments (truncated) |\n| `tool.is_error` | Whether execution failed |\n| `tool.duration_ms` | Execution time in milliseconds |\n\n## Configuration\n\n| Environment Variable | Default | Description |\n|---------------------|---------|-------------|\n| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | OTLP HTTP endpoint |\n| `OTEL_SERVICE_NAME` | `pi-coding-agent` | Service name in traces |\n| `PI_OTEL_ENABLED` | `true` | Set to `false` to disable |\n| `PI_OTEL_DEBUG` | `false` | Set to `true` to also log spans/metrics to console |\n| `OTEL_METRIC_EXPORT_INTERVAL` | `10000` | Metric export interval in ms |\n\n## Quick Start\n\n### With Jaeger (local)\n\n```bash\n# Start Jaeger with OTLP support\ndocker run -d --name jaeger \\\n  -p 16686:16686 \\\n  -p 4318:4318 \\\n  jaegertracing/jaeger:2 \\\n  --set receivers.otlp.protocols.http.endpoint=0.0.0.0:4318\n\n# Start pi (extension auto-discovered from ~/.pi/agent/extensions/)\npi\n\n# Open Jaeger UI\nopen http://localhost:16686\n```\n\n### With Grafana Tempo\n\n```bash\nOTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4318 pi\n```\n\n### Debug mode (console output)\n\n```bash\nPI_OTEL_DEBUG=true pi\n```\n\n### Disable\n\n```bash\nPI_OTEL_ENABLED=false pi\n```\n\n## Installation\n\nAlready installed at `~/.pi/agent/extensions/otel-telemetry/`. The extension is auto-discovered by pi.\n\nTo reinstall dependencies:\n\n```bash\ncd ~/.pi/agent/extensions/otel-telemetry\nnpm install\n```\n",
+  "keywords": [
+    "pi-package",
+    "opentelemetry",
+    "otel",
+    "telemetry",
+    "tracing",
+    "metrics"
+  ],
+  "author": {
+    "name": "Maksym Prokopov"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/mprokopov/pi-otel-telemetry#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mprokopov/pi-otel-telemetry.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-09T10:52:54.416Z",
+    "1.0.0": "2026-03-09T10:52:54.546Z",
+    "modified": "2026-03-09T10:52:54.717Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

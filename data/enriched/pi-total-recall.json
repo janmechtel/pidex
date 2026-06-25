@@ -1,0 +1,61 @@
+{
+  "name": "pi-total-recall",
+  "latest_version": "1.8.1",
+  "description": "Complete context stack for pi \u2014 persistent memory, session history search, and local knowledge search in one install.",
+  "readme": "# pi-total-recall\n\nComplete context stack for [pi](https://github.com/badlogic/pi-mono). One install gives your agent persistent memory, session history, and local knowledge search.\n\n## What's included\n\n| Layer | Package | What it does |\n|-------|---------|-------------|\n| **Memory** | [@samfp/pi-memory](https://github.com/samfoy/pi-memory) | Learns preferences, project patterns, and corrections. Injects relevant facts into every session. |\n| **Session history** | [pi-session-search](https://github.com/samfoy/pi-session-search) | Indexes past coding sessions. Search by topic to find previous work, decisions, and debugging context. |\n| **Knowledge base** | [pi-knowledge-search](https://github.com/samfoy/pi-knowledge-search) | Indexes local files (markdown, text, docs). Semantic search over your notes, documentation, and vault. |\n\nTogether, these give pi three layers of context about you:\n\n- **What you prefer** \u2014 coding style, tool choices, project conventions (memory)\n- **What you've done** \u2014 past sessions, debugging history, previous decisions (session search)\n- **What you know** \u2014 notes, docs, research, reference material (knowledge search)\n\n## Install\n\n```bash\npi install npm:pi-total-recall\n```\n\nThat's it. All three extensions are active immediately.\n\n> **Requires Node 24+.** `pi-session-search` and `pi-knowledge-search` use SQLite FTS5 via `node:sqlite`, which is compiled into Node 24 but not Node 22. On Node 22 you'll see `Error: no such table: sessions` at startup \u2014 upgrade Node and restart pi.\n\n## Tools\n\nAfter installing, your agent gets these tools:\n\n### Memory\n| Tool | Description |\n|------|-------------|\n| `memory_search` | Search stored facts and preferences |\n| `memory_remember` | Store a fact or lesson |\n| `memory_forget` | Remove a stored fact or lesson |\n| `memory_lessons` | List learned corrections |\n| `memory_stats` | Show memory statistics |\n\n### Session History\n| Tool | Description |\n|------|-------------|\n| `session_search` | Semantic search over past sessions |\n| `session_list` | Browse sessions by date, project, or status |\n| `session_read` | Read the full conversation from a past session |\n\n### Knowledge Search\n| Tool | Description |\n|------|-------------|\n| `knowledge_search` | Semantic search over local files |\n\n## Configuration\n\nEach component has its own configuration in `~/.pi/agent/settings.json`. See the individual package READMEs for details:\n\n### Memory\n\n```json\n{\n  \"memory\": {\n    \"lessonInjection\": \"selective\"\n  }\n}\n```\n\n### Knowledge Search\n\nPoint it at your notes directory:\n\n```json\n{\n  \"knowledge-search\": {\n    \"paths\": [\"~/Documents/Notes\"]\n  }\n}\n```\n\n### Session History\n\nWorks out of the box \u2014 indexes your existing pi sessions automatically.\n\n## Project-local storage\n\nBy default, all three components write to user-global locations under `~/.pi/` \u2014 which is usually what you want, because memory, sessions, and a notes index are normally global across projects.\n\nIf you want a project's memory/index to be isolated \u2014 e.g. a throwaway prototype, a client repo, or an experimental agent setup \u2014 drop a `pi-total-recall.localPath` key into `{project}/.pi/settings.json`:\n\n```jsonc\n{\n  \"pi-total-recall\": {\n    \"localPath\": \".pi/total-recall\"\n  }\n}\n```\n\n**Path resolution:** relative paths are resolved against the project root (where you run `pi`), not the `.pi/` directory. So `\".pi/total-recall\"` above resolves to `{project}/.pi/total-recall/`, and `\"./data\"` would resolve to `{project}/data/`. Use an absolute path (e.g. `\"/Users/you/shared-index\"`) if you want to pin outside the project.\n\nThe key is case-sensitive (`localPath`, lowercase `l`). A misspelled key like `LocalPath` is silently ignored \u2014 v1.3.2+ of the bundled packages will log a `console.error` warning when this happens.\n\nThat single key cascades to all three packages:\n\n| Package | Cascaded path |\n|---------|---------------|\n| `@samfp/pi-memory` | `{project}/.pi/total-recall/memory/memory.db` |\n| `pi-session-search` | `{project}/.pi/total-recall/session-search/` |\n| `pi-knowledge-search` | `{project}/.pi/total-recall/knowledge-search/` |\n\nYou can also override any single package independently \u2014 package-specific keys win over the cascade:\n\n```jsonc\n{\n  \"pi-total-recall\": { \"localPath\": \".pi/total-recall\" },\n  \"pi-knowledge-search\": {\n    \"localPath\": \"/some/other/path\"   // overrides just this one\n  }\n}\n```\n\n**Resolution order (highest priority first) for every package:**\n\n1. Package-specific env vars (`KNOWLEDGE_SEARCH_CONFIG`, etc.)\n2. `pi-<package>.localPath` in `{cwd}/.pi/settings.json`\n3. `pi-total-recall.localPath` cascade\n4. Global default under `~/.pi/`\n\n### Caveat: session-search source stays global\n\n`pi-session-search` relocates only its own config and index \u2014 the session *source* directories (`~/.pi/agent/sessions`, `~/.pi/agent/sessions-archive`) are pi's own files and remain global. That's where pi writes sessions, so making them project-local would point the tool at an empty directory. Use the `project` filter on `session_search` and `session_list` if you want to scope results to one project.\n\n### Cleanup\n\nWhen using `pi-total-recall.localPath`:\n\n```bash\nrm -rf {project}/.pi/total-recall   # nukes memory, session-search config+index, knowledge-search config+index\n```\n\n## Individual packages\n\nIf you only want one or two components, install them directly:\n\n```bash\npi install @samfp/pi-memory\npi install pi-session-search\npi install pi-knowledge-search\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "extension",
+    "memory",
+    "context",
+    "session-search",
+    "knowledge-search",
+    "semantic-search"
+  ],
+  "author": {
+    "name": "Sam Painter"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/samfoy/pi-total-recall#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/samfoy/pi-total-recall.git"
+  },
+  "pi": {
+    "extensions": [
+      "node_modules/@samfp/pi-memory/src/index.ts",
+      "node_modules/pi-session-search/src/index.ts",
+      "node_modules/pi-knowledge-search/src/index.ts"
+    ],
+    "skills": [
+      "node_modules/pi-session-search/skills"
+    ]
+  },
+  "time": {
+    "created": "2026-04-22T06:54:00.789Z",
+    "modified": "2026-06-10T18:36:42.696Z",
+    "1.0.0": "2026-04-22T06:54:01.303Z",
+    "1.0.1": "2026-04-23T17:48:40.497Z",
+    "1.0.2": "2026-04-24T13:38:52.497Z",
+    "1.0.3": "2026-04-24T13:42:14.876Z",
+    "1.0.4": "2026-04-30T04:21:44.405Z",
+    "1.1.0": "2026-05-01T16:41:17.876Z",
+    "1.2.0": "2026-05-03T01:59:56.363Z",
+    "1.3.0": "2026-05-03T17:11:17.746Z",
+    "1.4.0": "2026-05-03T21:58:40.948Z",
+    "1.4.1": "2026-05-05T21:18:29.432Z",
+    "1.4.2": "2026-05-07T02:39:03.042Z",
+    "1.4.3": "2026-05-08T14:53:59.309Z",
+    "1.4.4": "2026-05-08T14:57:09.674Z",
+    "1.4.5": "2026-05-11T22:32:04.158Z",
+    "1.5.0": "2026-05-11T22:40:10.593Z",
+    "1.6.0": "2026-05-12T14:17:56.464Z",
+    "1.7.0": "2026-05-12T14:32:23.201Z",
+    "1.7.1": "2026-05-12T16:13:36.178Z",
+    "1.8.0": "2026-05-12T18:37:12.657Z",
+    "1.8.1": "2026-06-10T18:36:42.605Z"
+  },
+  "versions_count": 20,
+  "downloads_last_week": 201,
+  "download_trend": []
+}

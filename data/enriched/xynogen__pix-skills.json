@@ -1,0 +1,375 @@
+{
+  "name": "@xynogen/pix-skills",
+  "latest_version": "0.4.17",
+  "description": "Pi extension \u2014 agent skill loader (skill tool + skills bundle)",
+  "readme": "# pix-skills\n\nPi coding agent extension \u2014 skill loader tool + skills bundle.\n\n## What's included\n\n| Resource | Type | Description |\n|---|---|---|\n| `read_skills` | tool | Browse and load bundled skills. No args \u2192 list all. `name` only \u2192 description. `name + full=true` \u2192 full instructions. |\n| `skills/` | skills | 29 bundled skills (auto-loaded by pi at startup \u2014 names + descriptions in system prompt) |\n\n## How it works\n\nPi loads skill *descriptions* into the system prompt at startup (progressive disclosure). Full content\nonly enters context when the agent calls `read_skills(name=<skill>, full=true)` \u2014 or reads the file via the `read` tool.\n\nSkills are also discovered from `~/.pi/agent/skills/` (user-level). Bundled skills take precedence on name collision.\n\n`read_skills` is the safe version of \"agent prompts itself\":\n\n- Agent calls tool explicitly \u2014 no autonomous injection\n- Orchestrator (user or system prompt) decides when skill loading is appropriate\n- Auditable: tool call is visible in the conversation\n\n## Skills\n\nAll skills are model-invocable \u2014 pi auto-loads each one on description match. The agent can also load any skill on demand via `read_skills(name=<skill>, full=true)`.\n\n| Skill | Description |\n|---|---|\n| `ask-user` | Present 2\u20135 options before high-stakes/irreversible or ambiguous decisions |\n| `audit` | Security audit, integrity check, and secret/vulnerability scan |\n| `bootstrap` | Project and tool scaffolding from authoritative docs |\n| `brainstorm` | Design exploration and spec refinement before implementation |\n| `clone` | Clone any git repo into `/tmp/clones` for read-only exploration |\n| `command-runner` | Inspect workspace health using pre-populated git context (status + diff) |\n| `commit` | Split, write, and maintain Conventional-Commit-style commits |\n| `debug` | Root-cause analysis and self-annealing error resolution |\n| `diff` | Review current git changes via pre-populated status + staged/unstaged diffs |\n| `environment` | Detect OS/distro/kernel/arch/user/CPU before running platform-specific commands |\n| `explain` | Technical deconstruction and logic tracing of existing code |\n| `finish` | Structured branch completion \u2014 verify, decide, clean up |\n| `graphify` | Codebase questions via a persistent knowledge graph |\n| `handoff` | Toggle session handoff \u2014 write or read+delete `HANDOFF.md` |\n| `notion` | Efficient Notion workspace retrieval \u2014 pages, databases, lists |\n| `plan` | Write detailed, bite-sized implementation plans before coding |\n| `readme` | Create or update a deployment-focused README in a fixed style |\n| `review` | Architectural review and quality assurance |\n| `runner` | Generate or convert a task runner (just/make/mise/task/npm/sh) |\n| `search` | Deep logic discovery and project context mapping |\n| `standup` | Prepare a daily standup update from Notion context |\n| `suggest` | Multi-dimensional optimization and improvement recommendations |\n| `task` | Task orchestration and ambiguity resolution |\n| `test` | Test execution, analysis, and failure resolution via TDD |\n| `tldr` | Maximum-density technical summary, zero filler |\n| `toon` | Handle information-dense JSON with jq + TOON compression |\n| `ui` | UI/UX design and implementation guidance for frontends |\n| `verify` | Verification before completion \u2014 confirm it's actually fixed |\n| `subagent` | Plan, decompose, and fan out independent units to cheaper parallel subagent workers |\n\n## Command interpolation\n\nSkill `.md` files may embed live command output with the `` !`cmd` `` directive.\nWhen the agent loads a skill with `read_skills(name=<skill>, full=true)`, each\ndirective is evaluated and replaced inline with a fenced block holding the\ncommand's output \u2014 so the skill arrives pre-populated with live workspace\ncontext (e.g. `git status`).\n\n```markdown\n### Working tree status\n!`git status -s`\n```\n\n### Security \u2014 pix-gate is the policy (no prompt)\n\nDirective commands are gated by the **same rule engine** as the `bash` tool\n(`@xynogen/pix-gate`), but with **no confirmation dialog**:\n\n- **Auto-deny on any rule match.** If a command matches any pix-gate rule\n  (critical / dangerous / risky), it is **not run** \u2014 the directive is replaced\n  with an inline `[blocked: <severity> \u2014 <reason>]` marker so the skill author\n  can see and fix it.\n- **Shell-free execution.** Commands run via a direct `argv` spawn (never\n  `bash -c`). Any shell metacharacter (`; | & $ \\` > < ( ) { }`, newline) is\n  rejected, so a clean-looking prefix can't smuggle a chained command.\n- **Bounded.** Per-command 10s timeout and 16 KB output cap; failures never\n  throw \u2014 they inline a marker so skill loading always completes.\n- **Escape.** `` \\!`cmd` `` is left literal, so docs can show the syntax without\n  running it.\n- **Single source of truth.** Expanding pix-gate's rule table or a user's\n  `~/.pi/agent/pix-gate.json` automatically tightens the skill path too.\n\nInterpolation only happens on the `full=true` path; listing and description\nlookups never run commands.\n\n## Usage\n\n```\n# Agent lists available skills (no args)\nread_skills()\n\n# Agent reads description of a specific skill\nread_skills(name=\"commit\")\n\n# Agent loads full commit procedure\nread_skills(name=\"commit\", full=true)\n```\n\n## Install\n\n```bash\npi install npm:@xynogen/pix-skills\n```\n\nOr from the monorepo:\n\n```bash\npi install ./packages/pix-skills\n```\n\n> Also included in [`@xynogen/pix-core`](https://www.npmjs.com/package/@xynogen/pix-core):\n>\n> ```bash\n> pi install npm:@xynogen/pix-core\n> ```\n\n## Full distro\n\nSource: [github.com/xynogen/pix-mono](https://github.com/xynogen/pix-mono)\n\nTo install the complete pix suite (all packages + Pi itself):\n\n```bash\ncurl -fsSL https://raw.githubusercontent.com/xynogen/pix-mono/main/scripts/install.sh | sh\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "pix"
+  ],
+  "author": {
+    "name": "xynogen"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/xynogen/pix-mono/tree/main/packages/pix-skills#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xynogen/pix-mono.git",
+    "directory": "packages/pix-skills"
+  },
+  "pi": {
+    "extensions": [
+      "src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-11T14:16:11.314Z",
+    "modified": "2026-06-25T09:54:47.933Z",
+    "0.1.0": "2026-06-11T14:16:11.732Z",
+    "0.1.1": "2026-06-11T14:54:15.343Z",
+    "0.2.0": "2026-06-11T15:41:23.534Z",
+    "0.2.1": "2026-06-12T03:40:10.377Z",
+    "0.2.2": "2026-06-12T06:20:07.651Z",
+    "0.2.3": "2026-06-12T07:10:22.203Z",
+    "0.3.0": "2026-06-15T08:28:50.600Z",
+    "0.3.1": "2026-06-16T02:17:59.206Z",
+    "0.4.0": "2026-06-18T04:15:31.426Z",
+    "0.4.1": "2026-06-18T10:08:18.786Z",
+    "0.4.2": "2026-06-18T10:41:56.076Z",
+    "0.4.3": "2026-06-19T02:15:59.608Z",
+    "0.4.4": "2026-06-19T03:11:15.789Z",
+    "0.4.5": "2026-06-19T14:30:02.665Z",
+    "0.4.6": "2026-06-20T08:21:59.318Z",
+    "0.4.8": "2026-06-20T09:51:23.861Z",
+    "0.4.9": "2026-06-20T16:29:51.288Z",
+    "0.4.10": "2026-06-20T16:47:51.983Z",
+    "0.4.11": "2026-06-20T19:31:50.947Z",
+    "0.4.12": "2026-06-20T19:56:41.236Z",
+    "0.4.13": "2026-06-20T20:04:03.407Z",
+    "0.4.14": "2026-06-23T09:04:37.993Z",
+    "0.4.15": "2026-06-23T21:01:12.769Z",
+    "0.4.16": "2026-06-23T23:11:49.019Z",
+    "0.4.17": "2026-06-25T09:54:47.656Z"
+  },
+  "versions_count": 25,
+  "downloads_last_week": 2467,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 1353
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 2415
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 70
+    }
+  ]
+}

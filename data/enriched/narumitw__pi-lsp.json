@@ -1,0 +1,383 @@
+{
+  "name": "@narumitw/pi-lsp",
+  "latest_version": "0.9.1",
+  "description": "Pi extension that exposes configurable, language-agnostic LSP tools through a shared runner.",
+  "readme": "# \ud83e\udde0 pi-lsp \u2014 Configurable Language Server Tools for Pi\n\n[![npm](https://img.shields.io/npm/v/@narumitw/pi-lsp)](https://www.npmjs.com/package/@narumitw/pi-lsp) [![Pi extension](https://img.shields.io/badge/Pi-extension-blue)](https://pi.dev) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)\n\n`@narumitw/pi-lsp` is a native [Pi coding agent](https://pi.dev) extension that exposes diagnostics and source-fix tools through configurable Language Server Protocol routes.\n\nThe extension is language-agnostic: servers are selected by config and file extension instead of hard-coded language families.\n\n## \u2728 Features\n\n- Configure LSP servers with simple JSON keyed by server name.\n- Routes diagnostics and source fixes by configured file extensions.\n- Supports multiple servers for the same extension, for example `ty` and `ruff` for `.py`/`.pyi` diagnostics.\n- Uses one internal LSP runner for JSON-RPC framing, subprocess lifecycle, diagnostics, code actions, and workspace edit application.\n- Supports workspace roots, file limits, recursive file discovery, server overrides, and write-or-preview edits.\n- Starts language servers only for tool calls, then shuts them down.\n- Shows statusline activity only while LSP tools are running.\n\n## \ud83d\udce6 Install\n\n```bash\npi install npm:@narumitw/pi-lsp\n```\n\nTry this package locally from the repository root:\n\n```bash\npi -e ./extensions/pi-lsp\n```\n\n## \u2699\ufe0f Configuration\n\nIf no config is provided, pi-lsp ships compatible defaults for Biome, ty, and Ruff.\n\nCustom config can be supplied in one of these locations:\n\n1. `PI_LSP_CONFIG` as inline JSON or a path to a JSON file\n2. `<workspace>/.pi/lsp.json`\n3. `~/.pi/agent/lsp.json`\n\n`PI_LSP_CONFIG` only accepts JSON or a JSON file path; JavaScript and TypeScript config files are not evaluated.\n\n`lsp.json` can be a plain object keyed by server name:\n\n```json\n{\n  \"ty\": {\n    \"command\": [\"ty\", \"server\"],\n    \"extensions\": [\".py\", \".pyi\"]\n  },\n  \"ruff\": {\n    \"command\": [\"ruff\", \"server\"],\n    \"extensions\": [\".py\", \".pyi\"]\n  },\n  \"biome\": {\n    \"command\": [\"biome\", \"lsp-proxy\"],\n    \"extensions\": [\n      \".astro\",\n      \".css\",\n      \".graphql\",\n      \".gql\",\n      \".html\",\n      \".js\",\n      \".jsx\",\n      \".json\",\n      \".jsonc\",\n      \".ts\",\n      \".tsx\",\n      \".vue\"\n    ]\n  }\n}\n```\n\nUse `servers` when you need global pi-lsp options such as timeout:\n\n```json\n{\n  \"timeout\": 30000,\n  \"servers\": {\n    \"ty\": {\n      \"command\": [\"ty\", \"server\"],\n      \"extensions\": [\".py\", \".pyi\"],\n      \"env\": {\n        \"LSP_LOG\": \"debug\"\n      },\n      \"initialization\": {\n        \"settings\": {}\n      }\n    }\n  }\n}\n```\n\nEach server entry supports:\n\n- `command`: argv array used to start the LSP server.\n- `extensions`: file extensions that should route to this server.\n- `env`: extra environment variables for the LSP server process.\n- `initialization`: LSP initialization options and workspace configuration values.\n\nGlobal options:\n\n- `timeout`: request timeout in milliseconds. Defaults to `20000`.\n\npi-lsp infers `languageId` from common extensions and falls back to the extension without the leading dot.\n\nPer-server command overrides still use the normalized server name:\n\n```bash\nPI_TY_LSP_COMMAND=\"uvx ty server\" \\\nPI_RUFF_LSP_COMMAND=\"uvx ruff server\" \\\npi -e ./extensions/pi-lsp\n```\n\n## \u26a0\ufe0f Tool changes\n\n`lsp_format` is no longer provided. pi-lsp now focuses on LSP diagnostics and source code actions:\n\n- `lsp_diagnostics`\n- `lsp_fix`\n\nUse project formatters or shell commands for formatting workflows.\n\n## \ud83d\udee0\ufe0f Pi tools\n\n### `lsp_diagnostics`\n\nRun diagnostics through configured servers.\n\nParameters:\n\n- `paths?`: files or directories to check. Defaults to the workspace root.\n- `root?`: workspace root. Defaults to cwd.\n- `limit?`: maximum files to open per selected server.\n- `server?`: configured server name, or an array of names. Defaults to all matching servers.\n\n### `lsp_fix`\n\nApply source fixes or import organization through a configured server that matches its extension. If multiple servers match, pass `server` explicitly.\n\nParameters:\n\n- `path`: file to fix.\n- `root?`: workspace root. Defaults to cwd.\n- `kind?`: source action kind. Defaults to `source.fixAll`.\n- `write?`: write fixed text back to the file. Defaults to false.\n- `server?`: optional configured server name.\n\n## \ud83d\udcac Command\n\n```text\n/lsp\n```\n\nShows configured LSP commands and whether each command is available on `PATH`.\n\n## \ud83d\uddc2\ufe0f Package layout\n\n```txt\nextensions/pi-lsp/\n\u251c\u2500\u2500 src/\n\u2502   \u251c\u2500\u2500 adapters.ts\n\u2502   \u251c\u2500\u2500 command.ts\n\u2502   \u251c\u2500\u2500 files.ts\n\u2502   \u251c\u2500\u2500 lsp-client.ts\n\u2502   \u251c\u2500\u2500 pi-lsp.ts\n\u2502   \u251c\u2500\u2500 routes.ts\n\u2502   \u251c\u2500\u2500 runner.ts\n\u2502   \u251c\u2500\u2500 text-edits.ts\n\u2502   \u2514\u2500\u2500 types.ts\n\u251c\u2500\u2500 README.md\n\u251c\u2500\u2500 LICENSE\n\u251c\u2500\u2500 tsconfig.json\n\u2514\u2500\u2500 package.json\n```\n\n## \ud83d\udcc4 License\n\nMIT. See [`LICENSE`](./LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "lsp",
+    "language-server-protocol",
+    "configurable",
+    "lint",
+    "diagnostics",
+    "code-action"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/narumiruna/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/narumiruna/pi-extensions.git",
+    "directory": "extensions/pi-lsp"
+  },
+  "pi": {
+    "extensions": [
+      "./src/pi-lsp.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-17T08:45:06.257Z",
+    "modified": "2026-06-25T16:53:47.006Z",
+    "0.1.19": "2026-05-17T08:45:06.814Z",
+    "0.1.20": "2026-05-17T08:48:33.959Z",
+    "0.1.21": "2026-05-17T09:20:35.342Z",
+    "0.1.22": "2026-05-17T10:07:57.536Z",
+    "0.1.23": "2026-05-17T11:32:08.377Z",
+    "0.1.24": "2026-05-17T12:47:14.993Z",
+    "0.1.25": "2026-05-17T18:00:57.813Z",
+    "0.1.26": "2026-05-17T18:38:23.502Z",
+    "0.1.27": "2026-05-19T13:50:54.664Z",
+    "0.1.28": "2026-05-20T05:15:00.339Z",
+    "0.1.29": "2026-05-20T11:52:24.294Z",
+    "0.1.30": "2026-05-21T16:05:51.003Z",
+    "0.1.31": "2026-05-21T16:52:39.333Z",
+    "0.1.32": "2026-05-22T15:54:23.179Z",
+    "0.1.33": "2026-05-24T06:19:18.099Z",
+    "0.1.34": "2026-05-24T16:19:30.488Z",
+    "0.1.35": "2026-05-26T16:36:56.736Z",
+    "0.1.36": "2026-05-26T17:02:02.757Z",
+    "0.1.37": "2026-06-05T22:05:17.884Z",
+    "0.2.0": "2026-06-11T11:34:57.638Z",
+    "0.3.0": "2026-06-12T06:38:51.814Z",
+    "0.4.0": "2026-06-12T21:47:53.378Z",
+    "0.4.1": "2026-06-13T06:13:42.944Z",
+    "0.4.2": "2026-06-13T08:55:44.239Z",
+    "0.4.3": "2026-06-18T13:35:21.395Z",
+    "0.5.0": "2026-06-19T09:52:12.046Z",
+    "0.6.0": "2026-06-20T13:15:57.605Z",
+    "0.6.1": "2026-06-20T15:40:07.679Z",
+    "0.6.2": "2026-06-21T18:56:26.332Z",
+    "0.7.0": "2026-06-24T01:02:24.163Z",
+    "0.8.0": "2026-06-24T15:46:35.521Z",
+    "0.9.0": "2026-06-25T15:05:48.307Z",
+    "0.9.1": "2026-06-25T16:53:46.731Z"
+  },
+  "versions_count": 33,
+  "downloads_last_week": 1204,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 1201
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 1344
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 139
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 258
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 947
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 961
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 283
+    }
+  ]
+}

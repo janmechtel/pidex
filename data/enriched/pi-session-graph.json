@@ -1,0 +1,42 @@
+{
+  "name": "pi-session-graph",
+  "latest_version": "0.1.11",
+  "description": "Session lineage graph tools for Pi",
+  "readme": "# pi-session-graph\n\n> One of my diet context engineering and workflow extensions. Add pi-diet-LSP, pi-diet-Ripgrep, pi-repo-move and others from [npm](https://www.npmjs.com/~probabilityengineer).\n\nLightweight Pi extension for text session status/lineage and generated session graph artifacts.\n\n`pi-session-graph` does not mutate raw session JSONLs or manifests. Canonical imports/rebuilds live in the bundled `agent-session-store` dependency; this package invokes that backend to prepare exports, then renders views.\n\n## Commands\n\nText/current-session commands:\n\n```text\n/session-status\n/session-lineage [--files]\n```\n\nGraph artifact generation:\n\n```text\n/session-graphs\n/session-graphs --dot [--svg]\n```\n\nCLI/admin equivalents:\n\n```bash\npigraph                 # help / command summary\npigraph status          # text status for the current session graph\npigraph lineage [--files]\npigraph leaves [--all]\npigraph repos\npigraph dot [--svg]\npigraph graphs\nnpm run whole-lineage   # rough archived-style whole-lineage Mermaid HTML/MMD\n```\n\n`pigraph` with no command prints help and does not inspect the store or generate files. Use `pigraph status` for the explicit status report. `/session-graphs` and `pigraph graphs` always rebuild/export the canonical store, then write timestamped interactive viewer files. There is no `--refresh` flag.\n\nThe singular `/session-graph ...` command is no longer part of the public command surface; graph artifact functions are under `/session-graphs ...`.\n\n## Graphviz DOT/SVG\n\n`/session-graphs --dot` and `pigraph dot` write a Graphviz DOT lineage export under the current working directory's `session-graphs/` directory. The structure follows the older Mermaid output from `agent-session-store/scripts/build-graphs.ts`: start circles point to session boxes, yellow diamond state nodes represent source-session state at relocation times, dotted arrows show progression inside a session file, and solid/dashed/bold edges show relocation/derived/compaction links.\n\n```bash\n/session-graphs --dot        # write .dot from inside Pi\n/session-graphs --dot --svg  # also run graphviz dot -Tsvg when installed\npigraph dot                  # CLI equivalent\npigraph dot --svg\n```\n\nIf Graphviz is not installed, `dot` is not on PATH, or Graphviz cannot render a large clustered graph, the DOT file is still written and the SVG step reports a clear skip message. On macOS, install Graphviz with:\n\n```bash\nbrew install graphviz\n```\n\nDOT files are plain text. To render one manually:\n\n```bash\ndot -Gnewrank=true -Tsvg path/to/session_graph.dot -o session_graph.svg\nopen session_graph.svg\n```\n\n## Graph outputs\n\nGraph report packs are written to timestamped folders:\n\n```text\n~/Desktop/session-graphs/<timestamp>/\n  index.html\n  README.md\n  archive/\n    full-session-graph.dot/.svg\n    full-session-graph-with-starts.dot/.svg\n    raw-graph-data.json\n  reports/\n    01-hotspots.html\n    02-repo-jump-map.dot/.svg\n    03-false-starts.html\n    04-active-hours.html\n    05-meaningful-lineage-forest.dot/.svg\n    06-lineage-full-interactive.html\n    07-lineage-focused-interactive.html\n    08-timeline-projects.html\n    09-timeline-sessions.html\n    09-project-focus-index.html\n    11-chart-timeline-projects.html\n    12-chart-timeline-sessions.html\n```\n\nOpen `index.html` first. The archive files preserve what happened; the report files are ranked/focused views for deciding what to inspect.\n\nFor a rough recreation of the archived `whole-lineage-graph.html` / `.mmd` style, use:\n\n```bash\nnpm run whole-lineage\n```\n\nThis writes simple white-background Mermaid artifacts to `~/.pi/agent/session-graph/whole-lineage-graph.html` and `.mmd`.\n\n## Data sources\n\nPreferred input:\n\n```text\n~/.pi/agent/session-store/graph-export.json\n```\n\nLegacy store input:\n\n```text\n~/.pi/agent/session-graph/curated-store.json\n```\n\n`/session-graphs` and `pigraph graphs` run the bundled `agent-session-store` backend first, so delayed installs are supported: a user can install only `pi-session-move` initially, then install `pi-session-graph` later and rebuild from raw sessions plus move manifests.\n\nIf `agent-session-store` is unavailable, install dependencies in this repo with:\n\n```bash\nnpm install\n```\n\nor install the backend globally with:\n\n```bash\nnpm install -g agent-session-store@latest\n```\n\nYou can also point at an existing install with:\n\n```bash\nexport AGENT_SESSION_STORE_BIN=/path/to/agent-session-store\n```\n\n`agent-session-store` merges legacy and namespaced session-move manifests before graph export:\n\n```text\n~/.pi/agent/relocations.jsonl\n~/.pi/agent/session-move/manifests/relocations.jsonl\n```\n\nFallback inputs, used only when the prepared graph export is unavailable:\n\n```text\n~/.pi/agent/relocations.jsonl\n~/.pi/agent/session-graph/lineage-overlays.jsonl\n```\n\n## Pi session suite relationship\n\n- `agent-session-store`: provider-neutral canonical store and graph export builder, installed as this package's backend dependency.\n- `pi-session-move`: session-facing move and restart UX.\n- `pi-repo-move`: filesystem repo move UX (`/repo-move <target>`).\n- `pi-session-graph`: read-only text status/lineage and graph artifact rendering.\n\n## Install\n\n```bash\npi install git:github.com/ProbabilityEngineer/pi-session-graph\n```\n\nThis package ships committed `dist/` JavaScript so Pi git installs can load the extension and the `pigraph` CLI without running TypeScript directly. Package entry points are:\n\n```text\npi extension: ./dist/index.js\nCLI bin:      ./dist/bin/pigraph.js\n```\n\nNormal npm installs expose `pigraph` through npm's bin shim location. For global npm installs, that is usually:\n\n```text\n$(npm prefix -g)/bin/pigraph\n```\n\nWith nvm this may resolve to a path like:\n\n```text\n~/.nvm/versions/node/<version>/bin/pigraph\n```\n\nPi git installs clone the package under `~/.pi/agent/git/...`; if you want `pigraph` on your shell PATH from a Pi git install, create a user shim in a PATH directory such as `~/.pi/agent/bin`:\n\n```bash\nmkdir -p ~/.pi/agent/bin\nln -sfn ~/.pi/agent/git/github.com/ProbabilityEngineer/pi-session-graph/dist/bin/pigraph.js ~/.pi/agent/bin/pigraph\n```\n\nLocal testing:\n\n```bash\nnpm run build\npi -e ./dist/index.js\n```\n\n## Boundaries\n\n`agent-session-store` owns provider imports, canonical SQLite/JSON exports, lineage/continuity/compaction/fork derivation, repo identity and alias facts, temporal work bursts, and provider/activity metrics.\n\n`pi-session-graph` owns read-only rendering/navigation over prepared exports.\n\n- Does not mutate session JSONLs.\n- Does not rewrite legacy `~/.pi/agent/relocations.jsonl` or namespaced `~/.pi/agent/session-move/manifests/relocations.jsonl`.\n- Does not infer repo identity from raw content.\n- Does not perform backup extraction/reconstruction.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "session",
+    "lineage",
+    "graph"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/ProbabilityEngineer/pi-session-graph#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ProbabilityEngineer/pi-session-graph.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-06-02T17:45:54.094Z",
+    "modified": "2026-06-20T19:04:20.397Z",
+    "0.1.1": "2026-06-02T17:45:54.487Z",
+    "0.1.4": "2026-06-02T19:34:50.243Z",
+    "0.1.5": "2026-06-02T22:20:03.909Z",
+    "0.1.6": "2026-06-02T22:23:38.161Z",
+    "0.1.7": "2026-06-02T22:31:39.670Z",
+    "0.1.8": "2026-06-05T02:29:27.470Z",
+    "0.1.9": "2026-06-05T05:24:00.810Z",
+    "0.1.10": "2026-06-12T04:12:41.633Z",
+    "0.1.11": "2026-06-20T19:04:20.130Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,439 @@
+{
+  "name": "pi-subagents",
+  "latest_version": "0.31.0",
+  "description": "Pi extension for delegating tasks to subagents with chains, parallel execution, and TUI clarification",
+  "readme": "<p>\n  <img src=\"https://raw.githubusercontent.com/nicobailon/pi-subagents/main/banner.png\" alt=\"pi-subagents\" width=\"1100\">\n</p>\n\n# pi-subagents\n\n`pi-subagents` lets Pi delegate work to focused child agents. Use it for code review, scouting, implementation, parallel audits, saved workflows, background jobs, and anything else that benefits from a second or third set of model eyes.\n\nhttps://github.com/user-attachments/assets/702554ec-faaf-4635-80aa-fb5d6e292fd1\n\n## Installation\n\n```bash\npi install npm:pi-subagents\n```\n\nThat is the only required step. You can add optional pieces later.\n\n## Try this first\n\nYou do not need to create agents, write config, or learn slash commands. After installing, ask Pi for delegation in plain language:\n\n```text\nUse reviewer to review this diff.\n```\n\n```text\nAsk oracle for a second opinion on my current plan.\n```\n\n```text\nUse scout to understand this code based on our discussion then ask me clarification questions.\n```\n\n```text\nRun parallel reviewers: one for correctness, one for tests, and one for unnecessary complexity.\n```\n\nThat is enough to start.\n\n## What happens\n\nPi is the parent session. A subagent is a focused child Pi session with its own job.\n\nWhen you ask for a subagent, Pi starts the child, gives it the task, and brings the result back. Foreground runs stream in the conversation. Background runs keep working and can be checked later.\n\nInstalling the extension does not start an automatic reviewer in the background. It gives Pi a delegation tool. If you want every implementation reviewed, say that in your prompt or put it in your project instructions:\n\n```text\nWhen you finish implementing, run a reviewer subagent before summarizing.\n```\n\n## Good first prompts\n\nThese cover most day-to-day use:\n\n```text\nAsk oracle for a second opinion on my current plan. Challenge assumptions and tell me what I might be missing.\n```\n\n```text\nUse oracle to help solve this hard bug. Have it inspect the code and propose the best next move before we edit anything.\n```\n\n```text\nRun parallel reviewers on this diff. I want one focused on correctness, one on tests, and one on unnecessary complexity.\n```\n\n```text\nHave worker implement this approved plan. Afterward, run parallel reviewers, summarize their feedback, and apply the fixes that make sense.\n```\n\n```text\nRun a review loop on this change until reviewers stop finding fixes worth doing, with a max of 3 rounds.\n```\n\n```text\nUse scout to understand the auth flow, then have planner turn that into an implementation plan.\n```\n\nThose are ordinary Pi requests. Pi decides whether to call `subagent`, which agent to use, and whether a chain or parallel run makes sense.\n\n## Common workflows\n\n| Want | Ask naturally |\n|------|---------------|\n| Get a second opinion | \u201cAsk oracle to review this plan and challenge assumptions.\u201d |\n| Solve a hard problem | \u201cUse oracle to investigate this bug before we edit.\u201d |\n| Review a diff | \u201cUse reviewer to review this diff.\u201d |\n| Run parallel reviewers | \u201cRun reviewers for correctness, tests, and cleanup.\u201d |\n| Implement then review | \u201cImplement this, then review it.\u201d |\n| Review until clean | \u201cRun a review loop on this change with a max of 3 rounds.\u201d |\n| Execute a plan carefully | \u201cHave worker implement this approved plan, then run reviewers and apply the feedback.\u201d |\n| Scout before planning | \u201cUse scout to inspect the auth flow before planning.\u201d |\n| Run in the background | \u201cRun this in the background.\u201d |\n| Browse agents | \u201cShow me the available subagents.\u201d |\n| Use a saved workflow | \u201cRun the review chain on this branch.\u201d |\n| See running work | \u201cShow active async runs.\u201d |\n| Check setup | \u201cCheck whether subagents are configured correctly.\u201d |\n\nThe extension ships with builtin agents you can use immediately.\n\n## Builtin agents in plain English\n\n| Agent | Use it when you want... |\n|-------|--------------------------|\n| `scout` | Fast local codebase recon: relevant files, entry points, data flow, risks, and where another agent should start. |\n| `researcher` | Web/docs research with sources: official docs, specs, benchmarks, recent changes, and a concise research brief. |\n| `planner` | A concrete implementation plan from existing context. It should read and plan, not edit code. |\n| `worker` | Implementation work, including approved oracle handoffs. It edits files, validates, and escalates unapproved decisions instead of guessing. |\n| `reviewer` | Code review and small fixes. It checks the implementation against the task/plan, tests, edge cases, and simplicity. |\n| `context-builder` | A stronger setup pass before planning: gathers code context and writes handoff material such as `context.md` and `meta-prompt.md`. |\n| `oracle` | A second opinion before acting. It challenges assumptions, catches drift, and recommends the safest next move without editing. |\n| `delegate` | A lightweight general delegate when you want a child agent that behaves close to the parent session. |\n\nA simple rule of thumb: use `scout` before you understand the code, `researcher` before you trust external facts, `planner` before a bigger change, `worker` to implement, `reviewer` to check, and `oracle` when the decision itself feels risky.\n\n## Changing an agent's model\n\nBuiltin agents inherit your current Pi default model by default. This keeps new installs from depending on a provider you may not have configured. If you want a role to use a specific model, set an override instead of copying the bundled agent file.\n\nFor one run, put the override in the command:\n\n```text\n/run reviewer[model=anthropic/claude-sonnet-4:high] \"Review this diff\"\n```\n\nFor a persistent override, edit settings. This example pins the reviewer everywhere, adds a backup model for provider failures, and keeps the other builtins on your normal default model:\n\n```json\n{\n  \"subagents\": {\n    \"agentOverrides\": {\n      \"reviewer\": {\n        \"model\": \"anthropic/claude-sonnet-4\",\n        \"thinking\": \"high\",\n        \"fallbackModels\": [\"openai/gpt-5-mini\"]\n      }\n    }\n  }\n}\n```\n\nUse `~/.pi/agent/settings.json` for a user override or the project config settings file (`.pi/settings.json` in standard Pi) for a project override. The same `agentOverrides` block can change `tools`, `skills`, inherited context, prompt text, or disable a builtin. Matching user and project agents also receive override fields that their frontmatter leaves unset, so a shared project config agent can keep the persona while local settings choose the model. Explicit frontmatter still wins.\n\nIf your provider rejects model IDs with thinking suffixes, set `subagents.disableThinking: true` in user or project settings. That clears bundled builtin thinking defaults in one place; an explicit higher-precedence `agentOverrides.<name>.thinking` value can opt a role back in.\n\nTo inspect what `pi-subagents` has actually loaded right now, use:\n\n```text\n/subagents-models\n/subagents-models reviewer\n```\n\nThat reports the live runtime mapping, which can differ from settings on disk until you reload Pi.\n\n## Where running subagents show up\n\nForeground runs stream progress in the conversation while they run.\n\nBackground runs keep working after control returns to you. Inspect active runs with `subagent({ action: \"status\" })`, or a specific run with `subagent({ action: \"status\", id: \"...\" })`.\n\nThey also show a compact async widget and send completion notifications. Parallel background runs show per-agent progress instead of fake chain steps. Chains with parallel groups keep their grouped shape in progress and results, so failed or paused agents stay visible next to completed ones. When a child is explicitly allowed to fan out with `tools: subagent`, its nested runs appear under that parent child in the main status tree instead of being hidden inside the child process.\n\nYou can also ask naturally:\n\n```text\nShow me the current async runs.\n```\n\nIf something feels misconfigured, run:\n\n```text\n/subagents-doctor\n```\n\nor ask:\n\n```text\nCheck whether subagents and intercom are set up correctly.\n```\n\n## Recommended orchestration pattern (scaffolding)\n\nUse orchestration as parent-agent guidance, not as a runtime workflow mode. For implementation work, the recommended loop is:\n\n```text\nclarify \u2192 planner \u2192 worker \u2192 fresh reviewers \u2192 worker\n```\n\nUse the optional prompt shortcuts below when you want the pattern to be repeatable.\n\nPackaged `planner`, `worker`, and `oracle` default to forked context when a launch omits `context`; pass `context: \"fresh\"` when you intentionally want a fresh child run.\n\nChild-safety boundaries are enforced at runtime. Spawned child sessions do not receive the bundled `pi-subagents` skill, and forked child context filtering removes parent-only subagent artifacts (including old hidden orchestration-instruction messages, slash/status/control messages, and prior parent `subagent` tool-call/tool-result history) while preserving ordinary prose and unrelated tool calls/results. By default, children do not register the `subagent` tool and receive boundary instructions that they are not the parent orchestrator and must not propose or run subagents. The explicit exception is an agent whose resolved builtin `tools` includes `subagent`; that child gets a child-safe `subagent` tool for the fanout work the parent assigned, still bounded by `maxSubagentDepth`.\n\n## Optional shortcuts\n\nThe package includes reusable prompt templates for common workflows. You do not need them, but they are handy when you want the same shape every time:\n\n| Prompt | Use it for |\n|--------|------------|\n| `/parallel-review` | Launch fresh-context reviewers with distinct angles, then synthesize what to fix. |\n| `/review-loop` | Run parent-controlled worker, reviewer, and fix-worker cycles until clean or capped. |\n| `/parallel-research` | Combine `researcher` and `scout` for external evidence, local code context, and practical tradeoffs. |\n| `/parallel-context-build` | Run `context-builder` agents in parallel to produce planning handoff context and meta-prompts. |\n| `/parallel-handoff-plan` | Combine external research and `context-builder` passes into an implementation handoff plan and meta-prompt. |\n| `/gather-context-and-clarify` | Scout/research first, then ask the user the clarification questions that matter. |\n| `/parallel-cleanup` | Run review-only cleanup passes after implementation. |\n\nAdd `autofix` to `/parallel-review` or `/parallel-cleanup` to apply only the synthesized fixes worth doing now after reviewers return.\n\n## Optional pi-intercom companion\n\n`pi-subagents` works without `pi-intercom`. Install `pi-intercom` only if you want child agents to talk back to the parent Pi session while they are running.\n\n```bash\npi install npm:pi-intercom\n```\n\nMost users do not call `intercom` directly. After `pi-intercom` is installed, `pi-subagents` can automatically give child agents a private coordination channel back to the parent session. The bridge recognizes the normal `pi install npm:pi-intercom` package install as well as legacy local extension checkouts.\n\nUse it for work where the child might need a decision instead of guessing:\n\n```text\nRun this implementation in the background. If the worker gets blocked or needs a product decision, have it ask me through intercom.\n```\n\n```text\nAsk oracle to review this plan. If it sees a decision I need to make, have it ask me instead of assuming.\n```\n\nThe child can use one dedicated coordination tool:\n\n- `contact_supervisor`: the child contacts the parent/supervisor session that delegated the task. Use `reason: \"need_decision\"` for blocking decisions or clarification, and `reason: \"progress_update\"` for short non-blocking updates when a discovery changes the plan. Do not ask for clarification when the only conflict is review-only/no-edit versus progress-writing or artifact-writing instructions; no-edit wins.\n\nChild-side routine completion handoffs are still not expected. With the intercom bridge active, parent-side `pi-subagents` sends grouped completion results through `pi-intercom`: one grouped message per foreground parent `subagent` run and one per completed async result file. Acknowledged foreground delivery returns a compact receipt with artifact/session paths; if unacknowledged, the normal full output is preserved. Grouped messages include child intercom targets, full child summaries, and compact nested child summaries under the parent child that launched them.\n\nIf a child appears stalled, needs-attention notices can show up in the parent session with useful next actions, such as checking `subagent({ action: \"status\" })`, interrupting the run, or nudging the child.\n\nIf messages do not show up, run:\n\n```text\n/subagents-doctor\n```\n\nFor normal use, you do not need to configure anything. Advanced users can tune the bridge with `intercomBridge` in the configuration section below.\n\nAt this point, you know enough to use the plugin. The rest of this README is reference material for exact command syntax, custom agents, saved chains, worktrees, and configuration.\n\n## Optional pi-permission-system integration\n\n[`@gotgenes/pi-permission-system`](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-permission-system)\nadds a second policy layer \u2014 `allow` / `ask` / `deny` \u2014 on top of\npi-subagents' visibility-based tool restrictions.\n\nThe two compose independently:\n\n| Layer | What it controls | Who provides it |\n|-------|-----------------|-----------------|\n| Visibility | Which tools are registered before the session starts | pi-subagents (`tools:` frontmatter key) |\n| Policy  | Runtime allow/ask/deny decisions on every tool call, bash command, MCP operation | pi-permission-system (`permission:` frontmatter key) |\n\n### Installing\n\n```bash\npi install npm:@gotgenes/pi-permission-system\n```\n\nNo configuration is required for the integration \u2014 it is automatic when both\nextensions are installed. pi-subagents passes the parent session identity\nto child processes via the `PI_SUBAGENT_PARENT_SESSION` environment variable,\nwhich the permission system uses to forward `ask` prompts from headless\nsubagent processes back to the parent session's UI.\n\n### Per-agent permission frontmatter\n\nAgent files can include a `permission:` block alongside the standard `tools:`\nkey. The permission system reads it independently:\n\n```yaml\n---\nname: worker\ntools: bash,read,write,edit\npermission:\n  \"*\": ask\n  read: allow\n  bash:\n    \"*\": ask\n    \"git *\": allow\n    \"npm test\": allow\n---\n```\n\nIn this example the subagent extension restricts visibility to four tools,\nand the permission system then applies `ask`/`allow` policy within that\nvisible set. Both keys coexist without collision.\n\n### Checking the integration\n\nRun `/subagents-doctor` to check the permission system status.\nIf `ask` prompts from children are not reaching the parent UI, verify both\nextensions are installed:\n\n```bash\npi list\n```\n\n### How it works\n\nAt session start, the interactive (root) session records its own identity in\n`PI_SUBAGENT_PARENT_SESSION`. When pi-subagents launches a child, it passes the\nlaunching session's identity to that child explicitly, falling back to the\ninherited environment variable. When the permission system inside a child\nencounters an `ask` permission, it reads this variable to locate the parent\nsession and forwards the confirmation request there.\n\nThis resolves an interactive prompt only when the parent it points at is the\ninteractive session \u2014 i.e. for the direct children of the root session. A\nnested child's parent is itself a headless subagent process with no UI to\nsurface the prompt, so `ask` policies are best placed on agents that run as\ndirect children of the interactive session.\n\n## Direct commands\n\nSkip this section until you want exact syntax.\n\n| Command | Description |\n|---------|-------------|\n| `/run <agent> [task]` | Run one agent; omit the task for self-contained agents |\n| `/chain agent1 \"task1\" -> agent2 \"task2\"` | Run agents in sequence |\n| `/parallel agent1 \"task1\" -> agent2 \"task2\"` | Run agents in parallel |\n| `/run-chain <chainName> -- <task>` | Launch a saved `.chain.md` or `.chain.json` workflow |\n| `/subagents-doctor` | Show read-only setup diagnostics |\n| `/subagents-models [agent]` | Show the runtime-loaded builtin model mapping, optionally filtered to one builtin |\n\nCommands validate agent names locally, support tab completion, and send results back into the conversation.\n\n### Per-step tasks\n\nUse `->` to separate steps and give each step its own task:\n\n```text\n/chain scout \"scan the codebase\" -> planner \"create an implementation plan\"\n/parallel scanner \"find security issues\" -> reviewer \"check code style\"\n```\n\nBoth double and single quotes work. You can also use `--` as a delimiter:\n\n```text\n/chain scout -- scan code -> planner -- analyze auth\n```\n\nSteps without a task inherit behavior from the execution mode. Chain steps get `{previous}`, the prior step\u2019s output. Parallel steps use the first available task as a fallback.\n\n```text\n/chain scout \"analyze auth\" -> planner -> worker\n# scout gets \"analyze auth\"; planner gets scout output; worker gets planner output\n```\n\nFor a shared task, list agents and place one `--` before the task:\n\n```text\n/chain scout planner -- analyze the auth system\n/parallel scout reviewer -- check for security issues\n```\n\n### Inline per-step config\n\nAppend `[key=value,...]` to an agent name to override defaults for that step:\n\n```text\n/chain scout[output=context.md] \"scan code\" -> planner[reads=context.md] \"analyze auth\"\n/run scout[model=anthropic/claude-sonnet-4] summarize this codebase\n/parallel reviewer[skills=code-review+security] \"review backend\" -> reviewer[model=openai/gpt-5-mini] \"review frontend\"\n```\n\n| Key | Example | Description |\n|-----|---------|-------------|\n| `output` | `output=context.md` | Write results to a file. For `/chain` and `/parallel`, relative paths live under the chain directory; for `/run`, relative paths resolve against cwd. |\n| `outputMode` | `outputMode=file-only` | Return only a concise file reference for saved output instead of the full saved content. Requires `output`; default is `inline`. |\n| `reads` | `reads=a.md+b.md` | Read files before executing. `+` separates multiple paths. |\n| `model` | `model=anthropic/claude-sonnet-4` | Override model for this step. |\n| `skills` | `skills=planning+review` | Override available skills. `+` separates multiple skills. |\n| `progress` | `progress` | Enable progress tracking. |\n\nSet `output=false`, `reads=false`, or `skills=false` to disable that behavior explicitly. Do not use `output=false` for file-only returns; use `outputMode=file-only` with an `output` path.\n\n### Background and forked runs\n\nAdd `--bg` to run in the background:\n\n```text\n/run scout \"audit the codebase\" --bg\n/chain scout \"analyze auth\" -> planner \"design refactor\" -> worker --bg\n/parallel scout \"scan frontend\" -> scout \"scan backend\" --bg\n```\n\nAdd `--fork` to start each child from a real branched session created from the parent\u2019s current leaf:\n\n```text\n/run reviewer \"review this diff\" --fork\n/chain scout \"analyze this branch\" -> planner \"plan next steps\" --fork\n/parallel scout \"audit frontend\" -> reviewer \"audit backend\" --fork\n```\n\nYou can combine them in either order:\n\n```text\n/run reviewer \"review this diff\" --fork --bg\n/run reviewer \"review this diff\" --bg --fork\n```\n\nBackground runs are detached. If the parent agent has other independent work, it should keep working. If it has nothing useful to do until the background result arrives, it should end the turn instead of running sleep or status-polling loops. Pi will deliver the completion when the run finishes.\n\nThe `oracle` and `worker` builtins are designed for an explicit decision loop. A typical pattern is to ask `oracle` for diagnosis and a recommended execution prompt, then only run `worker` after the main agent approves that direction.\n\n## Clarify and launch UI\n\nChains open a clarify UI by default so you can preview and edit the workflow before it runs. Single and parallel tool calls can opt into the same flow with `clarify: true`; slash commands launch directly.\n\nCommon clarify keys:\n\n- `Enter` runs in the foreground, or in the background if background is toggled on\n- `Esc` cancels or backs out\n- `\u2191\u2193` moves between steps or tasks\n- `e` edits the task/template\n- `m` selects a model\n- `t` selects thinking level\n- `s` selects skills\n- `b` toggles background execution\n- `w` edits output/write behavior where supported\n- `r` edits reads where supported\n- `p` toggles progress tracking where supported\nPicker screens use `\u2191\u2193`, `Enter`, `Esc`, and type-to-filter. The full-screen editor supports word wrapping, paste, `Esc` to save, and `Ctrl+C` to discard.\n\n## Agents and chains\n\nAgents are markdown files with YAML frontmatter and a system prompt body. They define the specialist that will run in the child Pi process.\n\nAgent locations, lowest to highest priority:\n\n| Scope | Path |\n|-------|------|\n| Builtin | `~/.pi/agent/extensions/subagent/agents/` |\n| Installed package | `package.json` `pi-subagents.agents` or `pi.subagents.agents` |\n| User | `~/.pi/agent/agents/**/*.md` |\n| Project | Project config `agents/**/*.md` (`.pi/agents/**/*.md` in standard Pi) |\n\nProject discovery also reads legacy `.agents/**/*.md` files. Nested subdirectories are discovered recursively. `.chain.md` files do not define agents. Installed Pi packages can expose agent directories from either `{\"pi-subagents\":{\"agents\":[\"./agents\"]}}` or `{\"pi\":{\"subagents\":{\"agents\":[\"./agents\"]}}}` in their package manifest. Package agents load above builtins and below user/project agents. If both `.agents/` and the project config agents directory define the same parsed runtime agent name, the project config directory wins. Use `agentScope: \"user\" | \"project\" | \"both\"` to control discovery; `both` is the default and project definitions win runtime-name collisions.\n\nBuiltin agents load at the lowest priority, so a user or project agent with the same name overrides them. They do not pin a provider model; they inherit your current Pi default model unless you set `subagents.agentOverrides.<name>.model`. `oracle` is an advisory reviewer that critiques direction and proposes an execution prompt without editing files. `worker` is the implementation agent for normal tasks and approved oracle handoffs.\n\nThe `researcher` builtin uses `web_search`, `fetch_content`, and `get_search_content`; those require [pi-web-access](https://github.com/nicobailon/pi-web-access):\n\n```bash\npi install npm:pi-web-access\n```\n\n### Builtin overrides\n\nYou can override selected builtin fields without copying the whole agent. Overrides live in settings:\n\n- User: `~/.pi/agent/settings.json`\n- Project: project config settings file (`.pi/settings.json` in standard Pi)\n\nExample:\n\n```json\n{\n  \"subagents\": {\n    \"agentOverrides\": {\n      \"reviewer\": {\n        \"inheritProjectContext\": false\n      }\n    }\n  }\n}\n```\n\nSupported override fields are `model`, `fallbackModels`, `thinking`, `systemPromptMode`, `inheritProjectContext`, `inheritSkills`, `defaultContext`, `disabled`, `skills`, `tools`, and `systemPrompt`. Use `defaultContext: false` in builtin overrides to clear an inherited context default. Project overrides beat user overrides.\n\nSet `disabled: true` to hide a builtin from runtime discovery and agent-facing `subagent({ action: \"list\" })` output. For bulk control, set `subagents.disableBuiltins: true` in settings.\n\nSet `subagents.disableThinking: true` to clear bundled builtin thinking defaults globally for providers that do not support `:low`, `:medium`, `:high`, or similar model suffixes. A higher-precedence per-agent `thinking` override can opt one builtin back in.\n\n### Prompt assembly\n\nSubagents are designed to be narrow by default. Custom agents start with a clean system prompt and only the context you intentionally give them. They do not automatically inherit Pi\u2019s whole base prompt, project instruction files, or discovered skills catalog.\n\nUse these fields when an agent should see more:\n\n| Field | Effect |\n|-------|--------|\n| `systemPromptMode: append` | Append the agent prompt to Pi\u2019s normal base prompt. |\n| `inheritProjectContext: true` | Keep inherited project instructions from files like `AGENTS.md` and `CLAUDE.md`. |\n| `inheritSkills: true` | Let the child see Pi\u2019s discovered skills catalog. |\n| `defaultContext: fork` | Use forked session context when a launch omits `context`; explicit `context: \"fresh\"` still wins. |\n\nBuiltin agents opt into project instruction inheritance by default so they follow repo-specific rules out of the box. `delegate` also uses append mode because its job is orchestration inside the parent workflow.\n\n### Agent frontmatter\n\nA typical agent looks like this:\n\n```yaml\n---\nname: scout\n# Optional: registers this as code-analysis.scout while preserving name: scout\npackage: code-analysis\ndescription: Fast codebase recon\ntools: read, grep, find, ls, bash, mcp:chrome-devtools\nextensions:\nsubagentOnlyExtensions: ./tools/child-only-search.ts\nmodel: claude-haiku-4-5\nfallbackModels: openai/gpt-5-mini, anthropic/claude-sonnet-4\nthinking: high\nsystemPromptMode: replace\ninheritProjectContext: false\ninheritSkills: false\nskills: safe-bash, chrome-devtools\noutput: context.md\ndefaultReads: context.md\ndefaultProgress: true\ncompletionGuard: false\ninteractive: true\nmaxSubagentDepth: 1\n---\n\nYour system prompt goes here.\n```\n\nImportant fields:\n\n| Field | Notes |\n|-------|-------|\n| `package` | Optional package identifier. A file with `name: scout` and `package: code-analysis` registers as `code-analysis.scout`; serialization keeps `name` and `package` separate. |\n| `tools` | Builtin tool allowlist. `mcp:` entries select direct MCP tools when `pi-mcp-adapter` is installed. |\n| `extensions` | Omitted means normal extensions; empty means no extensions; comma-separated values allowlist specific extensions. |\n| `subagentOnlyExtensions` | Comma-separated extension paths loaded only in spawned child sessions for this agent. Tools registered there are unavailable to the main agent unless also installed through normal Pi extension configuration. |\n| `model` | Default model. Bare ids prefer the current provider when possible, then unique registry matches. |\n| `fallbackModels` | Ordered backup models for provider/model failures such as quota, auth, timeout, or unavailable model. Ordinary task failures do not trigger fallback. |\n| `thinking` | Appended as a `:level` suffix at runtime unless a suffix is already present. |\n| `systemPromptMode` | `replace` by default; `append` keeps Pi\u2019s base prompt. |\n| `inheritProjectContext` | Keeps or strips inherited project instruction blocks. |\n| `inheritSkills` | Keeps or strips Pi\u2019s discovered skills catalog. |\n| `defaultContext` | Optional `fresh` or `fork` launch context default for this agent. |\n| `skills` | Adds specific skills to the child\u2019s available skill list, regardless of `inheritSkills`. |\n| `output` | Default single-agent output file. |\n| `defaultReads` | Files to read before running in chain/parallel behavior. |\n| `defaultProgress` | Maintain `progress.md`. |\n| `completionGuard` | Set `false` only for non-implementation agents that may mention implementation words while using mutation-capable tools such as `bash`. |\n| `interactive` | Parsed for compatibility but not enforced in v1. |\n| `maxSubagentDepth` | Tightens nested delegation for this agent\u2019s children. |\n\n### Tool and extension selection\n\nIf `tools` is omitted, `pi-subagents` does not pass `--tools`, so the child gets Pi\u2019s normal builtin tools. If `tools` is present, regular tool names become an explicit allowlist. `mcp:` entries are split out and forwarded as direct MCP selections. Path-like `tools` entries, such as extension paths or `.ts`/`.js` files, are treated as tool-extension paths rather than builtin tool names. Agents that declare only known read-only builtin tools skip the implementation completion guard, but `bash`, unknown tools, and MCP tools stay mutation-capable. Use `completionGuard: false` for bash-enabled validators or advisors that should never be judged as implementation agents.\n\nExamples:\n\n- `tools` omitted and `extensions` omitted: normal builtins and normal extensions.\n- `tools: mcp:chrome-devtools`: normal builtins plus direct Chrome DevTools MCP tools.\n- `tools: read, bash, mcp:chrome-devtools`: only `read` and `bash` as builtins, plus direct Chrome DevTools MCP tools.\n- `tools: subagent, read`: a child-safe `subagent` tool is available inside that child so it can run explicitly assigned nested fanout.\n\nDirect MCP tools require [pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter). Subagents only receive direct MCP tools when `mcp:` entries are listed in their frontmatter; global `directTools: true` in `mcp.json` is not enough by itself. The generic `mcp` proxy tool can still be used for discovery when available. The adapter caches tool metadata at startup, so after connecting a new MCP server for the first time, restart Pi before relying on direct tools. An `mcp:` entry named `subagent` does not authorize nested fanout; only the builtin `subagent` tool name does.\n\n`extensions` controls child extension loading:\n\n```yaml\n# Omitted: all normal extensions load\n\n# Empty: no extensions\nextensions:\n\n# Allowlist\nextensions: /abs/path/to/ext-a.ts, /abs/path/to/ext-b.ts\n```\n\nWhen `extensions` is present, it takes precedence over extension paths implied by `tools` entries.\n\nUse `subagentOnlyExtensions` when a custom extension tool should exist only inside child sessions. It is scoped by agent config: every run of that agent receives those extension paths, while other agents do not unless they declare the same field. The current model does not have a separate named-subagent audience inside one agent definition.\n\n## Chain files\n\nChains are reusable workflows stored separately from agent files. Use `.chain.md` for simple sequential saved chains. Use `.chain.json` when a chain needs dynamic fanout.\n\n| Scope | Path |\n|-------|------|\n| Installed package | `package.json` `pi-subagents.chains` or `pi.subagents.chains` |\n| User | `~/.pi/agent/chains/**/*.chain.md`, `~/.pi/agent/chains/**/*.chain.json` |\n| Project | Project config `chains/**/*.chain.md`, `chains/**/*.chain.json` (`.pi/chains/...` in standard Pi) |\n\nNested subdirectories are discovered recursively. Installed Pi packages can expose chain directories from either `{\"pi-subagents\":{\"chains\":[\"./chains\"]}}` or `{\"pi\":{\"subagents\":{\"chains\":[\"./chains\"]}}}` in their package manifest. Package chains load below user/project chains. If both `.chain.md` and `.chain.json` define the same parsed runtime chain name in the same scope, `.chain.json` wins. If user and project scopes define the same parsed runtime chain name, the project chain wins. Chains support the same optional `package` frontmatter as agents; `name: review-flow` plus `package: code-analysis` runs as `code-analysis.review-flow`.\n\nExample:\n\n```md\n---\nname: scout-planner\ndescription: Gather context then plan implementation\n---\n\n## scout\nphase: Context\nlabel: Map auth flow\nas: context\noutput: context.md\n\nAnalyze the codebase for {task}\n\n## planner\nphase: Planning\nlabel: Implementation plan\nreads: context.md\nmodel: anthropic/claude-sonnet-4-5:high\nprogress: true\n\nCreate an implementation plan based on {outputs.context}\n```\n\nEach `.chain.md` `## agent-name` section is a step. Config lines such as `phase`, `label`, `as`, `outputSchema`, `output`, `outputMode`, `reads`, `model`, `skills`, and `progress` go immediately after the header. A blank line separates config from task text. In saved `.chain.md` files, `outputSchema` is a path to a JSON Schema file; direct tool calls and `.chain.json` files can pass the schema object inline.\n\nFor `output`, `reads`, `skills`, and `progress`, chain behavior is three-state: omitted inherits from the agent, a value overrides, and `false` disables.\n\nUse `phase` to group related work in status output, `label` for a readable step name, and `as` to store a successful step or parallel task result for later `{outputs.name}` references. Duplicate `as` names, invalid identifiers, and unknown output references fail before child execution.\n\nDynamic fanout is available only through direct `subagent({ chain: [...] })` JSON or saved `.chain.json` files. It expands an array from a prior structured named output, runs one child template per item, and stores the ordered collection under `collect.as`. The source must be structured output; prose is never parsed. `expand.maxItems` is required, over-limit arrays fail, nested fanout and arbitrary expressions are not supported, and `.chain.md` has no dynamic syntax in this release.\n\n```json\n{\n  \"name\": \"dynamic-review\",\n  \"description\": \"Find review targets, fan out reviewers, then synthesize.\",\n  \"chain\": [\n    {\n      \"agent\": \"scout\",\n      \"task\": \"Return {\\\"items\\\":[{\\\"path\\\":\\\"...\\\",\\\"reason\\\":\\\"...\\\"}]} via structured_output.\",\n      \"as\": \"targets\",\n      \"outputSchema\": { \"type\": \"object\" }\n    },\n    {\n      \"expand\": {\n        \"from\": { \"output\": \"targets\", \"path\": \"/items\" },\n        \"item\": \"target\",\n        \"key\": \"/path\",\n        \"maxItems\": 12\n      },\n      \"parallel\": {\n        \"agent\": \"reviewer\",\n        \"label\": \"Review {target.path}\",\n        \"task\": \"Review {target.path}. Reason: {target.reason}\",\n        \"outputSchema\": { \"type\": \"object\" }\n      },\n      \"collect\": { \"as\": \"reviews\" },\n      \"concurrency\": 4\n    },\n    {\n      \"agent\": \"worker\",\n      \"task\": \"Synthesize fixes from {outputs.reviews}\"\n    }\n  ]\n}\n```\n\nCreate simple `.chain.md` chains by writing files directly or with the `subagent({ action: \"create\", config: ... })` management action. Create dynamic `.chain.json` chains by writing the JSON file directly. Run saved chains with natural language or:\n\n```text\n/run-chain scout-planner -- refactor authentication\n```\n\n## Chain variables\n\nTask templates support:\n\n| Variable | Description |\n|----------|-------------|\n| `{task}` | Original task from the first step. |\n| `{previous}` | Output from the prior step, or aggregated output from a parallel step. |\n| `{chain_dir}` | Path to the chain artifact directory. |\n| `{outputs.name}` | Text value from a prior step or completed parallel task with `as: \"name\"`. |\n\nParallel outputs are aggregated with clear separators before being passed to the next step:\n\n```text\n=== Parallel Task 1 (worker) ===\n...\n\n=== Parallel Task 2 (worker) ===\n...\n```\n\n## Skills\n\nSkills are `SKILL.md` files made available to an agent. The prompt includes skill metadata and the file location; the agent reads the full skill file only when the task matches.\n\nDiscovery uses project-first precedence:\n\n1. Project config `skills/{name}/SKILL.md` (`.pi/skills/{name}/SKILL.md` in standard Pi)\n2. Project packages and project settings packages via `package.json -> pi.skills`\n3. Current task cwd package via `package.json -> pi.skills`\n4. Project config `settings.json -> skills`\n5. `~/.pi/agent/skills/{name}/SKILL.md`\n6. User packages and user settings packages via `package.json -> pi.skills`\n7. `~/.pi/agent/settings.json -> skills`\n\nUse agent defaults, override them at runtime, or disable them:\n\n```ts\n{ agent: \"scout\", task: \"...\" }\n{ agent: \"scout\", task: \"...\", skill: \"tmux, safe-bash\" }\n{ agent: \"scout\", task: \"...\", skill: false }\n```\n\nFor chains, `skill` at the top level is additive. A step-level `skill` overrides that step; `false` disables skills for that step.\n\nAvailable skills use this shape:\n\n```xml\nThe following configured skills are available to this subagent.\nUse the read tool to load a skill's file when the task matches its description.\nWhen a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n<available_skills>\n  <skill>\n    <name>safe-bash</name>\n    <description>Run shell commands safely.</description>\n    <location>/absolute/path/to/safe-bash/SKILL.md</location>\n  </skill>\n</available_skills>\n```\n\nIf an agent has an explicit `tools` allowlist and resolved skills, `read` is added for that child run so the listed skill files can be loaded on demand.\n\nMissing skills do not fail execution. The result summary shows a warning.\n\n### Bundled skill\n\nThe package bundles a `pi-subagents` skill that is automatically available to the parent agent when the extension is installed. It is for the orchestrating parent only: child subagents never receive it, and their context is explicitly filtered to strip parent-only orchestration instructions.\n\nWhat the bundled skill covers:\n- **Delegation patterns**: when to launch which agent, whether to use single, parallel, chain, or async mode, and whether to use fresh or forked context\n- **Prompt workflow recipes**: how to apply the packaged techniques directly with `subagent(...)` when the user describes the workflow in natural language instead of invoking a slash command. This includes parallel review, review-loop, parallel research, parallel context-build, parallel handoff-plan, gather-context-and-clarify, and parallel cleanup\n- **Role-agent prompting guidance**: compact contract prompts instead of long scripts, what to include in role-specific meta prompts, and retrieval budgets for researchers\n- **Safety boundaries**: child agents must not run subagents unless their resolved builtin tools explicitly include `subagent`, must not invent intercom targets, and must escalate unapproved decisions\n- **Intercom conventions**: when to ask vs send, and how parent-side result delivery works with `pi-intercom`\n- **Control and diagnostics**: attention signals, soft interrupts, status, and the `doctor` action\n\nIf you are writing an agent that orchestrates subagents, the bundled skill helps it behave correctly without guessing the patterns. If you are a human user, you do not need to read it directly; the README and prompt shortcuts encode the same workflows in user-facing form.\n\n## Programmatic tool usage\n\nThese are the parameters the LLM passes when it calls the `subagent` tool. Most users ask naturally or use slash commands instead.\n\n### Execution examples\n\n```ts\n// Single agent\n{ agent: \"worker\", task: \"refactor auth\" }\n{ agent: \"scout\", task: \"find todos\", maxOutput: { lines: 1000 } }\n{ agent: \"scout\", task: \"investigate\", output: false }\n{ agent: \"scout\", task: \"write a large report\", output: \"reports/scout.md\", outputMode: \"file-only\" }\n\n// Forked context\n{ agent: \"worker\", task: \"continue this thread\", context: \"fork\" }\n\n// Parallel\n{ tasks: [{ agent: \"scout\", task: \"a\" }, { agent: \"reviewer\", task: \"b\" }] }\n{ tasks: [{ agent: \"scout\", task: \"audit auth\", count: 3 }] }\n{ tasks: [{ agent: \"scout\", task: \"audit frontend\" }, { agent: \"reviewer\", task: \"audit backend\" }], context: \"fork\" }\n\n// Chain\n{ chain: [\n  { agent: \"scout\", task: \"Gather context for auth refactor\" },\n  { agent: \"planner\" },\n  { agent: \"worker\" },\n  { agent: \"reviewer\" }\n]}\n\n// Chain in the background, suitable for unblocking the main chat\n{ chain: [...], async: true }\n\n// Chain with fan-out/fan-in\n{ chain: [\n  { agent: \"scout\", task: \"Gather context\", phase: \"Context\", label: \"Map code\", as: \"context\" },\n  { parallel: [\n    { agent: \"worker\", task: \"Implement feature A from {outputs.context}\", label: \"Feature A\", as: \"featureA\" },\n    { agent: \"worker\", task: \"Implement feature B from {outputs.context}\", label: \"Feature B\", as: \"featureB\" }\n  ], concurrency: 2, failFast: true },\n  { agent: \"reviewer\", task: \"Review {outputs.featureA} and {outputs.featureB}\" }\n]}\n\n// Dynamic fanout from structured output\n{ chain: [\n  {\n    agent: \"scout\",\n    task: \"Return review targets as structured_output: { items: [{ path, reason }] }\",\n    as: \"targets\",\n    outputSchema: { type: \"object\" }\n  },\n  {\n    expand: { from: { output: \"targets\", path: \"/items\" }, item: \"target\", key: \"/path\", maxItems: 12 },\n    parallel: { agent: \"reviewer\", task: \"Review {target.path}. Reason: {target.reason}\", outputSchema: { type: \"object\" } },\n    collect: { as: \"reviews\" },\n    concurrency: 4\n  },\n  { agent: \"worker\", task: \"Synthesize fixes from {outputs.reviews}\" }\n] }\n\n// Strict structured output for reliable handoff data\n{ chain: [\n  {\n    agent: \"scout\",\n    task: \"Return the key files and risks for {task}\",\n    as: \"scan\",\n    outputSchema: {\n      type: \"object\",\n      required: [\"files\", \"risks\"],\n      properties: {\n        files: { type: \"array\", items: { type: \"string\" } },\n        risks: { type: \"array\", items: { type: \"string\" } }\n      }\n    }\n  },\n  { agent: \"planner\", task: \"Plan from this scan: {outputs.scan}\" }\n] }\n\n// Worktree isolation\n{ tasks: [\n  { agent: \"worker\", task: \"Implement auth\" },\n  { agent: \"worker\", task: \"Implement API\" }\n], worktree: true }\n```\n\n### Management actions\n\nAgent definitions are not loaded into context by default. Management actions let the LLM discover, inspect, create, update, and delete agents and chains at runtime.\n\n```ts\n{ action: \"list\" }\n{ action: \"list\", agentScope: \"project\" }\n{ action: \"get\", agent: \"scout\" }\n{ action: \"models\" }\n{ action: \"models\", agent: \"reviewer\" }\n{ action: \"get\", agent: \"code-analysis.scout\" }\n{ action: \"get\", chainName: \"review-pipeline\" }\n\n{ action: \"create\", config: {\n  name: \"Code Scout\",\n  package: \"code-analysis\",\n  description: \"Scans codebases for patterns and issues\",\n  scope: \"user\",\n  systemPrompt: \"You are a code scout...\",\n  systemPromptMode: \"replace\",\n  inheritProjectContext: false,\n  inheritSkills: false,\n  model: \"anthropic/claude-sonnet-4\",\n  fallbackModels: [\"openai/gpt-5-mini\", \"anthropic/claude-haiku-4-5\"],\n  tools: \"read, bash, mcp:github/search_repositories\",\n  extensions: \"\",\n  skills: \"parallel-scout\",\n  thinking: \"high\",\n  output: \"context.md\",\n  reads: \"shared-context.md\",\n  progress: true\n}}\n\n{ action: \"create\", config: {\n  name: \"review-pipeline\",\n  description: \"Scout then review\",\n  scope: \"project\",\n  steps: [\n    { agent: \"scout\", task: \"Scan {task}\", output: \"context.md\" },\n    { agent: \"reviewer\", task: \"Review {previous}\", reads: [\"context.md\"] }\n  ]\n}}\n\n{ action: \"update\", agent: \"code-analysis.scout\", config: { model: \"openai/gpt-4o\" } }\n{ action: \"update\", chainName: \"review-pipeline\", config: { steps: [...] } }\n{ action: \"delete\", agent: \"scout\" }\n{ action: \"delete\", chainName: \"review-pipeline\" }\n```\n\n`create` uses `config.scope`, not `agentScope`. `config.name` is the local frontmatter name; optional `config.package` registers the runtime name as `{package}.{name}` and is saved as separate `name` and `package` frontmatter. `update` and `delete` use the runtime name and `agentScope` only when the same runtime name exists in multiple scopes. To clear optional string fields, including `package`, set them to `false` or `\"\"`.\n\n### Parameter reference\n\n| Param | Type | Default | Description |\n|-------|------|---------|-------------|\n| `agent` | string | - | Agent name for single mode, or target for management actions. |\n| `task` | string | - | Task string for single mode. |\n| `action` | string | - | `list`, `get`, `create`, `update`, `delete`, `status`, `interrupt`, `resume`, `append-step`, or `doctor`. |\n| `chainName` | string | - | Chain name for management actions. |\n| `config` | object/string | - | Agent or chain config for create/update. |\n| `output` | `string \\| false` | agent default | Override single-agent output file. |\n| `outputMode` | `\"inline\" \\| \"file-only\"` | `inline` | Return saved output inline or as a concise saved-file reference. `file-only` requires an `output` path. |\n| `skill` | `string \\| string[] \\| false` | agent default | Override skills or disable all. |\n| `model` | string | agent default | Override model. |\n| `tasks` | array | - | Top-level parallel tasks. Supports `agent`, `task`, `cwd`, `count`, `output`, `outputMode`, `reads`, `progress`, `skill`, `model`, and `acceptance`. |\n| `concurrency` | number | config or `4` | Top-level parallel concurrency. |\n| `worktree` | boolean | false | Create isolated git worktrees for parallel tasks. |\n| `chain` | array | - | Sequential, static parallel, and dynamic fanout chain steps. Steps and chain parallel tasks support `phase`, `label`, `as`, `outputSchema`, and `acceptance` in addition to the usual execution fields. Dynamic fanout uses `expand`, one child `parallel` template, and `collect`. With `action: \"append-step\"`, pass exactly one step to append to a running async chain. |\n| `context` | `fresh \\| fork` | per-agent default or `fresh` | Explicit `fresh` or `fork` overrides every child. When omitted, each agent uses its own `defaultContext`; `fork` creates real branched sessions from the parent leaf. Packaged `planner`, `worker`, and `oracle` default to `fork`. |\n| `chainDir` | string | temp chain dir | Persistent directory for chain artifacts. |\n| `clarify` | boolean | true for chains | Show TUI preview/edit flow. |\n| `agentScope` | `user \\| project \\| both` | `both` | Agent discovery scope. Project wins on collisions. |\n| `async` | boolean | false | Background execution. For chains, `clarify: true` explicitly keeps the run foreground for the clarify UI. |\n| `cwd` | string | runtime cwd | Override working directory. |\n| `maxOutput` | object | 200KB, 5000 lines | Final output truncation limits. |\n| `artifacts` | boolean | true | Write debug artifacts. |\n| `includeProgress` | boolean | false | Include full progress in result. |\n| `share` | boolean | false | Upload session export to GitHub Gist. |\n| `sessionDir` | string | derived | Override session log directory. |\n| `acceptance` | string/object/false | inferred | Override the run's inferred acceptance gates. Use `\"auto\"`, `\"attested\"`, `\"checked\"`, `\"verified\"`, `\"reviewed\"`, or `{ level: \"none\", reason: \"...\" }`. |\n\n`context: \"fork\"` fails fast when the parent session is not persisted, the current leaf is missing, or the branched child session cannot be created. It never silently downgrades to `fresh`. In multi-agent runs that omit `context`, each agent/task/step follows its own `defaultContext`, so a fresh-default scout can run fresh beside a fork-default worker. Pass explicit `context: \"fork\"` or `context: \"fresh\"` when you intentionally want one context for every child.\n\nUse `outputMode: \"file-only\"` when a saved output may be large and the parent only needs a pointer. The returned text is a compact reference like `Output saved to: /abs/report.md (48.2 KB, 2847 lines). Read this file if needed.` Failed runs and save errors still return normal inline output for debugging. In chains, later `{previous}` steps receive the same compact reference when the prior step used file-only mode.\n\nSequential and parallel chain tasks accept `agent`, `task`, `phase`, `label`, `as`, `outputSchema`, `cwd`, `output`, `outputMode`, `reads`, `progress`, `skill`, and `model`. Parallel tasks also accept `count`. Parallel step groups accept `parallel`, `concurrency`, `failFast`, and `worktree`. If `outputSchema` is present, the child must call `structured_output` with schema-valid JSON; prose-only completion or invalid JSON fails the step. Validated structured values are preserved on the step result, and `as` also exposes a compact text representation through `{outputs.name}`.\n\nStatus and control actions:\n\n```ts\nsubagent({ action: \"status\" })\nsubagent({ action: \"status\", id: \"<run-id>\" })\nsubagent({ action: \"status\", id: \"<nested-run-id>\" })\nsubagent({ action: \"interrupt\", id: \"<run-id>\" })\nsubagent({ action: \"interrupt\", id: \"<nested-run-id>\" })\nsubagent({ action: \"resume\", id: \"<run-id>\", message: \"follow-up question\" })\nsubagent({ action: \"resume\", id: \"<run-id>\", index: 1, message: \"follow-up for child 2\" })\nsubagent({ action: \"resume\", id: \"<nested-run-id>\", message: \"follow-up for a nested child\" })\nsubagent({ action: \"append-step\", id: \"<run-id>\", chain: [{ agent: \"worker\", task: \"Continue from {previous}\" }] })\nsubagent({ action: \"doctor\" })\n```\n\n`status` resolves exact foreground ids, top-level async ids, and nested run ids before falling back to prefix matching. Nested status shows the root/parent path, nested children, session/artifact paths when known, and nested control commands. Inside child-safe fanout mode, bare `status` requires an id when no local foreground run is active, so children cannot enumerate unrelated top-level async runs. Bare `interrupt` still targets only the visible top-level run; interrupting a nested run requires its explicit nested id.\n\n`resume` sends the follow-up directly when an async child is still reachable over intercom. After completion, it revives the child by starting a new async child from the stored child session file. Multi-child async runs and remembered foreground single, parallel, or chain runs can be revived by passing `index` to choose the child. Nested runs can be resumed by nested id when their live route or persisted session metadata is available. Revive starts a new child process from the old session context; it does not restart the same OS process, and it requires the chosen child to have a persisted `.jsonl` session file.\n\n`append-step` accepts exactly one sequential, static parallel, or dynamic fanout chain step for a top-level async chain whose status is still `running`. The step is persisted in the run directory and becomes eligible only after the chain's already-queued steps finish; completed, failed, paused, foreground, single, and top-level parallel runs reject appends.\n\n## Worktree isolation\n\nParallel agents can clobber each other if they edit the same checkout. `worktree: true` gives each parallel child its own git worktree branched from `HEAD`.\n\n```ts\n{ tasks: [\n  { agent: \"worker\", task: \"Implement auth\", count: 2 },\n  { agent: \"worker\", task: \"Implement API\" }\n], worktree: true }\n\n{ chain: [\n  { agent: \"scout\", task: \"Gather context\" },\n  { parallel: [\n    { agent: \"worker\", task: \"Implement feature A from {previous}\" },\n    { agent: \"worker\", task: \"Implement feature B from {previous}\" }\n  ], worktree: true },\n  { agent: \"reviewer\", task: \"Review all changes from {previous}\" }\n]}\n```\n\nRequirements:\n\n- run inside a git repo\n- working tree must be clean\n- `node_modules/` is symlinked into each worktree when present\n- task-level `cwd` overrides must be omitted or match the shared cwd\n- configured `worktreeSetupHook` must return valid JSON before timeout\n\nAfter a worktree parallel step completes, per-agent diff stats are appended to the output and full patch files are written to artifacts. Worktrees and temp branches are cleaned up in `finally` blocks.\n\n## Configuration\n\n`pi-subagents` reads optional JSON config from `~/.pi/agent/extensions/subagent/config.json`.\n\n### `asyncByDefault`\n\n```json\n{ \"asyncByDefault\": true }\n```\n\nMakes top-level calls use background execution when the request does not explicitly set `async`. Callers can still force foreground with `async: false` unless `forceTopLevelAsync` is enabled.\n\n### `forceTopLevelAsync`\n\n```json\n{ \"forceTopLevelAsync\": true }\n```\n\nForces depth-0 single, parallel, and chain runs into background mode and bypasses clarify UI by forcing `clarify: false`. Nested calls keep their own inherited settings.\n\n### `parallel`\n\n```json\n{\n  \"parallel\": {\n    \"maxTasks\": 12,\n    \"concurrency\": 6\n  }\n}\n```\n\n`maxTasks` defaults to `8`; `concurrency` defaults to `4`. Per-call `concurrency` takes precedence.\n\n### `defaultSessionDir`\n\n```json\n{ \"defaultSessionDir\": \"~/.pi/agent/sessions/subagent/\" }\n```\n\nSession directory precedence is: `params.sessionDir`, then `config.defaultSessionDir`, then a directory derived from the parent session. Sessions are always enabled.\n\n### `maxSubagentDepth`\n\n```json\n{ \"maxSubagentDepth\": 1 }\n```\n\nControls nested delegation when no inherited `PI_SUBAGENT_MAX_DEPTH` is already in effect. Per-agent `maxSubagentDepth` can tighten the limit for that agent\u2019s child runs, but cannot relax an inherited stricter limit. This applies even to children that explicitly declare `tools: subagent`; at the cap, execution fanout is blocked instead of silently hiding nested work.\n\n### `intercomBridge`\n\n```json\n{\n  \"intercomBridge\": {\n    \"mode\": \"always\",\n    \"instructionFile\": \"./intercom-bridge.md\"\n  }\n}\n```\n\nControls whether subagents receive runtime intercom coordination instructions and whether `intercom` and `contact_supervisor` are auto-added to their tool allowlist when needed.\n\nFields:\n\n- `mode`: default `always`; use `fork-only` to inject only for forked runs, or `off` to disable the bridge.\n- `instructionFile`: optional Markdown template replacing the default bridge instructions. `{orchestratorTarget}` is interpolated. Relative paths resolve from `~/.pi/agent/extensions/subagent/`.\n\nBridge activation also requires `pi-intercom` to be installed and enabled through `pi install npm:pi-intercom` or a legacy local extension checkout, a targetable current session name or fallback alias, and `pi-intercom` in any explicit agent `extensions` allowlist.\n\nThe default injected guidance tells children to use `contact_supervisor` with `reason: \"need_decision\"` when blocked or needing a decision, `reason: \"progress_update\"` only for meaningful blocked/progress updates, generic `intercom` as fallback plumbing, and avoid routine completion handoffs.\n\n### `worktreeSetupHook`\n\n```json\n{\n  \"worktreeSetupHook\": \"./scripts/setup-worktree.mjs\",\n  \"worktreeSetupHookTimeoutMs\": 45000\n}\n```\n\nThe hook runs once per created worktree. Paths must be absolute, `~/...`, or repo-relative; bare command names are rejected.\n\nstdin is a JSON object with `repoRoot`, `worktreePath`, `agentCwd`, `branch`, `index`, `runId`, and `baseCommit`. stdout must be one JSON object, for example:\n\n```json\n{ \"syntheticPaths\": [\".venv\", \".env.local\"] }\n```\n\n`syntheticPaths` must be relative to the worktree root. They are removed before diff capture so helper files do not pollute patches. Tracked files are never excluded; marking a tracked path as synthetic fails setup. Default timeout is `30000` ms.\n\n## Files, logs, and observability\n\nEach chain run creates a user-scoped temp directory like:\n\n```text\n<tmpdir>/pi-subagents-<scope>/chain-runs/{runId}/\n```\n\nIt may contain files such as `context.md`, `plan.md`, `progress.md`, and `parallel-{stepIndex}/.../output.md`. Directories older than 24 hours are cleaned up on extension startup.\n\nDebug artifacts live under `{sessionDir}/subagent-artifacts/` or a user-scoped temp artifact directory. Per task you may see:\n\n- `{runId}_{agent}_input.md`\n- `{runId}_{agent}_output.md`\n- `{runId}_{agent}.jsonl`\n- `{runId}_{agent}_meta.json`\n\nMetadata records timing, usage, exit code, final model, attempted models, and fallback attempt outcomes.\n\nSession files are stored under a per-run session directory. With `context: \"fork\"`, each child starts with `--session <branched-session-file>` produced from the parent\u2019s current leaf. That is a real session fork, not an injected summary.\n\nAsync completions notify only the originating session. The result watcher emits `subagent:async-complete`, and the extension consumes that event to render completion notifications.\n\nAsync runs write:\n\n```text\n<tmpdir>/pi-subagents-<scope>/async-subagent-runs/<id>/\n  status.json\n  events.jsonl\n  output-<n>.log\n  subagent-log-<id>.md\n```\n\n`status.json` powers the widget and `subagent({ action: \"status\" })` output. `events.jsonl` contains wrapper events plus child Pi JSON events annotated with run and step metadata. Nested fanout status is stored as compact sidecar event/registry metadata and merged into parent status views and result/intercom payloads; full recursive status snapshots are not embedded in parent result files. `output-<n>.log` is a live human-readable tail. Fallback information is persisted so background runs are debuggable after completion.\n\n## Acceptance Gates\n\nEvery run resolves an effective acceptance policy. Callers may omit `acceptance` for the inferred default, or set it on single runs, top-level parallel task items, chain steps, static parallel tasks, and dynamic fanout templates.\n\n```ts\n{\n  agent: \"worker\",\n  task: \"Implement the fix\",\n  acceptance: {\n    level: \"verified\",\n    criteria: [\"Patch the bug without widening scope\"],\n    evidence: [\"changed-files\", \"tests-added\", \"commands-run\", \"residual-risks\", \"no-staged-files\"],\n    verify: [{ id: \"focused\", command: \"npm test\", timeoutMs: 120000 }]\n  }\n}\n```\n\nAccepted levels are `auto`, `none`, `attested`, `checked`, `verified`, and `reviewed`. `acceptance: \"auto\"` is the default. Read-only reviewer/scout tasks infer lightweight attestation, normal writer tasks infer checked evidence, and async/risky/dynamic writer contexts infer a reviewed gate. To disable gates, prefer `{ level: \"none\", reason: \"...\" }`.\n\nAcceptance provenance is stored separately from child prose:\n\n- `claimed`: child finished but did not provide structured evidence.\n- `attested`: child returned a structured acceptance report.\n- `checked`: runtime structural checks passed, such as required evidence and no staged files.\n- `verified`: configured runtime verification commands passed. Child-reported command success does not count.\n- `reviewed`: an independent reviewer result is present.\n- `rejected`: attestation, structural checks, verification, or review failed.\n\nFor `attested` or stricter levels, the child prompt includes a standardized acceptance section and asks for a fenced `acceptance-report` JSON block. Explicit failed gates fail the run. Inferred gates are persisted for observability without breaking older calls that omit `acceptance`.\n\n## Live progress\n\nForeground runs show compact live progress for single, chain, and parallel modes: current tool, recent output, token counts, duration, activity freshness, current-tool duration, and chain graph metadata when available.\n\nPress `Ctrl+O` to expand the full streaming view with complete output per step.\n\nSequential chains show a flow line like `done scout \u2192 running planner`. Chains with parallel steps show per-step cards instead. Chain status uses `label` and `phase` metadata when present, while falling back to agent names for older chains.\n\n## Session sharing\n\nPass `share: true` to export a full session to HTML, upload it to a secret GitHub Gist through your `gh` credentials, and return a `https://shittycodingagent.ai/session/?<gistId>` URL.\n\n```ts\n{ agent: \"scout\", task: \"...\", share: true }\n```\n\nThis is disabled by default. Session data may contain source code, paths, environment variables, credentials, or other sensitive output. You need `gh` installed and authenticated.\n\n## Recursion guard\n\nSubagents can call `subagent` only when their resolved builtin tools explicitly include `subagent`. That is meant for delegated fanout agents, not ordinary worker/reviewer children. A depth guard prevents unbounded nesting.\n\nBy default, nesting is limited to two levels: main session \u2192 subagent \u2192 sub-subagent. Deeper calls are blocked with guidance to complete the current task directly. Nested runs appear in the parent status widget and `status` output as a tree, and `status`, `interrupt`, and `resume` can target a nested run by its id.\n\nConfigure the limit with:\n\n1. `PI_SUBAGENT_MAX_DEPTH` before starting Pi\n2. `config.maxSubagentDepth`\n3. `maxSubagentDepth` in agent frontmatter, which can only tighten the inherited limit\n\n```bash\nexport PI_SUBAGENT_MAX_DEPTH=3\nexport PI_SUBAGENT_MAX_DEPTH=1\nexport PI_SUBAGENT_MAX_DEPTH=0\n```\n\n`PI_SUBAGENT_DEPTH` is internal and propagated automatically. Do not set it manually.\n\n## Events\n\nAsync events:\n\n- `subagent:async-started`\n- `subagent:async-complete`\n\nIntercom delivery events:\n\n- `subagent:control-intercom`\n- `subagent:result-intercom`\n\nThe result watcher emits `subagent:async-complete`; `src/extension/index.ts` registers the notification handler that consumes it. Control/attention events are surfaced as visible parent notices and persisted for async runs. With `pi-intercom`, needs-attention notices and grouped parent-side subagent result deliveries can reach the orchestrator over intercom.\n\n## Prompt-template integration\n\n`pi-subagents` works standalone through natural language, the `subagent` tool, slash commands, and the packaged prompt shortcuts listed near the top of this README. If you use [pi-prompt-template-model](https://github.com/nicobailon/pi-prompt-template-model), you can also wrap subagent delegation in your own reusable prompt templates.\n\nExample:\n\n```md\n---\ndescription: Take a screenshot\nmodel: claude-sonnet-4-20250514\nsubagent: browser-screenshoter\ncwd: /tmp/screenshots\n---\nUse url in the prompt to take screenshot: $@\n```\n\nThen `/take-screenshot https://example.com` switches to Sonnet, delegates to `browser-screenshoter` with `/tmp/screenshots` as cwd, and restores your model when done. Runtime overrides like `--cwd=<path>` and `--subagent=<name>` work too.\n\nFor more reusable workflows on top of subagents, including `/chain-prompts` and compare-style prompts such as `/best-of-n`, install `pi-prompt-template-model` separately and copy the examples you want into `~/.pi/agent/prompts/`.\n\n## Runtime files\n\nThe main runtime files are:\n\n| File | Purpose |\n|------|---------|\n| `src/extension/index.ts` | Extension registration, tool registration, message/render wiring. |\n| `src/agents/agents.ts` | Agent and chain discovery, frontmatter parsing. |\n| `src/runs/foreground/subagent-executor.ts` | Main execution routing for single, parallel, chain, management, status, interrupt, and doctor actions. |\n| `src/runs/foreground/execution.ts` | Core foreground `runSync` handling. |\n| `src/runs/background/subagent-runner.ts` | Detached async runner. |\n| `src/runs/background/async-execution.ts` | Background launch support. |\n| `src/runs/background/async-status.ts` | Status discovery and formatting for async runs. |\n| `src/runs/foreground/chain-execution.ts` / `src/agents/chain-serializer.ts` | Chain orchestration and `.chain.md` parsing. |\n| `src/shared/settings.ts` | Chain behavior, instructions, and config helpers. |\n| `src/runs/shared/worktree.ts` | Git worktree isolation. |\n| `src/intercom/intercom-bridge.ts` | Runtime intercom bridge instructions and diagnostics. |\n| `src/extension/schemas.ts` / `src/shared/types.ts` | Tool schemas, shared types, and event constants. |\n| `test/unit/` / `test/integration/` | Unit and loader-based integration tests. |\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "subagents",
+    "ai",
+    "agents",
+    "cli"
+  ],
+  "author": {
+    "name": "Nico Bailon"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/nicobailon/pi-subagents#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicobailon/pi-subagents.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/extension/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-01-24T21:21:46.039Z",
+    "modified": "2026-06-24T03:36:59.835Z",
+    "0.3.0": "2026-01-24T21:21:46.358Z",
+    "0.3.1": "2026-01-24T23:59:57.645Z",
+    "0.3.2": "2026-01-25T06:19:48.975Z",
+    "0.3.3": "2026-01-25T08:44:22.497Z",
+    "0.4.1": "2026-01-26T18:38:35.169Z",
+    "0.5.0": "2026-01-27T18:41:11.923Z",
+    "0.5.1": "2026-01-28T06:53:42.375Z",
+    "0.5.2": "2026-01-28T15:45:01.292Z",
+    "0.5.3": "2026-02-02T00:39:56.615Z",
+    "0.6.0": "2026-02-02T07:16:02.997Z",
+    "0.6.1": "2026-02-02T07:51:55.630Z",
+    "0.7.0": "2026-02-09T23:27:39.656Z",
+    "0.8.0": "2026-02-10T05:48:22.663Z",
+    "0.8.1": "2026-02-10T18:30:40.643Z",
+    "0.8.2": "2026-02-11T23:46:30.762Z",
+    "0.8.3": "2026-02-12T06:33:57.580Z",
+    "0.8.4": "2026-02-13T19:39:59.480Z",
+    "0.8.5": "2026-02-16T14:51:46.397Z",
+    "0.9.0": "2026-02-18T02:31:30.176Z",
+    "0.9.1": "2026-02-18T03:20:41.322Z",
+    "0.9.2": "2026-02-20T03:39:44.431Z",
+    "0.10.0": "2026-02-23T20:58:33.245Z",
+    "0.11.0": "2026-02-23T21:49:39.007Z",
+    "0.11.1": "2026-03-08T18:40:29.980Z",
+    "0.11.2": "2026-03-12T03:19:53.957Z",
+    "0.11.3": "2026-03-17T06:31:02.651Z",
+    "0.11.4": "2026-03-19T18:56:26.666Z",
+    "0.11.5": "2026-03-20T05:53:18.750Z",
+    "0.11.6": "2026-03-20T06:11:12.969Z",
+    "0.11.7": "2026-03-20T17:48:31.017Z",
+    "0.11.8": "2026-03-21T02:20:29.326Z",
+    "0.11.9": "2026-03-21T06:10:59.151Z",
+    "0.11.10": "2026-03-21T14:48:57.173Z",
+    "0.11.11": "2026-03-23T06:33:26.067Z",
+    "0.11.12": "2026-03-28T18:52:04.213Z",
+    "0.12.0": "2026-04-01T21:31:09.894Z",
+    "0.12.1": "2026-04-03T22:21:32.059Z",
+    "0.12.2": "2026-04-04T02:09:17.243Z",
+    "0.12.4": "2026-04-04T19:12:33.741Z",
+    "0.12.5": "2026-04-09T06:24:15.758Z",
+    "0.13.0": "2026-04-12T01:07:55.782Z",
+    "0.13.1": "2026-04-13T04:29:41.769Z",
+    "0.13.2": "2026-04-13T04:40:17.990Z",
+    "0.13.3": "2026-04-13T07:26:14.449Z",
+    "0.13.4": "2026-04-13T20:41:13.362Z",
+    "0.14.0": "2026-04-14T07:09:10.490Z",
+    "0.14.1": "2026-04-14T18:11:20.405Z",
+    "0.15.0": "2026-04-16T18:11:26.212Z",
+    "0.16.0": "2026-04-16T19:55:08.607Z",
+    "0.16.1": "2026-04-16T20:27:29.799Z",
+    "0.17.0": "2026-04-16T23:15:53.976Z",
+    "0.17.1": "2026-04-20T04:54:08.027Z",
+    "0.17.2": "2026-04-21T23:01:18.679Z",
+    "0.17.3": "2026-04-23T05:10:13.203Z",
+    "0.17.4": "2026-04-23T06:11:40.603Z",
+    "0.17.5": "2026-04-23T19:21:34.746Z",
+    "0.18.0": "2026-04-24T04:36:13.836Z",
+    "0.18.1": "2026-04-26T06:06:16.954Z",
+    "0.19.0": "2026-04-26T18:25:58.103Z",
+    "0.19.1": "2026-04-26T19:47:35.935Z",
+    "0.19.2": "2026-04-27T06:47:36.110Z",
+    "0.19.3": "2026-04-27T07:05:04.946Z",
+    "0.20.0": "2026-04-27T19:25:41.058Z",
+    "0.20.1": "2026-04-27T19:55:11.283Z",
+    "0.21.0": "2026-04-29T23:16:39.385Z",
+    "0.21.1": "2026-04-30T00:04:29.491Z",
+    "0.21.2": "2026-04-30T18:14:47.740Z",
+    "0.21.3": "2026-04-30T18:37:27.726Z",
+    "0.21.4": "2026-05-01T18:56:18.985Z",
+    "0.21.5": "2026-05-02T01:21:26.739Z",
+    "0.22.0": "2026-05-02T06:06:27.842Z",
+    "0.23.0": "2026-05-02T17:52:18.054Z",
+    "0.23.1": "2026-05-02T21:48:22.885Z",
+    "0.24.0": "2026-05-03T05:36:42.779Z",
+    "0.24.1": "2026-05-10T18:23:10.960Z",
+    "0.24.2": "2026-05-10T18:59:56.119Z",
+    "0.24.3": "2026-05-15T02:55:40.408Z",
+    "0.24.4": "2026-05-20T20:02:52.208Z",
+    "0.25.0": "2026-05-21T16:34:13.887Z",
+    "0.27.0": "2026-05-30T22:16:28.531Z",
+    "0.28.0": "2026-06-03T20:31:07.994Z",
+    "0.29.0": "2026-06-19T19:11:35.350Z",
+    "0.30.0": "2026-06-20T07:07:49.815Z",
+    "0.31.0": "2026-06-24T03:36:59.738Z"
+  },
+  "versions_count": 84,
+  "downloads_last_week": 27835,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 484
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 665
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 689
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 1385
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 1857
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 1000
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 1524
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 3131
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 5289
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 4397
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 6090
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 10568
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 9807
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 17254
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 22912
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 24063
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 24460
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 23962
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 23039
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 20271
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 17967
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 24131
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 6527
+    }
+  ]
+}

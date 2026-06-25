@@ -1,0 +1,46 @@
+{
+  "name": "@rasmusengelbrecht/pi-semantic-query",
+  "latest_version": "0.1.6",
+  "description": "Compile and inspect governed semantic metrics from pi coding agent",
+  "readme": "# pi-semantic-query\n\nPi extension for working with governed semantic metrics from `semantic-query-compiler`.\n\nIt gives pi tools to discover metrics, inspect definitions, validate a model, and compile metric requests to SQL. It does **not** execute warehouse queries.\n\n## Requirements\n\n- pi coding agent\n- Node/npm for installing the pi package\n- `semantic-query-compiler >= 0.1.4` installed so the `semantic` CLI is on `PATH`\n- a semantic model in the project, usually `semantic.yml`\n\nInstall the Python compiler first:\n\n```bash\nuv tool install 'semantic-query-compiler>=0.1.4'\nsemantic --version\n```\n\n## Install in pi\n\nFrom npm, after publishing:\n\n```bash\npi install npm:@rasmusengelbrecht/pi-semantic-query\n```\n\nFor local development:\n\n```bash\npi install /absolute/path/to/pi-semantic-query\n```\n\nOr try without installing:\n\n```bash\npi -e /absolute/path/to/pi-semantic-query\n```\n\n## Tools\n\nThe package registers a bundled `semantic-query` skill plus these pi tools:\n\n- `semantic_metrics` \u2014 list metrics with discovery metadata\n- `semantic_search_metrics` \u2014 search metrics by id, name, description, synonyms, and teams\n- `semantic_describe` \u2014 describe one metric definition\n- `semantic_validate` \u2014 validate a semantic model\n- `semantic_compile` \u2014 compile a metric request to SQL\n\nThe skill teaches pi the default workflow: search before guessing metric IDs, describe ambiguous metrics, validate model changes, prefer `period`, and never present compiled SQL as executed results.\n\nAll tools shell out to the local `semantic` CLI. If target relation flags fail with `unrecognized arguments`, upgrade the Python CLI:\n\n```bash\nuv tool install 'semantic-query-compiler>=0.1.4' --force\n```\n\nBy default tools look for one of:\n\n- `semantic.yml`\n- `semantic.yaml`\n- `model.yml`\n- `model.yaml`\n- `semantic_layer.yml`\n- `semantic_layer.yaml`\n\nPass `model` explicitly when your file lives somewhere else.\n\n## Example prompt\n\n> List available semantic metrics in this repo, find the revenue metric, then compile revenue by country for the last 12 complete months.\n\nThe agent should:\n\n1. call `semantic_search_metrics`\n2. call `semantic_describe` for the chosen metric\n3. call `semantic_compile` with an inline request shape and `period`\n\nExample request shape for `semantic_compile`:\n\n```json\n{\n  \"metricId\": \"revenue\",\n  \"period\": \"last 12 complete months\",\n  \"dialect\": \"bigquery\",\n  \"request\": {\n    \"timeGrain\": \"monthly\",\n    \"breakdownDimensionIds\": [\"country\"]\n  }\n}\n```\n\nFor target series, pass `targetTable`. `semantic-query-compiler >= 0.1.4` accepts both core target column conventions (`metric_id`/`target_series`/`metric_time`/`target_value` and `metric`/`series`/`time`/`value`) on BigQuery. Use `targetProject` and `targetSchema` when the warehouse needs a qualified target relation but you want to keep the table name generic:\n\n```json\n{\n  \"metricId\": \"revenue\",\n  \"period\": \"current year\",\n  \"dialect\": \"bigquery\",\n  \"targetProject\": \"warehouse-project\",\n  \"targetSchema\": \"analytics\",\n  \"targetTable\": \"metric_targets\",\n  \"request\": {\n    \"timeGrain\": \"monthly\",\n    \"targetSeries\": \"budget_current\"\n  }\n}\n```\n\n## Safety boundary\n\nThis package is compile-only by design. `semantic_compile` returns SQL; it does not run the SQL. Query execution touches credentials, cost, and data access, so execution should stay in the caller's existing warehouse tooling or a separate explicitly configured integration.\n\n## Publishing\n\n```bash\nnpm pack --dry-run\nnpm publish --access public\n```\n\nThe `pi-package` keyword makes the package discoverable by pi package indexes.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "semantic-layer",
+    "analytics",
+    "metrics",
+    "sql"
+  ],
+  "author": {
+    "name": "Rasmus Engelbrecht"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/rasmusengelbrecht/pi-semantic-query#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rasmusengelbrecht/pi-semantic-query.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-13T14:17:06.639Z",
+    "modified": "2026-06-15T11:51:35.000Z",
+    "0.1.0": "2026-06-13T14:17:06.951Z",
+    "0.1.1": "2026-06-13T16:37:12.091Z",
+    "0.1.2": "2026-06-13T16:42:52.705Z",
+    "0.1.3": "2026-06-13T17:04:32.848Z",
+    "0.1.4": "2026-06-13T17:20:57.865Z",
+    "0.1.5": "2026-06-15T09:21:44.842Z",
+    "0.1.6": "2026-06-15T11:51:34.851Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 51,
+  "download_trend": []
+}

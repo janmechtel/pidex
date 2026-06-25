@@ -1,0 +1,429 @@
+{
+  "name": "@plannotator/pi-extension",
+  "latest_version": "0.21.2",
+  "description": "Plannotator Pi extension - interactive plan review with annotations, annotate agent messages, and review code/PRs",
+  "readme": "# Plannotator for Pi\n\nPlannotator integration for the [Pi coding agent](https://github.com/earendil-works/pi). Adds file-based plan mode with a visual browser UI for reviewing, annotating, and approving agent plans.\n\n## Install\n\n**From npm** (recommended):\n\n```bash\npi install npm:@plannotator/pi-extension\n```\n\n**From source:**\n\n```bash\ngit clone https://github.com/backnotprop/plannotator.git\npi install ./plannotator/apps/pi-extension\n```\n\n**Try without installing:**\n\n```bash\npi -e npm:@plannotator/pi-extension\n```\n\n## Build from source\n\nIf installing from a local clone, build the HTML assets first:\n\n```bash\ncd plannotator\nbun install\nbun run build:pi\n```\n\nThis builds the plan review and code review UIs and copies them into `apps/pi-extension/`.\n\n## Usage\n\n### Plan mode\n\nStart Pi in plan mode:\n\n```bash\npi --plan\n```\n\nOr toggle it during a session with `/plannotator` or `Ctrl+Alt+P`. The command accepts an optional file path argument (`/plannotator plans/auth.md`) or prompts you to choose one interactively.\n\nIn plan mode the agent is restricted \u2014 destructive commands are blocked, writes are limited to the plan file. It explores your codebase, then writes a plan using markdown checklists:\n\n```markdown\n- [ ] Add validation to the login form\n- [ ] Write tests for the new validation logic\n- [ ] Update error messages in the UI\n```\n\nWhen the agent calls `plannotator_submit_plan`, the Plannotator UI opens in your browser. You can:\n\n- **Approve** the plan to begin execution\n- **Deny with annotations** to send structured feedback back to the agent\n- **Approve with notes** to proceed but include implementation guidance\n\nThe agent iterates on the plan until you approve, then executes with full tool access. On resubmission, Plan Diff highlights what changed since the previous version.\n\n### Programmatic plan-mode control\n\nOther Pi extensions can enter, exit, toggle, or query Plannotator plan mode through the shared Pi event bus without invoking the `/plannotator` slash command:\n\n```ts\nimport { PLANNOTATOR_REQUEST_CHANNEL } from \"@plannotator/pi-extension/plannotator-events\";\n\nconst response = await new Promise((resolve) => {\n  pi.events.emit(PLANNOTATOR_REQUEST_CHANNEL, {\n    requestId: crypto.randomUUID(),\n    action: \"plan-mode\",\n    payload: { mode: \"enter\" }, // \"enter\" | \"exit\" | \"toggle\" | \"status\"\n    respond: resolve,\n  });\n});\n```\n\nA handled response returns the resulting phase, for example `{ status: \"handled\", result: { phase: \"planning\" } }`.\n\n### Configuring per-phase behavior\n\nPlannotator loads configuration in three layers:\n\n1. Built-in base config shipped with the package: `plannotator.json`\n2. Global user config: `~/.pi/agent/plannotator.json`\n3. Project-local config: `<cwd>/.pi/plannotator.json`\n\nLater layers overwrite earlier ones. If a field is omitted, it inherits the value from lower-precedence layers. If a value is set to `null`, an empty string, or an empty array, it clears the inherited value instead of merging it. You can also set `defaults` or an entire phase object to `null` to clear all inherited settings from lower-precedence layers.\n\n#### Top-level shape\n\n```json\n{\n  \"defaults\": {\n    \"model\": { \"provider\": \"anthropic\", \"id\": \"claude-sonnet-4-5\" },\n    \"thinking\": \"medium\",\n    \"activeTools\": [\"read\", \"bash\"],\n    \"statusLabel\": \"Ready\",\n    \"systemPrompt\": \"Optional prompt template\"\n  },\n  \"phases\": {\n    \"planning\": {\n      \"model\": null,\n      \"thinking\": null,\n      \"activeTools\": [\"grep\", \"find\", \"ls\", \"plannotator_submit_plan\"],\n      \"statusLabel\": \"\u23f8 plan\",\n      \"systemPrompt\": \"[PLANNING]\\nPlan file: ${planFilePath}\"\n    },\n    \"executing\": {\n      \"model\": { \"provider\": \"anthropic\", \"id\": \"claude-sonnet-4-5\" },\n      \"thinking\": \"high\",\n      \"activeTools\": [],\n      \"statusLabel\": \"\",\n      \"systemPrompt\": \"[EXECUTING]\\nRemaining steps:\\n${todoList}\"\n    },\n    \"reviewing\": {\n      \"systemPrompt\": \"...\"\n    }\n  }\n}\n```\n\n#### Option reference\n\n| Option | Type | Meaning |\n|--------|------|---------|\n| `defaults` | object | Base values applied to every phase before phase-specific overrides |\n| `phases` | object | Phase-specific overrides |\n| `phases.planning` | object | Settings for planning mode |\n| `phases.executing` | object | Settings for execution mode |\n| `phases.reviewing` | object | Reserved for future review-mode customization |\n| `model` | `{ provider, id }` \\| `null` | Sets the model for the phase; `null` leaves the current model unchanged |\n| `thinking` | `minimal` \\| `low` \\| `medium` \\| `high` \\| `xhigh` \\| `null` | Sets the thinking level; `null` leaves the current level unchanged |\n| `activeTools` | string[] \\| `null` | Extra tools to enable for the phase; `[]` or `null` means no extra phase tools |\n| `statusLabel` | string \\| `null` | Optional UI label for the phase; empty/null clears it |\n| `systemPrompt` | string \\| `null` | Phase system prompt template; empty/null disables prompt injection |\n\n#### Prompt variables\n\nUse these inside `systemPrompt` strings:\n\n- `${planFilePath}` \u2014 current plan file path\n- `${todoList}` \u2014 remaining checklist items as markdown checkboxes\n- `${completedCount}` \u2014 completed checklist count\n- `${totalCount}` \u2014 total checklist count\n- `${remainingCount}` \u2014 remaining checklist count\n- `${phase}` \u2014 current runtime phase (`planning`, `executing`, `reviewing`, or `idle`)\n\n#### Behavior notes\n\n- Unknown template variables trigger a warning in the UI and are rendered as empty strings.\n- `activeTools` are additive with the tools currently active in the session, so Plannotator still preserves tools provided by other extensions.\n- Execution progress remains dynamic (`[DONE:n]` + checklist tracking), even if `statusLabel` is set.\n\n#### Example files\n\n- Built-in base config shipped with the package: `apps/pi-extension/plannotator.json`\n- Global user override: `~/.pi/agent/plannotator.json`\n- Project-local override: `<cwd>/.pi/plannotator.json`\n\n### Code review\n\nRun `/plannotator-review` to open your current git changes in the code review UI. Annotate specific lines, switch between diff views (uncommitted, staged, last commit, branch), and submit feedback that gets sent to the agent.\n\n### Shared Plannotator event API\n\nPlannotator also listens on the shared `plannotator:request` event channel so other extensions can reuse the same browser review flows without importing Plannotator internals.\n\nSupported actions and payloads:\n\n- `plan-review`: `{ planContent, planFilePath? }`\n- `review-status`: `{ reviewId }`\n- `code-review`: `{ cwd?, defaultBranch?, diffType? }`\n- `annotate`: `{ filePath, markdown?, mode?, folderPath? }`\n- `annotate-last`: `{ markdown? }`\n- `archive`: `{ customPlanPath? }`\n\nPlan review is asynchronous:\n\n- callers send `plannotator:request` with action `plan-review`\n- Plannotator opens the browser review and immediately responds with `{ status: \"handled\", result: { status: \"pending\", reviewId } }`\n- when the human approves or rejects in the browser, Plannotator emits `plannotator:review-result` with `{ reviewId, approved, feedback, savedPath?, agentSwitch?, permissionMode? }`\n- callers can query `review-status` with the same `reviewId` to recover from startup races or session restarts\n\nThe other shared actions remain request/response flows. Payloads are intentionally minimal and only include fields the shared implementation actually uses.\n\n### Markdown annotation\n\nRun `/plannotator-annotate <file.md>` to open any markdown file in the annotation UI. Useful for reviewing documentation or design specs with the agent.\n\n### Annotate last message\n\nRun `/plannotator-last` to annotate the agent's most recent response. The message opens in the annotation UI where you can highlight text, add comments, and send structured feedback back to the agent.\n\n### Archive browser\n\nThe Plannotator archive browser is available through the shared event API as `archive`, which opens the saved plan/decision browser for future callers. The orchestrator does not expose a dedicated archive command yet.\n\n### Progress tracking\n\nDuring execution, the agent marks completed steps with `[DONE:n]` markers. Progress is shown in the status line and as a checklist widget in the terminal.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/plannotator` | Toggle plan mode. The agent writes a markdown plan file anywhere in the working directory and submits its path |\n| `/plannotator-review` | Open code review UI for current changes |\n| `/plannotator-annotate <file>` | Open markdown file in annotation UI |\n| `/plannotator-last` | Annotate the last assistant message |\n\n## Flags\n\n| Flag | Description |\n|------|-------------|\n| `--plan` | Start in plan mode |\n\n## Keyboard shortcuts\n\n| Shortcut | Description |\n|----------|-------------|\n| `Ctrl+Alt+P` | Toggle plan mode |\n\n## How it works\n\nThe extension manages a state machine: **idle** \u2192 **planning** \u2192 **executing** \u2192 **idle**.\n\nDuring **planning**:\n- All tools from other extensions remain available\n- Bash is unrestricted \u2014 the agent is guided by the system prompt not to run destructive commands\n- Writes and edits restricted to the plan file only\n\nDuring **executing**:\n- Full tool access: `read`, `bash`, `edit`, `write`\n- Progress tracked via `[DONE:n]` markers in agent responses\n- Plan re-read from disk each turn to stay current\n\nState persists across session restarts via Pi's `appendEntry` API.\n\n## Requirements\n\n- [Pi](https://github.com/earendil-works/pi) >= 0.74.0\n",
+  "keywords": [
+    "pi-package",
+    "plannotator",
+    "plan-review",
+    "ai-agent",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "backnotprop"
+  },
+  "license": "MIT OR Apache-2.0",
+  "homepage": "https://github.com/backnotprop/plannotator",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/backnotprop/plannotator.git",
+    "directory": "apps/pi-extension"
+  },
+  "pi": {
+    "extensions": [
+      "./"
+    ]
+  },
+  "time": {
+    "created": "2026-02-21T19:55:46.094Z",
+    "modified": "2026-06-25T13:17:03.517Z",
+    "0.8.3": "2026-02-21T19:55:46.637Z",
+    "0.8.5": "2026-02-21T20:23:03.851Z",
+    "0.9.0": "2026-02-23T08:38:40.832Z",
+    "0.9.1": "2026-02-23T08:56:17.802Z",
+    "0.9.2": "2026-02-23T20:37:09.368Z",
+    "0.9.3": "2026-02-27T05:33:11.341Z",
+    "0.10.0": "2026-03-03T01:38:15.520Z",
+    "0.11.0": "2026-03-05T00:58:14.360Z",
+    "0.11.1": "2026-03-06T09:11:42.459Z",
+    "0.11.2": "2026-03-07T20:40:14.963Z",
+    "0.11.3": "2026-03-08T23:34:14.489Z",
+    "0.11.4": "2026-03-09T14:43:03.146Z",
+    "0.12.0": "2026-03-12T08:12:10.437Z",
+    "0.13.0": "2026-03-16T15:46:22.238Z",
+    "0.13.1": "2026-03-16T23:46:59.331Z",
+    "0.14.0": "2026-03-18T14:56:27.908Z",
+    "0.14.1": "2026-03-18T23:38:26.554Z",
+    "0.14.2": "2026-03-19T17:48:26.663Z",
+    "0.14.3": "2026-03-20T06:49:51.657Z",
+    "0.14.4": "2026-03-21T00:41:08.060Z",
+    "0.14.5": "2026-03-23T07:09:08.285Z",
+    "0.15.0": "2026-03-24T08:27:49.147Z",
+    "0.15.1": "2026-03-24T10:08:43.416Z",
+    "0.15.2": "2026-03-25T07:37:04.438Z",
+    "0.15.3": "2026-03-25T15:01:41.055Z",
+    "0.15.4": "2026-03-25T16:51:50.322Z",
+    "0.15.5": "2026-03-27T05:36:59.074Z",
+    "0.16.0": "2026-03-30T05:17:21.087Z",
+    "0.16.1": "2026-03-30T16:18:19.691Z",
+    "0.16.2": "2026-03-31T04:51:44.477Z",
+    "0.16.3": "2026-04-01T04:30:49.509Z",
+    "0.16.4": "2026-04-01T22:11:23.564Z",
+    "0.16.5": "2026-04-02T05:16:24.911Z",
+    "0.16.6": "2026-04-02T17:59:51.889Z",
+    "0.16.7": "2026-04-02T22:36:32.457Z",
+    "0.17.0": "2026-04-06T20:14:20.264Z",
+    "0.17.1": "2026-04-07T01:17:12.209Z",
+    "0.17.2": "2026-04-08T14:10:30.614Z",
+    "0.17.3": "2026-04-08T14:42:04.470Z",
+    "0.17.4": "2026-04-08T23:23:13.666Z",
+    "0.17.5": "2026-04-09T14:10:58.615Z",
+    "0.17.6": "2026-04-09T15:08:23.644Z",
+    "0.17.7": "2026-04-09T16:38:17.282Z",
+    "0.17.8": "2026-04-11T00:29:58.896Z",
+    "0.17.9": "2026-04-11T19:02:51.551Z",
+    "0.17.10": "2026-04-13T15:05:34.945Z",
+    "0.18.0": "2026-04-20T00:44:49.249Z",
+    "0.19.0": "2026-04-22T02:39:04.077Z",
+    "0.19.1": "2026-04-24T05:52:59.541Z",
+    "0.19.2": "2026-04-28T06:52:06.605Z",
+    "0.19.3": "2026-04-29T07:33:56.612Z",
+    "0.19.4": "2026-04-30T18:13:40.378Z",
+    "0.19.5": "2026-05-01T07:18:39.071Z",
+    "0.19.6": "2026-05-02T01:41:46.019Z",
+    "0.19.7": "2026-05-02T21:05:49.994Z",
+    "0.19.8": "2026-05-05T07:30:51.636Z",
+    "0.19.9": "2026-05-06T23:02:21.941Z",
+    "0.19.10": "2026-05-06T23:18:41.647Z",
+    "0.19.11": "2026-05-08T03:28:24.575Z",
+    "0.19.12": "2026-05-11T16:43:31.865Z",
+    "0.19.13": "2026-05-11T18:31:49.254Z",
+    "0.19.14": "2026-05-11T19:48:18.015Z",
+    "0.19.15": "2026-05-13T15:23:40.393Z",
+    "0.19.16": "2026-05-13T22:49:37.655Z",
+    "0.19.17": "2026-05-15T00:40:55.953Z",
+    "0.19.18": "2026-05-18T06:57:21.642Z",
+    "0.19.20": "2026-05-19T15:35:31.245Z",
+    "0.19.21": "2026-05-21T09:00:27.391Z",
+    "0.19.22": "2026-05-24T06:35:09.683Z",
+    "0.19.23": "2026-05-25T19:34:11.655Z",
+    "0.19.24": "2026-05-28T05:27:46.219Z",
+    "0.19.25": "2026-06-01T02:25:15.106Z",
+    "0.19.26": "2026-06-01T03:17:21.813Z",
+    "0.19.27": "2026-06-03T21:37:07.499Z",
+    "0.20.0": "2026-06-09T19:18:26.417Z",
+    "0.20.1": "2026-06-10T16:31:11.501Z",
+    "0.20.2": "2026-06-14T07:57:36.401Z",
+    "0.20.3": "2026-06-16T07:38:35.453Z",
+    "0.21.0": "2026-06-19T18:16:44.215Z",
+    "0.21.1": "2026-06-22T12:32:14.919Z",
+    "0.21.2": "2026-06-25T13:17:02.900Z"
+  },
+  "versions_count": 81,
+  "downloads_last_week": 6367,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 479
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 359
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 935
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 1216
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 2354
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 2337
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 2801
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 4353
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 2823
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 4902
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 7032
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 7224
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 8106
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 7392
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 6338
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 5044
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 8388
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 6494
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 840
+    }
+  ]
+}

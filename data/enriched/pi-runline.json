@@ -1,0 +1,57 @@
+{
+  "name": "pi-runline",
+  "latest_version": "0.11.5",
+  "description": "Code mode for pi",
+  "readme": "# pi-runline\n\nCode mode for [pi](https://github.com/mariozechner/pi).\n\nAn extension that plugs [runline](https://www.npmjs.com/package/runline) into coding agents. The agent gets one native tool, in-sandbox action discovery, a fuzzy picker for choosing which of the 202 built-in plugins to expose, and a guided credential prompt for the ones it hasn't seen before.\n\n## Install\n\n```bash\npi install pi-runline\n```\n\n## How the agent uses it\n\nOn session start, if the current working directory has a `.runline/` (or one is configured globally \u2014 see below), the extension registers a single tool and injects a short primer naming the enabled plugins:\n\n- **`execute_runline`** \u2014 run JavaScript in runline's QuickJS sandbox. Every enabled plugin is a top-level global; `return` surfaces the result; logs are captured.\n\nDiscovery happens **inside the sandbox**, not as a separate tool. The agent uses an `actions` object to explore the catalog without paying for a full schema dump in its system prompt:\n\n```js\nactions.list()                  // every \"plugin.action\" path\nactions.list(\"github\")          // filter to one plugin\nactions.find(\"create issue\")    // ranked fuzzy search (MiniSearch)\nactions.describe(\"github.issue.create\")\n// \u2192 { path, plugin, action, description, signature, inputs }\nactions.check(\"github.issue.create\", { owner: \"a\" })\n// \u2192 { ok, missing, unknown, typeErrors, signature }   (does NOT call the action)\n```\n\nUnknown paths throw with did-you-mean suggestions, so typos are self-correcting. Recommended flow: `find` \u2192 `describe` \u2192 `check` \u2192 call.\n\nCalling actions is unchanged \u2014 plugin globals and `actions.<plugin>.<action>(...)` are the same call:\n\n```js\nreturn await github.issue.create({ owner: \"acme\", repo: \"api\", title: \"Bug\" });\n```\n\n## `/runline-plugins` \u2014 the picker\n\nTyping `/runline-plugins` in a pi session opens a fuzzy multi-select over all 202 built-in plugins.\n\n```\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 runline plugins \u00b7 5/202 enabled             \u2502\n\u2502 type to filter \u00b7 space toggle \u00b7 ^A toggle   \u2502\n\u2502                                             \u2502\n\u2502 filter \u276f gith                               \u2502\n\u2502                                             \u2502\n\u2502 \u276f \u25c9 github       34 actions                 \u2502\n\u2502   \u25ef gitlab       17 actions                 \u2502\n\u2502   ...                                       \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n```\n\nKeys: `type` to filter \u00b7 `\u2191/\u2193` to move \u00b7 `space` to toggle \u00b7 `Ctrl-A` to toggle all visible \u00b7 `enter` to save \u00b7 `esc` to cancel.\n\nAfter saving, any newly-enabled plugin with a `connectionConfigSchema` that doesn't already have a connection (and can't be fully resolved from env vars) will prompt you field-by-field for credentials. Values are written to `.runline/config.json` under `connections[]`.\n\n## Configuration\n\n### Per-project \u2014 `.runline/config.json`\n\n```json\n{\n  \"showStatus\": true,\n  \"piPlugins\": [\"github\", \"slack\", \"linear\"],\n  \"connections\": [\n    { \"name\": \"github\", \"plugin\": \"github\", \"config\": { \"token\": \"ghp_...\" } }\n  ]\n}\n```\n\n- **`piPlugins`** \u2014 the allowlist the extension uses. If missing or empty, nothing is exposed to the agent and the status bar says `runline: /runline-plugins to enable`.\n- **`showStatus`** \u2014 set to `false` to silence the status bar entry for this project.\n- **`connections`** \u2014 standard runline connections (shared with the CLI and SDK).\n\n### Global \u2014 `~/.pi/agent/runline.json`\n\n```json\n{ \"project\": \"~/Projects/my-runline-project\" }\n```\n\nFallback used when the current cwd has no `.runline/` anywhere up the tree. Useful when you want the runline tools available in every pi session without scattering `.runline/` folders.\n\n## How plugin allow-listing works\n\nThe extension deliberately exposes nothing by default. That's on purpose \u2014 2,614 actions is a lot of context budget. You pick the plugins that matter for a given project, commit the allowlist to `.runline/config.json`, and the agent only ever sees the ones you enabled in its primer.\n\nNote that the QuickJS sandbox itself still registers every runline plugin as a global (and `actions.list()` will surface them all), so in principle an agent could guess and call a disabled plugin. In practice the primer only advertises the allowlisted ones, and unconfigured plugins error out at first action call anyway. Plumbing the allowlist into the sandbox registry is on the roadmap.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "michaelliv"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "extensions/runline-context"
+    ]
+  },
+  "time": {
+    "created": "2026-04-17T21:45:28.619Z",
+    "modified": "2026-06-24T10:52:19.502Z",
+    "0.1.0": "2026-04-17T21:45:28.886Z",
+    "0.2.1": "2026-04-17T21:48:45.885Z",
+    "0.2.2": "2026-04-17T21:56:33.839Z",
+    "0.3.0": "2026-04-20T21:24:20.204Z",
+    "0.3.1": "2026-04-20T21:50:16.915Z",
+    "0.3.2": "2026-04-21T05:51:50.725Z",
+    "0.3.3": "2026-04-23T22:25:59.205Z",
+    "0.4.0": "2026-04-24T16:40:32.569Z",
+    "0.5.0": "2026-04-25T22:34:25.998Z",
+    "0.5.1": "2026-04-26T07:34:18.274Z",
+    "0.5.2": "2026-04-29T10:55:13.780Z",
+    "0.5.3": "2026-05-02T20:55:11.214Z",
+    "0.6.0": "2026-05-07T07:29:53.660Z",
+    "0.7.0": "2026-05-08T08:13:42.750Z",
+    "0.7.1": "2026-05-09T14:53:58.269Z",
+    "0.7.2": "2026-05-09T15:20:52.472Z",
+    "0.7.4": "2026-05-09T20:57:35.657Z",
+    "0.7.5": "2026-05-11T06:21:15.867Z",
+    "0.7.6": "2026-05-20T18:15:25.411Z",
+    "0.7.7": "2026-05-24T13:58:22.806Z",
+    "0.8.0": "2026-05-28T14:25:22.843Z",
+    "0.8.1": "2026-06-04T17:49:25.024Z",
+    "0.9.0": "2026-06-09T10:13:51.873Z",
+    "0.10.0": "2026-06-09T19:43:14.280Z",
+    "0.11.0": "2026-06-11T06:36:56.979Z",
+    "0.11.1": "2026-06-11T07:25:07.155Z",
+    "0.11.2": "2026-06-14T14:23:50.662Z",
+    "0.11.3": "2026-06-23T11:19:30.697Z",
+    "0.11.4": "2026-06-24T10:05:35.045Z",
+    "0.11.5": "2026-06-24T10:52:19.395Z"
+  },
+  "versions_count": 30,
+  "downloads_last_week": null,
+  "download_trend": []
+}

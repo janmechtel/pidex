@@ -1,0 +1,35 @@
+{
+  "name": "pi-dynamic-workflows",
+  "latest_version": "1.0.1",
+  "description": "Claude-Code-style dynamic workflow orchestration for Pi.",
+  "readme": "# pi-dynamic-workflows\n\n> Claude-Code-style dynamic workflows for [Pi](https://github.com/earendil-works/pi).\n\nA Pi extension that adds a `workflow` tool. Instead of one assistant doing everything sequentially, the model writes a small JavaScript script that fans out the work across many isolated subagents, then synthesizes the results.\n\nGreat for codebase audits, multi-perspective review, large refactors, and fan-out research.\n\nInspired by Anthropic's [dynamic workflows in Claude Code](https://claude.com/blog/introducing-dynamic-workflows-in-claude-code).\n\n## Install\n\n```bash\npi install npm:pi-dynamic-workflows\n# or from a local checkout\npi install /path/to/pi-dynamic-workflows\n```\n\nThen in Pi:\n\n```text\n/reload\n```\n\nThat's it. The extension registers a `workflow` tool and activates it on session start.\n\n## Usage\n\nJust ask Pi for a workflow in plain language:\n\n```text\nRun a workflow to inspect this repository and summarize the main modules.\n```\n\nThe model will write a workflow script and call the `workflow` tool. Live progress shows up inline:\n\n```text\n\u25c6 Workflow: inspect_project (3/3 done)\n  \u2713 Scan 1/1\n    #1 \u2713 repo inventory\n  \u2713 Analyze 2/2\n    #2 \u2713 source modules\n    #3 \u2713 final summary\n```\n\nPress `Esc` to cancel a running workflow. Active subagents are aborted and surfaced as skipped.\n\n## Workflow script shape\n\nA workflow is plain JavaScript. The first statement must export literal metadata. `name` and `description` are required; `phases` is optional documentation for an expected outline. The live progress view is driven by `phase(...)` calls at runtime:\n\n```js\nexport const meta = {\n  name: 'inspect_project',\n  description: 'Inspect a repository and summarize the main modules',\n  phases: [\n    { title: 'Scan' },\n    { title: 'Analyze' },\n  ],\n}\n\nphase('Scan')\nconst inventory = await agent('Inspect the repository structure.', {\n  label: 'repo inventory',\n})\n\nphase('Analyze')\nconst summary = await agent(\n  'Summarize the main modules from this inventory:\\n' + inventory,\n  { label: 'module summary' },\n)\n\nreturn { inventory, summary }\n```\n\nPhases are discovered as the script runs, so conditional and loop-created phases work naturally. If a branch is skipped, its phase does not show up as an empty progress row.\n\n### Editor IntelliSense\n\nReusable workflow files can opt into editor hints for workflow globals:\n\n```js\n/// <reference types=\"pi-dynamic-workflows/workflow\" />\n```\n\nThis declares `agent`, `parallel`, `pipeline`, `phase`, `log`, `args`, `cwd`, and `budget` for TypeScript-aware editors.\n\n### Available globals\n\n| Global | Description |\n| --- | --- |\n| `agent(prompt, opts)` | Spawn an isolated subagent. Returns its final text or, with `opts.schema`, a validated object. |\n| `parallel(thunks)` | Run an array of `() => agent(...)` thunks concurrently. Results are returned in input order. |\n| `pipeline(items, ...stages)` | Run each item through sequential stages while items fan out. Each stage receives `(prev, original, index)`. |\n| `phase(title)` | Mark the current phase. Used for grouping in the live progress view. |\n| `log(message)` | Append a workflow-level log line. |\n| `args` | Optional JSON value passed in via the tool's `args` parameter. |\n| `cwd`, `process.cwd()` | Current working directory for subagents. |\n| `budget` | `{ total, spent(), remaining() }` token budget tracker. |\n\n### Determinism rules\n\nWorkflow scripts are evaluated inside a Node `vm` sandbox. The following are intentionally unavailable:\n\n- `Date.now()`, `new Date()`\n- `Math.random()`\n- `require`, `import`, `fs`, network APIs\n- spreads, computed keys, template interpolation, function calls inside `meta`\n\nThis keeps `meta` parseable, runs reproducible, and the surface area small.\n\n### Structured subagent output\n\nPass a JSON Schema via `opts.schema` and the subagent will return a validated object:\n\n```js\nconst finding = await agent('Find security-sensitive files.', {\n  label: 'security scan',\n  schema: {\n    type: 'object',\n    properties: {\n      paths: { type: 'array', items: { type: 'string' } },\n      reason: { type: 'string' },\n    },\n    required: ['paths', 'reason'],\n  },\n})\n```\n\nUnder the hood this is a Pi `structured_output` tool with `terminate: true`, so the subagent ends on that call without an extra assistant turn.\n\n## How it works\n\n```text\nuser prompt\n  \u2192 Pi model writes a workflow script\n  \u2192 workflow tool parses + runs script in a vm sandbox\n  \u2192 script calls agent(), parallel(), pipeline()\n  \u2192 each agent() spawns an in-memory Pi subagent session\n  \u2192 snapshots stream back as compact progress\n  \u2192 final structured result returned to the parent assistant\n```\n\nSubagents run in fresh in-memory Pi sessions with the standard coding tools, so they can read files, run shell commands, and call structured output exactly like a normal Pi turn.\n\n## Library modules\n\n| File | Purpose |\n| --- | --- |\n| `src/workflow.ts` | AST-validated parser and sandboxed workflow runtime. |\n| `src/workflow-tool.ts` | The Pi `workflow` tool, prompt guidelines, rendering, abort handling. |\n| `src/agent.ts` | `WorkflowAgent`, an in-memory Pi subagent runner. |\n| `src/structured-output.ts` | Terminating structured-output tool backed by TypeBox/JSON Schema. |\n| `src/display.ts` | Workflow snapshots and compact text renderers. |\n| `extensions/workflow.ts` | The Pi extension entrypoint. |\n\n## Development\n\n```bash\nnpm install\nnpm test     # biome check + tsc + unit tests\nnpm run dev\n```\n\nParser unit tests live in `tests/workflow-parser.test.ts` and cover both accepted and rejected script shapes.\n\n## Status\n\nThis is a prototype. It implements the core workflow primitive (script, subagents, parallel/pipeline, phases, abort, structured output) but does not yet implement persisted or resumable runs, or a `/workflows` manager.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "workflow",
+    "agents"
+  ],
+  "author": {
+    "name": "michaelliv"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Michaelliv/pi-dynamic-workflows#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Michaelliv/pi-dynamic-workflows.git"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/workflow.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-28T21:22:41.977Z",
+    "modified": "2026-05-31T07:19:49.039Z",
+    "1.0.0": "2026-05-28T21:22:42.346Z",
+    "1.0.1": "2026-05-31T07:19:48.931Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

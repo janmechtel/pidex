@@ -1,0 +1,70 @@
+{
+  "name": "@undefineds.co/models",
+  "latest_version": "0.2.45",
+  "description": "`@undefineds.co/models` is the shared Solid Pod data model contract for LinX apps, desktop, CLI, sidecars, and future workers.",
+  "readme": "# LinX Models\n\n`@undefineds.co/models` is the shared Solid Pod data model contract for LinX\napps, desktop, CLI, sidecars, and future workers.\n\nApplication shells should use these schemas, repositories, and helpers directly.\nDo not duplicate shared predicates, subject templates, Turtle serializers,\nresource state machines, or cross-app use-case logic in `apps/*`.\n\n## Package\n\n```bash\nyarn workspace @undefineds.co/models build\nyarn workspace @undefineds.co/models test\n```\n\nRelease is tag-driven through GitHub Actions. See\n[`docs/RELEASE.md`](docs/RELEASE.md); do not use local `npm publish` as the\nnormal release path.\n\n```ts\nimport {\n  UDFS,\n  agentResource,\n  aiModelResource,\n  aiProviderResource,\n  chatResource,\n  contactResource,\n  credentialResource,\n  messageResource,\n  selectAIConfigCredential,\n  threadResource,\n} from '@undefineds.co/models'\n```\n\n## Pi Package\n\n`@undefineds.co/models` is also a Pi package. It exposes the shared\n`solid-modeling` skill through the package manifest, so Pi users can install it\nfrom npm or git:\n\n```bash\npi install npm:@undefineds.co/models\n```\n\nAfter installation, Pi can load the skill from `skills/solid-modeling/SKILL.md`.\n\n## Namespaces\n\nLinX-owned predicates and classes use the company namespace:\n\n```text\nhttps://undefineds.co/ns#\n```\n\nUse `udfs:` terms in models-level RDF contracts.\n\n## Core Runtime Semantics\n\nThe shared chat/runtime model is:\n\n```text\nChat       = who or what the user is talking with\nTask       = executable work surface parallel to Chat\nThread     = concrete timeline/place/runtime context under one parent surface\nMessage    = communication item in a Chat and optionally a Thread\nRun        = one Agent runtime execution attempt bound to Thread + Workspace\nSession    = lightweight runtime/collaboration lifecycle projection for a Thread\nAgent      = executable capability root with its own home/config filesystem\nWorkspace  = concrete working code area/worktree metadata\nRepository = durable source-control metadata, not the working directory\n```\n\nDetailed Agent-centered runtime, Repository/Workspace, branch/ref, Agent home,\nand Session binding rules live in:\n\n- [`docs/agent-runtime-model.md`](docs/agent-runtime-model.md)\n\n## Agent vs AI Config\n\n`agentResource` and `ai-config` intentionally both mention provider/model, but\nthey are not the same resource.\n\n`agentResource` answers: which executable actor is this, and what defaults\nshould it use at runtime?\n\nCurrent Agent fields include:\n\n```ts\n{\n  name: string\n  description?: string\n  avatarUrl?: string\n  instructions?: string\n  provider?: string\n  model?: string\n  temperature?: number\n  tools?: string[]\n  contextRound?: number\n  ttsModel?: string\n  videoModel?: string\n}\n```\n\nAgent owns runtime preference and capability state. It should not own shared\nAPI keys, endpoint catalogs, provider model lists, or credential rotation\npolicy.\n\n`ai-config` answers: which AI services are available, which models belong to a\nprovider, and which credential should be used for a provider call?\n\nThe resources are:\n\n```text\naiProviderResource   /settings/providers/{providerId}.ttl\naiModelResource      /settings/providers/{providerId}.ttl#{modelId}\ncredentialResource   /settings/credentials.ttl#{credentialId}\n```\n\nThe separation is:\n\n```text\nAgent.provider / Agent.model\n  runtime default selection for one Agent\n\nAI Provider\n  endpoint/catalog/family metadata such as baseUrl, proxyUrl, defaultModel\n\nAI Model\n  provider-provided model metadata linked by isProvidedBy\n\nCredential\n  named secret and routing state linked to a provider\n```\n\nCredential selection uses the shared helper:\n\n```ts\nconst selected = selectAIConfigCredential('openai', credentialRows, providerRows)\n```\n\nSelection semantics:\n\n- Only active `service = \"ai\"` credentials with an API key are candidates.\n- A credential marked `isDefault` is preferred.\n- If multiple defaults exist, the oldest `lastUsedAt` wins.\n- If no default exists, credentials rotate by oldest `lastUsedAt`.\n- `failCount` and stable id are tie breakers.\n- Callers should update `lastUsedAt` after using the selected credential.\n\nThis means `ai-config` is a shared service/credential pool. Agent records only\nrefer to a provider/model default and runtime parameters.\n\n## Contact / Person / Agent\n\nContact, Person, and Agent are distinct:\n\n```text\nContact = address-book/social projection shown in Contacts and Chat\nPerson  = natural human identity\nAgent   = executable runtime/capability root with an Agent home\n```\n\nAI Secretary has both:\n\n```text\nContact\n  contactType: agent\n  about: Agent context-root URI\n\nAgent\n  root: /agents/__secretary__/\n  meta: /agents/__secretary__/.meta\n```\n\nExternal people, services, or bots may appear as Contacts without being LinX\nAgents. If something is modeled as an executable LinX Agent, the Agent resource\nidentity is the context-root container itself.\n\n## Resource Ownership\n\nUse Resource-first names in shared code:\n\n```text\ncontactResource\nchatResource\nthreadResource\nmessageResource\nagentResource\naiProviderResource\naiModelResource\ncredentialResource\nsessionResource\napprovalResource\ngrantResource\nauditResource\ninboxNotificationResource\n```\n\n`*Table` exports are compatibility aliases for existing drizzle-solid call\nsites. New shared model code should prefer `*Resource`.\n\n## Pod Storage Patterns\n\nRepresentative paths:\n\n```text\n/.data/contacts/{contactId}.ttl\n/.data/chat/{chatId}/index.ttl#this\n/.data/chat/{chatId}/index.ttl#{threadId}\n/.data/task/{taskId}/index.ttl#{threadId}\n/.data/chat/{chatId}/{yyyy}/{MM}/{dd}/messages.ttl#{messageId}\n/agents/{agentId}/\n/.data/sessions/{yyyy}/{MM}/{dd}/{sessionId}.ttl\n/settings/providers/{providerId}.ttl\n/settings/providers/{providerId}.ttl#{modelId}\n/settings/credentials.ttl#{credentialId}\n```\n\nSchema fields that are RDF relations should store resource URIs, not hidden\n`xxxId` foreign keys. Short ids are acceptable at repository/helper boundaries\nwhen the helper derives the canonical URI internally. If a fact must be\nqueried, synced, approved, audited, or used to reconstruct shared state, model\nit as an explicit field or URI relation instead of hiding it in `metadata`.\n`metadata` is only for opaque protocol ids, local cache keys, UI state,\ncompatibility data, and non-structural context. Prefer semantic relation names\nsuch as `parent`, `chat`, `thread`, `message`, `task`, `delivery`, `session`,\n`workspace`, `source`, and `trigger`. Thread ownership is `parent` with\n`sioc:has_parent`.\n\nExternal/API ids use a fixed promotion rule:\n\n- `id` remains the Pod resource id, never an external system id.\n- Opaque adapter ids stay under `metadata.protocols.<apiNs>` by default, for\n  example `metadata.protocols.matrix.roomId/eventId/txnId` or\n  `metadata.protocols.chatkit.chat_id/thread_id`.\n- Promote an opaque id to a schema field only when it is required for\n  cross-client query, dedupe, audit, recovery, or a stable shared protocol\n  contract. The field description must say it is an external/runtime identifier,\n  not an RDF link.\n- Existing promoted examples are `Run.externalRunId`, `Message.toolCallId`,\n  `Message.coordinationId`, and `Contact.externalPlatform/externalId`.\n\n## Design Rules\n\n- Prefer standard RDF vocabularies such as VCARD, FOAF, SIOC, DCTerms,\n  Schema.org, LDP, and Solid Chat vocabularies.\n- Use `UDFS` only when a standard predicate does not describe the product\n  concept.\n- Keep UI-only state outside the Pod.\n- Put durable shared state in Pod resources owned by this package.\n- Add missing query/mutation helpers here before copying storage logic into\n  CLI, web, desktop, or plugins.\n- Do not store API secrets on Agent, Chat, Thread, Session, or Workspace.\n- Do not duplicate repository/Git metadata on Session; keep it on Workspace\n  metadata and snapshot it when audit requires reproducibility.\n\n## Development Checklist\n\nWhen adding or changing a durable model:\n\n1. Add or update the schema/resource in `src/`.\n2. Add namespace terms in `src/namespaces.ts` when needed.\n3. Export the resource, row, insert, update, and repository/helper from\n   `src/index.ts`.\n4. Add tests for RDF predicates, subject templates, and cross-app helper\n   semantics.\n5. Update this README or the focused document under `docs/`.\n\n## References\n\n- [Solid Protocol](https://solidproject.org/TR/protocol)\n- [Linked Data Platform](https://www.w3.org/TR/ldp/)\n- [WebID Profile](https://www.w3.org/2005/Incubator/webid/spec/)\n- [VCARD RDF](https://www.w3.org/TR/vcard-rdf/)\n- [FOAF Vocabulary](http://xmlns.com/foaf/spec/)\n- [SIOC Ontology](http://rdfs.org/sioc/spec/)\n- [Dublin Core Terms](https://www.dublincore.org/specifications/dublin-core/dcmi-terms/)\n- [Schema.org](https://schema.org/)\n",
+  "keywords": [
+    "pi-package",
+    "solid",
+    "rdf",
+    "pod",
+    "drizzle-solid",
+    "models"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/undefinedsco/models#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/undefinedsco/models.git"
+  },
+  "pi": {
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-03-21T15:57:03.821Z",
+    "modified": "2026-06-16T06:39:10.702Z",
+    "0.1.0": "2026-03-21T15:57:04.083Z",
+    "0.1.1": "2026-03-22T15:24:23.131Z",
+    "0.2.0": "2026-03-23T13:07:00.628Z",
+    "0.2.1": "2026-04-28T01:37:12.206Z",
+    "0.2.2": "2026-04-28T02:09:11.735Z",
+    "0.2.3": "2026-04-28T10:54:35.228Z",
+    "0.2.11": "2026-05-06T09:54:18.326Z",
+    "0.2.12": "2026-05-06T17:33:37.715Z",
+    "0.2.13": "2026-05-07T12:07:09.100Z",
+    "0.2.14": "2026-05-08T01:37:33.740Z",
+    "0.2.15": "2026-05-08T07:57:38.713Z",
+    "0.2.16": "2026-05-09T18:42:17.152Z",
+    "0.2.18": "2026-05-12T14:59:20.356Z",
+    "0.2.19": "2026-05-12T16:28:04.632Z",
+    "0.2.21": "2026-05-12T19:45:51.267Z",
+    "0.2.22": "2026-05-15T16:56:49.094Z",
+    "0.2.24": "2026-05-15T18:30:10.521Z",
+    "0.2.25": "2026-05-16T15:27:06.665Z",
+    "0.2.26": "2026-05-17T15:39:27.024Z",
+    "0.2.27": "2026-05-19T17:34:08.865Z",
+    "0.2.28": "2026-05-20T10:23:50.970Z",
+    "0.2.29": "2026-05-21T06:43:04.691Z",
+    "0.2.30": "2026-05-21T08:17:08.028Z",
+    "0.2.31": "2026-05-21T09:00:16.349Z",
+    "0.2.32": "2026-05-21T10:19:48.645Z",
+    "0.2.33": "2026-05-21T11:47:56.024Z",
+    "0.2.34": "2026-05-21T20:23:23.803Z",
+    "0.2.36": "2026-06-06T19:46:06.881Z",
+    "0.2.37": "2026-06-06T20:03:25.669Z",
+    "0.2.38": "2026-06-07T03:29:04.693Z",
+    "0.2.39": "2026-06-07T15:05:15.611Z",
+    "0.2.40": "2026-06-12T17:37:44.990Z",
+    "0.2.41": "2026-06-13T07:45:36.263Z",
+    "0.2.42": "2026-06-14T12:46:19.999Z",
+    "0.2.43": "2026-06-15T17:13:51.370Z",
+    "0.2.44": "2026-06-16T05:47:16.794Z",
+    "0.2.45": "2026-06-16T06:39:10.585Z"
+  },
+  "versions_count": 37,
+  "downloads_last_week": null,
+  "download_trend": []
+}

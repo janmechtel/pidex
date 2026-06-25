@@ -1,0 +1,42 @@
+{
+  "name": "pi-openplan",
+  "latest_version": "1.6.0",
+  "description": "Plan mode extension for pi \u2014 read-only exploration with structured planning, plan files, and phased execution tracking",
+  "readme": "# pi-openplan\n\n> Plan mode extension for [pi](https://pi.dev) \u2014 read-only exploration, structured planning, and phased execution tracking.\n\nToggle into plan mode to safely explore codebases, research approaches, write structured plans, and execute them phase by phase with progress tracking.\n\n## Features\n\n| Feature | Description |\n|---|---|\n| **Read-only mode** | Blocks `edit`/`write` tools and destructive bash commands via dual-gate safety |\n| **Structured plans** | Save plans to `.pi/plans/` with YAML frontmatter (title, status, type, dates). Renders inline in conversation on save. |\n| **Plan management** | LLM tools: `plan_write`, `plan_read`, `plan_list` with status filtering |\n| **Interactive Q&A** | `plan_question` tool \u2014 TUI overlay with options, multi-select, and free-text answers |\n| **Progress tracking** | Mark steps complete with `[DONE:n]` tags \u2014 widget shows live progress. Survives restarts. |\n| **Pause points** | `\u23f8\ufe0f PAUSE` markers create verification gates. Auto-pauses execution at each gate. |\n| **State persistence** | Plan mode, todos, and execution mode survive session restarts and `/reload` |\n\n## Installation\n\n```bash\npi install npm:pi-openplan          # from npm\npi install git:github.com/wilfredinni/pi-openplan  # from git\npi -e ./path/to/pi-openplan         # try without installing\n```\n\nAfter installing, restart pi or run `/reload`.\n\n## Quick Start\n\n```\n/plan                 # enable plan mode (read-only)\n/plans                # list saved plans\n/execute_plan <name>  # execute a saved plan\n/plan                 # disable plan mode (full access restored)\n```\n\n## Commands\n\n### `/plan`\nToggle plan mode. When enabled, tools are restricted to read-only and bash commands go through the dual-gate safety check (see [Bash Safety](#bash-safety)).\n\n### `/plans`\nList all saved plans from `.pi/plans/` with filename, status, title, and creation date.\n\n### `/execute_plan [plan-name]`\nExit plan mode and execute a saved plan. Loads the plan, extracts phases, and sets status to `in_progress`. If the plan is not found, execution is aborted and plan mode is restored. Run without a name to enter generic execution mode.\n\n## Keyboard Shortcuts\n\n| Shortcut | Action |\n|---|---|\n| `Ctrl+Alt+P` | Toggle plan mode |\n\n## CLI Flags\n\n```bash\npi --plan    # start pi in plan mode\n```\n\n## LLM Tools\n\nThese tools are registered for the agent to call during plan mode:\n\n**`plan_write`** \u2014 Save a plan. Accepts `filename`, `title`, `content` (markdown), and optional `type` (`feature`, `fix`, `refactor`, `chore`).\n\n**`plan_read`** \u2014 Read a saved plan by filename (fuzzy match). Use `full: false` for metadata only.\n\n**`plan_list`** \u2014 List all plans, optionally filtered by `status` (`draft`, `approved`, `in_progress`, `done`).\n\n**`plan_question`** \u2014 Present clarifying questions with options. Supports single-select, multi-select, and custom free-text. Max 4 questions, 2\u20134 options each. Falls back to text in non-interactive mode.\n\n**`plan_edit`** \u2014 Edit existing plans. Update a specific section by heading name (e.g. \"Approach\", \"Phase 1: Setup\") or replace the entire content. On full replace, the old version is preserved as a Previous Version.\n\n## Bash Safety\n\nPlan mode uses a **dual-gate** system to block destructive commands:\n\n1. **Destructive gate** \u2014 blocks 32 patterns (`rm`, `mv`, `git push`, `npm install`, `sudo`, `curl -d`, `curl -o`, `wget -O`, pipe-to-interpreter, etc.)\n2. **Safe gate** \u2014 only allows 48 known-safe patterns (`cat`, `grep`, `ls`, `git status`, `git log`, `npm list`, `curl` (read-only), `wget -O -`, etc.)\n\nA command must pass **both** gates. Unknown commands are conservatively blocked.\n\n## Plan File Format\n\nPlans are markdown files in `.pi/plans/` with YAML frontmatter:\n\n```markdown\n---\ntitle: \"Feature Name\"\nstatus: draft\ncreated: \"2026-01-15T12:00:00Z\"\ntype: feature\n---\n\n# Feature Name Implementation Plan\n\n## Overview\n...\n```\n\n**Statuses:** `draft`, `approved`, `in_progress`, `done`\n**Types:** `feature`, `fix`, `refactor`, `chore`\n\n### Progress Tracking\n\nDuring execution, include `[DONE:n]` in responses where `n` matches the phase number. The widget updates automatically. On session resume, completed markers are re-scanned to restore state.\n\n### Pause Points\n\nInclude `\u23f8\ufe0f PAUSE` or `PAUSE` in your plan to create verification gates. The extension pauses and asks for confirmation before continuing.\n\n## Plan Mode Workflow\n\n1. **Toggle on** \u2014 `/plan` or `Ctrl+Alt+P`\n2. **Explore** \u2014 read files, search code, research approaches (read-only)\n3. **Ask** \u2014 use `plan_question` to clarify scope, constraints, priorities\n4. **Plan** \u2014 agent creates a structured plan via `plan_write` with phases, verification, risks\n5. **Edit** \u2014 refine the plan with `plan_edit` (update sections or full replace; previous version preserved)\n6. **Review** \u2014 agent presents plan summary and stops\n7. **Execute** \u2014 `/execute_plan <plan-name>` loads plan, begins phased execution\n8. **Track** \u2014 use `[DONE:n]` to mark steps complete\n9. **Verify** \u2014 review at each `\u23f8\ufe0f PAUSE` gate before continuing\n10. **Complete** \u2014 all steps done; extension announces completion, resets execution mode\n\n## Development\n\n```bash\nnpm install            # install dev deps (typecheck/lint/test only)\nnpm run typecheck      # tsc --noEmit\nnpm run lint           # biome check .\nnpm run lint:fix       # biome check --write .\nnpm test               # vitest \u2014 204 tests, 10 files\nnpm run test:coverage  # vitest with v8 coverage\npi -e .                # load extension locally\n```\n\nSee [AGENTS.md](./AGENTS.md) for architecture, release process, and gotchas.\n\n## Requirements\n\n- [pi](https://pi.dev) 0.74.0 or later\n- Node.js 22+\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "plan-mode",
+    "openplan"
+  ],
+  "author": {
+    "name": "Carlos Montecinos"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/wilfredinni/pi-openplan#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wilfredinni/pi-openplan.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-05-28T21:11:13.119Z",
+    "modified": "2026-06-17T22:47:33.838Z",
+    "1.0.0": "2026-05-28T21:11:13.392Z",
+    "1.1.0": "2026-05-29T01:04:06.800Z",
+    "1.2.0": "2026-05-29T03:21:54.760Z",
+    "1.3.0": "2026-05-29T16:42:57.819Z",
+    "1.4.0": "2026-05-31T16:30:00.164Z",
+    "1.5.0": "2026-06-01T23:44:34.700Z",
+    "1.5.1": "2026-06-03T19:55:57.592Z",
+    "1.6.0": "2026-06-17T22:47:33.579Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": null,
+  "download_trend": []
+}

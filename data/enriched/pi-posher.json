@@ -1,0 +1,368 @@
+{
+  "name": "pi-posher",
+  "latest_version": "0.3.2",
+  "description": "Helps clankers keep code prim and proper with linters, formatters and security tools",
+  "readme": "# pi-posher\n\n<p>\n  <img src=\"https://raw.githubusercontent.com/jeff-phil/pi-posher/refs/heads/main/assets/pi-posher.webp\" alt=\"Pi Posher\" width=\"1100\">\n</p>\n\n> Pi extension that helps agents and builders keep their code prim and proper.\n\n`pi-posher` automatically runs configured tools such as: formatters, linters, SAST, file conversions, etc. after successful `write` / `edit` agent tool calls.\n\nUsers are also able to run `/poshify` slash command on-demand to validate changes to files in newly sourced repos, or for adding external files into a project that need to be posh.\n\n## Why\n\nMany times IDEs automatically format, lint, reorganize imports, do security checks, convert files, and run many other tools when saving files, creating code outside of your standards. This allows users to immediately know issues and fix code issues when it's fresh, vs. going through an entire pipeline.\n\nAgents need the same capabilities in order to format, adjust, check files after edits and write operations. And this may be even more of a need depending on the model being used, or the technology being built.\n\n## Install\n\n```bash\npi install npm:pi-posher\n```\n\n## Defaults and prerequisites\n\nOn first use, `pi-posher` seeds a global config (`~/.pi/agent/extensions/pi-posher/poshifiers.json`) with default poshifiers for many languages and formats such as go, python, typescript, javascript, svelte, json, yaml, and markdown. These defaults are a starting point \u2014 you should edit or remove any entry to match the set of tools and technology you actually use.\n\n> **Note:** The default `audit-tools` and most Python tooling rely on [`uv`](https://docs.astral.sh/uv/) to run commands. For the best out-of-box experience, install `uv` so that `semgrep` and `ruff` commands work without modification. If you prefer `pip`, `npm`, `pnpm`, or other runners, update the `cmd` and `args` in the config to suit your environment.\n\n## Configuration\n\n`pi-posher` automatically respects `.gitignore` and `.ignore` files in the project root (`{workspace}`) when scanning directories or matching files. Any paths listed in those files are skipped entirely \u2014 no tools are run against them, and they are pruned during recursive directory walks.\n\nThis means you don't need to duplicate `.gitignore` entries in every poshifier's `exclude` array. Only add `exclude` patterns for files that _are_ tracked but should still be skipped by a specific tool (e.g. `vendor/` for Go, but not `node_modules/` which is already in `.gitignore`).\n\nEach poshifier has an optional `init-setup` block with:\n\n- `init-configs`: Array of bundled config files, directories, or glob patterns to copy into the project root (`{root}`). Supports `{name}` placeholder for per-language variants.\n  - Paths without `{name}/` are copied to `{root}` directly (e.g., `.prettierrc`).\n  - Paths with `{name}/` strip the `{name}` prefix and preserve any remaining subdirectories (e.g., `{name}/foo/bar.json` \u2192 `{root}/foo/bar.json`).\n  - Directory entries (e.g., `{name}/foo/`, `{name}/foo/**`) are copied recursively. Existing files in the destination are skipped; new files from the source are merged in.\n  - Glob patterns are supported in the final path segment (e.g., `{name}/configs/*.json`, `{name}/rules/*.{json,yaml}`). The glob matches files in the directory part. Any matched file is copied with its parent subdirectory preserved.\n  - Files already in the destination are skipped without error.\n  - Empty glob matches silently skip.\n- `init-tools`: Commands to run during init (e.g., `npm install --save-dev ...`).\n- `fix-tools`: Commands to run for `/poshify --fix` (same schema as `tools`).\n- `audit-tools`: Commands to run for `/poshify --audit` and at `turn_end` after agent edits (same schema as `tools`).\n- `maxFileSizeBytes`: Optional limit in bytes; files larger than this are silently skipped (default 2 MB).\n\nEvery tool object (in `tools`, `fix-tools`, `audit-tools`, or `init-tools`) supports these fields:\n\n| Field       | Type     | Description                                                           |\n| ----------- | -------- | --------------------------------------------------------------------- |\n| `cmd`       | string   | Command to run                                                        |\n| `args`      | string[] | Arguments passed to the command                                       |\n| `cwd`       | string   | Working directory (supports placeholders)                             |\n| `timeoutMs` | number   | Timeout in milliseconds (default 15000)                               |\n| `config`    | string   | Path to a config file; sets `{config}` and `{configDir}` placeholders |\n| `env`       | object   | Key/value map merged into the command's environment                   |\n\nGlobal config, trusted automatically:\n\n```text\n~/.pi/agent/extensions/pi-posher/poshifiers.json\n```\n\n**On first use**, the `pi-posher` seeds this file with default \"poshifiers\" for go, python, typescript, javascript, svelte, json, yaml, and markdown. You can edit or remove any entry to fit your desired defaults, and add your own tools to run.\n\nProject local configs can be placed in the project level `.pi` directory:\n\n```text\n~/projects/my-project/.pi/poshifiers.json\n```\n\nProject entries override global entries with the same `name` (go, typescript, python, etc.), and entries must be explicitly trusted by the user before running.\n\n### <u>Example config</u>\n\n<details>\n\n<summary>\n  ${\\color{#5991F1}[\\,click\\,to\\,expand\\,]}$\n</summary>\n\nConfiguration examples for named `python`, `json`, and `markdown` **_poshifiers_**\n\n```json\n{\n  \"poshifiers\": [\n    {\n      \"name\": \"python\",\n      \"include\": [\"**/*.py\"],\n      \"anchors\": [\"pyproject.toml\", \"ruff.toml\"],\n      \"tools\": [\n        {\n          \"cmd\": \"uv\",\n          \"args\": [\"run\", \"ruff\", \"format\", \"{files}\"],\n          \"cwd\": \"{root}\",\n          \"timeoutMs\": 25000\n        },\n        {\n          \"cmd\": \"uv\",\n          \"args\": [\"run\", \"ruff\", \"check\", \"{files}\"],\n          \"cwd\": \"{root}\",\n          \"timeoutMs\": 30000\n        }\n      ],\n      \"fix-tools\": [\n        {\n          \"cmd\": \"uv\",\n          \"args\": [\"run\", \"ruff\", \"check\", \"--fix\", \"{files}\"],\n          \"cwd\": \"{root}\",\n          \"timeoutMs\": 30000\n        }\n      ],\n      \"audit-tools\": [\n        {\n          \"cmd\": \"uv\",\n          \"args\": [\n            \"run\",\n            \"--with\",\n            \"semgrep\",\n            \"semgrep\",\n            \"scan\",\n            \"--json\",\n            \"-q\",\n            \"--error\",\n            \"--config\",\n            \"auto\",\n            \"{files}\"\n          ],\n          \"cwd\": \"{root}\",\n          \"timeoutMs\": 60000\n        }\n      ]\n    },\n    {\n      \"name\": \"json\",\n      \"include\": [\"**/*.json*\"],\n      \"exclude\": [\"node_modules/**\", \"package-lock.json\"],\n      \"anchors\": [\"package.json\"],\n      \"init-setup\": {\n        \"init-configs\": [\".prettierrc\", \".prettierignore\"],\n        \"init-tools\": [\n          {\n            \"cmd\": \"npm\",\n            \"args\": [\"install\", \"--save-dev\", \"prettier\", \"node-jq\"],\n            \"cwd\": \"{root}\",\n            \"timeoutMs\": 120000\n          }\n        ]\n      },\n      \"tools\": [\n        {\n          \"cmd\": \"npm\",\n          \"args\": [\"exec\", \"--\", \"prettier\", \"--parser=json\", \"--write\", \"{files}\"],\n          \"cwd\": \"{root}\",\n          \"timeoutMs\": 15000\n        },\n        {\n          \"cmd\": \"npm\",\n          \"args\": [\"exec\", \"--\", \"node-jq\", \"-e\", \".\", \"{file}\"],\n          \"cwd\": \"{root}\",\n          \"timeoutMs\": 15000\n        }\n      ],\n      \"audit-tools\": [\n        {\n          \"cmd\": \"uv\",\n          \"args\": [\n            \"run\",\n            \"--with\",\n            \"semgrep\",\n            \"semgrep\",\n            \"scan\",\n            \"--json\",\n            \"-q\",\n            \"--error\",\n            \"--config\",\n            \"auto\",\n            \"{files}\"\n          ],\n          \"cwd\": \"{root}\",\n          \"timeoutMs\": 60000\n        }\n      ]\n    },\n    {\n      \"name\": \"markdown\",\n      \"include\": [\"**/*.md\"],\n      \"exclude\": [\"node_modules/**\"],\n      \"anchors\": [\"package.json\"],\n      \"init-setup\": {\n        \"init-configs\": [\".prettierrc\", \".markdownlint.json\"],\n        \"init-tools\": [\n          {\n            \"cmd\": \"npm\",\n            \"args\": [\"install\", \"--save-dev\", \"prettier\", \"markdownlint-cli\"],\n            \"cwd\": \"{root}\",\n            \"timeoutMs\": 120000\n          }\n        ]\n      },\n      \"tools\": [\n        {\n          \"cmd\": \"npm\",\n          \"args\": [\"exec\", \"--\", \"prettier\", \"--write\", \"{files}\"],\n          \"cwd\": \"{root}\",\n          \"timeoutMs\": 15000\n        },\n        {\n          \"cmd\": \"npm\",\n          \"args\": [\"exec\", \"--\", \"markdownlint\", \"{files}\"],\n          \"cwd\": \"{root}\",\n          \"timeoutMs\": 15000\n        }\n      ],\n      \"fix-tools\": [\n        {\n          \"cmd\": \"npm\",\n          \"args\": [\"exec\", \"--\", \"markdownlint\", \"--fix\", \"{files}\"],\n          \"cwd\": \"{root}\",\n          \"timeoutMs\": 15000\n        }\n      ],\n      \"audit-tools\": [\n        {\n          \"cmd\": \"uv\",\n          \"args\": [\n            \"run\",\n            \"--with\",\n            \"semgrep\",\n            \"semgrep\",\n            \"scan\",\n            \"--json\",\n            \"-q\",\n            \"--error\",\n            \"--config\",\n            \"auto\",\n            \"{files}\"\n          ],\n          \"cwd\": \"{root}\",\n          \"timeoutMs\": 60000\n        }\n      ]\n    }\n  ]\n}\n```\n\n</details>\n\n## Trust and security\n\nProject local configs (e.g. `~/projects/my-project/.pi/poshifiers.json`), especially from unknown repositories, could run arbitrary commands on your machine that are evil in nature.\n\nHere are the guardrails to prevent malicious configs and scripts:\n\n- Project local config content is uniquely hashed\n- Unknown hashes prompt for `Trust once`, `Trust always`, or `Reject`\n- The prompt shows every configured tool command in the project local config file\n- The options `Trust once` and `Reject` are session specific, and won't prompt again during the current session while the config remains unchanged.\n- `Trust always` stores the hash in `~/.pi/agent/extensions/pi-posher/trust/poshify.json`\n- Changing the project local config changes the hash and asks again to trust or reject\n- Non-interactive mode rejects project local config by default\n- Commands run as `cmd` & `args[]`, so each can be validated against shell injection\n\nGlobal config (`~/.pi/agent/extensions/pi-posher/poshifiers.json`) is considered trusted because it is user-owned agent configuration.\n\n## Behavior\n\nAfter the agent successfully does a `write` or `edit` operation on a file:\n\n1. Pi Posher looks for poshifiers matching `include` / `exclude` file and directory glob patterns\n2. Extension uses `anchors` to find the `{root}` of the current project\n3. Skips files above `maxFileSizeBytes`\n4. Runs each command in the `tools` array sequentially, in order on the file.\n5. Sends a compact summary for the tool, or error details if the tool fails that is also a `steer` message for the clanker to correct.\n6. Tracks the file in a list of files that were written or edited during the turn.\n7. At the end of the turn, the list of tracked files will have the `audit-tools` batch run on them together. This will be more efficient for deeper level, longer taking audit tools such as `semgrep` because the files and tools are batched.\n\n> **Note:** if files are modified by the clanker with `bash` commands, then the files are **_not_** tracked. For this, it would be a good idea to run the one of the `/poshify ...` slash commands manually to look for issues. Or you can ask `Run poshify on .` or `Run poshify on @src/` from the prompt.\n\nWhen a slash command (`/poshify`, `/poshify --fix`, `/poshify --audit`) is used, or when `audit-tools` run at `turn_end`, all matched files are collected and grouped by their resolved command configuration. Commands that contain a `{files}` placeholder are batched \u2014 all matching files sharing the exact same resolved command are passed together in one invocation by replacing `{files}` with the collected paths. This works for `tools`, `fix-tools`, and `audit-tools`.\n\nTo avoid shell ARG_MAX limits (the system's longest number of argument or parameter characters that can be passed to a command), batched files are further split into sub-batches of up to **100 files** per invocation.\n\nAt `turn_end`, audit findings are deduplicated across turns (same finding is reported once per session), and all audit output is steered into the agent context so it can react to issues.\n\nAgent `write` and `edit` operations still run `tools` per-file (not batched for the turn), so you get immediate feedback after each edit.\n\n> **Note:** Since there could be several `write` and `edit` operations to files during an agent \"turn\" (which is the agent processing, thinking, working, and responding to a user prompt), you would not want long running tool commands (2+ secs) for each write and edit. That is the main reason in the default configuration, `semgrep` runs in batch at the end of the turn because it could take 5+ seconds even for a basic source file. The disadvantage of audit-tools being run at `turn_end` is you have to reprompt to fix the issues, since it completes after a turn has ended. But the advantage is any files that were written or edited can be batched all together at the end instead of each sequentially.\n\nIf the tool command and parameters are the same across names (e.g. python, typescript, markdown), then all of those files will be batched into the same run as well saving lots of time. Key point, try to keep tools as consistent as possible for long running commands like `semgrep`, but specialized tools such as `svelte-check` can also be run as a specific audit tool for any changed svelte files during the turn.\n\n### Context filtering\n\nSuccessful poshify output is automatically filtered out of the agent's conversation context to reduce token usage. Only messages containing warnings, errors, or audit findings are retained, so the agent can focus on actionable issues rather than repeated \"all good\" confirmations.\n\n### Manually running\n\nYou can also trigger poshify manually with the slash command or the `run_poshify` custom tool.\n\n#### `/poshify` slash command\n\n```text\n /poshify (file|dir)...         # Run configured tools for required file(s) or directory(ies)\n /poshify --init <name>         # Install init configs for a poshifier type\n /poshify --fix [file|dir]...   # Run configured fix-tools, default: current working directory\n /poshify --audit [file|dir]... # Run tools & audit-tools for file(s) or directory(ies), def: cwd\n /poshify --help                # Show this usage\n```\n\n`/poshify` with no arguments and `/poshify --help` shows help usage message, and includes the list of available `--init` names.\n\n**`/poshify --init <name>`** copies the `init-configs` defined for that poshifier into the current project, seeds user-level overrides from bundled templates if absent, and runs the `init-tools` commands (typically `npm install --save-dev ...`). Existing files in the project are skipped. For example:\n\n- `/poshify --init typescript` copies `.prettierrc`, `.prettierignore`, `eslint.config.mjs`, `eslint-ts.mjs` to the project root and installs ESLint + Prettier.\n- `/poshify --init markdown` copies `.prettierrc` to the project root and `.markdownlint.json` to the project root, then installs Prettier + markdownlint-cli.\n- A config like `{name}/foo/bar.json` would be placed at `foo/bar.json` in the project.\n\n**`/poshify --fix [file|dir]`** runs the `fix-tools` configured for each matching poshifier. Each poshifier can define its own fix commands (e.g., `eslint --fix`, `ruff check --fix`, `markdownlint --fix`). Files without configured `fix-tools` are silently skipped. Default: current working directory.\n\n**`/poshify --audit [files|dir]`** runs both the `tools` and `audit-tools` for each matching poshifier, reporting them as separate sections under a combined `Poshify Audit` header. Files without configured `audit-tools` are silently skipped for that section. This is the same behavior used at turn-end for agent edits. Default: current working directory.\n\n#### `run_poshify` tool\n\nCallable by the LLM with a `path` argument. The model can invoke it when asked to \"run poshify on X\".\n\nBoth the slash command and the tool scan matching files recursively, run configured tools, and report results in the same output format as the automatic trigger.\n\n> **Note:** `run_poshify` or \"run poshify on X\" prompt only runs the standard `tools` and not `audit-tools`. To manually run the `audit-tools` use the `/poshify --audit (file|dir)` slash command.\n\n## Relative paths and placeholders\n\nPath rules:\n\n1. Absolute paths are used as-is.\n2. Relative `cmd`, `config`, and `cwd` values with `/` are resolved relative to `{root}`.\n3. Bare command names are resolved through `PATH`.\n4. Passing paths to `/poshify ...` commands can use standard \"@\" prefix such as `@some/file` for file discovery.\n\nPlaceholders (template tags):\n\n| Placeholder   | Meaning                                                                                   | Example                                                                     |\n| ------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |\n| `{workspace}` | Pi working directory, or directory containing `.pi/poshifiers.json`                       | `/Users/jeffrey/my-project`                                                 |\n| `{root}`      | Nearest directory containing an `anchor` marker                                           | `/Users/jeffrey/my-project`                                                 |\n| `{file}`      | Absolute path to the file being processed                                                 | `/Users/jeffrey/my-project/src/foo.go`                                      |\n| `{files}`     | All matched file paths (triggers batching; use in `tools`, `fix-tools`, or `audit-tools`) | `/Users/jeffrey/my-project/src/foo.go /Users/jeffrey/my-project/src/bar.go` |\n| `{relFile}`   | `{file}` relative to `{root}`                                                             | `src/foo.go`                                                                |\n| `{dir}`       | Absolute directory containing the file                                                    | `/Users/jeffrey/my-project/src`                                             |\n| `{relDir}`    | That directory relative to `{root}`                                                       | `src`                                                                       |\n| `{config}`    | Resolved command config path (if set)                                                     |                                                                             |\n| `{configDir}` | Directory containing `{config}`                                                           |                                                                             |\n| `{name}`      | Poshifier name (useful in `init-setup` paths and args)                                    | `typescript`                                                                |\n\n`{root}` is found by walking up from `{file}` looking for `anchors`. `{workspace}` is where Pi is running. They are usually the same, but in a monorepo where a file is in `packages/bar/` and the anchor (`package.json`) is there, `{root}` = `packages/bar/` while `{workspace}` = the repo root.\n\n> **Note on `anchors`:** If `anchors` is omitted or empty, it defaults to `['.project', '.git']`.\n> The auto discovery behavior if no anchor defined:\n>\n> - Walks up from the target file/directory\n> - Stops at the first directory containing either .project or .git\n> - .project still wins if intentionally placed in a subdir (e.g., monorepo package boundary)\n> - .git catches everything else as a universal fallback\n> - If neither exists anywhere up to root directory, error message lists both: anchors not found (.project, .git)\n\n## Screenshot and Output examples\n\nProject local config file needing to be trusted:\n\n<p>\n  <img src=\"https://raw.githubusercontent.com/jeff-phil/pi-posher/refs/heads/main/assets/pi-posher-ss-trust.webp\" alt=\"Pi Posher asking for trust\" width=\"220\">\n</p>\n\nWhile running:\n\n<p>\n  <img src=\"https://raw.githubusercontent.com/jeff-phil/pi-posher/refs/heads/main/assets/pi-posher-ss-run.webp\" alt=\"Pi Posher running\" width=\"220\">\n</p>\n\nSuccessful run with details:\n\n<p>\n  <img src=\"https://raw.githubusercontent.com/jeff-phil/pi-posher/refs/heads/main/assets/pi-posher-ss-success.webp\" alt=\"Pi Posher success\" width=\"1100\">\n</p>\n\nFailed run for full `audit` and details:\n\n<p>\n  <img src=\"https://raw.githubusercontent.com/jeff-phil/pi-posher/refs/heads/main/assets/pi-posher-ss-err.webp\" alt=\"Pi Posher error\" width=\"1100\">\n</p>\n\n## Disable a poshifier\n\nRemove it from the config, or override with an empty object:\n\n```json\n{\n  \"poshifiers\": [{ \"name\": \"go\" }]\n}\n```\n\n## Acknowledgement\n\nSecurity hashing aspects inspired by [pi-code-quality](https://pi.dev/packages/pi-code-quality).\n",
+  "keywords": [
+    "audit",
+    "format",
+    "lint",
+    "code-quality",
+    "sast",
+    "formatters",
+    "linters",
+    "conversions",
+    "converters",
+    "posher",
+    "postflight",
+    "poshify",
+    "pi",
+    "pi-package"
+  ],
+  "author": {
+    "name": "jeffphil"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/jeff-phil/pi-posher#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jeff-phil/pi-posher.git",
+    "directory": "."
+  },
+  "pi": {
+    "extensions": [
+      "src/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/jeff-phil/pi-posher/refs/heads/main/assets/pi-posher.webp"
+  },
+  "time": {
+    "created": "2026-05-28T05:27:06.883Z",
+    "modified": "2026-06-02T18:36:38.223Z",
+    "0.1.5": "2026-05-28T05:27:07.250Z",
+    "0.1.6": "2026-05-28T14:41:33.148Z",
+    "0.1.7": "2026-05-28T15:14:29.167Z",
+    "0.2.0": "2026-05-29T04:55:05.941Z",
+    "0.2.2": "2026-05-29T18:18:39.754Z",
+    "0.2.4": "2026-05-30T06:16:28.330Z",
+    "0.2.5": "2026-05-30T07:02:01.736Z",
+    "0.2.6": "2026-05-30T16:39:55.888Z",
+    "0.3.0": "2026-05-31T17:16:35.499Z",
+    "0.3.2": "2026-06-02T18:36:38.120Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": null,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 1388
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 29
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 41
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 78
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 10
+    }
+  ]
+}

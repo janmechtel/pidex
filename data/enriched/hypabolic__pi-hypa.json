@@ -1,0 +1,348 @@
+{
+  "name": "@hypabolic/pi-hypa",
+  "latest_version": "0.1.6",
+  "description": "Pi extension that keeps noisy tool output out of your context window. Automatically rewrites shell commands through Hypa for local, deterministic compression, context-aware file tools, and recoverable evidence.",
+  "readme": "# pi-hypa\n\n**The Pi extension for Hypa \u2014 a local context runtime for coding agents.**\n\n[![npm](https://img.shields.io/npm/v/@hypabolic/pi-hypa?color=cb3837&logo=npm)](https://www.npmjs.com/package/@hypabolic/pi-hypa)\n[![CI](https://github.com/Hypabolic/Hypa/actions/workflows/ci.yml/badge.svg)](https://github.com/Hypabolic/Hypa/actions/workflows/ci.yml)\n[![GitHub](https://img.shields.io/github/stars/Hypabolic/Hypa?style=flat&logo=github)](https://github.com/Hypabolic/Hypa)\n[![License](https://img.shields.io/badge/license-FSL--1.1--ALv2-blue)](https://github.com/Hypabolic/Hypa/blob/main/license.md)\n\n`@hypabolic/pi-hypa` wires [Hypa](https://github.com/Hypabolic/Hypa) into the [Pi coding agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent). Hypa reduces the noisy tool output that reaches an agent's context window: it runs locally, compresses shell output with deterministic reducers, exposes context-aware file and code tools, and records enough evidence to recover the details that matter.\n\n```text\nPi bash / tool call\n        \u2193\n      Hypa\n        \u2193\nerrors \u00b7 warnings \u00b7 changed files \u00b7 failing tests \u00b7 exit codes\n```\n\nHypa is not an LLM summarizer. The default reduction path is local, deterministic, and testable \u2014 your source code and command output do not need to be sent to a separate cloud service.\n\n## What this extension adds\n\nInstalling this package through Pi also installs `@hypabolic/hypa` as a package dependency and creates a best-effort user-level `hypa` shim when no `hypa` command is already on `PATH`. The shim delegates to a later global/system `hypa` install if one appears earlier on `PATH`, and otherwise falls back to the bundled dependency.\n\nThe extension provides:\n\n- **Bash rewrite interception** via `hypa rewrite --json` \u2014 Pi's `bash` command is mutated before execution when Hypa returns `Rewritten` or `GenericWrapper`, so command output is compressed in place.\n- **`/hypa` diagnostics** \u2014 inspect extension mode, binary resolution, MCP proxy setting, and the last rewrite status.\n- **CLI-backed tools** \u2014 `hypa_shell`, `hypa_read`, `hypa_grep`, `hypa_find`, `hypa_ls`.\n- **Optional Hypa MCP proxy** \u2014 the `hypa_mcp_proxy` discovery tool for upstream MCP servers.\n\n## Install\n\nThis extension is installed automatically when you run `hypa init --agent pi` (or `hypa init` with Pi detected). To install or test it directly:\n\n```bash\npi -e ./packages/pi-hypa/extensions/index.ts\n# or\npi install ./packages/pi-hypa\n# from npm\npi install npm:@hypabolic/pi-hypa\n```\n\n### Requirements\n\n- Pi with the `@earendil-works/pi-coding-agent` peer dependency.\n- Node.js 18 or newer.\n- Linux, macOS, or Windows on x64 or arm64 (the bundled `@hypabolic/hypa` selects the matching native binary).\n\n## Configuration\n\n| Variable | Default | Description |\n|---|---|---|\n| `HYPA_BIN` | bundled `@hypabolic/hypa`, then `hypa` | Hypa executable or absolute path. |\n| `HYPA_PI_MODE` | `additive` | `additive` keeps Pi builtins; `replace` disables Pi `bash/read/grep/find/ls` after registering `hypa_*` tools. |\n| `HYPA_PI_REWRITE_TIMEOUT_MS` | `5000` | Rewrite CLI timeout in milliseconds. |\n| `HYPA_PI_ASK_NON_INTERACTIVE` | `deny` | `Ask` fallback when `ctx.hasUI === false`: `deny` or `allow`. |\n| `HYPA_PI_ENABLE_MCP_PROXY` | `0` | Enable `hypa_mcp_proxy`, a lazy discovery/invocation bridge for upstream MCP servers configured in Hypa. |\n| `HYPA_PI_ENABLE_MCP` | unset | Legacy alias for `HYPA_PI_ENABLE_MCP_PROXY` if needed. |\n| `HYPA_PI_MCP_PROXY_TIMEOUT_MS` | `10000` | Timeout for `hypa mcp ...` proxy calls. |\n| `HYPA_PI_MCP_CONFIG` | `~/.pi/agent/mcp.json` | Pi MCP config path used to deduplicate Hypa upstream servers already configured directly in Pi. |\n\n## CLI-backed tools\n\nWhen registered, the extension exposes Hypa-backed equivalents of Pi's file and shell builtins. In `additive` mode they sit alongside Pi's own tools; in `replace` mode they take over.\n\n| Tool | Purpose |\n|---|---|\n| `hypa_shell` | Run shell commands with rewrite rules, compression, and evidence recording. |\n| `hypa_read` | Read files with full, outline, signatures, pruned, or smart selection. |\n| `hypa_grep` | Search file contents with safe ripgrep options. |\n| `hypa_find` | Find files with an optional result limit. |\n| `hypa_ls` | List directory contents. |\n\n`hypa_*` tool outputs are capped at 50KB / 2000 lines; truncated full output is saved to a temp file for recovery.\n\n## MCP proxy discovery\n\nWhen `HYPA_PI_ENABLE_MCP_PROXY=1`, the extension registers one compact tool, `hypa_mcp_proxy`, instead of dumping every upstream MCP server/tool into Pi context.\n\nSupported actions:\n\n- `list` \u2014 compact list of upstream MCP servers configured in Hypa\n- `search` \u2014 search upstream tools by query\n- `schema` \u2014 fetch details/schema on demand for a selected server\n- `invoke` \u2014 invoke a selected upstream tool through Hypa's proxy/passthrough service\n- `auth_check` \u2014 validate auth for a selected upstream server\n\nServers already configured directly in Pi are filtered by default. Pass `includeDuplicates=true` to inspect/invoke through Hypa anyway.\n\n## Diagnostics\n\nRun `/hypa` in Pi to show extension mode, binary resolution, MCP proxy setting, and the last rewrite status/error.\n\n## Safety\n\n- Commands already starting with `hypa` are not rewritten.\n- Parse, timeout, or process errors fail open by passing the original command through and recording diagnostics.\n- `Deny` blocks the tool call.\n- `Ask` confirms in UI mode and uses a deterministic non-UI fallback.\n- `hypa_*` tool outputs are capped at 50KB / 2000 lines; truncated full output is saved to a temp file.\n\n## Documentation\n\n- [Pi integration guide](https://github.com/Hypabolic/Hypa/blob/main/docs/guides/pi.md)\n- [Hypa documentation](https://hypabolic.dev/products/hypa/docs)\n- [GitHub repository](https://github.com/Hypabolic/Hypa)\n- [`@hypabolic/hypa` on npm](https://www.npmjs.com/package/@hypabolic/hypa)\n- [Issue tracker](https://github.com/Hypabolic/Hypa/issues)\n\n## License\n\nHypa is licensed under the [Functional Source License 1.1 with an Apache License 2.0 future license](https://github.com/Hypabolic/Hypa/blob/main/license.md).\n",
+  "keywords": [
+    "pi-package",
+    "hypa",
+    "pi"
+  ],
+  "author": null,
+  "license": "FSL-1.1-ALv2",
+  "homepage": "https://github.com/Hypabolic/Hypa#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hypabolic/Hypa.git",
+    "directory": "packages/pi-hypa"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-01T03:33:10.055Z",
+    "modified": "2026-06-22T00:55:46.495Z",
+    "0.0.0-bootstrap.1": "2026-06-01T03:33:10.354Z",
+    "0.1.4": "2026-06-01T08:16:25.517Z",
+    "0.1.5": "2026-06-21T06:40:18.864Z",
+    "0.1.6": "2026-06-22T00:55:46.134Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 12754,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 1275
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 10593
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 92940
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 98562
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 354
+    }
+  ]
+}

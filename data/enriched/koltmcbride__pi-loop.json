@@ -1,0 +1,44 @@
+{
+  "name": "@koltmcbride/pi-loop",
+  "latest_version": "0.2.0",
+  "description": "A pi coding-agent extension that runs a prompt repeatedly on a timer, pi event, or self-paced (Claude Code-style /loop)",
+  "readme": "# pi-loop\n\nA [pi](https://github.com/earendil-works/pi) extension that runs a prompt **repeatedly** \u2014 on a fixed timer, when a pi event fires, or at the agent's own pace. Modelled on Claude Code's `/loop`.\n\n## Overview\n\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kolt-mcb/pi-loop/blob/main/LICENSE)\n[![pi-package](https://img.shields.io/badge/pi-package-orange.svg)](https://pi.dev/packages)\n[![Version](https://img.shields.io/badge/version-%40v0.2.0-blue.svg)](https://github.com/kolt-mcb/pi-loop/releases/tag/v0.2.0)\n\nSchedule a prompt to run repeatedly inside pi. An interval is parsed at the command layer into a cron schedule and run by a **self-re-arming timer**, so the loop keeps going on its own \u2014 the model is never responsible for keeping it alive. A self-paced mode is kept for \"let the model decide when there's nothing left to do.\"\n\n## What changed in 0.2.0\n\nEarlier versions had a single **self-paced** mode: the model had to call a wakeup tool at the end of every turn or the loop ended. That meant a turn ending on a summary silently killed the loop, and an interval like `15m` written in the prompt was never actually a cadence \u2014 just text.\n\n0.2.0 makes a parsed interval **authoritative and timer-driven**, adds **event** and **hybrid** triggers, **multiple concurrent loops**, and **persistence** that restores unexpired loops on resume. Self-paced remains as a second mode.\n\n## Features\n\n- **Fixed-interval loops** \u2014 `/loop 15m <prompt>` parses the interval into cron and runs it on a self-re-arming timer. Continuation is the default.\n- **Self-paced loops** \u2014 `/loop <prompt>` (no interval) fires once, then continues only if the model calls `schedule_loop_wakeup`. It may end the loop by not calling it.\n- **Event & hybrid triggers** \u2014 fire on a pi event (e.g. `tool_execution_end`, `turn_end`, `monitor:done`) instead of polling, or combine cron + event with debounce.\n- **Multiple loops** \u2014 run several at once; manage with `LoopCreate` / `LoopList` / `LoopDelete` or `/loop list`.\n- **Persistence** \u2014 loops are stored under `.pi/loops` and restored, if unexpired, on `--resume`/`--continue`.\n- **Safety caps** \u2014 per-loop `maxFires` and an automatic 7-day expiry; jittered fire times avoid API stampedes.\n- **Read-only mode** \u2014 restrict a loop's fires to read/inspection tools.\n- **Live status** \u2014 a footer indicator and widget list active loops with next-fire countdowns.\n\n## Installation\n\n```bash\npi install npm:@koltmcbride/pi-loop\n# or\npi install git:github.com/kolt-mcb/pi-loop@v0.2.0\n```\n\nVerify it's loaded with `pi list`.\n\n## Quick start\n\n```\n/loop 5m check if the deployment finished and report what happened\n```\nFixed 5-minute loop. Runs until you stop it, 7 days pass, or it hits a fire cap.\n\n```\n/loop check whether CI passed and address review comments\n```\nSelf-paced: the model works, then decides whether to continue via `schedule_loop_wakeup` (and at what delay).\n\n```\n/loop stop          # stop all active loops\n/loop stop 3        # stop loop #3\n/loop list          # show / manage active loops\n```\n\n## Usage\n\n### `/loop` command\n\n| Input | Behaviour |\n|---|---|\n| `/loop 15m <prompt>` | Fixed-interval (cron) loop. Interval may also trail: `<prompt> every 2 hours`. |\n| `/loop 0 9 * * 1-5 <prompt>` | Full 5-field cron schedule. |\n| `/loop <prompt>` | Self-paced loop (model-driven cadence). |\n| `/loop list` | List/manage active loops. |\n| `/loop stop [id]` | Stop all loops, or one by id. |\n\nIntervals use `s` / `m` / `h` / `d`. Sub-minute rounds up to one minute (cron's floor); odd intervals like `7m` snap to the nearest clean cron step and the loop tells you what it picked.\n\n### Tools (for the agent)\n\n| Tool | What it does |\n|---|---|\n| `LoopCreate` | Schedule a loop on a cron timer, a pi event, or a hybrid of both. Supports `recurring`, `readOnly`, `maxFires`, `filter`. |\n| `LoopList` | List loops with ids, triggers, fire counts, next-fire times. |\n| `LoopDelete` | Delete a loop, or `action=\"pause\"` to keep it without firing. |\n| `schedule_loop_wakeup` | Continue the active **self-paced** loop; optional `delaySeconds`. Omit to end it. |\n\nTrigger types: `cron` (`5m`, `1h`, `0 9 * * 1-5`), `event` (any pi event-bus channel; lifecycle events `tool_execution_start/end`, `turn_start/end`, `agent_start/end`, `message_end` are bridged through), or `hybrid` (both, debounced).\n\n## Behaviour notes\n\n- **Fires land between turns.** Each fire is delivered as a follow-up message, so it waits for the current turn to finish. A recurring fire is skipped while a message is already queued, so ticks never stack.\n- **Takeover.** Typing while a **self-paced** loop is waiting ends it (you took over). Fixed and event loops keep running across your messages until you `/loop stop` them.\n- **No catch-up.** If fires were missed while busy, the loop fires once when idle, not once per missed interval.\n\n## Configuration\n\n| Variable | Effect | Default |\n|---|---|---|\n| `PI_LOOP` | `off` disables persistence (in-memory only); an absolute or relative path sets a custom store file | `.pi/loops/loops-<sessionId>.json` |\n\nConstants at the top of `loop.ts` / `src/`: status tick interval, default hybrid debounce, and the bridged lifecycle event list. Caps: 25 active loops, 7-day expiry.\n\n## Development\n\n```bash\nnpm install\nnpm run typecheck   # tsc --noEmit\nnpm test            # node:test via tsx \u2014 covers parsing, cron, jitter\n```\n\nSource layout:\n\n| File | Responsibility |\n|---|---|\n| `src/types.ts` | Loop/trigger types. |\n| `src/loop-parse.ts` | `parseInterval`, `extractInterval`, cron math, jitter (pure, tested). |\n| `src/store.ts` | Loop registry + JSON persistence. |\n| `src/scheduler.ts` | Self-re-arming cron timers. |\n| `src/triggers.ts` | Event/hybrid subscriptions + debounce. |\n| `loop.ts` | Entry: command, tools, fire\u2192message bridge, status widget, lifecycle. |\n\n## License\n\n[MIT](LICENSE)\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "loop",
+    "automation"
+  ],
+  "author": {
+    "name": "Kolt McBride"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/kolt-mcb/pi-loop#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kolt-mcb/pi-loop.git"
+  },
+  "pi": {
+    "extensions": [
+      "./loop.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-27T17:35:07.418Z",
+    "modified": "2026-05-30T17:57:53.261Z",
+    "0.1.0": "2026-05-27T17:35:07.691Z",
+    "0.1.1": "2026-05-30T07:49:59.481Z",
+    "0.1.2": "2026-05-30T07:53:53.418Z",
+    "0.1.3": "2026-05-30T07:58:54.887Z",
+    "0.1.4": "2026-05-30T08:02:16.117Z",
+    "0.1.5": "2026-05-30T08:06:34.923Z",
+    "0.1.6": "2026-05-30T08:09:35.846Z",
+    "0.1.7": "2026-05-30T08:16:45.329Z",
+    "0.1.8": "2026-05-30T08:21:36.550Z",
+    "0.2.0": "2026-05-30T17:57:53.151Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,61 @@
+{
+  "name": "pi-skill-gate",
+  "latest_version": "0.8.1",
+  "description": "Interactive skill visibility manager for pi coding agent \u2014 browse, toggle, invoke, and track usage of skills from a keyboard-driven TUI overlay.",
+  "readme": "<div align=\"center\">\n\n# Skill Gate\n\n*Interactive skill visibility manager for pi coding agent*\n\n[Features](#features) \u2022 [Installation](#installation) \u2022 [Usage](#usage) \u2022 [Configuration](#configuration) \u2022 [How It Works](#how-it-works)\n\n</div>\n\nControl which skills are injected into the initial system prompt with `/skill-gate`. Browse full skill content, toggle visibility on or off, and invoke skills \u2014 all from a keyboard-driven overlay. Skills that are not injected can still be executed manually in chat. State is persisted across sessions and injected into the system prompt before every agent run.\n\n![Pi-skill-gate interactive overlay](https://raw.githubusercontent.com/cullendotdev/pi-skill-gate/refs/heads/main/images/skill-gate-overlay-preview.png)\n\n## Features\n\n- **Complete skill coverage** \u2014 uses pi's `ResourceLoader` API with dynamic directory discovery to match `/skill:` autocomplete (including extension-contributed, project-memory, and migrated package skills)\n- **Skill browser** \u2014 view the complete `SKILL.md` content (description, when-to-use, procedure, prompt body) for every skill with syntax-highlighted markdown rendering\n- **Toggle visibility** \u2014 enable or disable skills individually; disabled skills are excluded from the system prompt\n- **Search with highlighting** \u2014 `/` searches by skill name; `f` performs full-text search across names, descriptions, and SKILL.md bodies. Matching text is highlighted in the sidebar, description, and rendered prompt body\n- **Bulk actions with confirm modals** \u2014 enable/disable all visible skills at once (`a`/`A`, warning-bordered modal) or reset the current scope to defaults (`r`, error-bordered modal). Bulk respects the active search filter\n- **Persistent state** \u2014 toggle state saved to `~/.pi/agent/config/skill-gate.json`\n- **Usage analytics** \u2014 every `/skill:name` invocation is counted and persisted; show a \"Uses\" column in the sidebar (toggle with `u`) and per-skill usage in the detail view\n- **System prompt injection** \u2014 enabled skills are automatically inserted as `<available_skills>` before each agent start via the `before_agent_start` hook\n- **Respects native-disabled** \u2014 skills with `disableModelInvocation: true` are marked with a disabled indicator and cannot be toggled\n- **Per-project configs** \u2014 project-level overrides stored under a `projects` key in the same config file, keyed by absolute path. Toggle scope between global and project with `g`\n- **Fast hook** \u2014 `before_agent_start` filters from in-memory caches (skills + config) \u2014 zero filesystem access per agent turn\n\n## Installation\n\n### Via npm (recommended)\n\nInstall the package, then let pi discover it:\n\n```bash\npi install npm:pi-skill-gate\n```\n\n### Manual (local development)\n\nClone / copy the extension into your pi extensions directory:\n\n```bash\ngit clone https://github.com/cullendotdev/pi-skill-gate.git\ncp -r pi-skill-gate ~/.pi/agent/extensions/pi-skill-gate\n```\n\n## Usage\n\n```\n/skill-gate\n```\n\nOpens an overlay showing all discovered skills.\n\n| Key | Action |\n|---|---|\n| `\u2191` `\u2193` | Navigate skills |\n| `Space` | Toggle selected skill enabled/disabled |\n| `/` | Enter name-only search mode \u2014 type to filter skills by name (Enter commits query, filter persists) |\n| `f` | Enter full-text search mode \u2014 type to filter skills by name, description, and body (Enter commits query, filter persists) |\n| `b` | Toggle skill-list sidebar |\n| `u` | Toggle \"Uses\" column in sidebar (shows per-skill invocation count) |\n| `k` `j` | Scroll prompt content |\n| `Home` `End` | Jump to top/bottom |\n| `Enter` | Invoke skill into chat (confirm selection in search mode and confirm modals) |\n| `g` | Toggle editing scope (global \u2194 project) \u2014 only in a project directory |\n| `a` | Open \"Enable all\" confirm modal (warning border) \u2014 respects active filter |\n| `A` | Open \"Disable all\" confirm modal (warning border) \u2014 respects active filter |\n| `r` | Open \"Reset scope\" confirm modal (error border) |\n| `Esc` | Close (cancel search when searching; clear active filter on first press; cancel confirm modal when open) |\n\n### Confirm modals\n\n`a`, `A`, and `r` open a centered confirmation modal before applying the change:\n\n- **`a` / `A` \u2014 Warning border (yellow):** show the count of skills that will be affected plus the active scope. Use `Enter` or `y` to confirm, `Esc` or `n` to cancel.\n- **`r` \u2014 Error border (red):** shows the scope that will be cleared and how many toggles will be removed. Use `Enter` or `y` to confirm, `Esc` or `n` to cancel.\n\nWhen the modal is open, all other keys (including `r`, arrows, `j`/`k`) are ignored so you can't accidentally double-confirm.\n\n## Configuration\n\n`skill-gate.json` at `~/.pi/agent/config/skill-gate.json` is created automatically. Only `\"enabled\"` keys are persisted; `\"disabled\"` is the default.\n\n### Global skills\n\n```json\n{\n  \"skills\": {\n    \"code-review\": \"enabled\",\n    \"blueprint\": \"disabled\"\n  }\n}\n```\n\n### Per-project overrides\n\nAdd a `projects` key keyed by the absolute project path. Project entries override global settings for that project only. The overlay defaults to editing the **global** scope \u2014 press `g` to switch to project-level editing.\n\n```json\n{\n  \"skills\": {\n    \"code-review\": \"enabled\",\n    \"debugger\": \"enabled\"\n  },\n  \"projects\": {\n    \"/home/user/work/my-react-app\": {\n      \"skills\": {\n        \"debugger\": \"disabled\",\n        \"test-runner\": \"enabled\"\n      }\n    }\n  }\n}\n```\n\nIn this example, `my-react-app` inherits `code-review` from global, overrides `debugger` to disabled (shown in red in the sidebar), and adds `test-runner` (not in global).\n\nRedundant project entries (where the project toggle matches the global effective state) are automatically removed to keep the config clean.\n\n> [!WARNING]\n> Corrupted JSON resets all toggles to disabled.\n\n### Usage analytics\n\nInvocation counts are stored separately at `~/.pi/agent/config/skill-gate-analytics.json`. The `input` event hook increments the count for every `/skill:name` (or `/skill:foo bar` etc.) that fires before skill expansion. Duplicate names in a single input are counted once.\n\n```json\n{\n  \"counts\": {\n    \"code-review\": 47,\n    \"debugger\": 12,\n    \"blueprint\": 3\n  }\n}\n```\n\nIn the overlay, the detail view always shows a `Usage: Used Nx` line (or `Usage: \u2014` for never-used skills). Press `u` to add a dedicated `Uses` column to the sidebar with a vertical `\u2502` divider aligned to the `\u252c` in the separator and the right edge of the `Uses` header. Numbers are centered in the column and the column width auto-sizes for 1-, 2-, and 3-digit counts.\n\nTo reset analytics, delete the file or set counts to `{}`.\n\n## How It Works\n\n```\nsession_start\n        \u2193\n  DefaultResourceLoader + dynamic skill path discovery\n  (walks agentDir for skills/ dirs not covered by includeDefaults,\n   e.g. pi-hermes-memory/skills/, projects-memory/*/skills/)\n        \u2193                         \u2193\n  cachedSkills[]              skill-gate.json\n  (Skill: name, desc,         (global skills + per-project\n   filePath, disableModelInvocation)   overrides keyed by abs path)\n        \u2193                         \u2193\n  SkillDetailOverlay \u2190\u2500\u2500 loadEffectiveState() / persistToggle(scope)\n        \u2193\n  before_agent_start hook (in-memory filter, project-aware)\n        \u2193\n  buildVisibleBlock() \u2192 injected into system prompt\n\ninput hook (pi.on(\"input\", ...))\n        \u2193\n  match /skill:name patterns \u2192 incrementSkillUsage()\n        \u2193\n  skill-gate-analytics.json (persisted, in-memory cache)\n```\n\n### State resolution\n\nEffective state is resolved per-skill: **project override** \u2192 **global** \u2192 **disabled** (default). The `before_agent_start` hook passes `ctx.cwd` as the project path, so per-project toggles take effect automatically when running an agent from that directory.\n\n### Editing scope\n\nWhen opened from a project directory, the overlay defaults to **global** editing scope. Press `g` to switch to project-level editing. The sidebar shows `\u00b7G` indicators for skills inherited from global (project scope) and `\u00b7P` for skills overridden at the project level (global scope). Skills that are enabled globally but explicitly disabled by a project override render in red.\n\n### Skill discovery\n\nThe extension creates a `DefaultResourceLoader` at `session_start` with `includeDefaults: true` (covers `~/.pi/agent/skills/`, npm package skills, and `.agents/skills/`) plus dynamically discovered `additionalSkillPaths`:\n\n- Agent-level directories with `skills/` subdirectories (e.g. `pi-hermes-memory/skills/`)\n- Project memory skills (`projects-memory/<project>/skills/`)\n\nThis ensures the skill count always matches `/skill:` autocomplete, regardless of where skills are stored.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "skill",
+    "skills",
+    "skill-gate",
+    "skill-management",
+    "skill-usage",
+    "usage-analytics",
+    "context",
+    "context-management",
+    "system-prompt",
+    "prompt-injection",
+    "pi",
+    "coding-agent",
+    "tui",
+    "terminal-ui"
+  ],
+  "author": {
+    "name": "Cullen Botha",
+    "email": "mail@cullen.dev"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/cullendotdev/pi-skill-gate#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cullendotdev/pi-skill-gate.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/cullendotdev/pi-skill-gate/refs/heads/main/images/skill-gate-overlay-preview.png"
+  },
+  "time": {
+    "created": "2026-06-12T13:18:05.684Z",
+    "modified": "2026-06-25T15:53:57.764Z",
+    "0.1.0": "2026-06-12T13:18:06.025Z",
+    "0.1.1": "2026-06-12T13:40:59.210Z",
+    "0.1.2": "2026-06-15T12:13:35.316Z",
+    "0.1.3": "2026-06-15T13:12:00.349Z",
+    "0.2.0": "2026-06-19T16:01:51.976Z",
+    "0.3.0": "2026-06-20T09:39:24.055Z",
+    "0.3.1": "2026-06-20T13:30:49.395Z",
+    "0.4.0": "2026-06-21T12:22:44.915Z",
+    "0.5.0": "2026-06-22T19:36:18.248Z",
+    "0.6.0": "2026-06-23T12:13:46.509Z",
+    "0.7.0": "2026-06-24T12:16:49.904Z",
+    "0.7.1": "2026-06-24T12:38:35.044Z",
+    "0.8.0": "2026-06-25T15:50:08.799Z",
+    "0.8.1": "2026-06-25T15:53:57.659Z"
+  },
+  "versions_count": 14,
+  "downloads_last_week": null,
+  "download_trend": []
+}

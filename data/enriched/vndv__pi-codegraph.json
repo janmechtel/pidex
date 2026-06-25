@@ -1,0 +1,45 @@
+{
+  "name": "@vndv/pi-codegraph",
+  "latest_version": "0.1.10",
+  "description": "CodeGraph tools for Pi Agent.",
+  "readme": "# pi-codegraph\n### CodeGraph tools for pi\n\n[![Skylos Grade](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/vndv/pi-codegraph/main/.github/badges/skylos.json)](https://github.com/duriantaco/skylos)\n[![npm downloads](https://img.shields.io/npm/dm/%40vndv%2Fpi-codegraph)](https://www.npmjs.com/package/@vndv/pi-codegraph)\n\n[Install](#install) \u00b7 [Usage](#usage) \u00b7 [How it works](#how-it-works)\n\nAsk pi structural questions about your codebase without falling back to slow grep/read loops.\n\nAn extension for [pi](https://pi.dev) that gives the agent access to [CodeGraph](https://github.com/colbymchenry/codegraph) tools. CodeGraph indexes your project with tree-sitter, then pi can query symbols, callers, callees, dependency impact, files, and relationships through native extension tools.\n\n---\n\n## Quick start\n\n```bash\nnpm install -g @colbymchenry/codegraph\ncd /path/to/project\ncodegraph init -i\npi install npm:@vndv/pi-codegraph@0.1.10\npi\n```\n\nThen ask:\n\n```text\nUse CodeGraph. Show project structure and main entry points.\n```\n\n---\n\n## What's included\n\nExtension tools only. There is no MCP setup for pi users to maintain.\n\n| Tool | Description |\n| --- | --- |\n| `codegraph_search` | Symbol search by name |\n| `codegraph_node` | One symbol's signature, location, source, callers, and callees |\n| `codegraph_files` | Indexed file tree |\n| `codegraph_callers` | Functions or methods that call a symbol |\n| `codegraph_callees` | Functions or methods called by a symbol |\n| `codegraph_impact` | Impact radius for changing a symbol |\n| `codegraph_explore` | Source for several related symbols grouped by file |\n| `codegraph_status` | Index health and pending sync status |\n\n---\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:@vndv/pi-codegraph@0.1.10\n```\n\nFrom GitHub:\n\n```bash\npi install https://github.com/vndv/pi-codegraph\n```\n\nLocal development install:\n\n```bash\ngit clone https://github.com/vndv/pi-codegraph.git\ncd pi-codegraph\npi install \"$(pwd)\"\n```\n\nThen `/reload` in pi, or restart pi.\n\nVerify pi sees the package:\n\n```bash\npi list\n```\n\n---\n\n## Requirements\n\nNode.js 22.19.0 or newer is required.\n\nCodeGraph must be installed and available on `PATH`:\n\n```bash\nnpm install -g @colbymchenry/codegraph\n```\n\nThis extension is tested against the `@colbymchenry/codegraph` npm package declared in `devDependencies`. Dependabot watches that package and opens update PRs when CodeGraph releases a new version.\n\nEach project must be indexed before pi can query it:\n\n```bash\ncd /path/to/project\ncodegraph init -i\n```\n\nThis package declares `@earendil-works/pi-coding-agent` and `typebox` as peer dependencies because pi provides the extension runtime.\n\n---\n\n## Usage\n\n### 1. Start pi inside an indexed project\n\n```bash\ncd /path/to/project\npi\n```\n\n### 2. Ask structural questions\n\nGood prompts:\n\n```text\nUse CodeGraph. Explain how authentication reaches the request handler.\nUse CodeGraph. What calls PlanBoostSession?\nUse CodeGraph. What would break if I change UserRepository?\nUse CodeGraph. Show files under internal/services and important symbols.\n```\n\n### 3. Prefer the right tool\n\nUse `codegraph_explore` for broad \"how does this work?\" or \"how does X reach Y?\" questions.\n\nUse `codegraph_node` when you already know the symbol name.\n\nUse `codegraph_search` for declarations and symbols, not arbitrary text or constant values.\n\n---\n\n## How it works\n\npi extensions are not MCP configuration files. This package registers native pi tools, and each tool proxies one request to CodeGraph's MCP server internally:\n\n```bash\ncodegraph serve --mcp --path <project>\n```\n\nThe flow is:\n\n```text\npi agent\n  -> pi-codegraph extension tool\n  -> local CodeGraph MCP process\n  -> .codegraph/codegraph.db in the current project\n  -> structured result back to pi\n```\n\nThat means another developer only needs the npm package, the `codegraph` CLI, and an initialized `.codegraph` index in their project. They do not need to edit pi MCP config.\n\n---\n\n## Uninstall\n\nRemove the package using the same source shown by `pi list`:\n\n```bash\npi remove npm:@vndv/pi-codegraph@0.1.10\n```\n\nIf you installed from GitHub or a local path, remove that exact entry instead:\n\n```bash\npi remove https://github.com/vndv/pi-codegraph\npi remove /path/to/pi-codegraph\n```\n\nThen `/reload` in pi, or restart pi.\n\n---\n\n## Troubleshooting\n\n### `codegraph_*` tools are missing\n\nCheck that pi installed the package:\n\n```bash\npi list\n```\n\nThen reload or restart pi.\n\n### CodeGraph says the project is not initialized\n\nRun:\n\n```bash\ncd /path/to/project\ncodegraph init -i\n```\n\n### Node.js version is unsupported\n\nUse Node.js 22.19.0 or newer:\n\n```bash\nnvm install 22\nnvm use 22\n```\n\n---\n\n## Development\n\n```bash\nnpm ci\nnpm run ci\n```\n\n`npm run ci` type-checks the extension, runs tests, verifies the pinned CodeGraph CLI can start, and dry-runs the npm package.\n\nInstall the local checkout into pi:\n\n```bash\npi install /Users/vndv/Documents/programming/open-source/pi-codegraph\n```\n\nBefore opening a pull request:\n\n```bash\nnpm run ci\n```\n\n---\n\n## Release\n\nThe package is published to npm as `@vndv/pi-codegraph`.\n\nReleases are automated with Changesets. Any package update, including README changes shipped to npm, needs a changeset so the release workflow can bump the version and deploy a new npm package.\n\nFor every user-facing change, add a changeset in the feature branch:\n\n```bash\nnpx changeset\n```\n\nChoose the bump type:\n\n- `patch` for fixes and docs that affect package users\n- `minor` for new tools or behavior\n- `major` for breaking changes\n\nAfter the PR is merged to `main`, the release workflow opens or updates a `chore: version packages` pull request. That PR contains the version bump and changelog update.\n\nMerge the version PR to publish to npm automatically.\n\nThe workflow runs:\n\n```bash\nnpm run version-packages\nnpm run publish-packages\n```\n\n`publish-packages` runs `npm publish --access public --provenance`.\n\nThe workflow uses npm trusted publishing through GitHub Actions OIDC.\n\nLocal release commands are still available when needed:\n\n```bash\nnpm run ci\nnpm run local-release\n```\n\nGitHub Actions needs npm trusted publishing configured for `.github/workflows/publish.yml`.\n\n---\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "codegraph",
+    "coding-agent",
+    "code-intelligence"
+  ],
+  "author": {
+    "name": "CodeGraph contributors"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/vndv/pi-codegraph#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vndv/pi-codegraph.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-05-30T16:10:56.079Z",
+    "modified": "2026-06-22T13:30:11.021Z",
+    "0.1.0": "2026-05-30T16:10:56.482Z",
+    "0.1.1": "2026-05-30T19:23:28.047Z",
+    "0.1.2": "2026-05-30T19:34:28.068Z",
+    "0.1.3": "2026-05-30T20:01:28.633Z",
+    "0.1.4": "2026-05-31T12:01:47.360Z",
+    "0.1.5": "2026-05-31T12:12:33.416Z",
+    "0.1.6": "2026-05-31T12:43:47.502Z",
+    "0.1.7": "2026-06-07T14:45:29.919Z",
+    "0.1.8": "2026-06-17T05:16:24.567Z",
+    "0.1.9": "2026-06-21T16:37:35.772Z",
+    "0.1.10": "2026-06-22T13:30:10.786Z"
+  },
+  "versions_count": 11,
+  "downloads_last_week": null,
+  "download_trend": []
+}

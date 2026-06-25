@@ -1,0 +1,41 @@
+{
+  "name": "@juanibiapina/pi-extension-settings",
+  "latest_version": "0.8.0",
+  "description": "Pi extension for centralized settings management across extensions",
+  "readme": "# @juanibiapina/pi-extension-settings\n\nA [pi](https://github.com/badlogic/pi-mono) extension that provides centralized settings management for all extensions.\n\n## Features\n\n- **`/extension-settings` command** - Interactive UI to configure all registered extension settings\n- **Helpers for reading/writing** - `getSetting()` and `setSetting()` functions\n- **Ordered multi-select** - Settings where users pick and reorder items from a list\n- **Persistent storage** - Settings stored in `~/.pi/agent/settings-extensions.json`\n\n## For Users\n\nInstall the extension to get the `/extension-settings` command, which provides an interactive UI to configure settings for all extensions that support it:\n\n```bash\npi install npm:@juanibiapina/pi-extension-settings\n```\n\n> **\u26a0\ufe0f Load Order:** `pi-extension-settings` must appear **before** any extension that registers settings in your `packages` array in `~/.pi/settings.json`. Extensions register via the event bus at load time, so if `pi-extension-settings` hasn't loaded yet, those registrations are silently lost.\n\nThen use `/extension-settings` in pi:\n\n- Settings are grouped by extension with headers\n- Use arrow keys to navigate\n- Press Enter or Space to cycle through values (or edit string inputs)\n- Type to search/filter settings\n- Press Escape to close\n\n## For Extension Authors\n\nIf you're developing an extension and want to use the settings system, add this package as a dependency in your extension's `package.json`:\n\n```json\n{\n  \"dependencies\": {\n    \"@juanibiapina/pi-extension-settings\": \"^0.5.0\"\n  }\n}\n```\n\nThis gives you access to `getSetting()` and `setSetting()` helpers, and lets you register settings so they appear in the `/extension-settings` UI.\n\n### Register Settings (for the UI)\n\nEmit the `pi-extension-settings:register` event during extension load to make your settings appear in `/extension-settings`:\n\n```typescript\nimport type { ExtensionAPI } from \"@mariozechner/pi-coding-agent\";\nimport type { SettingDefinition } from \"@juanibiapina/pi-extension-settings\";\n\nexport default function myExtension(pi: ExtensionAPI) {\n  pi.events.emit(\"pi-extension-settings:register\", {\n    name: \"my-extension\",\n    settings: [\n      {\n        id: \"timeout\",\n        label: \"Request Timeout\",\n        description: \"Timeout in seconds for API requests\",\n        defaultValue: \"30\",\n        values: [\"10\", \"30\", \"60\", \"120\"],  // Cycles through these values\n      },\n      {\n        id: \"debug\",\n        label: \"Debug Mode\",\n        description: \"Enable verbose logging\",\n        defaultValue: \"off\",\n        values: [\"on\", \"off\"],\n      },\n      {\n        id: \"projectName\",\n        label: \"Project Name\",\n        description: \"Name used in commit messages\",\n        defaultValue: \"\",\n        // No 'values' = free-form string input\n      },\n      {\n        id: \"enabledModels\",\n        label: \"Enabled Models\",\n        description: \"Pick and reorder your preferred models\",\n        defaultValue: \"\",\n        // Ordered multi-select: opens a submenu to toggle and reorder items\n        options: [\n          { id: \"model-a\", label: \"Model A\" },\n          { id: \"model-b\", label: \"Model B\" },\n          { id: \"model-c\", label: \"Model C\" },\n        ],\n      },\n    ] satisfies SettingDefinition[]\n  });\n}\n```\n\n### Read/Write Settings\n\nUse the helper functions to read and write settings:\n\n```typescript\nimport { getSetting, setSetting } from \"@juanibiapina/pi-extension-settings\";\n\n// Read a setting (with default fallback - must match defaultValue from registration)\nconst timeout = getSetting(\"my-extension\", \"timeout\", \"30\");\n\n// Write a setting\nsetSetting(\"my-extension\", \"debug\", \"on\");\n```\n\n## API Reference\n\n### `getSetting(extensionName, settingId, defaultValue?)`\n\nGet a setting value. Returns the stored value, or the provided default, or `undefined`.\n\n```typescript\nconst value = getSetting(\"my-extension\", \"timeout\", \"30\");\n```\n\n### `setSetting(extensionName, settingId, value)`\n\nSet a setting value. Writes to `~/.pi/agent/settings-extensions.json`.\n\n```typescript\nsetSetting(\"my-extension\", \"debug\", \"on\");\n```\n\n### `SettingDefinition` (type)\n\nType for settings registration (use with `satisfies` for type checking):\n\n```typescript\ninterface SettingDefinition {\n  id: string;                   // Unique ID within the extension\n  label: string;                // Display label in UI\n  description?: string;         // Optional help text shown when selected\n  defaultValue: string;         // Default value if not set\n  values?: string[];            // Values to cycle through (omit for free-form string input)\n  options?: OrderedListOption[]; // Ordered multi-select options (mutually exclusive with values)\n}\n\ninterface OrderedListOption {\n  id: string;    // Value stored in the comma-separated setting\n  label: string; // Display label in the menu\n}\n```\n\nWhen `options` is set, Enter opens a submenu where items can be toggled (Space), reordered (Shift+\u2191/\u2193), confirmed (Enter), or cancelled (Esc). The value is stored as comma-separated IDs.\n\n### Event: `pi-extension-settings:register`\n\nEmit this event to register settings for the UI:\n\n```typescript\npi.events.emit(\"pi-extension-settings:register\", {\n  name: string;                    // Extension name\n  settings: SettingDefinition[];   // Array of setting definitions\n});\n```\n\n## Storage\n\nSettings are stored in `~/.pi/agent/settings-extensions.json`:\n\n```json\n{\n  \"my-extension\": {\n    \"timeout\": \"60\",\n    \"debug\": \"on\"\n  },\n  \"another-extension\": {\n    \"theme\": \"dark\"\n  }\n}\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "extension",
+    "config",
+    "utilities"
+  ],
+  "author": {
+    "name": "Juan Ibiapina"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/juanibiapina/pi-extension-settings#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juanibiapina/pi-extension-settings.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-03T13:01:26.643Z",
+    "modified": "2026-05-20T09:24:22.150Z",
+    "0.4.0": "2026-02-03T13:01:26.891Z",
+    "0.5.0": "2026-02-07T19:43:40.618Z",
+    "0.5.1": "2026-03-07T09:49:56.365Z",
+    "0.6.0": "2026-03-24T07:29:17.911Z",
+    "0.6.1": "2026-04-02T06:43:54.865Z",
+    "0.7.0": "2026-05-20T09:24:21.051Z",
+    "0.8.0": "2026-05-20T09:24:21.879Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": null,
+  "download_trend": []
+}

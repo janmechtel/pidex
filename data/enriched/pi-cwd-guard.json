@@ -1,0 +1,37 @@
+{
+  "name": "pi-cwd-guard",
+  "latest_version": "0.3.5",
+  "description": "Small Pi safety extension for cwd access, protected paths, runtime config confirmation, and common destructive bash commands.",
+  "readme": "# pi-cwd-guard\n\nA small [Pi](https://github.com/earendil-works/pi) safety extension package for cwd access, protected paths, runtime config confirmation, and common destructive bash commands.\n\n## What it guards\n\nThe extension intercepts these built-in tools:\n\n- `read`\n- `write`\n- `edit`\n- `bash`\n\n### Current working directory guard\n\nBefore `read`, `write`, or `edit` runs, the extension strips a leading `@` the same way Pi's built-in file tools do, then resolves the tool's `path` argument against the current working directory.\n\n- If the resolved path is inside the current working directory, the tool continues to the next checks.\n- If the resolved path is outside the current working directory and is not covered by `allowedOutsideCwdPaths`, Pi asks for confirmation.\n- If no UI is available, outside-cwd access is blocked by default unless the path is covered by `allowedOutsideCwdPaths`.\n\n### Configuring outside-cwd exceptions\n\nYou can allow specific outside-cwd paths with JSON config files:\n\n- Project-local: `.pi/pi-cwd-guard.json`\n- Global: `~/.pi/agent/extensions/pi-cwd-guard.json`\n\nExample:\n\n```json\n{\n  \"allowedOutsideCwdPaths\": [\n    \"/tmp\",\n    \"/var/tmp\",\n    \"~/shared-workspace\",\n    \"../sibling-project\"\n  ]\n}\n```\n\nNotes:\n\n- Multiple paths are supported.\n- Matching is recursive: allowing `/tmp` allows `/tmp/foo/bar.txt`.\n- `~` expands to your home directory.\n- Absolute paths are used as-is.\n- Relative paths in project config resolve against the current working directory.\n- Relative paths in global config resolve against `~/.pi/agent/extensions`.\n- Project and global `allowedOutsideCwdPaths` are merged.\n- These exceptions only skip the outside-cwd confirmation. They do not bypass hard-protected path blocks, runtime config confirmation, or destructive bash confirmation.\n\nYou can also inspect or update the config from Pi with the `/cwd-guard` command:\n\n```text\n/cwd-guard\n/cwd-guard show\n/cwd-guard allow /tmp --project\n/cwd-guard allow /tmp --global\n/cwd-guard allow /tmp /var/tmp ~/shared-workspace --project\n/cwd-guard allow \"/tmp/my folder\" --project\n```\n\nCommand notes:\n\n- `/cwd-guard` opens an interactive menu for showing config or adding exceptions. Without UI, it displays the merged active configuration.\n- `/cwd-guard show` displays the merged active configuration.\n- Typing `/cwd-guard ` in interactive mode autocompletes subcommands, and `allow ... ` autocompletes `--project` / `--global`.\n- `allow <path...> --project` updates `.pi/pi-cwd-guard.json`.\n- `allow <path...> --global` updates `~/.pi/agent/extensions/pi-cwd-guard.json` and asks for confirmation first.\n- Paths added by the command are written as absolute resolved paths.\n- Command arguments support shell-style single quotes, double quotes, and backslash escapes for paths with spaces.\n\n### Hard-protected paths\n\n`write` and `edit` are blocked for sensitive, vendor, or generated paths such as:\n\n- `.env`, `.env.*`\n- `secrets/`, `.secrets/`, `credentials/`, `.credentials/`\n- `.npmrc`, `.pypirc`, `id_rsa`, `id_ed25519`, kubeconfig files\n- common credential JSON files such as `secrets.json`, `credentials.json`, `client_secret.json`, service-account JSON files\n- `*.pem`, `*.key`, `*.p12`, `*.pfx`\n- `node_modules/`\n- generated/build output dirs like `dist/`, `build/`, `coverage/`, `.next/`, `.nuxt/`, `generated/`\n\nThese are hard-blocked rather than confirmed.\n\n### Runtime config confirmation\n\n`write` and `edit` ask for confirmation before changing likely runtime config, including paths like `env.ts`, `runtime-config.ts`, `app-config.ts`, `config.ts`, `config.json`, `appsettings.json`, `application.yml`, deployment config such as `docker-compose.yml`, `serverless.yml`, `vercel.json`, `netlify.toml`, `wrangler.toml`, and config files under config-ish/deployment directories such as `config/*.ts`, `config/*.json`, `k8s/*.yaml`, or `infra/*.tfvars`. For config-ish files/directories only, edits containing obvious environment/API markers also ask for confirmation, such as:\n\n- `BASE_URL`\n- `API_URL`\n- `PUBLIC_*`\n- `*_KEY`\n- `*_TOKEN`\n- `CLIENT_ID`\n- `CLIENT_SECRET`\n- `process.env`\n- `znv`\n\nIf no UI is available, runtime config changes are blocked by default.\n\n### Permission prompt notifications\n\nIf [pi-cmux](https://www.npmjs.com/package/pi-cmux) is installed, `pi-cwd-guard` sends a best-effort cmux notification/status update whenever it opens a permission confirmation. This is optional and no-ops when pi-cmux is not present.\n\n### Common destructive bash confirmation\n\n`bash` asks for confirmation before common destructive commands such as:\n\n- recursive/forced `rm`\n- `sudo`\n- dangerous `chmod`\n- recursive `chown`\n- `git reset --hard`\n- `git clean -fd`\n\nThis is intentionally heuristic and small. It does not parse shell scripts, inspect script files, or sandbox Python/Node.js/other scripts. For scripts, the extension adds advisory prompt guidance telling the agent to ask before intentionally accessing paths outside `process.cwd()` unless the path is covered by configured `allowedOutsideCwdPaths`.\n\n## Install\n\nFrom npm:\n\n```sh\npi install npm:pi-cwd-guard\n```\n\nFrom a local checkout:\n\n```sh\npi install /absolute/path/to/pi-cwd-guard\n```\n\nOr test for one run:\n\n```sh\npi -e /absolute/path/to/pi-cwd-guard\n```\n\nThe package also includes a root `index.ts` shim, so direct extension-directory configuration such as `\"extensions\": [\"/absolute/path/to/pi-cwd-guard\"]` works too.\n\n## Compatibility\n\n`pi-cwd-guard` uses Pi's extension API via a peer dependency and is intended to work across current Pi releases.\n\n## Development\n\n```sh\nnpm install\nnpm run typecheck\nnpm run pack:dry-run\n```\n\n## Package manifest\n\nThis package exposes its extension through:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./src/index.ts\"]\n  }\n}\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "cwd",
+    "guard",
+    "safety"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-25T07:03:05.101Z",
+    "modified": "2026-05-31T13:56:58.252Z",
+    "0.1.0": "2026-05-25T07:03:05.446Z",
+    "0.2.0": "2026-05-25T14:45:42.293Z",
+    "0.3.0": "2026-05-26T16:10:10.516Z",
+    "0.3.1": "2026-05-26T16:46:19.476Z",
+    "0.3.2": "2026-05-28T15:44:02.721Z",
+    "0.3.3": "2026-05-28T16:48:22.606Z",
+    "0.3.4": "2026-05-29T15:43:09.094Z",
+    "0.3.5": "2026-05-31T13:56:58.169Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": null,
+  "download_trend": []
+}

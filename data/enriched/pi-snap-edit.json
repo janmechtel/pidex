@@ -1,0 +1,49 @@
+{
+  "name": "pi-snap-edit",
+  "latest_version": "4.2.0",
+  "description": "Fast, precise, script-free edits for Pi agents",
+  "readme": "# pi-snap-edit\n\nFast, precise line edits for Pi. Experimental.\n\n## Why\n\nPain points from agent workflow:\n\n- Pi's built-in edit tools are safe and precise, but exact replacements can use a lot of tokens.\n- Small mismatches can cause retries, especially in large or messy edits.\n- Escaped strings, quotes, backslashes, regex, and templates can turn exact replacements into escape hell.\n- For complex changes, agents often use ad-hoc Python scripts, which are harder to review.\n- Indentation/whitespace mismatches cause `expectedStartLine` guard to fail despite visually matching content, requiring careful copy or the use of `expectedStartLineMatch: \"trim\"` + `preserveIndent: true`.\n- Most search tools (`rg -n`, `grep -n`, src maps) naturally return line numbers, not custom anchors.\n\n`pi-snap-edit` uses a narrower model: edit by line number with required start-line content guards, or exact target text with line/range selectors. It trades whole-block exact matching and ad-hoc scripts for smaller, easier-to-review tool calls; re-read before editing when line positions may have shifted.\n\n## Why not hash-line anchors\n\nEarlier versions centered the main read-driven workflow on `<line>:<hash>|<content>` anchors. In practice, the first successful edit made the rest of the read output stale. Current `read` output uses line numbers instead.\n\n## Behavior\n\n`pi-snap-edit` currently registers `quick_edit` and `target_edit` as preferred active editing tools. Use line-numbered edits when target lines are known; use `target_edit` when the stable handle is exact text/marker content instead.\n\n| Need | Pi built-in edit | pi-snap-edit |\n| --- | --- | --- |\n| Small exact text replacement | Best when the exact old text is short and easy to quote | Use `target_edit` by exact target `line`/`range`, or `quick_edit` when line numbers are known |\n| Large block replacement | Requires sending the full exact old block | Replace by 1-indexed line/range with `quick_edit` |\n| Escape-heavy text (quotes, backslashes, regex, templates) | Can get noisy because old/new text must be escaped | Easier: replace whole lines or target a small marker |\n| Output from `rg -n` / `grep -n` | Usually needs another read or exact old text | Directly usable with line numbers and `expectedStartLine` |\n| Concurrent file changes | Exact old text must still match | Start-line guarded; re-read when line positions may have shifted |\n| Duplicate/repeated blocks | Exact text can be more precise | Use explicit line numbers plus `expectedStartLine`, or `target_edit` with `line` or `range` |\n| Reviewability | Shows exact replacement intent | Avoids ad-hoc scripts; tool output shows diff + line-numbered refreshed context |\n\nTool behavior:\n\n- `read` output includes padded line numbers; offset reads keep absolute file line numbers.\n- On session start, the extension removes Pi's built-in `edit` tool from the active set and adds `quick_edit` and `target_edit`.\n- `quick_edit` performs atomic line/range replacements using 1-indexed line numbers; requires `expectedStartLine` for each edit.\n- `expectedStartLine` guards the current `start` line only; it does not verify the full range or detect line shifts from insertions/deletions above.\n- `quick_edit` defaults to exact guard matching. Use `expectedStartLineMatch: \"trim\"` plus `preserveIndent: true` when indentation/trailing whitespace is uncertain and replacement lines should inherit the current line indentation.\n- `substitute_edit` registration is currently disabled; its engine remains exported for now.\n- `target_edit` performs ordered exact-target operations: `replace`, `delete`, `insert_before`, and `insert_after`.\n- For `replace` and `delete`, selectors are flexible: omit both `line`/`range` when the target is unique in the file; use `line` for one occurrence on a line; use `range` for every occurrence fully inside an inclusive line range; or combine `line` + `range` to scope by range and verify one selected occurrence intersects the line.\n- `insert_before` and `insert_after` require `line` and insert full lines before/after the target occurrence.\n- `target_edit` defaults to exact substring matching. Set `matchMode: \"trim\"` when indentation or trailing whitespace may differ: it compares whole lines after trimming, bounds the edit to the trimmed content so original indentation is preserved, strips replacement edge whitespace, rejects whitespace-only trim targets, and does not consume the following line ending.\n- Line endings are preserved, including CRLF and no-trailing-newline files.\n- Invalid `quick_edit` ranges/overlaps, invalid `target_edit` selectors/ranges, target misses, and `expectedStartLine` mismatches are rejected without partial writes.\n- Failure hints may list moved/close matches with line numbers. Multi-line target misses can include first-line near matches, last-line near matches, and capped anchor block candidates. Fuzzy hints are diagnostic-only and never applied automatically.\n\n## `target_edit` quick shape\n\n```json\n{\n  \"path\": \"src/file.ts\",\n  \"ops\": [\n    {\n      \"type\": \"insert_after\",\n      \"target\": \"const app = createApp();\",\n      \"line\": 1,\n      \"lines\": [\"app.use(logger);\"]\n    }\n  ]\n}\n```\n\nRules: `target` is exact literal text by default; use `matchMode: \"trim\"` for whole-line whitespace-tolerant matching. `replace`/`delete` may use no selector, `line`, `range`, or `line` + `range` as described above. `insert_before`/`insert_after` require `line`. `replace` uses `replacement` text.\n\n## Install\n\n```bash\npi install npm:pi-snap-edit\n```\n\nOr load locally from this checkout:\n\n```bash\npi -e ./src/index.ts\n```\n\n## Eval harness\n\nThis repo includes a small prompt-guideline eval harness. It compares \"informed\" tool calls that follow the documented guidance against simpler naive calls, then reports which guidelines changed outcomes.\n\n```bash\nnpx tsx test/eval-guidelines.ts\n```\n\nUse it as a documentation sanity check when changing tool guidance or edit semantics; it is not a replacement for `npm test`.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "snap-edit",
+    "fast-edit",
+    "anchored-edit",
+    "atomic-edit",
+    "coding-agent"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-07T05:07:04.521Z",
+    "modified": "2026-06-20T04:20:06.943Z",
+    "0.1.0": "2026-05-07T05:07:04.669Z",
+    "0.1.1": "2026-05-07T05:11:41.599Z",
+    "0.1.2": "2026-05-07T07:06:42.444Z",
+    "0.1.3": "2026-05-07T07:46:24.168Z",
+    "0.1.4": "2026-05-07T08:32:19.161Z",
+    "0.1.5": "2026-05-07T16:32:04.953Z",
+    "1.0.0": "2026-05-08T14:54:33.097Z",
+    "1.1.0": "2026-05-08T17:46:37.745Z",
+    "1.1.1": "2026-05-08T18:03:12.816Z",
+    "2.0.0": "2026-05-09T04:04:24.118Z",
+    "2.1.0": "2026-05-09T20:03:28.855Z",
+    "3.0.0": "2026-05-17T07:34:48.760Z",
+    "3.0.1": "2026-06-02T13:50:08.183Z",
+    "3.0.2": "2026-06-06T10:40:16.086Z",
+    "3.0.3": "2026-06-07T05:41:58.024Z",
+    "4.0.0": "2026-06-08T05:49:46.475Z",
+    "4.1.0": "2026-06-11T10:29:33.086Z",
+    "4.2.0": "2026-06-20T04:20:06.817Z"
+  },
+  "versions_count": 18,
+  "downloads_last_week": null,
+  "download_trend": []
+}

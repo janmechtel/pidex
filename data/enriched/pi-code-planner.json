@@ -1,0 +1,57 @@
+{
+  "name": "pi-code-planner",
+  "latest_version": "0.7.0",
+  "description": "Structured planning, TDD, and Git worktrees for Pi local coding agents",
+  "readme": "> \u26a0\ufe0f Experimental. pi-code-planner is built **for local coding models** and, at runtime, is driven by one \u2014 a small local model (tested with Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf) running through Pi. Cloud LLMs (such as Claude) take part in its development. It is maintained with AI assistance and may contain non-professional design choices, rough edges, broken behavior, or mistakes. Use it at your own risk.\n\n# pi-code-planner\n\n<p align=\"center\">\n  <img src=\"assets/icon.webp\" alt=\"pi-code-planner icon\" width=\"120\">\n</p>\n\nAn experimental [Pi](https://github.com/badlogic/pi-mono) extension for local coding models. Adds a persisted state machine so long tasks survive context compaction, Git branching, and user approval steps without babysitting the session.\n\n> Not a guarantee of better output. In practice, a session implementing a nontrivial feature ran about 3 hours untouched. That is the goal.\n\n---\n\n## Install\n\nReleased versions, published to npm:\n\n```bash\npi install npm:pi-code-planner\n```\n\nDeveloper version \u2014 the latest `main`, including changes not yet released to npm:\n\n```bash\npi install git:github.com/m62624/pi-code-planner\n```\n\nBoth channels can have bugs; the difference is only what they track \u2014 npm follows tagged releases, GitHub follows `main`. Pick npm for released versions and GitHub to try the newest changes.\n\nOpen Pi inside a Git project and run `/planner-create`.\n\n> If `Shift+Enter` doesn't insert a new line, add `\"tui.input.newLine\": [\"ctrl+j\"]` to `~/.pi/agent/keybindings.json` and run `/reload`.\n\n---\n\n## How it works\n\n```mermaid\nflowchart TD\n    S([user runs /planner-create]) --> INIT\n\n    INIT[\"**init** \u2014 bootstrap worktree and plan record\"]\n    INTAKE[\"**intake** \u2014 write and approve goal\"]\n    DISCOVERY[\"**discovery** \u2014 scan project, write verification protocol\"]\n    PLANNING[\"**planning** \u2014 write plan.md, split into tasks, consistency check\"]\n    EXECUTION[\"**execution** \u2014 TDD \u2192 implement \u2192 contracts \u2192 refactor \u2192 merge\"]\n    FINALIZE[\"**finalize** \u2014 integration check, doubt review, summary\"]\n    DONE[\"**done** \u2014 present result, await user acceptance\"]\n    RECOVERY[\"**recovery** \u2014 diagnose and repair broken state\"]\n    OUT([output/&lt;plan-id&gt; branch])\n\n    INIT --> INTAKE\n    INTAKE --> DISCOVERY\n    DISCOVERY --> PLANNING\n    PLANNING --> EXECUTION\n    EXECUTION -->|\"next task\"| EXECUTION\n    EXECUTION -->|\"all done\"| FINALIZE\n    FINALIZE --> DONE\n    DONE -->|\"/planner-finish\"| OUT\n    DONE -->|\"change request\"| PLANNING\n\n    INIT & INTAKE & DISCOVERY & PLANNING & EXECUTION & FINALIZE -.->|\"broken / stuck\"| RECOVERY\n    RECOVERY -.->|\"resume\"| INIT\n```\n\n**Runs on its own** through init, discovery, planning, execution, and finalize.\n\n**Stops and waits for you** at two moments:\n- **intake** \u2014 approves the goal before planning starts\n- **done** \u2014 waits for `/planner-finish` or a correction\n\n| Stage | Who drives it |\n| --- | --- |\n| init | Automated |\n| intake | **You approve the goal** |\n| discovery | Automated |\n| planning | Automated |\n| execution | Automated (repeated per task) |\n| finalize | Automated |\n| done | **You run `/planner-finish`** |\n| recovery | Automated, may ask before destructive repairs |\n\n---\n\n## Settings\n\nSee [SETTINGS.md](SETTINGS.md) for the full reference.\n\n**Idle watchdog** (`idle.timeoutMinutes`) \u2014 wakes the model when it goes silent mid-step.\n\nThe watchdog sends a wake-up message when the model has made no planner tool call for `timeoutMinutes`. This handles the common case where the model pauses mid-step \u2014 a long inference, a generation that produced prose instead of a tool call, or a context edge case. The wake message tells it to call `planner_status` and continue from the persisted state.\n\nThe right value depends on your model's inference speed. If the timeout is too short, the watchdog fires during normal generation and interrupts a step in progress. Too long, and a genuinely stuck model sits idle for a long time before recovery.\n\n| Speed | Recommended |\n| --- | --- |\n| < 5 tok/s | `20` |\n| 5\u201315 tok/s | `15` |\n| 15\u201330 tok/s | `10` |\n| > 30 tok/s | `6` |\n\n> `timer.syncIntervalMinutes` is separate \u2014 it only controls how often the TUI clock saves telemetry, it does not wake the model.\n\n---\n\n## Commands\n\n| Command | Purpose |\n| --- | --- |\n| `/planner-create` | Create a new plan from a request |\n| `/planner-resume` | Resume an existing plan |\n| `/planner-finish` | Export result, clean up state |\n| `/planner-dashboard` | Open the live stage dashboard |\n| `/planner-improve` | Discovery-first self-improvement plan |\n| `/planner-skills` | Search and manage planner-generated skills |\n| `/planner-exit` | Return to the original session without finishing |\n| `/planner-delete` | Delete a plan |\n| `/planner-rename` | Rename a plan |\n| `/planner-helper` | Show current effective settings |\n\n---\n\n## Git Branches\n\n```\nbase \u2192 plan/<plan-id> \u2192 task/<plan-id>/<task-id> \u2192 output/<plan-id>\n```\n\nRaw `git` is blocked while a plan is active. Use planner Git wrappers. Run tests from the worktree path reported by `planner_status`.\n\n---\n\n## Development\n\n```bash\ngit clone https://github.com/m62624/pi-code-planner.git\ncd pi-code-planner\nnpm install\nnpm run build\npi -e ./src/index.ts\n```\n\n---\n\n## Why local, and why this exists\n\nNotes out loud, not a pitch.\n\nAfter a few months of running both cloud and local models day to day, one thing stuck with me: **the harness decides as much as the model does.** How work is framed, bounded, and fed in matters about as much as which model it is. I'm drawn to running things locally \u2014 a model on my own hardware \u2014 so I wrote this for myself, mostly to see how far my own model can carry real development work over long sessions. Pi is the base because it ships an SDK for exactly that kind of fine-grained control over the harness \u2014 a minimal core that doesn't bloat the context, and an extension API flexible enough to reshape the whole loop.\n\nWhy local, specifically? Mostly cost. Running everything through cloud models \u2014 across every class, from the cheap ones to the frontier \u2014 adds up fast, and a local model can claw some of that back on the right tasks. Cloud is clearly still ahead today, no illusions there; but I'm already trying to wire local agents into my own pet projects, and even when a lot of that gets refactored through Claude models afterwards, the local pass is interesting on its own. For small and mid-size tasks I use **[Qwen3.6-35B-A3B](https://huggingface.co/unsloth/Qwen3.6-35B-A3B-MTP-GGUF)** (the experiment here used only this model, the `Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf` quant), context at **131k** for my hardware, roughly **30\u201340 t/s** depending on how full the window is. The output still isn't optimal \u2014 but I think hardware will get better at running MoE models at speeds comfortable for agentic work, and at that point leaving the simpler tasks to a small local model is an easy call. This is me getting ready for that.\n\nIt does **not** make the model smarter \u2014 nothing here adds reasoning. It adds boundaries and moves out of the model the parts a small model is worst at. The failure mode of a local model on a medium or large codebase is rarely a wrong line; it is loss of coherence over distance \u2014 facts that don't fit in the window together, drift across compaction, a decision contradicted ten steps later, \"done\" declared early. So each stage removes one degree of freedom:\n\n- **Persisted state** \u2014 plan, tasks, decisions, and the current step live on disk, not in chat; they survive compaction and are reconstructed via `planner_status`.\n- **Forced order** \u2014 no implementation before discovery, no production code before tests, no \"done\" with pending tasks; a guard holds a model that \"feels finished\" to the protocol.\n- **Per-task Git isolation** \u2014 one task, one branch, one merge; a bad task is contained instead of smearing across the change.\n- **Local contracts (AGENTS.md)** \u2014 scope is pinned to the relevant directory chain instead of guessed.\n- **Mechanical consistency ([elenchus](https://github.com/m62624/elenchus))** \u2014 the model states only facts and first principles in a tiny DSL; a wasm SAT engine does the inference and reports `CONSISTENT / WARNING / UNDERDETERMINED / CONFLICT` with the premises to blame, so the model can only be wrong at the premise level and that is caught immediately. It is a soft gate with a `not_applicable` escape, so it never traps simple work.\n\nThe honest part, kept short: a local model is still a local model, and the project itself is largely vibe-coded \u2014 so expect rough edges, bugs, and instability, and be ready for them. A small model can't infer hidden requirements on its own \u2014 it wants everything explicit rather than implied, and the more detailed the plan, the better the result. Even at its best, its ceiling today still sits below the cloud models. It helps; it doesn't guarantee anything.\n\n## License\n\n[MIT](https://github.com/m62624/pi-code-planner/blob/main/LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "pi-code",
+    "pi-extension",
+    "planner",
+    "local-ai"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/m62624/pi-code-planner#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/m62624/pi-code-planner.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/m62624/pi-code-planner/main/assets/icon.webp"
+  },
+  "time": {
+    "created": "2026-06-12T04:51:51.850Z",
+    "modified": "2026-06-25T19:36:24.819Z",
+    "0.1.0": "2026-06-12T04:51:52.281Z",
+    "0.1.1": "2026-06-12T05:00:34.467Z",
+    "0.1.2": "2026-06-12T11:11:22.045Z",
+    "0.1.3": "2026-06-12T13:49:56.733Z",
+    "0.1.4": "2026-06-13T08:49:42.902Z",
+    "0.1.5": "2026-06-13T09:27:13.003Z",
+    "0.1.6": "2026-06-13T15:23:51.074Z",
+    "0.1.7": "2026-06-13T19:59:05.162Z",
+    "0.1.8": "2026-06-14T11:04:03.701Z",
+    "0.1.9": "2026-06-14T20:20:17.750Z",
+    "0.2.0": "2026-06-15T09:05:41.983Z",
+    "0.2.1": "2026-06-15T13:47:30.716Z",
+    "0.2.2": "2026-06-15T14:09:29.282Z",
+    "0.2.3": "2026-06-15T18:11:22.738Z",
+    "0.2.4": "2026-06-16T05:36:24.244Z",
+    "0.2.5": "2026-06-16T06:02:57.526Z",
+    "0.3.0": "2026-06-17T07:11:42.658Z",
+    "0.3.1": "2026-06-20T12:30:58.035Z",
+    "0.4.0": "2026-06-21T15:16:45.176Z",
+    "0.5.0": "2026-06-22T15:13:29.909Z",
+    "0.5.1": "2026-06-23T10:15:53.901Z",
+    "0.5.2": "2026-06-23T14:23:13.434Z",
+    "0.6.0": "2026-06-24T12:12:58.837Z",
+    "0.7.0": "2026-06-25T19:36:24.535Z"
+  },
+  "versions_count": 24,
+  "downloads_last_week": null,
+  "download_trend": []
+}

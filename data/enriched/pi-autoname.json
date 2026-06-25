@@ -1,0 +1,371 @@
+{
+  "name": "pi-autoname",
+  "latest_version": "0.6.5",
+  "description": "AI-powered session naming for Pi \u2014 generate meaningful, semantic session names via LLM",
+  "readme": "<p align=\"center\">\n  <img src=\"https://github.com/ssdiwu/pi-autoname/releases/download/readme-assets/pi-autoname-cover.png\" alt=\"pi-autoname cover\" width=\"100%\" />\n</p>\n\n<p align=\"center\">\n  <strong>AI-powered semantic session naming for Pi.</strong>\n</p>\n\n<p align=\"center\">\n  Automatically name sessions after the first dialogue, periodically re-name as the conversation evolves, and regenerate on demand with <code>/autoname</code>.\n</p>\n\n<p align=\"center\">\n  <code>pi install npm:pi-autoname</code>\n</p>\n\n## \u2728 What it does\n\n| Scenario | Behavior |\n|---|---|\n| First dialogue completes | Automatically generates a semantic session name |\n| Conversation continues | Silently re-names every 10 minutes (configurable) |\n| Session topic drifts | Name updates to reflect the new focus |\n| Run `/autoname` | Manually regenerate from recent context |\n| AI naming fails | Falls back to smart text extraction |\n\n## \ud83d\ude80 Install\n\n```bash\npi install npm:pi-autoname\n```\n\n**Works out of the box.** No configuration needed \u2014 uses your current session's model by default.\n\n## \u2699\ufe0f Configuration\n\nConfig file is **auto-generated** on first use at `~/.pi/agent/pi-autoname.json`:\n\n```json\n{\n  \"enabled\": true,\n  \"model\": \"\",\n  \"fallbackModels\": [],\n  \"cooldownMinutes\": 10,\n  \"debug\": false,\n  \"respectManualName\": false\n}\n```\n\n| Field | Type | Default | Description |\n|---|---|---|---|\n| `enabled` | boolean | `true` | Set to `false` to disable AI naming |\n| `model` | string | _(session model)_ | Primary model (`provider/modelId`). Empty = use session model |\n| `fallbackModels` | string[] | `[]` | Additional models to try if primary fails |\n| `cooldownMinutes` | number | `10` | Minutes between periodic re-names |\n| `debug` | boolean | `false` | Enable debug logging |\n| `respectManualName` | boolean | `false` | When `false` (default), pi-autoname owns session naming: automatic naming runs on first dialogue and periodically, and may overwrite a name set via `/name` or `/autoname`. Set to `true` for the legacy behavior of treating a user-issued rename as sticky. |\n\n### Example: Model fallback chain\n\n```json\n{\n  \"enabled\": true,\n  \"model\": \"minimax-cn/MiniMax-M2.7\",\n  \"fallbackModels\": [\n    \"xiaomi-token-plan-cn/mimo-v2-omni\"\n  ],\n  \"cooldownMinutes\": 10\n}\n```\n\nThis tries models in order: `MiniMax-M2.7` \u2192 `mimo-v2-omni` \u2192 session model.\n\n## \ud83c\udfd7\ufe0f How it works\n\n### Automatic naming\n\n```\nfirst user message\n        \u2193\nfirst assistant reply finishes\n        \u2193\nAI generates semantic session name\n        \u2193\nsetSessionName(name)\n```\n\n### Periodic re-naming\n\n```\nagent_end event (new message processed)\n        \u2193\ncooldown passed? (10 min default)\n        \u2193\nAI generates new name from recent context\n        \u2193\nname changed? \u2192 silently update\nname same? \u2192 skip\n```\n\n### Model fallback chain\n\n```\nprimary model (from config)\n        \u2193 failed?\nfallback models (from config)\n        \u2193 failed?\nsession model (automatic)\n        \u2193 failed?\nsmart text extraction (no AI)\n```\n\n### Manual naming\n\n```bash\n/autoname\n```\n\nRegenerates the session name from recent conversation context. Useful when you want to force an immediate rename.\n\n### Built-in `/name` is largely redundant\n\nPi's native command still works:\n\n```bash\n/name My custom title\n```\n\nHowever, with `pi-autoname` installed, the periodic re-naming (`cooldownMinutes` default 10 min) will likely overwrite your `/name` change on the next `agent_end`. This is the **default** behavior (`respectManualName: false`) \u2014 pi-autoname owns the session name.\n\n- For a one-shot rename that pi-autoname will then take over again: use `/name`.\n- To force a re-name from the current conversation right now: use `/autoname`.\n- To opt out of pi-autoname ever overwriting your `/name`: set `respectManualName: true` in the config.\n\n#### `/name` grace period\n\nWhen you `/name` a session, pi-autoname detects the out-of-band change on the next `agent_end` and **resets the rename cooldown to now**. That gives your `/name` choice a full `cooldownMinutes` window before the next periodic rename is allowed to consider overwriting it. If the conversation topic changes earlier, the periodic rename will still run normally \u2014 `/name` is a grace period, not a lock.\n\n## \ud83d\udd10 Privacy note\n\n`pi-autoname` sends a short, recent conversation excerpt to the selected naming model. Before sending, it redacts common secret patterns such as API keys, bearer tokens, AWS access keys, private keys, and `*_TOKEN` / `*_SECRET` / `*_PASSWORD` environment assignments. If the AI call fails and the user text contained a detected secret, the local fallback name is skipped to avoid turning secrets into session names.\n\n## \ud83c\udf0d Locale support\n\nAuto-detected from system environment (`PI_LOCALE` > `LC_ALL` > `LANG`). Names are generated in the detected language.\n\n## \ud83d\udd17 Related\n\n- [pi-compaction-i18n](https://github.com/ssdiwu/pi-compaction-i18n) \u2014 localized compaction summaries\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "session-name",
+    "auto-name",
+    "ai-naming",
+    "extension"
+  ],
+  "author": {
+    "name": "ssdiwu"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ssdiwu/pi-autoname#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ssdiwu/pi-autoname.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-25T17:03:42.158Z",
+    "modified": "2026-06-18T15:11:09.978Z",
+    "0.1.0": "2026-05-25T17:03:42.345Z",
+    "0.2.0": "2026-05-25T17:21:12.943Z",
+    "0.3.0": "2026-05-25T17:38:48.248Z",
+    "0.4.0": "2026-05-25T17:46:08.715Z",
+    "0.4.1": "2026-05-25T18:19:26.211Z",
+    "0.5.0": "2026-05-25T18:33:45.213Z",
+    "0.5.2": "2026-05-26T04:00:37.165Z",
+    "0.5.3": "2026-05-27T09:04:33.932Z",
+    "0.5.4": "2026-05-27T17:00:31.372Z",
+    "0.5.5": "2026-05-27T17:26:52.955Z",
+    "0.5.6": "2026-05-27T17:35:26.436Z",
+    "0.5.7": "2026-05-27T17:50:33.440Z",
+    "0.5.9": "2026-05-27T20:11:44.706Z",
+    "0.5.10": "2026-05-27T20:33:01.023Z",
+    "0.5.11": "2026-05-27T20:38:24.533Z",
+    "0.5.12": "2026-05-30T20:31:47.910Z",
+    "0.5.13": "2026-05-31T19:27:36.729Z",
+    "0.6.0": "2026-06-07T09:29:27.672Z",
+    "0.6.1": "2026-06-07T17:28:28.492Z",
+    "0.6.2": "2026-06-07T17:50:47.643Z",
+    "0.6.3": "2026-06-10T17:37:33.332Z",
+    "0.6.4": "2026-06-11T09:46:05.170Z",
+    "0.6.5": "2026-06-18T15:11:09.877Z"
+  },
+  "versions_count": 23,
+  "downloads_last_week": 298,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 891
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 1553
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 555
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 594
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 294
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 13
+    }
+  ]
+}

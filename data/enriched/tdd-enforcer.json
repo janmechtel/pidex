@@ -1,0 +1,61 @@
+{
+  "name": "tdd-enforcer",
+  "latest_version": "0.3.6",
+  "description": "TDD enforcer extension for the pi coding agent \u2014 enforces Red-Green-Refactor phases with file access restrictions and transition gates",
+  "readme": "# tdd-enforcer\n\n**Lock files per TDD phase. Gate transitions on test outcomes.**\n\n[![CI](https://github.com/Cyclone1070/tdd-enforcer/actions/workflows/ci.yml/badge.svg)](https://github.com/Cyclone1070/tdd-enforcer/actions/workflows/ci.yml)\n[![npm version](https://img.shields.io/npm/v/tdd-enforcer.svg)](https://www.npmjs.com/package/tdd-enforcer)\n[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)\n\n---\n\n## Features\n\n- **Phase-locked file access** \u2014 prevents the agent from modifying test files in GREEN and implementation files in RED. Everything is open in REFACTOR\n- **Guards all file-modifying tools** \u2014 `write`, `edit`, and `bash` are all intercepted. All invalid modifications are blocked.\n- **Automatic transition gates** \u2014 advancing to the next phase requires tests to fail (RED\u2192GREEN) or pass (GREEN\u2192REFACTOR, REFACTOR\u2192RED). Misconfigured or broken transitions are rejected\n- **Safe rollback** \u2014 if the previous phase's work was wrong, reverting discards all current changes and restores the exact working tree from before that phase\n- **Stays out of your way** \u2014 TDD enforcement is opt-in (`/tdd:on`). Disable anytime with `/tdd:off` to unlock all files\n- **Version-controlled config** \u2014 `.pi/tdd/rules.json` lives in your repo alongside the code, so the whole team shares the same rules\n\n---\n\n## Setup\n\n### 1. Install\n\n```bash\npi install npm:tdd-enforcer\n```\n\n### 2. Ask the agent to set up TDD\n\nTell the agent to configure TDD for your project, using the `tdd-enforcer` skill to create `.pi/tdd/rules.json` with the right file globs and test commands for your stack.\n\n### 3. Enable TDD\n\nOnce configured, run:\n\n```\n/tdd:on\n```\n\n### Config reference\n\n`.pi/tdd/rules.json` fields (created by the agent, not manually):\n\n| Field | Description |\n|-------|-------------|\n| `blockedInRed` | Globs the agent **cannot** touch in RED phase (implementation files) |\n| `blockedInGreen` | Globs the agent **cannot** touch in GREEN phase (test files) |\n| `!` prefix | Exclusion: carves out subsets from a block (e.g. co-located test files) |\n| `testCommands` | Commands run in parallel for gate checks. Exit 0 = pass, non-zero = block. Use `&&` inside a single entry to chain dependent steps |\n| `timeoutSeconds` | Test timeout per command (default: 120) |\n\n---\n\n## Usage\n\n### User commands\n\n| Command | Description |\n|---------|-------------|\n| `/tdd:on` | Enable TDD enforcement |\n| `/tdd:off` | Disable TDD enforcement, all files become free |\n| `/tdd:status` | Show phase, blocked globs, test commands |\n| `/tdd:reset` | **Destructive**: nukes all snapshot history, resets to RED (disabled) |\n| `/tdd:red`, `/tdd:green`, `/tdd:refactor` | Skip to a given phase (auto-enables, no gate checks) |\n\n### Agent tools\n\n| Tool | When to use | Effect |\n|------|-------------|--------|\n| `next_tdd_phase` | Current phase work is complete | Runs allowlist check + gate test, snapshots state, advances phase|\n| `previous_tdd_phase` | Previous phase work was wrong | **Discards all current-phase changes**, restores working tree to previous snapshot |\n| `tdd_status` | Check current enforcement state | Returns phase, blocked globs, test commands |\n\n---\n\n## How it works\n\nUses a **private git repository** at `.pi/tdd/.git/` (separate from your project's real git history) to detect locked-file changes, revert invalid modifications, and track state across phase transitions.\n\n```\n                 tests fail                  tests pass\n     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2510    (gate check)    \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510  (gate check)   \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n     \u2502 RED  \u2502 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25b6\u2502 GREEN  \u2502 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25b6\u2502 REFACTOR \u2502\n     \u2502(test)\u2502                    \u2502 (impl) \u2502                 \u2502(cleanup) \u2502\n     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2518                    \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518                 \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n        \u25b2                                                        \u2502\n        \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n                                tests pass\n```\n\nEvery phase transition runs two validations before advancing:\n\n1. **Allowlist check** \u2014 scans working tree changes against the phase's blocked globs. If any locked file has been modified, the transition is rejected with the violating paths listed\n2. **Gate check** \u2014 runs `testCommands` in parallel. The required outcome depends on the transition:\n   - RED\u2192GREEN: all commands must fail (a passing test suite means there's no failing test to justify moving to GREEN)\n   - GREEN\u2192REFACTOR: all commands must pass\n   - REFACTOR\u2192RED: all commands must pass\n\nIf both checks pass, the working tree is snapshotted and the phase advances.\n\n### File-level enforcement\n\nWhen TDD is active, every `write`, `edit`, and `bash` tool call is intercepted:\n\n- **`write` / `edit`** \u2014 the target file path is checked against the current phase's blocked globs before the tool executes. Locked file writes are blocked with an error message\n- **`bash`** \u2014 the working tree is stashed before the command runs. After it finishes, the diff is compared against the stash to find what changed. Any locked-file modifications are automatically reverted, and the command output is amended with a warning listing the violations\n\nThis means the agent can attempt any change \u2014 enforcement happens transparently at the tool layer.\n\n### Rollback mechanics\n\nEach phase transition creates a labeled commit in a private git repository at `.pi/tdd/.git/`. Calling `previous_tdd_phase`:\n\n1. Confirms HEAD is a TDD snapshot (commit message starts with `tdd: {phase}`)\n2. Hard-resets the working tree to discard uncommitted changes\n3. Soft-resets HEAD~1 to pop the snapshot\n4. Sets the phase back\n\nSince TDD owns its own git repo, rollback doesn't touch the project's real git history at all.\n\n### State recovery\n\nIf `state.json` is missing or corrupted, the extension recovers by reading the last TDD commit message from `.pi/tdd/.git/`. The label (`tdd: red`, `tdd: green`, etc.) determines the current phase. If no TDD commits exist, it defaults to disabled in RED.\n\n---\n\n## Development\n\n```bash\nnpm install\nnpm run check\n```\n\n### Project structure\n\n```\ntdd-enforcer/\n\u251c\u2500\u2500 engine/                  # Framework-agnostic core\n\u2502   \u251c\u2500\u2500 types.ts             # Phase, Config, Transition types\n\u2502   \u251c\u2500\u2500 config.ts            # Load & validate rules.json\n\u2502   \u251c\u2500\u2500 state.ts             # Load/save/recover phase state\n\u2502   \u251c\u2500\u2500 enforce.ts           # Glob-based file allowlist checks\n\u2502   \u251c\u2500\u2500 transition.ts        # Gate checks (test failure/pass per transition)\n\u2502   \u251c\u2500\u2500 orchestrate.ts       # advancePhase / revertPhase orchestration\n\u2502   \u251c\u2500\u2500 git.ts               # Private git repo for snapshots & diff\n\u2502   \u251c\u2500\u2500 log.ts               # Append-only log with line cap\n\u2502   \u2514\u2500\u2500 prompts.ts           # Phase-specific agent nudges\n\u251c\u2500\u2500 adapters/\n\u2502   \u2514\u2500\u2500 pi/                  # pi extension adapter\n\u2502       \u251c\u2500\u2500 index.ts         # Extension entry: commands (tdd:on/off/status/reset/jump)\n\u2502       \u251c\u2500\u2500 hooks.ts         # Intercept write/edit/bash tool calls & results\n\u2502       \u2514\u2500\u2500 tools.ts         # Agent tools: next_tdd_phase, previous_tdd_phase, tdd_status\n\u251c\u2500\u2500 skills/\n\u2502   \u2514\u2500\u2500 tdd-enforcer/\n\u2502       \u2514\u2500\u2500 SKILL.md         # Agent instructions for TDD workflows\n\u2514\u2500\u2500 package.json\n```\n\n- `engine/` \u2014 pure logic, zero pi dependencies. Testable in isolation\n- `adapters/pi/` \u2014 pi-specific wiring: commands, hooks, agent tools\n- `skills/tdd-enforcer/` \u2014 agent instructions consumed at runtime\n\n---\n\n## License\n\n[MIT](LICENSE)\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "Cyclone1070",
+    "email": "hoangmai1070@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Cyclone1070/tdd-enforcer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cyclone1070/tdd-enforcer.git"
+  },
+  "pi": {
+    "extensions": [
+      "./adapters/pi/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-16T05:32:42.514Z",
+    "modified": "2026-06-24T10:09:24.222Z",
+    "0.1.0": "2026-06-16T05:32:42.807Z",
+    "0.1.1": "2026-06-16T08:05:14.673Z",
+    "0.1.2": "2026-06-16T08:41:21.699Z",
+    "0.1.3": "2026-06-16T09:18:58.642Z",
+    "0.1.4": "2026-06-16T10:37:42.270Z",
+    "0.1.5": "2026-06-16T10:55:29.779Z",
+    "0.1.6": "2026-06-16T12:33:06.742Z",
+    "0.1.7": "2026-06-16T13:37:54.526Z",
+    "0.1.8": "2026-06-16T13:50:42.201Z",
+    "0.1.9": "2026-06-16T14:45:42.943Z",
+    "0.2.0": "2026-06-17T03:56:00.451Z",
+    "0.2.1": "2026-06-17T13:53:56.854Z",
+    "0.2.2": "2026-06-17T13:56:02.084Z",
+    "0.2.3": "2026-06-18T09:49:16.330Z",
+    "0.2.4": "2026-06-18T10:01:09.557Z",
+    "0.2.5": "2026-06-19T06:58:00.570Z",
+    "0.2.6": "2026-06-19T07:15:14.935Z",
+    "0.2.7": "2026-06-20T05:22:34.590Z",
+    "0.2.8": "2026-06-20T06:25:17.983Z",
+    "0.2.9": "2026-06-20T12:38:05.552Z",
+    "0.3.0": "2026-06-21T13:44:05.825Z",
+    "0.3.1": "2026-06-21T15:02:34.221Z",
+    "0.3.2": "2026-06-21T15:12:42.252Z",
+    "0.3.3": "2026-06-22T11:11:29.225Z",
+    "0.3.4": "2026-06-23T01:44:15.994Z",
+    "0.3.5": "2026-06-23T12:17:49.053Z",
+    "0.3.6": "2026-06-24T10:09:24.126Z"
+  },
+  "versions_count": 26,
+  "downloads_last_week": null,
+  "download_trend": []
+}

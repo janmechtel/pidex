@@ -1,0 +1,407 @@
+{
+  "name": "latchkey",
+  "latest_version": "2.19.1",
+  "description": "A CLI tool that injects API credentials into curl requests to third-party services",
+  "readme": "# Latchkey\n\n[![npm](https://img.shields.io/npm/v/latchkey?style=flat-square)](https://npmjs.com/package/latchkey)\n[![CI](https://img.shields.io/github/actions/workflow/status/imbue-ai/latchkey/test.yml?style=flat-square)](https://github.com/imbue-ai/latchkey/actions)\n[![license](https://img.shields.io/npm/l/latchkey?style=flat-square)](LICENSE)\n[![downloads](https://img.shields.io/npm/dm/latchkey?style=flat-square)](https://npmjs.com/package/latchkey)\n\nInject API credentials into local agent requests.\n\n**[Full documentation](https://docs.imbue.com/latchkey)**\n\n## Quick example\n\n```bash\n# User stores the credentials.\nlatchkey auth set slack -H \"Authorization: Bearer xoxb-your-token\"\n\n# Agent makes http calls.\nlatchkey curl -X POST 'https://slack.com/api/conversations.create' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"name\":\"something-urgent\"}'\n```\n\n## Overview\n\nLatchkey is a command-line tool that injects credentials into curl commands.\n\n- `latchkey services list`\n\t- List third-party services (Slack, Google Workspace, Linear, GitHub, etc.) that are supported out-of-the-box.\n    - (In simple cases, `latchkey services register` can be used to add basic support for a new service at runtime.)\n- `latchkey curl <arguments>`\n\t- Automatically inject credentials into your otherwise standard curl calls to HTTP APIs.\n\t- Credentials must already exist (see below).\n- `latchkey auth set <service_name> <curl_arguments>`\n\t- Manually store credentials for a service as arbitrary curl arguments.\n- `latchkey auth browser <service_name>`\n\t- Open a browser login pop-up window and store the resulting API credentials.\n    - This also allows agents to prompt users for credentials.\n    - Only some services support this option.\n\nLatchkey is primarily designed for AI agents. By invoking\nLatchkey, agents can utilize user-provided credentials or prompt\nthe user to authenticate, then continue interacting with HTTP\nAPIs using standard curl syntax. No custom integrations or\nembedded credentials are required.\n\nUnlike OAuth-based flows or typical MCP-style integrations,\nLatchkey does not introduce an intermediary between the agent\nand the service. When the `browser` command is used, requests are made\ndirectly on the user\u2019s behalf, which enables greater flexibility\nat the cost of formal delegation: agents authenticate as the\nuser.\n\nLatchkey integrates with [Detent](https://github.com/imbue-ai/detent)\nto let you define fine-grained HTTP permissions for agents.\n\nIf a service you need isn\u2019t supported out of the box, the\n[new service registering mechanism](#entirely-new-services)\nmay help. Otherwise, contributions are welcome! See the [development docs](docs/development.md)\nfor details.\n\nYou can also [leave us a note](https://github.com/imbue-ai/latchkey/issues/56).\n\n## Installation\n\n### Prerequisites\n\n- `curl`, `node` and `npm` need to be present on your system in reasonably recent versions.\n- The `latchkey auth browser` subcommand requires a graphical environment.\n\n### Steps\n\n```bash\nnpm install -g latchkey\n\n# Optionally, if you intend to use `latchkey auth browser`:\nlatchkey ensure-browser\n```\n\nThe `ensure-browser` command discovers and configures a browser\nfor Latchkey to use. It searches for Chrome, Chromium, or Edge\non your system. If none is found, it downloads Chromium via\nPlaywright.\n\n## Agent integrations\n\nWarning: giving AI agents access to your API credentials is\npotentially dangerous, especially when using the `auth browser`\nfeature. They will be able to perform most of the actions you\ncan. Only do this if you're willing to accept the risks.\n\n\n### Using skills.sh\n\n```bash\nnpx skills add imbue-ai/latchkey\n```\n\n### From ClawHub\n\n```bash\nnpx clawhub install latchkey\n```\n\n### As a Pi package\n\n```bash\npi install npm:latchkey\n```\n\n### Manually\n\nThe exact steps will differ depending on the agent. Taking OpenCode as an example:\n\n```bash\nmkdir -p ~/.opencode/skills/latchkey\nlatchkey skill-md > ~/.opencode/skills/latchkey/SKILL.md\n```\n\n### Using the Python `llm` tool\n\nSee [integrations/llm-latchkey/README.md](integrations/llm-latchkey/README.md).\nAlso check out our [llm-webchat](https://github.com/imbue-ai/llm-webchat) web UI that can be used together with Latchkey!\n\n\n## Demo\n\n![Image](https://github.com/user-attachments/assets/953eae6e-35ab-4d64-91f3-98b6843c502d)\n\n\n## Direct usage\n\nLet's revisit the initial example:\n\n```bash\nlatchkey curl -X POST 'https://slack.com/api/conversations.create' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"name\":\"something-urgent\"}'\n```\n\nNotice that `-H 'Authorization: Bearer ...'` is absent. This is\nbecause Latchkey injects stored credentials automatically. To\nset up credentials for a service (Slack in this example), run:\n\n```bash\nlatchkey auth browser slack\n```\n\nThis opens the browser with a login screen. After you log in, Latchkey extracts\nthe necessary API credentials from the browser session, closes the browser, and\nstores the credentials so that they can be reused.\n\nAlternatively, you can provide credentials manually:\n\n```bash\nlatchkey auth set slack -H \"Authorization: Bearer xoxb-your-token\"\n```\n\n`latchkey curl` passes your arguments straight through to `curl`\nso you can use the same interface you are used to. The return\ncode, stdout and stderr are passed back from curl to the caller\nof `latchkey`.\n\n\n### Self-hosted services\n\nFor services that can be self-hosted, like GitLab, first make Latchkey aware of your service instance:\n\n```bash\nlatchkey services register my-gitlab-instance --service-family=gitlab --base-api-url=\"https://gitlab.example.com/api/v4/\"\n```\n\nThen continue as usual.\n\n```bash\nlatchkey auth set my-gitlab-instance -H \"PRIVATE-TOKEN: <token>\"\n\n# Agents can then call the API.\nlatchkey curl https://gitlab.example.com/api/v4/user\n```\n\n\n### Entirely new services\n\nIf you want to use Latchkey with a service that is not in the\nlist of supported built-in services, you can still use the\nmechanism described above to register a new service at runtime:\n\n```bash\nlatchkey services register mastodon --base-api-url=\"https://mastodon.social/api/v1/\"\nlatchkey auth set mastodon -H \"Authorization: Bearer <your_access_token>\"\n\n# Agents can then call the service:\nlatchkey curl https://mastodon.social/api/v1/timelines/public?limit=2\n```\n\nUser-registered services only support authentication via static curl arguments provided through `latchkey auth set`.\n\n\n### Indirect credentials\n\nSome services can't express their credentials as static curl\narguments. For example:\n\n- AWS requires a signature that changes with each request.\n- Telegram expects bot tokens to be directly part of the URL.\n\nIn similar cases, when supported, you can use the `latchkey auth set-nocurl` command, e.g.\nlike this:\n\n```bash\nlatchkey auth set-nocurl aws <access-key-id> <secret-access-key>\n```\n\nLatchkey will then modify subsequent `latchkey curl` requests as\nneeded. You can find more information (including the expected\nsignature) by calling `latchkey services info <service_name>`.\n\n### Remembering API credentials\n\nYour API credentials and browser state are encrypted and stored\nby default under `~/.latchkey`. They are never transmitted\nanywhere beyond the endpoints specified by the actual curl\ncalls.\n\n\n### Inspecting the status of stored credentials\n\nCalling `latchkey services info <service_name>` will show information\nabout the service, including the credentials status. The\ncredentials status line will show one of:\n\n- `missing`\n- `invalid`\n- `valid`\n- `unknown` (for user-registered services)\n\n### Clearing credentials\n\nRemembered API credentials can expire. The caller of `latchkey\ncurl` will typically notice this because the calls will start returning\nHTTP 401 or 403. To verify that, first call `latchkey services info`, e.g.:\n\n```bash\nlatchkey services info discord\n```\n\nIf the credentials status is `invalid`, it means the Unauthorized/Forbidden\nresponses are caused by invalid or expired credentials rather than insufficient\npermissions. In that case, log in again:\n\n```bash\nlatchkey auth browser discord\n```\n\nOr alternatively:\n\n```bash\nlatchkey auth set discord -H \"Authorization: ...\"\n```\n\n\n### Clearing credentials and logins\n\nIn case you want to remove stored API credentials, use the `auth clear` subcommand.\n\n```bash\nlatchkey auth clear discord\n```\n\nTo clear all stored data (both the credential store and browser state file), run:\n\n```bash\nlatchkey auth clear\n```\n\n\n### Re-encrypting credentials\n\nIf you want to export your stored credentials encrypted with\na different key or containing only some of the credentials (for\nexample to move them to another machine) , use the `auth re-encrypt`\nsubcommand.\n\n\n### Permissions\n\nOptionally, you can specify rules for approving / rejecting\nrequests by creating the `permissions.json` file in the Latchkey\ndirectory (`~/.latchkey/permissions.json`). For example:\n\n```json\n{\n  \"rules\": [\n    {\"google-gmail-api\": [\"google-gmail-read-all\"]},\n    {\"slack-api\": [\"slack-read-all\"]}\n  ]\n}\n```\n\nThis would mean that:\n\n- When accessing the Gmail or the Slack API, only read actions are allowed.\n- No requests are allowed to any other domains.\n\nIdeally make the file read-only: `chmod -w ~/.latchkey/permissions.json`.\nIn the gateway mode, you can use [permission overrides](#permission-overrides) to let\ndifferent callers claim different permission policies.\nFor more details, check out the [permission docs](https://docs.imbue.com/latchkey/basics/permissions).\n\n\n### Gateway mode\n\nPeople sometimes run agents in isolated sandboxes for higher\nsecurity. Using gateway mode lets you extend the isolation\nto Latchkey itself. Run this to start a Latchkey server on the\nmachine where your main configuration lives:\n\n```bash\n# Listens on localhost:1989 by default.\n# You can override this using the LATCHKEY_GATEWAY_LISTEN_HOST\n# and LATCHKEY_GATEWAY_LISTEN_PORT environment variables.\nlatchkey gateway\n```\n\nSuppose you run an agent inside a container on the same machine,\nwith the gateway port mapped into the container. Then setting\n`LATCHKEY_GATEWAY=http://localhost:1989` in your container will\nroute your agent's `latchkey` calls to the host Latchkey\n(limited to a selected safe subset of commands). That way the\nagent won't be able to tamper with your Latchkey configuration\nwhile still being able to use Latchkey itself as intended.\n\n#### Password\n\nYou can additionally protect the gateway with a shared password.\nSet `LATCHKEY_GATEWAY_LISTEN_PASSWORD` on the machine running\n`latchkey gateway` (the value the server requires) and\n`LATCHKEY_GATEWAY_PASSWORD` on the client (the value the CLI\nsends). When the two match, the request is accepted; otherwise\nthe gateway responds with `401`. The password is carried in the\n`X-Latchkey-Gateway-Password` header and is never forwarded\nupstream, so it stays internal to Latchkey.\n\n\n#### Permission overrides\n\nIndividual gateway requests can also override which\n`permissions.json` file the gateway consults by sending a\n`X-Latchkey-Gateway-Permissions-Override` header. The header\nvalue is a minimal HS256 JWT whose only payload field,\n`permissionsConfig`, is an absolute path. The signing key is\nderived from your Latchkey encryption key, so only someone with\naccess to that key can mint valid pointers. Generate one with:\n\n```bash\nlatchkey gateway create-jwt /etc/latchkey/permissions-readonly.json\n```\n\n(Pass `--no-validate` to skip the existence check, e.g. when\nthe target file lives on a different machine.) The gateway\nresponds with `401` for invalid or missing-signature JWTs and\nwith `400` when the JWT is valid but the referenced file does\nnot exist.\n\nOn the client side, set `LATCHKEY_GATEWAY_PERMISSIONS_OVERRIDE`\nto the JWT and the CLI will attach it to every outgoing gateway\nrequest automatically (analogous to `LATCHKEY_GATEWAY_PASSWORD`).\n\n\n#### Extensions\n\nYou can extend the gateway with your own HTTP endpoints. For\ndetails, see the [extensions docs](./docs/extensions.md).\n\n\n### Other configuration\n\nYou can set these environment variables to override certain\ndefaults:\n\n- `LATCHKEY_DIRECTORY`: path to the directory where Latchkey stores its data (defaults to `~/.latchkey`)\n- `LATCHKEY_CURL`: path to the curl binary\n- `LATCHKEY_KEYRING_SERVICE_NAME`, `LATCHKEY_KEYRING_ACCOUNT_NAME`: identifiers that are used to store the encryption password in your keyring\n- `LATCHKEY_ENCRYPTION_KEY`: override the encryption key, e.g. when a keyring is not available. Example: `export LATCHKEY_ENCRYPTION_KEY=\"$(openssl rand -base64 32)\"`\n- `LATCHKEY_DISABLE_BROWSER`: when set to a non-empty value, disables the browser login flow; commands that would trigger a browser login (`auth browser`, `auth browser-prepare`) will fail with an error instead\n- `LATCHKEY_DISABLE_COUNTING`: when set to a non-empty value, disables daily usage counting.\n- `LATCHKEY_DISABLE_CREDENTIALS_REFRESH`: when set to a non-empty value, expired credentials are never refreshed. (Useful when the credentials are shared and refreshing in one place would risk exhausting the refresh token for the other one.)\n- `LATCHKEY_PERMISSIONS_CONFIG`: override the `permissions.json` location.\n- `LATCHKEY_PERMISSIONS_DO_NOT_USE_BUILTIN_SCHEMAS`: do not use the built-in permission definitions.\n- `LATCHKEY_PASSTHROUGH_UNKNOWN`: if set, Latchkey will forward requests (via `latchkey curl` or gateway) even if no credentials are injected.\n- `LATCHKEY_GATEWAY`: when set to a base URL (e.g. `http://localhost:1989`), the CLI delegates commands to a remote Latchkey gateway instead of running them locally. Commands that change local state (`auth set`, `auth clear`, `auth re-encrypt`, `services register`, `ensure-browser`, `gateway`) cannot run in this mode.\n- `LATCHKEY_GATEWAY_LISTEN_HOST`, `LATCHKEY_GATEWAY_LISTEN_PORT`: default address and port the local `latchkey gateway` command binds to when `--host` / `--port` are not supplied (defaults: `localhost`, `1989`). Distinct from `LATCHKEY_GATEWAY`, which configures a *remote* gateway URL.\n- `LATCHKEY_GATEWAY_PASSWORD`: optional shared secret used by the client side. When set together with `LATCHKEY_GATEWAY`, the CLI sends the value in the `X-Latchkey-Gateway-Password` header on every outgoing gateway request.\n- `LATCHKEY_GATEWAY_LISTEN_PASSWORD`: optional shared secret used by the server side. When set, `latchkey gateway` rejects (with `401`) any request that does not present the same value in the `X-Latchkey-Gateway-Password` header. The header is stripped before requests are forwarded upstream.\n- `LATCHKEY_GATEWAY_PERMISSIONS_OVERRIDE`: optional permissions-override JWT (see `latchkey gateway create-jwt`) used by the client side. When set together with `LATCHKEY_GATEWAY`, the CLI sends the value in the `X-Latchkey-Gateway-Permissions-Override` header on every outgoing gateway request, causing the remote gateway to enforce the permissions.json file referenced by the JWT instead of its default one.\n- `LATCHKEY_APP_NAME_PREFIX`: prefix used for the app, project, and OAuth client names that Latchkey creates on your behalf inside third-party consoles (defaults to `Latchkey`).\n\nAll of the above settings, except for `LATCHKEY_DIRECTORY`,\n`LATCHKEY_ENCRYPTION_KEY`, `LATCHKEY_GATEWAY_PASSWORD`,\n`LATCHKEY_GATEWAY_LISTEN_PASSWORD`, and\n`LATCHKEY_GATEWAY_PERMISSIONS_OVERRIDE`, can alternatively be\nspecified in the `settings` section of `config.json` inside the\nLatchkey directory.  In case of a clash, environment variables\noverride `config.json` values.\n\n```json\n{\n  \"settings\": {\n    \"curlCommand\": \"/usr/local/bin/curl\",\n    \"keyringServiceName\": \"latchkey\",\n    \"keyringAccountName\": \"encryption-key\",\n    \"browserDisabled\": false,\n    \"countingDisabled\": true,\n    \"permissionsConfig\": \"/etc/latchkey/permissions.json\",\n    \"permissionsDoNotUseBuiltinSchemas\": false,\n    \"passthroughUnknown\": false,\n    \"gateway\": \"http://localhost:1989\",\n    \"gatewayListenHost\": \"localhost\",\n    \"gatewayListenPort\": 1989,\n    \"appNamePrefix\": \"Latchkey\"\n  }\n}\n```\n\n\n## Disclaimers\n\n- This is still a work in progress.\n- Latchkey has been created with the help of AI-assisted coding tools with careful human curation.\n- Invoking `latchkey auth browser ...` can sometimes have side effects in the form of\n  new API keys being created in your accounts (through browser automation).\n- Using agents for automated access may be prohibited by some services' ToS.\n- Unless `LATCHKEY_DISABLE_COUNTING` is set, once a day, when invoking `latchkey`, a GET request is sent to [goatcounter.com](https://goatcounter.com). We don't store any sort of private information and don't track anything beyond a simple daily count of active users.\n- We reserve the right to change the license of future releases of Latchkey.\n- Latchkey was not tested on Windows.\n\n## Currently supported services\n\nLatchkey currently offers varying levels of support for the\nfollowing services: AWS, Calendly, Discord, Dropbox, Figma, GitHub, GitLab,\nGmail, Google Analytics, Google Calendar, Google Docs, Google Drive, Google Sheets,\nLinear, Mailchimp, Notion, Ramp, Sentry, Slack, Stripe, Telegram, Todoist, Yelp, Zoom, and more.\n",
+  "keywords": [
+    "cli",
+    "curl",
+    "api",
+    "credentials",
+    "authentication",
+    "agents",
+    "imbue",
+    "pi-package"
+  ],
+  "author": {
+    "name": "Imbue",
+    "email": "hynek@imbue.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/imbue-ai/latchkey#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imbue-ai/latchkey.git"
+  },
+  "pi": {
+    "skills": [
+      "./dist/skills/generic"
+    ],
+    "video": "https://github.com/imbue-ai/latchkey/releases/download/2.5.4/demo.mp4"
+  },
+  "time": {
+    "created": "2026-01-30T11:51:46.770Z",
+    "modified": "2026-06-25T08:16:28.560Z",
+    "0.1.0": "2026-01-30T11:51:46.939Z",
+    "0.1.1": "2026-01-30T12:04:08.807Z",
+    "0.1.2": "2026-01-30T12:05:26.273Z",
+    "0.1.3": "2026-01-30T12:25:58.214Z",
+    "0.1.4": "2026-02-03T17:39:46.560Z",
+    "0.2.0": "2026-02-10T15:06:48.840Z",
+    "1.0.0": "2026-02-13T13:31:23.600Z",
+    "1.0.1": "2026-02-13T19:13:33.385Z",
+    "2.0.0": "2026-02-20T16:46:21.982Z",
+    "2.1.0": "2026-02-24T14:28:40.593Z",
+    "2.2.0": "2026-02-27T13:49:54.785Z",
+    "2.2.1": "2026-02-27T20:03:11.656Z",
+    "2.3.0": "2026-03-04T13:50:20.034Z",
+    "2.4.0": "2026-03-06T12:02:39.430Z",
+    "2.4.1": "2026-03-06T12:18:24.813Z",
+    "2.4.2": "2026-03-06T12:31:50.836Z",
+    "2.4.3": "2026-03-06T15:28:15.435Z",
+    "2.5.0": "2026-03-08T16:55:12.535Z",
+    "2.5.1": "2026-03-08T17:15:30.189Z",
+    "2.5.2": "2026-03-10T15:28:31.710Z",
+    "2.5.3": "2026-03-19T13:25:53.011Z",
+    "2.5.4": "2026-03-25T11:33:37.574Z",
+    "2.5.5": "2026-04-01T13:26:38.180Z",
+    "2.6.0": "2026-04-10T14:18:17.449Z",
+    "2.6.1": "2026-04-15T13:39:04.761Z",
+    "2.7.0": "2026-04-20T15:22:41.692Z",
+    "2.7.1": "2026-04-22T16:32:40.064Z",
+    "2.7.2": "2026-04-24T08:32:17.466Z",
+    "2.7.3": "2026-04-30T00:05:21.462Z",
+    "2.8.0": "2026-05-06T12:11:37.023Z",
+    "2.9.0": "2026-05-08T10:57:58.208Z",
+    "2.10.0": "2026-05-11T13:43:36.226Z",
+    "2.10.1": "2026-05-12T15:21:06.160Z",
+    "2.11.0": "2026-05-13T13:50:31.734Z",
+    "2.11.1": "2026-05-14T07:35:05.005Z",
+    "2.11.2": "2026-05-20T19:24:40.098Z",
+    "2.11.3": "2026-05-22T07:56:48.933Z",
+    "2.12.0": "2026-05-25T11:01:43.613Z",
+    "2.12.1": "2026-05-27T14:38:29.756Z",
+    "2.12.2": "2026-05-28T12:20:26.670Z",
+    "2.13.0": "2026-05-29T09:32:02.039Z",
+    "2.14.0": "2026-05-29T12:13:01.852Z",
+    "2.15.0": "2026-06-01T14:19:30.558Z",
+    "2.15.1": "2026-06-04T10:23:57.142Z",
+    "2.15.2": "2026-06-08T15:34:26.340Z",
+    "2.15.3": "2026-06-09T07:42:25.507Z",
+    "2.15.4": "2026-06-09T08:54:33.106Z",
+    "2.16.0": "2026-06-10T12:11:06.893Z",
+    "2.16.1": "2026-06-16T14:36:22.398Z",
+    "2.17.0": "2026-06-18T07:05:41.319Z",
+    "2.17.1": "2026-06-19T10:08:56.571Z",
+    "2.17.2": "2026-06-22T13:57:39.901Z",
+    "2.18.0": "2026-06-23T11:21:43.727Z",
+    "2.19.0": "2026-06-25T08:05:36.758Z",
+    "2.19.1": "2026-06-25T08:16:28.447Z"
+  },
+  "versions_count": 55,
+  "downloads_last_week": 2141,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 495
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 153
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 211
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 8286
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 17858
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 7302
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 193
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 273
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 364
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 444
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 356
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 377
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 451
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 275
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 781
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 559
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 1198
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 3030
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 2687
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 3497
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 2065
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 449
+    }
+  ]
+}

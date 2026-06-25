@@ -1,0 +1,350 @@
+{
+  "name": "@pi-stef/figma",
+  "latest_version": "0.3.4",
+  "description": "Pi extension for Figma REST API tools, compact design context, and Jira-linked Figma summaries.",
+  "readme": "# @pi-stef/figma\n\nPi extension for Figma REST API tools, compact design context, and Jira-linked Figma summaries.\n\nUse this package when implementation work starts from Figma files, frames, FigJam boards, or Jira tickets that contain Figma design links. It keeps the existing `figma_context` workflow while adding broader `figma_*` REST tools for search, summaries, assets, comments, variables, styles, and raw debugging escape hatches.\n\n## Contents\n\n- [Natural Language Usage](#natural-language-usage)\n- [Setup And Auth](#setup-and-auth)\n- [Migration From figma-context](#migration-from-figma-context)\n- [REST Tool Surface](#rest-tool-surface)\n- [Figma Context Workflow](#figma-context-workflow)\n- [Atlassian Integration](#atlassian-integration)\n- [Scopes And Permissions](#scopes-and-permissions)\n- [Rate Limits And Caching](#rate-limits-and-caching)\n- [FigJam Slides And Limitations](#figjam-slides-and-limitations)\n- [Troubleshooting](#troubleshooting)\n- [Security Notes](#security-notes)\n\n## Natural Language Usage\n\nAsk the agent to inspect Figma links in normal task language:\n\n```text\npi \"Summarize this Figma flow before implementing the settings page: https://www.figma.com/file/...\"\npi \"Use figma to inspect the checkout screen, list text content, and extract implementation hints before coding.\"\npi \"Read Jira ABC-123 with Atlassian context and include linked Figma context if auth is configured.\"\n```\n\nUse exact tool calls when you need deterministic parameters:\n\n```text\nfigma_context url=\"https://www.figma.com/file/...\" mode=\"overview\"\nfigma_context url=\"https://www.figma.com/file/...\" mode=\"screen\" maxDepth=8 includeStyles=true\nfigma_get_implementation_context input=\"https://www.figma.com/design/...\" maxDepth=6\n```\n\n## Setup And Auth\n\n`figma` calls the Figma REST API and needs a personal access token for private or team files. pi never creates token files automatically because they contain secrets.\n\nCreate the canonical config file:\n\n```bash\nmkdir -p ~/.pi/sf/figma\ncat > ~/.pi/sf/figma/config.json <<'JSON'\n{\n  \"apiToken\": \"MY_TOKEN\"\n}\nJSON\nchmod 600 ~/.pi/sf/figma/config.json\n```\n\nInstall the package:\n\n```bash\npi install npm:@pi-stef/figma\n```\n\nUse the default install for global availability, or add `-l` for project-local install. Use `--dry-run` first when you want to inspect the Pi install command:\n\n```bash\npi install npm:@pi-stef/figma --dry-run\n```\n\nCheck token discovery without printing the token:\n\n```text\nfigma_auth_status\nfigma_auth_status fileKey=\"abc123\"\n```\n\nWithout a `fileKey`, `figma_auth_status` only checks local config presence. With a `fileKey`, it makes the smallest safe Figma request needed to verify API access.\n\nCompatibility fallbacks are supported during the first minor release after `figma` ships:\n\n- `{ \"apiKey\": \"...\" }` in `~/.pi/sf/figma/config.json`\n- `FIGMA_API_TOKEN`, `FIGMA_TOKEN`, or `FIGMA_ACCESS_TOKEN`\n- compatible `.mcp.json` Figma token entries\n\nNew setups should use `{ \"apiToken\": \"...\" }` in `~/.pi/sf/figma/config.json`.\n\n## Migration From figma-context\n\n`figma` replaces the old `figma-context` package and keeps the compatibility tool name `figma_context`.\n\nBefore enabling this package, remove the old package from both Pi scopes if it was installed:\n\n```bash\npi remove figma-context\npi remove -l figma-context\n```\n\nThe helper wrapper performs that cleanup when possible:\n\n```bash\nscripts/install-figma.sh project\nscripts/install-figma.sh global\n```\n\nDo not enable both packages in the same Pi runtime. If another package registered `figma_context` first, this package skips duplicate registration and logs a migration warning.\n\n## REST Tool Surface\n\nProcessed tools return compact, bounded output suitable for agent context:\n\n| Tool | Purpose |\n|---|---|\n| `figma_parse_url` | Parse a Figma URL, bare file key, and optional node id. |\n| `figma_auth_status` | Check local auth and optional file access without exposing tokens. |\n| `figma_get_design_context` | Return page/frame context, hierarchy, and relevant nearby nodes. |\n| `figma_get_node_summary` | Summarize layout, dimensions, styles, text, components, and children. |\n| `figma_get_implementation_context` | Produce design-to-code layout, color, typography, spacing, asset, and accessibility hints. |\n| `figma_extract_text` | Extract visible text nodes with paths and node ids. |\n| `figma_find_nodes_by_name` | Search node names with compact path-aware results. |\n| `figma_find_nodes_by_text` | Search visible text content. |\n| `figma_render_nodes` | Return Figma image render URLs and optional downloaded artifacts. |\n| `figma_extract_assets` | Build an asset manifest for renderable nodes and image fills. |\n| `figma_get_styles` | List file styles. |\n| `figma_get_variables` | List variables and collections when the token has library scopes. |\n| `figma_get_components` | List file components. |\n| `figma_get_component_sets` | List component sets. |\n| `figma_search_components` | Search components by name. |\n| `figma_get_comments` | Read file comments when the token has comment scope. |\n| `figma_get_image_fills` | Retrieve expiring image-fill URLs. |\n\nRaw escape hatches are explicit and capped:\n\n| Tool | Purpose |\n|---|---|\n| `figma_get_file_raw` | Fetch raw file JSON for debugging. |\n| `figma_get_nodes_raw` | Fetch raw node JSON for debugging. |\n\nPrefer processed tools first. Use raw tools only when debugging a shape the compact transformers do not expose yet.\n\n## Figma Context Workflow\n\n`figma_context` keeps the original overview/screen concepts:\n\n- `mode=\"overview\"` is for pages, canvases, worksheets, and multi-screen flows.\n- `mode=\"screen\"` is for a focused frame or screen.\n\nRecommended flow:\n\n1. Start with `mode=\"overview\"` for broad Jira or story links.\n2. Pick relevant screen node IDs from the overview.\n3. Re-run with `mode=\"screen\"` for implementation details.\n\nUseful options:\n\n| Option | Notes |\n|---|---|\n| `format` | `markdown` for agent-readable text, or structured JSON when exact fields matter. |\n| `includeRaw` | Adds raw tree data; use sparingly because output can grow quickly. |\n| `includeHidden` | Includes hidden nodes. Defaults to visible-only summaries. |\n| `includeStyles` | Includes style details where available. |\n| `maxDepth` | Bounds tree traversal. |\n| `maxScreens` | Bounds overview screen candidates. |\n| `maxTextPerScreen` | Bounds extracted text per screen. |\n\n## Atlassian Integration\n\n`packages/atlassian` uses this package when Jira or Confluence context contains Figma links. `story_context`, `jira_issue includeContext=true`, and `jira_get_issue includeContext=true` keep the Figma URL inventory and, when auth is configured, add a `Linked Figma Context` section.\n\nThe integration is bounded for Jira latency:\n\n- Figma enrichment defaults to auto: enabled only when Figma auth is configured.\n- `includeFigmaContext: false` keeps only URL inventory.\n- `includeFigmaContext: true` records missing-auth or API failures in `inaccessibleLinks` instead of failing Jira context.\n- `maxFigmaLinks` defaults to `2`.\n- Figma links are fetched with concurrency `2`.\n- Individual Figma failures do not prevent Jira or Confluence context from returning.\n\n## Scopes And Permissions\n\nFigma REST tokens need scopes that match the tool you call:\n\n| Capability | Typical scope |\n|---|---|\n| Files, nodes, text, design context | `file_content:read` |\n| Comments | `file_comments:read` |\n| Components, styles, libraries | `library_assets:read` and `library_content:read` |\n\nSome files also require membership or file-level access in Figma. A valid token without access to the target file returns 403/404-style guidance.\n\n## Rate Limits And Caching\n\nThe REST client retries 429 responses using Figma's `Retry-After` header, up to a bounded retry cap. If rate limits continue, narrow requests with `ids`, `nodeId`, and `depth`, or wait before retrying.\n\nCacheable responses are stored under:\n\n```text\n$XDG_CACHE_HOME/pi/figma\n```\n\nor, when `XDG_CACHE_HOME` is unset:\n\n```text\n~/.cache/pi/figma\n```\n\nClear cached responses with:\n\n```bash\nrm -rf \"${XDG_CACHE_HOME:-$HOME/.cache}/pi/figma\"\n```\n\nImage render URLs and image-fill URLs are not cached because Figma treats them as expiring links.\n\n## FigJam Slides And Limitations\n\nURL parsing accepts Figma `/file`, `/design`, `/proto`, `/board`, and `/slides` links when a file key is present. REST detail varies by file type and token scope:\n\n- FigJam and Slides documents may expose less design-to-code structure than design files.\n- Prototype behavior, live selection, desktop MCP state, OAuth app publishing, webhooks, and mutating Figma APIs are out of scope.\n- Large files should be queried by node id and bounded depth instead of raw full-file reads.\n\n## Troubleshooting\n\n| Symptom | Action |\n|---|---|\n| `Figma API token not found` | Create `~/.pi/sf/figma/config.json` with `{ \"apiToken\": \"MY_TOKEN\" }` or set a documented env fallback. |\n| 401 or 403 | Check token validity, scopes, and file access. |\n| 404 | Confirm the file key and node id, and verify the token can access the file. |\n| 429 | Wait or narrow the request with node IDs and lower depth. |\n| Request too large | Use `figma_get_nodes_raw`, `figma_get_design_context`, or `figma_context` with a node id and bounded depth. |\n| Duplicate `figma_context` warning | Remove the legacy `figma-context` package from Pi global and project scopes. |\n\n## Security Notes\n\n- Tokens are read from local config or environment and are never printed by tools.\n- `pi` does not scaffold secret-bearing Figma config files.\n- Keep `~/.pi/sf/figma/config.json` at `chmod 600` when possible.\n- Asset downloads only write when `outputDir` is explicit and resolved safely under the allowed working directory.\n- Raw tools can return large file data; prefer compact tools for normal agent work.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "figma"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://sfiorini.github.io/pi-stef/packages/figma.html",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sfiorini/pi-stef.git",
+    "directory": "packages/figma"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-11T23:37:51.483Z",
+    "modified": "2026-06-17T03:34:34.527Z",
+    "0.2.2": "2026-06-11T23:37:51.764Z",
+    "0.3.0": "2026-06-12T00:04:10.426Z",
+    "0.3.1": "2026-06-12T01:04:34.953Z",
+    "0.3.2": "2026-06-14T21:51:32.461Z",
+    "0.3.3": "2026-06-15T21:24:40.183Z",
+    "0.3.4": "2026-06-17T03:34:34.374Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 519,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 1227
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 739
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 50
+    }
+  ]
+}

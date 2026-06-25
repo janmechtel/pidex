@@ -1,0 +1,37 @@
+{
+  "name": "@raquezha/notrace",
+  "latest_version": "0.1.0",
+  "description": "Zero-dependency, local-first interactive HTML Trace Viewer for the Pi Coding Agent",
+  "readme": "<p align=\"center\">\n  <img src=\"./assets/notrace-logo.svg\" alt=\"notrace logo\" width=\"240\" />\n</p>\n\n# notrace\n\n**Traces in, lessons out.**\n\n`notrace` is a local-first retrospective engine for the Pi Coding Agent.\nIt captures session evidence, writes a versioned `notrace.json` run record, renders a human-readable HTML report, and supports review/compare flows for workflow R&D.\n\n## What notrace owns\n\nWhen enabled, `notrace` is the durable retrospective layer for a session.\nIt aggregates:\n- core Pi session telemetry\n- workflow/task context\n- optional dynamic extension telemetry\n\nToday, Pi is the first harness adapter.\nThe canonical run schema is designed so other harness adapters can be added later, but multi-harness support is not implemented in this package yet.\n\n## What notrace does not own\n\n`notrace` is **not**:\n- the live Pi footer\n- the Pi resume/session-switch UX\n- a scraper of terminal status strings\n\nLive footer output, resume hints, and extension footer badges may appear near `notrace` output during shutdown, but they are separate producers.\n\n## Retrospective spine\n\n1. **Capture evidence**: `notrace.json`\n2. **Inspect**: `notrace.html`\n3. **Review outcome**: `notrace.review.json`\n4. **Compare attempts**: `compare:notrace`\n\n## Storage\n\n```text\n.notrace/\n  index.json\n  index.html\n  sessions/\n    <session-id>/\n      notrace.json\n      notrace.html\n      notrace.review.json\n```\n\n## Canonical run model\n\nGenerated `notrace.json` is the source of truth for runtime output, HTML rendering, and downstream tooling.\nThe record is versioned and centers on:\n- `kind`\n- `schemaVersion`\n- `traceId`\n- `repository`\n- `session`\n- `task`\n- `captureMode`\n- `conditions`\n- `activity`\n- `telemetry`\n- `events`\n\nKey rule:\n- **consumed tokens** and **saved tokens** are separate metric families\n- optimization telemetry belongs under `telemetry.extensions.*`\n- presentation-only UI strings are not canonical evidence\n\n## Dynamic extension telemetry\n\n`notrace` can include optional structured telemetry from dynamic extensions.\nCurrent first target is `noheadroom`.\n\nIf an extension is absent, `notrace` should still succeed.\nIf an extension is present, it can contribute a structured summary such as:\n- loaded / enabled / active state\n- optimization attempts\n- tokens saved\n- last applied compression summary\n\n## Capture modes\n\nDefault capture mode is **full**.\n\n```bash\npi --extension ./packages/notrace\n```\n\nOptional modes:\n\n```bash\nNOTRACE_CAPTURE=redacted pi --extension ./packages/notrace\nNOTRACE_CAPTURE=metadata pi --extension ./packages/notrace\nNOTRACE_CAPTURE=full pi --extension ./packages/notrace\n```\n\nMode meanings:\n- `full`: full captured payloads; best for local debugging; highest sensitivity\n- `redacted`: captured payloads with common secret-like values redacted\n- `metadata`: minimal capture, no prompt/tool bodies\n\n**Security warning:** `full` reports can contain prompts, tool arguments, tool outputs, local paths, model payloads, and secrets returned by tools. `redacted` mode removes common secret-shaped values and sensitive keys, but redaction is best-effort and can miss project-specific secrets. `metadata` mode is safest for sharing because prompt/tool bodies are omitted, but reports can still reveal repository names, paths, timing, models, providers, and workflow metadata. Do not publish generated reports without review.\n\n## Review\n\nFrom this monorepo:\n\n```bash\nnpm run review:notrace -- \\\n  .notrace/sessions/<id>/notrace.json \\\n  --outcome partial \\\n  --friction high \\\n  --lesson \"Headroom reduced tokens but needed manual steering.\" \\\n  --next-change \"Try same task with RepoScry enabled.\"\n```\n\nFrom an installed package:\n\n```bash\nnpx -p @raquezha/notrace notrace-review \\\n  .notrace/sessions/<id>/notrace.json \\\n  --outcome partial \\\n  --friction high \\\n  --lesson \"Headroom reduced tokens but needed manual steering.\" \\\n  --next-change \"Try same task with RepoScry enabled.\"\n```\n\nReview fields:\n- `outcome`: `success`, `partial`, `failed`, `abandoned`, `inconclusive`\n- `friction`: `low`, `medium`, `high`\n- `lesson`\n- `nextChange`\n\n## Compare\n\nFrom this monorepo:\n\n```bash\nnpm run compare:notrace -- \\\n  .notrace/sessions/<baseline-id>/notrace.json \\\n  .notrace/sessions/<candidate-id>/notrace.json\n```\n\nFrom an installed package:\n\n```bash\nnpx -p @raquezha/notrace notrace-compare \\\n  .notrace/sessions/<baseline-id>/notrace.json \\\n  .notrace/sessions/<candidate-id>/notrace.json\n```\n\n## Templates\n\nHTML source-of-truth lives in `templates/`:\n- `dashboard.sample.json`\n- `session.sample.json`\n- `dashboard.sample.html`\n- `session.sample.html`\n\nRefresh previews after renderer changes:\n\n```bash\ncd packages/notrace\nnpm run render:samples\n```\n\n## Build\n\n```bash\ncd packages/notrace\nnpm install\nnpm run build\n```\n\nOutput lands in `dist/`.\n",
+  "keywords": [
+    "pi-agent",
+    "observability",
+    "trace",
+    "telemetry",
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-05T07:18:25.630Z",
+    "modified": "2026-06-21T13:22:00.199Z",
+    "0.0.1": "2026-06-05T07:18:25.922Z",
+    "0.0.2": "2026-06-08T17:15:55.930Z",
+    "0.0.3": "2026-06-09T08:19:52.512Z",
+    "0.0.4": "2026-06-11T03:46:00.728Z",
+    "0.0.5": "2026-06-15T16:59:26.565Z",
+    "0.0.6": "2026-06-18T01:41:52.409Z",
+    "0.0.7": "2026-06-19T03:11:40.111Z",
+    "0.1.0": "2026-06-21T13:22:00.093Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": null,
+  "download_trend": []
+}

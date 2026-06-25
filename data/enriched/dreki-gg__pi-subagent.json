@@ -1,0 +1,56 @@
+{
+  "name": "@dreki-gg/pi-subagent",
+  "latest_version": "0.9.2",
+  "description": "Subagent tool and direct agent runs for pi \u2014 isolated agents, parallel scouts, manager workflows, and bundled prompts",
+  "readme": "# @dreki-gg/pi-subagent\n\nSubagent tool and direct agent runs for pi \u2014 isolated agents, parallel scouts, manager workflows, and bundled prompts.\n\n## Install\n\n```bash\npi install npm:@dreki-gg/pi-subagent\n```\n\n## Subagent Tool\n\nThe `subagent` tool supports three modes:\n\n| Mode | Description |\n|------|-------------|\n| Single | `{ agent, task }` \u2014 one agent, one task |\n| Parallel | `{ tasks: [...] }` \u2014 multiple agents concurrently |\n| Chain | `{ chain: [...] }` \u2014 sequential with `{previous}` placeholder |\n\nOptional overrides:\n- `model` \u2014 override the agent's default model for one run, or set a default for all tasks/steps in a call\n- `thinking` \u2014 override the agent's default reasoning level for one run, or set a default for all tasks/steps in a call\n\nNotes:\n- `/run-agent` provides autocomplete for `--model` and `--thinking`\n- the `subagent` tool supports the same fields in its schema, but this package does not currently add custom interactive autocomplete for tool-call JSON parameters\n\n## Opinionated Defaults\n\nThis package is intentionally opinionated about orchestration:\n\n- Use **parallel mode for discovery, not competing edits**.\n- Prefer **one worker** and surround it with scouts, planners, and reviewers.\n- Use **chain mode** when work needs ordered handoffs.\n- Treat `reviewer` as a **verifier with fresh context**, not as a second writer.\n- Use `advisor` for **targeted second opinions** on tricky or high-risk cases, not as a default extra hop.\n- Only split implementation across multiple workers when file ownership is clearly partitioned.\n\nA good default mental model is: **parallel readers, single writer**.\n\nSee [`docs/orchestration-principles.md`](./docs/orchestration-principles.md) for the fuller guidance.\n\n## Recommended Usage\n\nIn day-to-day use, the main agent should usually call the `subagent` tool from normal conversation.\n\nSafe defaults:\n- \"spawn a scout for the auth code\"\n- \"run scout and docs-scout in parallel\"\n- \"have planner make a plan, then worker implement it\"\n- \"send this to reviewer\"\n- \"ask advisor whether this migration should be split before sending it to worker\"\n- \"use manager for this cross-package migration\"\n\nFor direct user-invoked single-agent runs, use:\n\n```text\n/run-agent worker implement the auth flow we discussed\n/run-agent --model anthropic/claude-opus-4-6 --thinking high reviewer review the latest diff\n```\n\nAutocomplete notes:\n- `/run-agent --model` suggests available configured models plus models referenced by discovered agents\n- `/run-agent --thinking` suggests supported reasoning levels such as `off`, `minimal`, `low`, `medium`, `high`, and `xhigh`\n\nFor reusable multi-step workflows, prefer the main agent calling the `subagent` tool directly in `single` / `parallel` / `chain` mode rather than relying on canned slash workflows.\n\nExamples:\n\n```text\nspawn scout and docs-scout in parallel for auth session refresh\nhave worker implement the questionnaire validation fix\nsend this diff to reviewer, and if a claim needs proof use validator or bug-prover\nask advisor whether this migration should be split before implementation\nuse manager for this cross-package migration\n```\n\nRecommended pattern in practice:\n- `parallel`: `scout` + `docs-scout` for repo and docs recon\n- `chain`: `scout` \u2192 `planner` \u2192 `worker` for coherent implementation\n- `chain`: `worker` \u2192 `reviewer`, then optionally `validator` / `bug-prover`, then `worker` for a prove-before-fix loop\n- `single`: `advisor` for a focused second opinion on a hard decision, failing test loop, or high-risk change\n- `single`: `manager` for multi-slice work that needs bounded delegation and synthesis\n\n`advisor` and `manager` are higher-level entry points built on the same `single` / `parallel` / `chain` primitives. `advisor` is for capability routing and second opinions; `manager` is for coherent delegation, not arbitrary peer-to-peer swarms. `validator` and `bug-prover` support evidence-driven review: validate a claim first, then build the smallest repro only when needed.\n\n## Direct Agent Runs\n\nRun one agent directly from the current session:\n\n```text\n/run-agent [--scope user|project|both] [--model <id>] [--thinking <level>] [--yes-project-agents] <agent> [task]\n```\n\nExamples:\n\n```text\n/run-agent scout trace how auth state is loaded\n/run-agent validator validate whether this suspected regression is real\n/run-agent bug-prover create a minimal failing repro for the auth refresh bug\n/run-agent advisor sanity-check whether this migration should be split\n/run-agent manager coordinate a multi-package migration plan\n/run-agent worker implement the refactor we just planned\n/run-agent --scope project reviewer review the latest changes\n```\n\nIf the chosen agent frontmatter sets `sessionStrategy: fork-at`, the command clones the current active path into a new session before running the agent. That keeps long implementation runs isolated in their own branch while preserving the original conversation.\n\n### `run-agent` Flags\n\n| Flag | Meaning |\n|------|---------|\n| `--scope user|project|both` | Which agent layers to use. Default: `user` |\n| `--model <id>` | Override the agent model for this run |\n| `--thinking <level>` | Override the default reasoning level for this run |\n| `--yes-project-agents` | Disable the confirmation prompt for project-local agents |\n\n## Agent Definitions\n\nCreate agent prompt files in `~/.pi/agent/prompts/` or `.pi/prompts/` as markdown with YAML frontmatter:\n\n```markdown\n---\nname: my-agent\ndescription: What this agent does\ntools: read, grep, find, ls\nmodel: anthropic/claude-haiku-4-5\nsessionStrategy: fork-at\n---\n\nSystem prompt for the agent.\n```\n\n### Bundled Agents\n\nThe package ships with these agents out of the box:\n\n| Agent | Purpose | Default model | Default reasoning level |\n|------|---------|---------------|-------------------------|\n| `scout` | Fast codebase recon | `openai/gpt-5.4-mini` | `medium` |\n| `docs-scout` | Context7-first documentation lookup | `openai/gpt-5.4-mini` | `medium` |\n| `planner` | Implementation planning | `openai/gpt-5.4` | `high` |\n| `worker` | General-purpose implementation | `openai/gpt-5.4` | `medium` |\n| `reviewer` | Code review | `openai/gpt-5.4` | `medium` |\n| `validator` | Validate or falsify a specific bug or behavior claim from code, tests, and commands | `openai/gpt-5.4` | `medium` |\n| `bug-prover` | Create the smallest failing repro for a suspected bug | `openai/gpt-5.4` | `medium` |\n| `advisor` | Focused second-opinion consult for tricky planning, implementation, or review decisions | `openai/gpt-5.4` | `medium` |\n| `manager` | Bounded orchestration for multi-slice work | `openai/gpt-5.4` | `high` |\n| `ux-designer` | Frontend UI design | `anthropic/claude-opus-4-6` | `medium` |\n\nNotes:\n- `worker`, `reviewer`, `bug-prover`, and `manager` default to `sessionStrategy: fork-at`.\n- \"Default reasoning level\" maps to the frontmatter field `thinking` and can be overridden per run.\n\nResolution order is: bundled \u2192 user (`~/.pi/agent/prompts/`) \u2192 project (`.pi/prompts/`). Project agents override user and bundled agents by name.\n\nOptional frontmatter:\n- `thinking` \u2014 default reasoning effort for the spawned pi process\n- `sessionStrategy: fork-at` \u2014 when used with `/run-agent`, clone the current active branch into a new session before running\n\n> Note: pi supports package-shipped prompts via `pi.prompts` (or conventional `prompts/` directories). This package publishes its bundled agent prompts that way, while user prompts in `~/.pi/agent/prompts/` and project prompts in `.pi/prompts/` still override them by name.\n\n## Bundled Resources\n\n### Skill\n- `spawn-subagents` \u2014 guides the model on when/how to spawn specialized subagents conversationally\n\n### No Prompt Templates by Design\nThis package intentionally does **not** ship canned workflow prompts.\n\nPrefer:\n- normal conversation that leads the main agent to call `subagent`\n- direct `/run-agent <agent> ...` for explicit single-agent runs\n- examples in this README and `docs/orchestration-principles.md` for common orchestration shapes\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "Juan Albarran",
+    "email": "jalbarrandev@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/dreki-gg/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dreki-gg/pi-extensions.git",
+    "directory": "packages/subagent"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/subagent"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-01T17:45:28.162Z",
+    "modified": "2026-06-10T01:24:37.662Z",
+    "0.1.0": "2026-04-01T17:45:28.389Z",
+    "0.1.2": "2026-04-01T18:36:41.257Z",
+    "0.1.3": "2026-04-02T04:29:04.208Z",
+    "0.2.0": "2026-04-05T21:21:25.621Z",
+    "0.3.0": "2026-04-06T00:32:44.272Z",
+    "0.3.1": "2026-04-16T18:48:26.469Z",
+    "0.4.0": "2026-04-18T17:51:04.175Z",
+    "0.5.0": "2026-04-18T22:53:44.927Z",
+    "0.6.0": "2026-04-21T04:52:02.540Z",
+    "0.7.0": "2026-04-24T03:41:59.069Z",
+    "0.8.0": "2026-05-08T05:29:09.386Z",
+    "0.8.1": "2026-05-08T06:37:11.367Z",
+    "0.8.2": "2026-05-09T06:39:45.096Z",
+    "0.8.3": "2026-05-13T20:50:25.828Z",
+    "0.8.4": "2026-05-23T04:34:55.304Z",
+    "0.9.0": "2026-05-26T04:20:30.734Z",
+    "0.9.1": "2026-05-27T18:41:15.113Z",
+    "0.9.2": "2026-06-10T01:24:37.401Z"
+  },
+  "versions_count": 18,
+  "downloads_last_week": null,
+  "download_trend": []
+}

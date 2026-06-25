@@ -1,0 +1,66 @@
+{
+  "name": "@mrclrchtr/supi-review",
+  "latest_version": "1.16.0",
+  "description": "SuPi Review extension \u2014 structured code review via /supi-review command",
+  "readme": "<div align=\"center\">\n  <a href=\"https://github.com/mrclrchtr/supi/tree/main/packages/supi-review\">\n    <picture>\n      <img src=\"https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-review/assets/logo.png\" alt=\"SuPi\" width=\"50%\">\n    </picture>\n  </a>\n</div>\n\n# @mrclrchtr/supi-review\n\nAdds an interactive `/supi-review` command to the [pi coding agent](https://github.com/earendil-works/pi) for session-aware code review.\n\n## Install\n\n```bash\npi install npm:@mrclrchtr/supi-review\n```\n\nThis is a **beta** package. Install individually.\n\nFor local development:\n\n```bash\npi install ./packages/supi-review\n```\n\n## What you get\n\nAfter install, pi gets one command:\n\n- `/supi-review` \u2014 launch a guided review flow over a concrete git snapshot\n\nThe reviewer runs in managed child agent sessions:\n\n- a **brief synthesizer** creates a structured review brief from the active session branch\n- a **read-only reviewer** inspects the selected snapshot (without receiving bulk inline diffs) and submits structured review items\n\n![Review target selection](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-review-1.png)\n\n![Review brief preview](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-review-2.png)\n\n![Review result](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-review-3.png)\n\n![Review progress](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-review-4.png)\n\n## Review flow\n\n`/supi-review` walks you through:\n\n1. choose a review target\n2. choose the reviewer model\n3. optionally add a short note\n4. resolve the snapshot\n5. synthesize a review brief from the current session history\n6. preview the synthesized brief + compact prompt preview, then press `v` for an in-app inspector (Overview first, Raw Prompt via `tab`, export via `e`)\n7. the reviewer fetches per-file diffs on demand via snapshot-aware tools; live progress widget shows activity\n8. normalize the submitted review items into a host-derived verdict + structured result\n9. if review items exist, hand off to the main agent so it can ask what to do next with fixed options (`Fix all`, `Fix selected`, `Verify findings`, `Skip`)\n\n## Review targets\n\nCurrent targets:\n\n- working tree\n- branch diff vs a selected local base branch\n- one recent commit\n\n## Session-aware brief synthesis\n\nThe generated review prompt is **not** just a static diff wrapper.\n\nBefore the actual review starts, the package:\n\n- resolves the **active session branch into the current LLM-visible context**\n- **serializes** that resolved context into a compaction-style transcript\n- feeds the serialized transcript (plus snapshot + optional note) to a dedicated brief synthesizer\n- synthesizes a structured brief with:\n  - summary\n  - intended outcome\n  - constraints to preserve\n  - focus areas\n  - risky files\n  - unresolved questions\n  - `reviewInstructionBlockIds` selected from a fixed host-owned catalog\n\nThe synthesizer also receives a bounded diff excerpt from the snapshot so it can reason about actual code changes, not just filenames.\n\nThat synthesized brief is then combined with the git snapshot into a compact reviewer prompt. The host owns a fixed catalog of review instruction blocks, and the brief selects zero or more block IDs from that catalog when extra review guidance is warranted. The resulting prompt contains the brief, file manifest, per-file overview, and any brief-selected **mandatory review instructions**, but no large inline diffs. Instead, the reviewer session gets snapshot-aware tools (`read_snapshot_diff`, `read_snapshot_file`) to fetch exact per-file diffs and before/after file contents on demand.\n\nThe session-transcript approach mirrors how Pi summarizes context for compaction: the entire resolved conversation is rendered in a readable label format and sent to the model as a whole, rather than relying on heuristic excerpt ranking.\n\n## Review-plan inspector\n\nBefore the reviewer runs, the plan preview stays inside Pi:\n\n- `v` opens an in-app inspector instead of spawning an external pager\n- the inspector opens in **Overview** mode first\n- `tab` toggles between **Overview** and **Raw Prompt**\n- `\u2191\u2193` or `j` / `k` scroll long content in the inspector\n- `q` or `esc` returns to the summary preview without canceling the review\n- `e` exports the raw prompt to a temp file as a debugging fallback\n\nThe Overview mode uses the same structured packet data that feeds the reviewer prompt: mandatory review instructions, file overview rows, and truncated snapshot notes all come from shared packet derivation rather than re-parsing the raw prompt text.\n\n## Model selection\n\nEvery `/supi-review` run asks you to choose the reviewer model.\n\n- the picker only shows **scoped models** from Pi's `enabledModels` configuration\n- the current session model is preselected only when it is inside that scoped set\n- the selected model is used for both brief synthesis and the final review\n- no review model is persisted in settings\n\n## Result shape\n\nA successful review includes:\n\n- a host-derived binary verdict:\n  - `PATCH IS CORRECT`\n  - `PATCH HAS ISSUES`\n- overall explanation\n- overall confidence score\n- normalized action/category summary counts\n- structured review items with:\n  - title\n  - body\n  - category\n  - impact\n  - effort\n  - recommended action\n  - confidence score\n  - suggested fix\n  - verification hint\n  - optional code location\n- the synthesized brief that drove the review\n\nThe renderer also handles failed, canceled, and timed-out reviews.\n\nThe reviewer model does **not** decide the final binary verdict directly. It submits review items plus overall explanation/confidence, then the host derives the verdict from the normalized items (`must-fix` items => `PATCH HAS ISSUES`).\n\nWhen a successful review contains review items, `supi-review` also injects an agent-visible hidden follow-up message that asks the main agent to decide the next step with the user. If `ask_user` is available, the main agent is instructed to use it and offer:\n\n- Fix all\n- Fix selected\n- Verify findings\n- Skip\n\n## Source\n\n- `src/review.ts` \u2014 command orchestration and interactive flow\n- `src/model.ts` \u2014 explicit model selection helpers\n- `src/git.ts` \u2014 git snapshot resolution\n- `src/history/collect.ts` \u2014 compaction-style session-context serialization\n- `src/history/synthesize.ts` \u2014 brief synthesis orchestration\n- `src/review-result.ts` \u2014 review-item normalization, verdict derivation, and summary counts\n- `src/target/review-instruction-blocks.ts` \u2014 fixed catalog of host-owned review instruction blocks\n- `src/target/packet.ts` \u2014 final reviewer packet builder + shared preview-data derivation for the inspector\n- `src/tool/brief-runner.ts` \u2014 brief synthesis child session\n- `src/tool/review-runner.ts` \u2014 read-only reviewer child session with snapshot-aware tools\n- `src/tool/snapshot-tools.ts` \u2014 per-file diff and before/after content tools scoped to the selected snapshot\n- `src/ui/review-plan-inspector.ts` \u2014 in-app summary/inspector preview with Overview + Raw Prompt modes and export fallback\n- `src/ui/renderer.ts` \u2014 structured result rendering\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "code-review",
+    "review",
+    "llm-review",
+    "tui"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-review#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-review"
+  },
+  "pi": {
+    "extensions": [
+      "./src/extension.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-review-3.png"
+  },
+  "time": {
+    "created": "2026-05-14T01:44:11.401Z",
+    "modified": "2026-06-25T00:42:01.917Z",
+    "0.1.0": "2026-05-14T01:44:11.681Z",
+    "0.2.0": "2026-05-14T10:38:32.468Z",
+    "1.1.2": "2026-05-17T01:41:12.863Z",
+    "1.1.3": "2026-05-17T02:21:31.551Z",
+    "1.2.0": "2026-05-17T02:49:42.892Z",
+    "1.3.0": "2026-05-17T05:10:56.874Z",
+    "1.3.1": "2026-05-17T06:21:32.038Z",
+    "1.4.0": "2026-05-21T10:17:21.811Z",
+    "1.5.0": "2026-05-21T14:24:09.959Z",
+    "1.6.0": "2026-05-22T16:17:08.606Z",
+    "1.7.0": "2026-05-24T09:17:29.182Z",
+    "1.8.0": "2026-05-25T00:17:07.268Z",
+    "1.8.1": "2026-05-25T15:27:00.287Z",
+    "1.9.0": "2026-05-25T15:52:43.073Z",
+    "1.9.1": "2026-05-25T16:56:54.454Z",
+    "1.10.0": "2026-05-25T17:40:04.823Z",
+    "1.11.0": "2026-05-31T10:54:06.734Z",
+    "1.11.1": "2026-06-01T06:37:44.088Z",
+    "1.11.2": "2026-06-06T22:31:23.384Z",
+    "1.11.3": "2026-06-07T13:22:27.692Z",
+    "1.12.0": "2026-06-07T23:49:13.851Z",
+    "1.12.1": "2026-06-15T23:00:25.431Z",
+    "1.13.0": "2026-06-17T01:10:43.861Z",
+    "1.14.0": "2026-06-18T17:53:00.056Z",
+    "1.14.1": "2026-06-20T15:58:31.259Z",
+    "1.14.2": "2026-06-22T22:00:52.332Z",
+    "1.14.3": "2026-06-23T01:02:51.430Z",
+    "1.15.0": "2026-06-23T20:54:54.970Z",
+    "1.16.0": "2026-06-25T00:42:01.632Z"
+  },
+  "versions_count": 29,
+  "downloads_last_week": 775,
+  "download_trend": []
+}

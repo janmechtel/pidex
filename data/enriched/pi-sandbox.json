@@ -1,0 +1,48 @@
+{
+  "name": "pi-sandbox",
+  "latest_version": "0.4.3",
+  "description": "OS-level sandboxing for pi with interactive permission prompts",
+  "readme": "# pi-sandbox\n\nSandbox for [pi](https://pi.dev/).\n\nSandboxes pi like this:\n- read/write/edit: direct control using allow/deny lists\n- bash: uses [`@carderne/sandbox-runtime`](https://www.npmjs.com/package/@carderne/sandbox-runtime) to control network and file system access\n\nWhen a blocked action is attempted, the user is\nprompted to allow it temporarily or permanently rather than silently failing.\n\n![demo](./demo/demo.gif)\n\n## Notes\nThere is an example config at [sandbox.json](./sandbox.json). It was quite a few things added to get this extension to work with [agent-browser](https://agent-browser.dev/) and other common tools.\n\nThese open significant security loopholes, so shouldn't be used in a sensitive context or when you don't need browser support.\n\nYou may need to trial and error to find additional things you need to allow.\n\n## Quickstart\n\n#### Prerequisites\n\n`pi-sandbox` delegates the OS-level bash sandbox to\n[`@carderne/sandbox-runtime`](https://www.npmjs.com/package/@carderne/sandbox-runtime),\npublished from the fork at <https://github.com/carderne/sandbox-runtime>,\nwhich is forked from Anthropic's\n[`anthropic-experimental/sandbox-runtime`](https://github.com/anthropic-experimental/sandbox-runtime).\nThe sandbox runtime checks for [`ripgrep`](https://github.com/BurntSushi/ripgrep) (the\n`rg` binary) on **both macOS and Linux** at sandbox-init time. If `rg`\nis not on the `PATH` that pi was launched with, sandbox initialization\nfails with:\n\n```\nSandbox initialization failed: Sandbox dependencies not available: ripgrep (rg) not found\n```\n\nInstall ripgrep before enabling the extension:\n\n| Platform | Install |\n|---|---|\n| macOS (Homebrew) | `brew install ripgrep` |\n| macOS (MacPorts) | `sudo port install ripgrep` |\n| Linux (Debian/Ubuntu) | `sudo apt install ripgrep` |\n| Linux (Fedora/RHEL) | `sudo dnf install ripgrep` |\n| Linux (Arch) | `sudo pacman -S ripgrep` |\n| From source / other | <https://github.com/BurntSushi/ripgrep#installation> |\n\nIf `which rg` succeeds in your shell but pi still reports `rg not\nfound`, pi is being launched from a parent process whose `PATH` does\nnot include the directory containing `rg` (common when GUI launchers\ninherit a minimal non-login `PATH`). On macOS, `/opt/homebrew/bin` and\n`/usr/local/bin` are the usual culprits \u2014 make sure your launcher's\nenvironment includes whichever one your install uses.\n\n#### Install\n```bash\npi install npm:pi-sandbox\n```\n\n#### Configure\nAdd a config like this either to `~/.pi/agent/sandbox.json` (global) or to `.pi/sandbox.json` (local).\nLocal config takes precedence over global.\n\nNote below that the order of precedence for filesystem read and write are opposite.\n\n```json\n{\n  \"enabled\": true,\n  \"allowBrowserProcess\": true,     // If you want to use agent-browser or similar Chrome setup\n  \"network\": {\n    \"allowLocalBinding\": true,     // ditto\n    \"allowAllUnixSockets\": true,   // ditto\n    \"allowedDomains\": [\"github.com\", \"*.github.com\"],\n    \"deniedDomains\": []\n  },\n  \"filesystem\": {\n    // For READS:\n    // - ANY read is prompted unless the path is already in allowRead\n    // - Granting a prompt adds to allowRead, which overrides denyRead\n    // - denyRead is not a hard-block; it just marks regions as denied by default\n    \"denyRead\": [\"/Users\", \"/home\"],\n    \"allowRead\": [\".\", \"~/.config\", \"~/.local\", \"Library\"],\n\n    // For WRITES:\n    // - empty ALLOW means no write access at all\n    // - DENY takes precedence and is never prompted\n    \"allowWrite\": [\".\", \"/tmp\"],\n    \"denyWrite\": [\".env\", \".env.*\", \"*.pem\", \"*.key\"]\n  }\n}\n```\n\n#### Usage\n\n```\npi --no-sandbox          disable sandboxing for the session\n/sandbox                 show current configuration and session allowances\n```\n\n## What it does\n\n**Bash commands** are wrapped with `sandbox-exec` (macOS) or `bubblewrap`\n(Linux) to enforce network and filesystem restrictions at the OS level.\n\n**Read, write, and edit tool calls** are intercepted before execution and\nchecked against the same filesystem policy. The OS-level sandbox cannot cover\nthese tools because they run directly in the Node.js process rather than in a\nsubprocess.\n\nWhen a block is triggered, a prompt appears with four options:\n\n- Abort (keep blocked)\n- Allow for this session only\n- Allow for this project \u2014 written to `.pi/sandbox.json`\n- Allow for all projects \u2014 written to `~/.pi/agent/sandbox.json`\n\n**Session allowances** are held in memory only. They are never written to disk\nand the agent has no way to read or modify them. They are reset when the\nextension reloads or pi restarts.\n\n### What is prompted vs. hard-blocked\n\n| Rule | Behaviour |\n|------|-----------|\n| Domain not in `allowedDomains` | Prompted (bash and `!cmd`) |\n| Path not in `allowRead` | Prompted (read tool); granting adds to `allowRead` |\n| Path not in `allowWrite` | Prompted (write/edit tools and bash write failures) |\n| Path in `denyWrite` | Hard-blocked, no prompt |\n| Domain in `deniedDomains` | Hard-blocked at OS level, no prompt |\n\nIf a path is added to `allowWrite` via a prompt but is also present in\n`denyWrite`, it remains blocked. A warning is shown explaining which config\nfiles to check.\n\n`allowedDomains` supports `*.example.com` wildcards. It also supports `\"*\"` to\nallow all domains; pi-sandbox shows a warning when this is configured because it\nremoves per-domain prompts and can be easy to add accidentally. `allowWrite` uses prefix\nmatching, so `.` covers the entire current working directory.\n\n> **\u26a0\ufe0f Read and write have different precedence rules:**\n>\n> - **Read:** Every read is prompted unless the path is already in `allowRead`.\n>   `denyRead` is not a hard-block \u2014 it marks regions as denied by default, but\n>   granting a prompt adds the path to `allowRead`, overriding `denyRead`.\n> - **Write:** `denyWrite` takes precedence over `allowWrite` and is never\n>   prompted. A path in `denyWrite` is always blocked, even if it matches\n>   `allowWrite`.\n\nIf neither file exists, built-in defaults apply (see above for the defaults).\n\nThe footer shows a lock indicator while the sandbox is active.\n\n## Ackowledgements\nBased on code from\n[badlogic/pi-mono](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/sandbox/index.ts)\nby Mario Zechner, used under the\n[MIT License](https://github.com/badlogic/pi-mono/blob/main/LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension"
+  ],
+  "author": {
+    "name": "Chris Arderne",
+    "email": "chris@rdrn.me"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/carderne/pi-sandbox",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/carderne/pi-sandbox.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-19T15:19:19.678Z",
+    "modified": "2026-05-07T08:14:26.489Z",
+    "0.1.0": "2026-02-19T15:19:19.813Z",
+    "0.1.6": "2026-02-19T15:43:23.268Z",
+    "0.1.7": "2026-02-19T15:56:47.755Z",
+    "0.1.8": "2026-03-02T10:50:48.449Z",
+    "0.1.9": "2026-03-02T10:53:29.803Z",
+    "0.2.0": "2026-03-08T13:12:57.763Z",
+    "0.2.1": "2026-03-08T14:42:55.559Z",
+    "0.2.4": "2026-03-13T14:50:38.835Z",
+    "0.2.6": "2026-03-17T09:28:18.534Z",
+    "0.3.0": "2026-03-20T12:45:32.923Z",
+    "0.3.1": "2026-04-24T10:27:25.878Z",
+    "0.3.2": "2026-04-28T15:18:04.342Z",
+    "0.4.0": "2026-04-29T09:49:26.689Z",
+    "0.4.1": "2026-05-03T13:42:21.041Z",
+    "0.4.2": "2026-05-03T15:42:30.291Z",
+    "0.4.3": "2026-05-07T08:14:26.222Z"
+  },
+  "versions_count": 16,
+  "downloads_last_week": null,
+  "download_trend": []
+}

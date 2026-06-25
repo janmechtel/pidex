@@ -1,0 +1,52 @@
+{
+  "name": "@pratikgajjar/pi-recall",
+  "latest_version": "0.4.1",
+  "description": "pi extension: search your past AI chat history (Cursor, Claude Code, Codex, pi) via the recall CLI",
+  "readme": "# pi-recall\n\n> A [pi](https://github.com/badlogic/pi-mono) extension that lets the agent search **your past AI chat history** \u2014 across Cursor, Claude Code, Codex, and pi \u2014 without you copy-pasting transcripts.\n\nIt's a thin wrapper over the [`recall`](https://github.com/pratikgajjar/recall) CLI, which indexes your conversations into a local SQLite FTS5 index. The extension shells out to that binary and exposes the index to the agent as tools.\n\n![recall_search running inside pi](./assets/demo.png)\n\n_The agent calls `recall_search` to find a past conversation, then reads it in full with `recall_transcript` \u2014 no copy-paste._\n\n## Install\n\n```bash\npi install npm:@pratikgajjar/pi-recall\n```\n\nThe prebuilt `recall` binary for your platform ships inside the package, so\n`pi install` / `pi update` keep the extension **and** the binary in lockstep \u2014\nno separate `go install` or `brew`. The extension resolves the binary in this\norder: `--recall-bin` flag -> `RECALL_BIN` env -> bundled binary -> `recall` on `PATH`.\n\nThen build the index once:\n\n```bash\nrecall index        # one-time, ~1 minute on real data\nrecall doctor       # confirm sources are detected\n```\n\nFor local development, load the extension ad-hoc:\n\n```bash\npi -e ./packages/pi-recall/src/index.ts\n```\n\n## Tools\n\n| Tool | What it does |\n| --- | --- |\n| `recall_search` | Full-text search over past sessions. Returns ranked hits with matched excerpts and a session id. |\n| `recall_transcript` | Read a session in full \u2014 by `session_id`, or omit it for the most recent session (filterable by repo/source/since). |\n| `recall_sessions` | List recent sessions (titles + ids, no bodies). |\n| `recall_related` | Given a session id, find other sessions on the same topic. |\n| `recall_tag` / `recall_untag` | Attach/remove durable tags on a session \u2014 bookmark sessions worth remembering. Tags survive index rebuilds. |\n| `recall_tags` | List all tags (with counts), or the tags on one session. |\n\nAll search/list tools accept `repo` (pass `\".\"` for the current project),\n`source` (`cursor` \\| `claude` \\| `codex` \\| `pi`), `since` (e.g. `7d`), and\n`tags` (filter to sessions carrying ALL given tags; AND). A tag may be a user\ntag or a reserved facet like `source:cursor` \u2014 `tags: [\"source:cursor\"]` is\nequivalent to `source: \"cursor\"`.\n\n### Navigating large sessions\n\nSome sessions are huge (thousands of messages). `recall_transcript` takes\nthree extra params to slice instead of dumping everything:\n\n- `range` \u2014 Python-style slice over the message list: `\":100\"` first 100,\n  `\"-50:\"` last 50, `\"305:315\"` window. Negative indices count from the end.\n- `outline` \u2014 one line per message: `[N] role: first-line`. A cheap table of\n  contents you can scan before slicing in.\n- `role` \u2014 comma-separated allowlist: `\"user,assistant\"` (skip tool noise),\n  `\"user\"` (just the prompts), `\"tool\"`. Tool-related labels (`toolResult`,\n  `toolCall`, `function_call`, \u2026) all collapse to `tool`. In long agent loops,\n  ~50% of messages are tool noise; in some, 98% \u2014 a 30k-msg session shrinks to\n  ~600 with `role=\"user\"`.\n\nEvery rendered message carries its own `## msg N/TOTAL role` header so any\nslice is self-locating. **Default-cap:** if a session has more than 200\nmessages and you ask for neither `range` nor `outline`, the tool returns the\noutline (plus a one-line note explaining how to drill in) instead of a\ncontext-blowing wall of text. After a `recall_search` hit at `msg_idx=N`,\nprefer `range: \"N-5:N+5\"` over reading the whole session.\n\n### Recommended agent prompt\n\nDrop into your project's `AGENTS.md` / `CLAUDE.md`:\n\n```markdown\nWhen the user refers to earlier work (\"how did we fix\u2026\", \"continue the\u2026\"),\nuse the recall tools to find and read the relevant past AI session first.\n```\n\n## Staying fresh\n\nBecause the extension is a long-lived process, it keeps the index warm in the\nbackground so searches always reflect your latest conversations \u2014 you never pay\nan index rebuild on the query path:\n\n- On **session start** it runs an incremental `recall index` to catch up on\n  anything that changed since your last pi session.\n- After **each agent turn** it debounces a background refresh, so the session\n  you're in right now is searchable moments later.\n\nThe incremental index is append-only (it reads just the new lines of changed\nsession files), so each refresh is typically tens of milliseconds. Disable it\nwith `--recall-auto-index=false` or `RECALL_AUTO_INDEX=0` and refresh manually\nvia `/recall-index`.\n\n## Commands\n\n- `/recall-health` \u2014 runs `recall doctor` (CLI status + detected sources).\n- `/recall-index` \u2014 rebuilds the index (`recall index`; pass `--full` for a full rebuild).\n\n## Configuration\n\n| | |\n| --- | --- |\n| `--recall-bin PATH` flag / `RECALL_BIN` env | Path to the `recall` binary. Default: `recall` on `PATH`. |\n| `--recall-auto-index=false` flag / `RECALL_AUTO_INDEX=0` env | Turn off the background index refresh (on by default). |\n\n## License\n\nMIT.\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "recall",
+    "ai-agent",
+    "chat-history",
+    "search",
+    "cursor",
+    "claude-code",
+    "codex"
+  ],
+  "author": {
+    "name": "pratikgajjar"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/pratikgajjar/recall/tree/main/packages/pi-recall",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pratikgajjar/recall.git",
+    "directory": "packages/pi-recall"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/pratikgajjar/recall/main/packages/pi-recall/assets/demo.png"
+  },
+  "time": {
+    "created": "2026-05-30T06:12:47.974Z",
+    "modified": "2026-06-20T07:12:59.339Z",
+    "0.1.0": "2026-05-30T06:12:48.223Z",
+    "0.1.1": "2026-06-03T19:14:15.873Z",
+    "0.1.2": "2026-06-03T21:58:30.829Z",
+    "0.2.2": "2026-06-06T17:17:07.474Z",
+    "0.2.3": "2026-06-06T17:36:29.121Z",
+    "0.2.4": "2026-06-06T17:51:30.399Z",
+    "0.2.5": "2026-06-06T18:05:43.331Z",
+    "0.2.6": "2026-06-06T20:05:07.979Z",
+    "0.3.0": "2026-06-20T06:20:46.176Z",
+    "0.4.0": "2026-06-20T07:05:07.859Z",
+    "0.4.1": "2026-06-20T07:12:59.067Z"
+  },
+  "versions_count": 11,
+  "downloads_last_week": 610,
+  "download_trend": []
+}

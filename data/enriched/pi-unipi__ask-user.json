@@ -1,0 +1,62 @@
+{
+  "name": "@pi-unipi/ask-user",
+  "latest_version": "2.0.13",
+  "description": "Structured user input tool for Pi coding agent \u2014 single-select, multi-select, freeform",
+  "readme": "# @pi-unipi/ask-user\n\nStructured user input for decision gates. When the agent needs you to pick between options \u2014 which database, which approach, which files to change \u2014 it calls `ask_user` instead of guessing.\n\nThree input modes: single-select (pick one), multi-select (toggle several), freeform (type your own). The agent presents the question, you answer, it continues.\n\n## Commands\n\nAsk-user has no user commands. It's an agent tool package \u2014 the agent calls it when it needs input.\n\n## Special Triggers\n\nAll workflow skills detect ask-user and use it for decision gates. Instead of the agent deciding on its own, it presents options and waits for your input. This happens naturally during brainstorm, plan, work, and other skills when the agent faces ambiguity.\n\nFor workflow handoffs, options can use `action: \"new_session\"` with a `prefill`. Selecting one opens a launcher where **Compact & run** queues the prefill after compaction (or a short fallback) and **Run directly** queues it immediately. If automatic queuing fails, the prefill is placed in the editor for you to submit manually.\n\nThe bundled skill guides the agent to use `ask_user` for high-stakes decisions \u2014 architecture choices, database selection, naming decisions, anything with lasting impact.\n\n## Agent Tool\n\n| Tool | Description |\n|------|-------------|\n| `ask_user` | Structured user input with options |\n\n### Parameters\n\n| Parameter | Type | Default | Description |\n|-----------|------|---------|-------------|\n| `question` | string | required | The question to ask |\n| `context` | string? | \u2014 | Additional context shown before question |\n| `options` | array? | [] | Multiple-choice options |\n| `allowMultiple` | boolean? | false | Enable multi-select mode |\n| `allowFreeform` | boolean? | true | Allow freeform text input |\n| `timeout` | number? | \u2014 | Auto-dismiss after N ms |\n\n### Example\n\n```typescript\nask_user({\n  question: \"Which database should we use?\",\n  options: [\n    { label: \"PostgreSQL\", description: \"Reliable, feature-rich\" },\n    { label: \"SQLite\", description: \"Simple, serverless\" },\n  ],\n})\n```\n\n### `new_session` Handoffs\n\n```typescript\nask_user({\n  question: \"Continue with implementation?\",\n  options: [\n    {\n      label: \"Proceed to work\",\n      value: \"work\",\n      action: \"new_session\",\n      prefill: \"/unipi:work specs:2026-05-06-feature-plan.md\",\n    },\n    { label: \"Done for now\", value: \"done\", action: \"end_turn\" },\n  ],\n  allowFreeform: false,\n})\n```\n\nWhen the user chooses a `new_session` option:\n\n| Launcher choice | Behavior |\n|-----------------|----------|\n| \ud83e\uddf9 Compact & run | Starts context compaction, returns immediately, then queues/submits the prefill as a follow-up message from the compaction callback or a short fallback timer |\n| \u25b6 Run directly | Queues/submits the prefill immediately as a follow-up message |\n| \u2715 Cancel | Cancels the handoff; no message is queued |\n\nThe tool result is rendered as `queued compact \u2192 ...` or `queued direct \u2192 ...`. If automatic delivery fails, ask-user falls back to editor prefill and warns you to press Enter.\n\n### History Expansion\n\nCompleted `ask_user` calls stay readable in chat history. The collapsed result shows the selected answer; press Ctrl+O on the tool result to expand the original question, context, and options that were presented.\n\n### Keyboard Controls\n\n| Mode | Keys |\n|------|------|\n| Single-select | Up/Down navigate, Enter select, Esc cancel |\n| Multi-select | Up/Down navigate, Space toggle, Enter submit, Esc cancel |\n| Freeform | Type text, Enter submit, Esc back |\n\n### TUI Display\n\n**Single-select:**\n```\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n Which approach should we use?\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n > Option A\n   Option B\n   Option C\n   Type something...\n\n Up/Down navigate, Enter select, Esc cancel\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n```\n\n**Multi-select:**\n```\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n Which features to enable?\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n > [x] Logging\n   [ ] Metrics\n   [x] Tracing\n   [ ] Type something...\n\n Up/Down navigate, Space toggle, Enter submit, Esc cancel\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n```\n\n## Configurables\n\nAsk-user has no configuration. Input mode is determined by the `allowMultiple` and `allowFreeform` parameters the agent passes.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "unipi",
+    "ask-user",
+    "interactive",
+    "user-input"
+  ],
+  "author": {
+    "name": "Neuron Mr White"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Neuron-Mr-White/unipi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Neuron-Mr-White/unipi.git",
+    "directory": "packages/ask-user"
+  },
+  "pi": {
+    "extensions": [],
+    "skills": [],
+    "prompts": [],
+    "themes": []
+  },
+  "time": {
+    "created": "2026-04-27T07:33:38.884Z",
+    "modified": "2026-06-01T04:31:46.822Z",
+    "0.1.1": "2026-04-27T07:33:39.196Z",
+    "0.1.2": "2026-04-27T07:42:12.177Z",
+    "0.1.3": "2026-04-27T20:12:16.201Z",
+    "0.1.4": "2026-04-28T10:47:22.179Z",
+    "0.1.5": "2026-04-28T10:48:13.911Z",
+    "0.1.6": "2026-04-28T12:56:16.991Z",
+    "0.1.7": "2026-04-28T17:58:23.241Z",
+    "0.1.8": "2026-04-29T17:51:48.391Z",
+    "0.1.9": "2026-04-30T19:18:06.085Z",
+    "0.1.10": "2026-05-01T09:51:56.015Z",
+    "0.1.11": "2026-05-01T19:47:34.583Z",
+    "2.0.0": "2026-05-06T07:29:16.138Z",
+    "2.0.1": "2026-05-15T07:06:22.504Z",
+    "2.0.2": "2026-05-16T06:43:39.572Z",
+    "2.0.3": "2026-05-16T15:20:07.744Z",
+    "2.0.4": "2026-05-18T03:31:14.764Z",
+    "2.0.5": "2026-05-19T07:01:46.826Z",
+    "2.0.7": "2026-05-24T07:59:08.250Z",
+    "2.0.8": "2026-05-25T08:25:01.977Z",
+    "2.0.9": "2026-05-28T08:20:30.417Z",
+    "2.0.10": "2026-06-01T03:38:41.706Z",
+    "2.0.11": "2026-06-01T04:01:27.168Z",
+    "2.0.12": "2026-06-01T04:22:52.858Z",
+    "2.0.13": "2026-06-01T04:31:46.711Z"
+  },
+  "versions_count": 24,
+  "downloads_last_week": 42,
+  "download_trend": []
+}

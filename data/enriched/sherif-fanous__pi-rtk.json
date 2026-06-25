@@ -1,0 +1,39 @@
+{
+  "name": "@sherif-fanous/pi-rtk",
+  "latest_version": "0.6.0",
+  "description": "Pi extension that routes bash commands through rtk (Rust Token Killer) for LLM token savings",
+  "readme": "# pi-rtk\n\n[Pi](https://github.com/badlogic/pi-mono) coding agent extension that uses [rtk](https://github.com/rtk-ai/rtk) to reduce LLM token usage for shell command execution.\n\nWhen `pi-rtk` is loaded, it participates in two Pi shell paths:\n\n- agent-initiated `bash` tool calls\n- user-issued `!<cmd>` shell commands whose output is included in model context\n\nIn both cases, `pi-rtk` first attempts to rewrite the command with:\n\n```shell\nrtk rewrite \"<original command>\"\n```\n\nIf rewrite succeeds, Pi executes the rewritten command. If rewrite fails for any reason, `pi-rtk` falls back silently so normal Pi shell behavior continues.\n\nCommands entered with `!!<cmd>` are intentionally not intercepted. They continue through Pi's normal context-excluded shell execution path unchanged.\n\n## Prerequisites\n\n- Pi v0.60.0 or later\n- [rtk](https://github.com/rtk-ai/rtk), installed and available on your `PATH`\n\nIf `rtk` is unavailable, `pi-rtk` still preserves normal shell behavior by falling back to the original command.\n\n## Install\n\nMake sure your Pi installation is v0.60.0 or later before installing this package.\n\n```shell\npi install npm:@sherif-fanous/pi-rtk\n```\n\nOr try without installing:\n\n```shell\npi -e npm:@sherif-fanous/pi-rtk\n```\n\nTo uninstall:\n\n```shell\npi remove npm:@sherif-fanous/pi-rtk\n```\n\n## How It Works\n\n### Agent `bash` tool calls\n\n`pi-rtk` registers a replacement `bash` tool for Pi. Before the tool executes a command, the extension attempts an `rtk rewrite` and uses the rewritten command when available.\n\nThis preserves the normal `bash` tool interface while routing supported commands through `rtk`, which can filter and compress output before it reaches the model.\n\nIf `rtk` is unavailable, times out, or cannot rewrite the command, the original command runs unchanged.\n\n#### Behavior summary\n\n```text\nAgent bash tool call\n        \u2502\n        \u25bc\npi-rtk replacement bash tool\n        \u2502\n        \u251c\u2500 try: rtk rewrite \"<command>\"\n        \u2502      \u2502\n        \u2502      \u251c\u2500 success -> execute rewritten command\n        \u2502      \u2514\u2500 failure -> execute original command unchanged\n        \u2502\n        \u25bc\n    same bash tool interface to Pi\n```\n\n### User `!<cmd>` shell commands\n\n`pi-rtk` also hooks Pi's `user_bash` event for context-visible user shell commands entered with `!<cmd>`.\n\nFor these commands, the extension probes rewrite eligibility before claiming the event. If rewrite succeeds, it returns custom bash operations so Pi can keep owning the normal execution lifecycle and UI behavior. If rewrite does not succeed, the extension falls through and Pi handles the command normally.\n\nThis keeps optimization best-effort, silent, and non-disruptive during normal operation.\n\n#### Behavior summary\n\n```text\nUser !<cmd>\n        \u2502\n        \u251c\u2500 try: rtk rewrite \"<command>\"\n        \u2502      \u2502\n        \u2502      \u251c\u2500 success -> return custom bash operations\n        \u2502      \u2514\u2500 failure -> fall through to normal Pi user_bash handling\n        \u2502\n        \u25bc\n    same user shell experience in Pi\n```\n\n### User `!!<cmd>` shell commands\n\nCommands entered with `!!<cmd>` are excluded from model context by design, so `pi-rtk` does not intercept them.\n\nThey bypass `pi-rtk` completely and continue through Pi's normal context-excluded shell handling.\n\n#### Behavior summary\n\n```text\nUser !!<cmd>\n        \u2502\n        \u25bc\n    bypass pi-rtk and use normal Pi context-excluded shell handling\n```\n\n## `/rtk` Slash Command\n\n`pi-rtk` registers a `/rtk` slash command for session-scoped control:\n\n- `/rtk enable` turns command rewriting on for the current Pi session.\n- `/rtk disable` turns command rewriting off for the current Pi session.\n- `/rtk status` shows the current toggle state, detected `rtk` binary details, and a bypass tip.\n- `/rtk` opens an overlay where you can choose the same actions interactively.\n\nThe footer includes a persistent `pi-rtk` status indicator: `rtk \u2713` in green when rewriting is enabled, `rtk \u2717` in red when disabled.\n\nThe toggle is in-memory only. It resets to enabled every time Pi restarts and is not written to disk. For a single-command bypass while leaving the session toggle enabled, use rtk's per-command form:\n\n```shell\n!RTK_DISABLED=1 <cmd>\n```\n\n## What pi-rtk Does Not Do\n\n`pi-rtk` is a rewrite shim. It does not gate, prompt for, sandbox, or deny commands based on their content, including when `rtk rewrite` surfaces a deny verdict.\n\nThat scope is intentional. `rtk`'s deny verdict comes from a permission source that does not match Pi's permission model, and Pi's built-in approval flow plus Pi's extension ecosystem cover command gating better as composable layers.\n\nIf you want command-level permissions, guardrails, or shields, install a dedicated Pi extension for that. Browse [pi.dev/packages](https://pi.dev/packages) filtered by extension and search for terms like `permission`, `guardrail`, or `shield`.\n\nThose extensions compose with `pi-rtk`: they block disallowed commands at execution time, whether or not `pi-rtk` has rewritten the command.\n",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-package",
+    "rtk"
+  ],
+  "author": {
+    "name": "Sherif Fanous"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/sherif-fanous/pi-rtk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sherif-fanous/pi-rtk.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-09T21:06:58.782Z",
+    "modified": "2026-05-13T23:24:23.083Z",
+    "0.1.0": "2026-03-09T21:06:59.100Z",
+    "0.2.0": "2026-03-15T02:16:45.522Z",
+    "0.3.0": "2026-03-18T17:22:03.903Z",
+    "0.4.0": "2026-05-12T15:14:51.111Z",
+    "0.5.0": "2026-05-12T15:48:10.518Z",
+    "0.6.0": "2026-05-13T23:24:22.977Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 114,
+  "download_trend": []
+}

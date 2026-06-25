@@ -1,0 +1,43 @@
+{
+  "name": "@jmcombs/pi-better-toolsy",
+  "latest_version": "1.1.3",
+  "description": "Drop-in replacements for Pi's built-in ls, read, grep, find, edit, and write tools \u2014 adds .gitignore awareness, path-traversal protection, and $ injection-safe edits.",
+  "readme": "<div align=\"center\">\n  <img src=\"https://raw.githubusercontent.com/jmcombs/pi-extensions/main/assets/better-toolsy/preview.png\" width=\"250\" alt=\"pi-better-toolsy\">\n  <br>\n  <a href=\"https://www.npmjs.com/package/@jmcombs/pi-better-toolsy\"><img src=\"https://img.shields.io/npm/v/@jmcombs/pi-better-toolsy.svg\" alt=\"npm version\"></a>\n  <a href=\"https://www.npmjs.com/package/@jmcombs/pi-better-toolsy\"><img src=\"https://img.shields.io/npm/dm/@jmcombs/pi-better-toolsy.svg\" alt=\"npm downloads\"></a>\n  <a href=\"https://opensource.org/licenses/MIT\"><img src=\"https://img.shields.io/badge/License-MIT-yellow.svg\" alt=\"License: MIT\"></a>\n  <a href=\"https://github.com/jmcombs/pi-extensions/stargazers\"><img src=\"https://img.shields.io/github/stars/jmcombs/pi-extensions?style=social\" alt=\"GitHub stars\"></a>\n  <a href=\"https://github.com/jmcombs/pi-extensions/issues\"><img src=\"https://img.shields.io/github/issues/jmcombs/pi-extensions\" alt=\"Open issues\"></a>\n  <a href=\"https://github.com/sponsors/jmcombs\"><img src=\"https://img.shields.io/badge/Sponsor-30363D?style=flat&logo=GitHub-Sponsors&logoColor=EA4AAA\" alt=\"Sponsor\"></a>\n</div>\n\n# @jmcombs/pi-better-toolsy\n\nDrop-in replacements for Pi's built-in `ls`, `read`, `grep`, `find`, `edit`, and `write` tools \u2014 transparently adds `.gitignore` awareness, path-traversal protection, and injection-safe edits without changing how the agent works.\n\n## Quick Start\n\n```bash\npi install @jmcombs/pi-better-toolsy\n```\n\nThat's it. The agent uses its normal tool names and your implementations run automatically.\n\n## How It Works\n\nPi exposes six built-in file tools that the LLM is trained to call by name. This extension overrides all six with Node.js implementations that add correctness and safety guarantees the originals lack.\n\n| Tool    | What's added                                                                                                                               |\n| ------- | ------------------------------------------------------------------------------------------------------------------------------------------ |\n| `ls`    | `.gitignore` filtering, dotfile suppression, directories listed as `name/`                                                                 |\n| `read`  | 50 KB size guard, accurate line-number prefixes when using `offset`                                                                        |\n| `grep`  | Relative paths in all results, ripgrep fast-path with Node.js fallback, `ignoreCase` / `literal` / `context` flags, `.gitignore` filtering |\n| `find`  | `.gitignore` filtering, path-based gitignore patterns (`dist/**`), reliable result cap                                                     |\n| `edit`  | `$`-injection-safe replacement (slice arithmetic, not `String.replace`), uniqueness validation, multiple edits in one call                 |\n| `write` | Path-traversal guard, automatic parent directory creation                                                                                  |\n\nBecause the overrides use the same tool names, the agent's trained behavior is completely unchanged \u2014 it calls `grep`, `edit`, etc. as always, and the improvements are invisible.\n\n### Path Safety\n\nEvery tool resolves user-supplied paths through `safeResolve()`, which blocks directory traversal attacks (`../../etc/passwd`). Paths are always resolved relative to the current working directory.\n\n### .gitignore Awareness\n\n`ls`, `grep`, and `find` load `.gitignore` at the search root and skip ignored entries. Path-based patterns (`dist/**`, `packages/*/node_modules/`) are matched against the full relative path, not just the basename, so nested ignores work correctly.\n\n### $ Injection Safety\n\nThe built-in `edit` tool uses `String.prototype.replace`, which silently expands special `$`-patterns in replacement text (`$&`, `` $` ``, `$'`, `$$`). This is especially dangerous in TypeScript source files full of template literals and `$`-prefixed identifiers. The override uses slice arithmetic so replacement text is always treated as a literal string.\n\n### Multi-Edit Support\n\nThe `edit` tool accepts an array of `{ oldText, newText }` pairs and applies them in sequence within a single call. Each edit is validated for uniqueness before any change is written to disk.\n\n## Development\n\nThis package lives in the [pi-extensions monorepo](https://github.com/jmcombs/pi-extensions).\n\n```bash\n# From the repo root\nnpm ci\nnpm run check\n```\n\nTo test changes locally against a real Pi session:\n\n```bash\npi -e ./packages/better-toolsy\n```\n\n## License\n\n[MIT](./LICENSE) \u00a9 Jeremy Combs\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "file-tools",
+    "fs",
+    "search"
+  ],
+  "author": {
+    "name": "Jeremy Combs"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/jmcombs/pi-extensions/tree/main/packages/better-toolsy",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jmcombs/pi-extensions.git",
+    "directory": "packages/better-toolsy"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/jmcombs/pi-extensions/main/assets/better-toolsy/preview.png"
+  },
+  "time": {
+    "created": "2026-05-31T23:14:55.908Z",
+    "modified": "2026-06-07T21:06:56.875Z",
+    "0.0.0": "2026-05-31T23:14:56.173Z",
+    "1.0.0": "2026-06-01T11:22:20.611Z",
+    "1.0.1": "2026-06-01T12:47:20.837Z",
+    "1.1.0": "2026-06-01T18:42:27.259Z",
+    "1.1.1": "2026-06-06T13:30:50.249Z",
+    "1.1.2": "2026-06-06T19:39:26.962Z",
+    "1.1.3": "2026-06-07T21:06:56.611Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 111,
+  "download_trend": []
+}

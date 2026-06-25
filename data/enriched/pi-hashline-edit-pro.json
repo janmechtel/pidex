@@ -1,0 +1,76 @@
+{
+  "name": "pi-hashline-edit-pro",
+  "latest_version": "0.12.1",
+  "description": "Strict hashline read/replace tool for pi-coding-agent with hash-anchored edits (3-char, 18-bit, perfect hashing)",
+  "readme": "# pi-hashline-edit-pro\n\nA [pi-coding-agent](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) extension that replaces the built-in `read` and `edit` tools with a hash-anchored line-replacing workflow. Strict semantics, no silent relocation, no autocorrection, no fuzzy fallback. 3-character content hashes over a 64-character URL-safe base64 alphabet give 18 bits of entropy per anchor, with perfect hashing (collision resolution) ensuring every line gets a unique anchor.\n\nFork of [pi-hashline-edit](https://github.com/RimuruW/pi-hashline-edit) by RimuruW. The strict-semantics policy is unchanged. This fork extends the upstream design in two ways: a 3-character hash length with a 64-character alphabet for more entropy, and perfect hashing (collision resolution) that ensures every line in a file gets a unique anchor.\n\nEvery line returned by `read` carries a short content hash. Edits reference those hashes instead of raw text, so the tool can detect stale context and reject outdated changes before they reach the file.\n\n## Why fork?\n\nThe original uses 2-character hashes of a 16-character alphabet, with the hash being a pure function of line content. That's 8 bits / 256 buckets, and two byte-identical lines (e.g. repeated `import` statements, repeated `}`) always share a hash because the hash is `xxHash32(content)`.\n\nThis fork makes two changes that compound:\n\n1. **Bump hash length to 3 characters** of the 64-char URL-safe base64 alphabet. That gives 18 bits / 262,144 buckets, up from 8 bits / 256 in the upstream.\n2. **Perfect hashing (collision resolution).** When computing hashes for a file, if a line's base hash collides with an already-assigned hash, the hash is incremented (using a retry counter: `R{retry}`) until a unique hash is found. This ensures every line in a file gets a unique anchor, even with the shorter 3-character hash space. Two byte-identical lines (e.g. repeated `import` statements, repeated `}`) get different hashes automatically.\n\n## Installation\n\nFrom npm:\n\n```bash\npi install npm:pi-hashline-edit-pro\n```\n\nFrom a local checkout:\n\n```bash\npi install /path/to/pi-hashline-edit-pro\n```\n\n## How It Works\n\n### `read` -- tagged line output\n\nText files are returned with a `HASH\u2502content` prefix on every line. The line number is not part of the wire format, only the 3-character hash followed by the `\u2502` separator and the line content. Example output for the source below:\n\n```js\nfunction hello() {\n  console.log(\"world\");\n}\n```\n\nwould be returned as:\n\n```text\n0qH\u2502function hello() {\nszJ\u2502  console.log(\"world\");\n_zl\u2502}\n```\n\n- `HASH` is a 3-character content hash from the URL-safe base64 alphabet `A-Za-z0-9-_` (e.g. `aB3`).\n\nOptional parameters:\n\n- `offset` -- start reading from this line number (1-indexed).\n- `limit` -- maximum number of lines to return.\n\nImages (JPEG, PNG, GIF, WebP) are passed through as attachments and do not participate in the hashline protocol. Binary and directory paths are rejected with a descriptive error. Empty files return an advisory suggesting using replace to insert content.\n\n### `replace` -- hash-anchored modifications\n\nReplaces using the `HASH\u2502content` anchors from `read` output to target lines precisely:\n\n```json\n{\n  \"path\": \"src/main.ts\",\n  \"edits\": [\n    { \"hash_range_incl\": [\"ve7\", \"ve7\"], \"new_lines\": [\"  console.log('hashline');\"] }\n  ]\n}\n```\n| `hash_range_incl` | Inclusive line range `[start_hash, end_hash]` (required). |\n\n- **Request structure validation.** The request envelope (`path`, `edits`) and individual edit items are validated before any file I/O. Unknown fields, missing required fields, invalid types, and malformed anchors are rejected with `[E_BAD_SHAPE]` or `[E_BAD_REF]`.\n- **Legacy dialect rejected.** The native top-level `oldText`/`newText` (and `old_text`/`new_text`) dialect is rejected with `[E_LEGACY_SHAPE]`. The error message tells the model to call `read` first and send `{hash_range_incl: [\"<START>\", \"<END>\"], new_lines: [...]}`.\nAll edits in a single call validate against the same pre-edit snapshot and apply bottom-up, so the hashes from a single `read` call remain valid across all edits in the batch.\n\n### Chained edits\n\nAfter a successful replace, the response text is empty (warnings are still shown if present). To get fresh anchors for follow-up edits, call `read` on the file first. This avoids token overhead from re-displaying content the model already knows.\n\n### Auto-read after write\n\nAuto-read is **disabled by default**. When enabled, after a successful `write` the extension automatically reads the file and appends a `--- Auto-read (hashline anchors) ---` block to the result. This gives the model immediate `HASH\u2502content` anchors for the newly written file without requiring a separate `read` call. The workflow becomes:\n\n1. `write` a file, result includes hashline anchors\n2. `replace` using those anchors directly\n\nToggle at runtime with the `/toggle-auto-read` command. The current state persists for the session.\n\nFor large files (>2000 lines), the auto-read output is truncated with a pagination hint. Use `read` with `offset` to see more.\n\n### Diff for the host\n\nThe post-edit diff (with `+`/`-` markers) is exposed to the host UI via `details.diff`. It is intentionally not in the LLM-visible text. The model already knows what it changed and can call `read` for fresh anchors when needed.\n\n## Design Decisions\n\n- **Stale anchors fail.** A hash mismatch means the file has changed since the last `read`. The error tells the model to call `read()` to get fresh anchors, then copy the 3-character HASH from each line into the next replace call.\n- **No fallback relocation.** Mismatched anchors are never silently relocated to a \"close enough\" line. This trades convenience for correctness.\n- **Strict patch content.** If `new_lines` contains `+HASH\u2502` display prefixes (or `-N   ` diff rows), the edit is rejected with `[E_INVALID_PATCH]`. Bare `HASH\u2502` content (the first 4 chars of a `new_lines` entry looking like 3 base64 chars + `\u2502`) is also rejected with `[E_BARE_HASH_PREFIX]`. When the suspect's prefix happens to match a real file-line anchor, the error message flags that as strong evidence the model copied an anchor from the read output.\n- **Legacy dialect rejected.** The native top-level `oldText`/`newText` (and `old_text`/`new_text`) dialect is rejected with `[E_LEGACY_SHAPE]`. The error message tells the model to call `read` first and send `{hash_range_incl: [\"<START>\", \"<END>\"], new_lines: [...]}`.\n- **Atomic writes.** Files are written via temp-file-then-rename to avoid corruption from interrupted writes. Symlink chains are resolved so the target file is updated without replacing the symlink. Hard-linked files are updated in place to preserve the shared inode. File permissions are preserved across atomic renames.\n- **Per-file mutation queue.** Edits queue by the canonical write target, so concurrent edits through different symlink paths still serialize onto the same underlying file.\n- **Boundary duplication warnings.** When the last line of a replacement matches the next surviving line (or the first line matches the preceding one), a warning is emitted. This catches a common LLM pattern where closing delimiters like `}`, `});`, or `} else {` are accidentally duplicated. The warning includes the surviving line's post-edit hash so the model can reference it in a follow-up edit. No autocorrection is applied \u2014 the duplicate stays in the file and the model decides whether to remove it. Raw line comparison (not trimmed) avoids false positives when indentation differs.\n\n## Hashing\n\nHashes are computed with [xxhash-wasm](https://github.com/jungomi/xxhash-wasm) (xxHash32 via WebAssembly), then mapped to a 3-character string from the URL-safe base64 alphabet `A-Za-z0-9-_`. That's 64 distinct characters, 6 bits per position, 18 bits of entropy per anchor.\n\nThe alphabet is sized for an LLM consumer. The model tokenizes, it doesn't squint at pixel glyphs, so the human-readability heuristics used by smaller hand-curated alphabets (no G/L/I/O because they look like digits, no vowels so the hash doesn't accidentally spell a word, no hex digits so it can't be confused with `0xFF`) don't apply. The full 64 chars give maximum entropy per character, with case and digits included.\n\n**Perfect hashing (collision resolution):** When computing hashes for a file, if a line's base hash collides with an already-assigned hash, the hash is incremented (using a retry counter: `R{retry}`) until a unique hash is found. This ensures every line in a file gets a unique anchor, even with the shorter 3-character hash space. Two byte-identical lines (e.g. repeated `}` or repeated `import` statements) get different hashes automatically.\n\nThe runtime always precomputes the full per-line hash array for a file via `computeLineHashes(content)`, then looks up by line number during validation and during `read` / `replace` response formatting. There is no per-line recomputation that could disagree with what the model saw in its last read.\n\n`HASH_LENGTH` and `HASH_ALPHABET` are constants at the top of `src/hashline/hash.ts`; bump the length to 4 if you need even more entropy without collision resolution.\n\n### Bare-prefix detector\n\nWith the `\u2502` delimiter format, the bare-prefix detector regex `^\\s*[A-Za-z0-9_\\-]{3}\u2502` is highly specific. It only matches lines starting with exactly 3 base64 chars and `\u2502`. This eliminates false positives from common code patterns like `init:`, `data:`, `else:`, etc. The detector rejects edit lines matching this pattern with `[E_BARE_HASH_PREFIX]` to prevent the model from accidentally pasting hash anchors into file content.\n\n## Development\n\nRequires [Node.js](https://nodejs.org) and npm.\n\n```bash\nnpm install\nnpm test\n```\n\nSet `PI_HASHLINE_DEBUG=1` to show an \"active\" notification at session start.\n\nSet `PI_HASHLINE_AUTO_READ=1` to enable auto-read after write by default (can still be toggled at runtime with `/toggle-auto-read`).\n\n## Credits\n\n- [RimuruW](https://github.com/RimuruW) -- original `pi-hashline-edit` and the strict-semantics policy\n- [can1357](https://github.com/can1357) -- original [oh-my-pi](https://github.com/can1357/oh-my-pi) implementation and the hashline concept\n\n## License\n\n[MIT](LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "coding-agent",
+    "extension",
+    "hashline",
+    "hash-anchored",
+    "strict"
+  ],
+  "author": {
+    "name": "pi-hashline-edit-pro contributors"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/YuGiMob/pi-hashline-edit-pro#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YuGiMob/pi-hashline-edit-pro.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-15T07:21:04.210Z",
+    "modified": "2026-06-25T10:52:26.417Z",
+    "0.2.0": "2026-06-15T07:21:04.405Z",
+    "0.2.1": "2026-06-15T07:29:17.338Z",
+    "0.3.0": "2026-06-15T08:40:43.643Z",
+    "0.3.1": "2026-06-15T08:43:55.380Z",
+    "0.3.2": "2026-06-15T08:51:27.773Z",
+    "0.3.3": "2026-06-15T13:37:41.074Z",
+    "0.3.4": "2026-06-15T14:35:25.989Z",
+    "0.3.5": "2026-06-15T14:40:49.047Z",
+    "0.3.6": "2026-06-16T04:10:08.387Z",
+    "0.3.7": "2026-06-16T05:08:09.374Z",
+    "0.3.8": "2026-06-16T06:05:26.692Z",
+    "0.3.9": "2026-06-16T07:03:41.130Z",
+    "0.4.0": "2026-06-16T09:12:23.972Z",
+    "0.4.1": "2026-06-16T10:39:30.580Z",
+    "0.4.2": "2026-06-16T10:40:05.805Z",
+    "0.4.3": "2026-06-16T12:41:17.876Z",
+    "0.5.1": "2026-06-16T15:01:55.646Z",
+    "0.6.0": "2026-06-17T15:22:46.534Z",
+    "0.6.1": "2026-06-17T18:10:27.700Z",
+    "0.7.0": "2026-06-18T06:29:14.844Z",
+    "0.8.0": "2026-06-18T06:46:21.357Z",
+    "0.8.1": "2026-06-18T07:30:42.051Z",
+    "0.9.0": "2026-06-19T07:49:57.817Z",
+    "0.9.1": "2026-06-19T08:10:43.981Z",
+    "0.9.2": "2026-06-19T14:39:46.831Z",
+    "0.9.3": "2026-06-19T15:10:57.221Z",
+    "0.9.4": "2026-06-20T11:01:43.894Z",
+    "0.9.5": "2026-06-20T18:05:36.259Z",
+    "0.9.6": "2026-06-21T11:19:48.181Z",
+    "0.9.7": "2026-06-22T20:05:38.613Z",
+    "0.9.8": "2026-06-22T20:08:38.459Z",
+    "0.10.0": "2026-06-22T20:50:51.914Z",
+    "0.11.0": "2026-06-23T07:07:17.485Z",
+    "0.11.1": "2026-06-23T07:33:53.354Z",
+    "0.11.2": "2026-06-23T07:45:46.530Z",
+    "0.11.3": "2026-06-23T08:09:36.252Z",
+    "0.11.4": "2026-06-23T08:53:10.228Z",
+    "0.11.5": "2026-06-25T05:24:15.401Z",
+    "0.12.0": "2026-06-25T08:31:15.784Z",
+    "0.12.1": "2026-06-25T10:52:26.322Z"
+  },
+  "versions_count": 40,
+  "downloads_last_week": null,
+  "download_trend": []
+}

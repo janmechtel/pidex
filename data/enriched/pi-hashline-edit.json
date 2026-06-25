@@ -1,0 +1,43 @@
+{
+  "name": "pi-hashline-edit",
+  "latest_version": "0.7.0",
+  "description": "Hashline read/edit tool override for pi-coding-agent",
+  "readme": "![pi-hashline-edit](assets/banner.jpeg)\n\n# pi-hashline-edit\n\nA [pi-coding-agent](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) extension that replaces the built-in `read` and `edit` tools with a hash-anchored line-editing workflow.\n\nEvery line returned by `read` carries a short content hash. Edits reference these hashes instead of raw text, so the tool can detect stale context and reject outdated changes before they reach the file.\n\nInspired by [oh-my-pi](https://github.com/can1357/oh-my-pi).\n\n## Installation\n\n```bash\n# From npm\npi install npm:pi-hashline-edit\n\n# From a local checkout\npi install /path/to/pi-hashline-edit\n```\n\n## How It Works\n\n### `read` \u2014 tagged line output\n\nText files are returned with a `LINE#HASH:` prefix on every line. Line numbers may be left-padded within each returned block so the `#HASH:` columns align:\n\n```text\n 8#VR:function hello() {\n 9#KT:  console.log(\"world\");\n10#BH:}\n```\n\n- `LINE` \u2014 1-indexed line number.\n- `HASH` \u2014 2-character content hash from the alphabet `ZPMQVRWSNKTXJBYH`.\n\nOptional parameters:\n- `offset` \u2014 start reading from this line number (1-indexed).\n- `limit` \u2014 maximum number of lines to return.\n\nImages (JPEG, PNG, GIF, WebP) are passed through as attachments and do not participate in the hashline protocol. Binary and directory paths are rejected with a descriptive error. Empty files return an advisory suggesting `prepend`/`append` instead of a synthetic anchor.\n\n### `edit` \u2014 hash-anchored modifications\n\nEdits use the `LINE#HASH` anchors from `read` output to target lines precisely:\n\n```json\n{\n  \"path\": \"src/main.ts\",\n  \"edits\": [\n    { \"op\": \"replace\", \"pos\": \"11#KT\", \"lines\": [\"  console.log('hashline');\"] }\n  ]\n}\n```\n\n| Op | Purpose | Fields |\n|---|---|---|\n| `replace` | Replace one line (`pos`) or an inclusive range (`pos` + `end`). | `pos` required, `end` optional, `lines` |\n| `append` | Insert lines after `pos`. Omit `pos` to append at EOF. | `pos` optional, `lines` |\n| `prepend` | Insert lines before `pos`. Omit `pos` to prepend at BOF. | `pos` optional, `lines` |\n| `replace_text` | Replace an exact unique substring anywhere in the file. Fails if the text is not found or matches more than once. | `oldText`, `newText` |\n\nAll edits in a single call validate against the same pre-edit snapshot and apply bottom-up, so line numbers stay consistent across operations.\n\n### Chained edits\n\nAfter a successful edit in the default `changed` return mode, the result text includes an `--- Anchors A-B ---` block with fresh `LINE#HASH` references for the changed region. These can be used directly in the next `edit` call on the same file without a full re-read, provided the next edit targets the same or nearby lines. For distant changes, use `read` first.\n\n### Diff preview\n\nThe full diff is stored in `details.diff` for the host UI. The model-visible text stays compact and focuses on fresh anchors, warnings, and retry guidance.\n\n## Design Decisions\n\n- **Stale anchors fail.** A hash mismatch means the file has changed since the last `read`. The error includes a snippet with fresh `LINE#HASH` references for the affected lines for immediate retry.\n- **No fallback relocation.** Mismatched anchors are never silently relocated to a \"close enough\" line. This trades convenience for correctness.\n- **Strict patch content.** If `lines` contains `LINE#HASH:` display prefixes or diff `+`/`-` markers, the edit is rejected with `[E_INVALID_PATCH]`. The model must send literal file content; the runtime does not silently strip accidental prefixes.\n- **Native edit normalization.** When a caller sends a top-level `oldText`/`newText` payload (the built-in edit format), the request is normalized into `op: \"replace_text\"` and uses the same strict exact-unique-match semantics as any other `replace_text` edit. Inexact or non-unique matches are rejected; there is no fuzzy legacy fallback or separate compatibility notifier.\n- **Atomic writes.** Files are written via temp-file-then-rename to avoid corruption from interrupted writes. Symlink chains are resolved so the target file is updated without replacing the symlink. Hard-linked files are updated in place to preserve the shared inode. File permissions are preserved across atomic renames.\n- **Per-file mutation queue.** Edits queue by the canonical write target, so concurrent edits through different symlink paths still serialize onto the same underlying file.\n\n## Hashing\n\nHashes are computed with [xxhashjs](https://github.com/pierrec/js-xxhash) (xxHash32), then mapped to a 2-character string from a custom 16-character alphabet.\n\nThe alphabet (`ZPMQVRWSNKTXJBYH`) excludes hex digits, common vowels, and visually ambiguous letters (D/G/I/L/O), so a reference like `5#MQ` can never be confused with code content, hex literals, or English words.\n\nLines that contain no alphanumeric characters (e.g. a lone `}`) use their line number as the hash seed to reduce collisions on structurally identical markers.\n\n## Development\n\nRequires [Node.js](https://nodejs.org) and npm.\n\n```bash\nnpm install\nnpm test\n```\n\nSet `PI_HASHLINE_DEBUG=1` to show an \"active\" notification at session start.\n\n## Credits\n\nThanks to [can1357](https://github.com/can1357) for the original [oh-my-pi](https://github.com/can1357/oh-my-pi) implementation and the hashline concept.\n\n## License\n\n[MIT](LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "coding-agent",
+    "extension",
+    "hashline"
+  ],
+  "author": {
+    "name": "RimuruW"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/RimuruW/pi-hashline-edit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RimuruW/pi-hashline-edit.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-15T14:31:31.158Z",
+    "modified": "2026-06-12T08:15:32.833Z",
+    "0.2.0": "2026-02-15T14:31:31.303Z",
+    "0.3.0": "2026-02-19T16:15:06.130Z",
+    "0.4.0": "2026-03-22T16:08:30.003Z",
+    "0.4.1": "2026-03-27T02:59:27.459Z",
+    "0.5.3": "2026-04-06T14:34:49.206Z",
+    "0.5.4": "2026-04-19T05:12:40.779Z",
+    "0.6.0": "2026-04-24T15:25:29.022Z",
+    "0.6.1": "2026-05-09T16:29:51.794Z",
+    "0.7.0": "2026-06-12T08:15:32.733Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": 242,
+  "download_trend": []
+}

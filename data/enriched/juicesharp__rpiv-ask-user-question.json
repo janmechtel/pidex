@@ -1,0 +1,451 @@
+{
+  "name": "@juicesharp/rpiv-ask-user-question",
+  "latest_version": "1.20.0",
+  "description": "Pi extension. A structured questionnaire the model can put to you when it would otherwise guess, with typed options instead of free-form replies.",
+  "readme": "# rpiv-ask-user-question\n\n<div align=\"center\">\n  <a href=\"https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-ask-user-question\">\n    <picture>\n      <img src=\"https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-ask-user-question/docs/cover.png\" alt=\"rpiv-ask-user-question cover\" width=\"50%\">\n    </picture>\n  </a>\n</div>\n\nLet the model ask you structured clarifying questions instead of guessing. `rpiv-ask-user-question` adds the `ask_user_question` tool to [Pi Agent](https://github.com/badlogic/pi-mono) - a tabbed dialog with single- and multi-select questions, side-by-side previews, per-option notes, and a Submit tab that reviews answers before they go back to the model.\n\n![Side-by-side code preview](https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-ask-user-question/docs/code-preview.jpg)\n\n## Features\n\n- **Multi-question dialogs** - ask several questions in one turn with a tab bar (`Tab` to switch).\n- **Preview pane** - render an ASCII diagram, code snippet, or markdown next to each option, side-by-side or stacked depending on terminal width.\n- **Per-option notes** - press `n` on a previewed option to attach a free-text note that travels back with the answer.\n- **Multi-select questions** - checkboxes with `Space` to toggle, Enter-as-toggle on rows, a `Next` sentinel to advance, and toggles persisted across tab switches.\n- **Submit tab** - review every answer before submitting; warns about unanswered questions and offers a Submit picker.\n- **Chat row on every tab** - redirect the conversation without leaving the dialog.\n- **Terminal-row-aware overflow scroll** - when the dialog is taller than the terminal, the body scrolls between a sticky heading and sticky hints/border; overflow indicators (\u2191 / \u2193 / \u2195) show what's clipped.\n- **\"Other\" free-text fallback** - type a custom answer when no option fits.\n- **Localized UI** - sentinel rows, hints, submit/cancel labels, review pane, and notes affordance display in the user's chosen language via `@juicesharp/rpiv-i18n`. Ships Deutsch / English / Espa\u00f1ol / Fran\u00e7ais / Portugu\u00eas (PT) / Portugu\u00eas (BR) / \u0420\u0443\u0441\u0441\u043a\u0438\u0439 / \u0423\u043a\u0440\u0430\u0457\u043d\u0441\u044c\u043a\u0430; switch with `/languages` or `pi --locale <code>`. LLM-facing copy (tool description, schemas, errors) stays English by design.\n\n## Screens\n\n| | |\n|---|---|\n| ![Single-question dialog](https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-ask-user-question/docs/single-question.jpg) | ![Multi-tab + ASCII preview](https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-ask-user-question/docs/multi-tab-preview.jpg) |\n| ![Multi-select with checkboxes](https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-ask-user-question/docs/multi-select.jpg) | ![Submit tab review](https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-ask-user-question/docs/submit-tab.jpg) |\n| ![Localized UI - German](https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-ask-user-question/docs/localized-german-ui.jpg) | |\n\n## Install\n\n```bash\npi install npm:@juicesharp/rpiv-ask-user-question\n```\n\nThen restart your Pi session.\n\n### Optional: localization\n\n`rpiv-ask-user-question` works standalone - install only this package and you get the full English UI. Install `@juicesharp/rpiv-i18n` alongside it to flip sentinel labels, dialog hints, review-tab heading, and chat-summary lines to your active locale:\n\n```bash\npi install npm:@juicesharp/rpiv-i18n\n```\n\nWith the SDK present, locale resolves from `--locale <code>` \u2192 `~/.config/rpiv-i18n/locale.json` \u2192 `LANG` / `LC_ALL` \u2192 English. The `/languages` interactive picker and `pi --locale <code>` startup flag are also enabled. Without the SDK, the dialog stays online and renders English at every call site - no warning, no crash. Users who installed via `pi install npm:@juicesharp/rpiv-pi` + `/rpiv-setup` get the SDK automatically.\n\n## Tool\n\n- **`ask_user_question`** - present one or more structured questions, each with 2+ options, optional `multiSelect`, optional per-option `preview`, and an optional free-text \"Other\" fallback. Returns the user's selection(s) plus any notes. See the tool's `promptGuidelines` for usage policy.\n\n### Schema\n\n```ts\nask_user_question({\n  questions: [\n    {\n      question: string,            // full question text, ends with \"?\"\n      header: string,              // chip label, max 16 chars\n      options: [\n        {\n          label: string,           // 1-5 words, max 60 chars\n          description: string,     // explains the choice / its trade-off\n          preview?: string,        // optional markdown shown next to options\n        },\n        // \u2026 2-4 options total\n      ],\n      multiSelect?: boolean,       // default false\n    },\n    // \u2026 1-4 questions total\n  ]\n})\n```\n\nReserved option labels (rejected at validation): `\"Other\"`, plus the runtime sentinels (`\"Type something.\"`, `\"Chat about this\"`, `\"Next \u2192\"`).\n\nReturns:\n\n```ts\n{\n  content: [{ type: \"text\", text: string }], // human-readable envelope or DECLINE_MESSAGE\n  details: {\n    answers: Array<{\n      questionIndex: number,\n      question: string,\n      kind: \"option\" | \"custom\" | \"chat\" | \"multi\",\n      answer: string | null,\n      selected?: string[],         // present for multi-select\n      notes?: string,              // free-text note, when typed\n      preview?: string,            // echoed back when option carried a preview\n    }>,\n    cancelled: boolean,\n    error?: \"no_ui\" | \"no_questions\" | \"empty_options\" | \"too_many_questions\"\n          | \"duplicate_question\" | \"duplicate_option_label\" | \"reserved_label\",\n  }\n}\n```\n\n## License\n\n[![npm version](https://img.shields.io/npm/v/@juicesharp/rpiv-ask-user-question.svg)](https://www.npmjs.com/package/@juicesharp/rpiv-ask-user-question)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "rpiv"
+  ],
+  "author": {
+    "name": "juicesharp"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-ask-user-question#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juicesharp/rpiv-mono.git",
+    "directory": "packages/rpiv-ask-user-question"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-13T22:36:04.659Z",
+    "modified": "2026-06-15T12:35:30.751Z",
+    "0.1.0": "2026-04-13T22:36:04.916Z",
+    "0.1.1": "2026-04-13T23:39:36.394Z",
+    "0.1.2": "2026-04-14T00:57:46.151Z",
+    "0.1.3": "2026-04-15T05:12:47.556Z",
+    "0.1.4": "2026-04-15T05:14:53.815Z",
+    "0.6.1": "2026-04-18T15:35:33.709Z",
+    "0.7.0": "2026-04-18T20:40:27.916Z",
+    "0.8.0": "2026-04-19T00:14:25.110Z",
+    "0.8.1": "2026-04-19T14:17:44.767Z",
+    "0.8.2": "2026-04-19T14:37:12.094Z",
+    "0.8.3": "2026-04-19T19:35:19.932Z",
+    "0.9.0": "2026-04-19T23:09:06.931Z",
+    "0.9.1": "2026-04-20T01:56:45.849Z",
+    "0.10.0": "2026-04-20T02:30:14.150Z",
+    "0.11.0": "2026-04-20T14:43:11.575Z",
+    "0.11.1": "2026-04-20T17:28:03.280Z",
+    "0.11.2": "2026-04-21T20:11:54.640Z",
+    "0.11.3": "2026-04-21T20:26:55.688Z",
+    "0.11.4": "2026-04-21T21:18:17.539Z",
+    "0.11.5": "2026-04-22T03:10:25.556Z",
+    "0.11.6": "2026-04-22T19:53:14.254Z",
+    "0.11.7": "2026-04-23T17:44:42.885Z",
+    "0.12.0": "2026-04-24T16:37:54.701Z",
+    "0.12.1": "2026-04-24T17:35:49.510Z",
+    "0.12.2": "2026-04-24T17:43:20.133Z",
+    "0.12.3": "2026-04-24T18:21:13.433Z",
+    "0.12.4": "2026-04-24T22:10:35.370Z",
+    "0.12.5": "2026-04-24T22:32:57.967Z",
+    "0.12.6": "2026-04-26T00:40:57.214Z",
+    "0.12.7": "2026-04-26T05:55:59.538Z",
+    "0.13.0": "2026-04-28T02:09:00.864Z",
+    "0.13.1": "2026-04-28T02:28:27.787Z",
+    "0.13.2": "2026-04-28T02:33:13.200Z",
+    "0.13.3": "2026-04-28T12:13:55.313Z",
+    "1.0.0": "2026-04-28T13:30:33.906Z",
+    "1.0.1": "2026-04-28T13:34:17.437Z",
+    "1.0.2": "2026-04-28T15:59:08.217Z",
+    "1.0.3": "2026-04-28T20:32:04.855Z",
+    "1.0.4": "2026-04-28T20:34:10.590Z",
+    "1.0.5": "2026-04-29T12:50:53.427Z",
+    "1.0.6": "2026-04-29T16:21:25.487Z",
+    "1.0.7": "2026-04-29T19:57:09.422Z",
+    "1.0.8": "2026-04-29T21:09:53.083Z",
+    "1.0.9": "2026-04-30T00:08:39.775Z",
+    "1.0.10": "2026-04-30T12:46:34.163Z",
+    "1.0.11": "2026-04-30T14:40:32.341Z",
+    "1.0.12": "2026-05-01T14:15:19.092Z",
+    "1.0.13": "2026-05-01T16:51:19.214Z",
+    "1.0.14": "2026-05-01T21:31:39.754Z",
+    "1.0.15": "2026-05-02T20:02:43.581Z",
+    "1.0.16": "2026-05-02T20:10:59.167Z",
+    "1.0.17": "2026-05-02T20:18:28.657Z",
+    "1.0.18": "2026-05-02T21:19:22.458Z",
+    "1.0.19": "2026-05-03T10:58:24.492Z",
+    "1.1.0": "2026-05-03T14:14:46.182Z",
+    "1.1.1": "2026-05-03T14:22:12.763Z",
+    "1.1.2": "2026-05-03T15:34:00.391Z",
+    "1.1.3": "2026-05-03T16:03:54.758Z",
+    "1.1.4": "2026-05-03T17:54:01.333Z",
+    "1.1.5": "2026-05-05T21:31:05.179Z",
+    "1.2.0": "2026-05-07T05:29:50.011Z",
+    "1.2.1": "2026-05-07T15:28:18.012Z",
+    "1.3.0": "2026-05-08T18:45:42.294Z",
+    "1.3.1": "2026-05-10T00:31:35.898Z",
+    "1.4.0": "2026-05-10T18:55:55.145Z",
+    "1.4.1": "2026-05-11T12:47:23.359Z",
+    "1.4.2": "2026-05-11T13:07:24.434Z",
+    "1.5.0": "2026-05-12T16:37:33.216Z",
+    "1.5.1": "2026-05-13T00:14:56.108Z",
+    "1.5.2": "2026-05-13T17:02:15.359Z",
+    "1.6.0": "2026-05-14T17:13:29.083Z",
+    "1.6.1": "2026-05-14T20:15:15.204Z",
+    "1.7.0": "2026-05-15T17:46:46.928Z",
+    "1.8.0": "2026-05-16T14:40:41.149Z",
+    "1.8.1": "2026-05-17T17:00:56.726Z",
+    "1.8.2": "2026-05-17T22:12:20.373Z",
+    "1.8.3": "2026-05-18T02:42:31.582Z",
+    "1.9.0": "2026-05-18T18:11:20.119Z",
+    "1.9.1": "2026-05-19T10:44:59.199Z",
+    "1.9.2": "2026-05-19T13:49:00.944Z",
+    "1.10.0": "2026-05-19T21:02:49.642Z",
+    "1.10.1": "2026-05-19T23:29:15.925Z",
+    "1.10.2": "2026-05-20T03:01:59.583Z",
+    "1.11.0": "2026-05-20T21:03:49.520Z",
+    "1.12.0": "2026-05-21T13:15:50.566Z",
+    "1.13.0": "2026-05-25T19:36:42.974Z",
+    "1.14.0": "2026-05-28T01:45:31.217Z",
+    "1.14.1": "2026-05-28T02:02:29.183Z",
+    "1.14.2": "2026-05-28T02:12:18.872Z",
+    "1.14.3": "2026-05-28T02:33:48.184Z",
+    "1.14.4": "2026-05-28T02:45:30.952Z",
+    "1.14.5": "2026-05-28T04:47:50.150Z",
+    "1.14.6": "2026-05-28T10:12:49.158Z",
+    "1.14.7": "2026-05-28T12:16:12.096Z",
+    "1.15.0": "2026-05-28T15:21:34.843Z",
+    "1.16.0": "2026-05-30T14:56:44.105Z",
+    "1.16.1": "2026-05-30T15:03:13.576Z",
+    "1.17.0": "2026-06-01T02:33:06.291Z",
+    "1.17.1": "2026-06-01T13:13:07.299Z",
+    "1.18.0": "2026-06-04T14:56:22.194Z",
+    "1.18.1": "2026-06-04T16:03:53.930Z",
+    "1.18.2": "2026-06-04T16:30:13.296Z",
+    "1.19.0": "2026-06-09T13:23:44.361Z",
+    "1.19.1": "2026-06-10T03:41:24.868Z",
+    "1.20.0": "2026-06-15T12:35:30.641Z"
+  },
+  "versions_count": 105,
+  "downloads_last_week": 5750,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 332
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 1924
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 2891
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 4572
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 6826
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 15633
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 12194
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 16923
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 10341
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 12445
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 6552
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 680
+    }
+  ]
+}

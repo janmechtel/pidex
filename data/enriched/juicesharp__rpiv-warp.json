@@ -1,0 +1,81 @@
+{
+  "name": "@juicesharp/rpiv-warp",
+  "latest_version": "1.20.0",
+  "description": "Pi extension. Native Warp terminal notifications, dispatched via OSC 777 on Pi lifecycle events.",
+  "readme": "# rpiv-warp\n\n<div align=\"center\">\n  <a href=\"https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-warp\">\n    <picture>\n      <img src=\"https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-warp/docs/cover.png\" alt=\"rpiv-warp cover\" width=\"50%\">\n    </picture>\n  </a>\n</div>\n\nNative [Warp terminal](https://www.warp.dev/) toasts for [Pi Agent](https://github.com/badlogic/pi-mono) lifecycle events. When Pi finishes a long task, asks for your input, or completes a turn, `rpiv-warp` emits Warp's `OSC 777` escape sequence and Warp surfaces a native OS notification. Outside Warp it does nothing - install it everywhere, it only fires where it's useful.\n\n## Features\n\n- **Native OS toasts on Pi lifecycle events** - agent start, agent end, blocking-tool calls, and turn boundaries surface as native Warp / macOS / Windows notifications.\n- **Live Warp tab badge** - the tab indicator transitions through **In progress \u2192 Success / Blocked** as Pi works.\n- **Tab-title spinner** - animates the tab title while the agent loop is active and restores Pi's `\u03c0 - <repo>` title on stop.\n- **Configurable blocking-tool allowlist** - choose which tool calls flip the badge to **Blocked** via `~/.config/rpiv-warp/config.json`. Defaults to `ask_user_question`.\n- **Startup-only session notifications** - `/new`, `/resume`, `/fork`, and `/reload` stay quiet; only fresh startups notify.\n- **Silent outside Warp** - no-op when not running in Warp, on known-broken Warp builds, or when `/dev/tty` is unreachable.\n- **Windows support** - best-effort delivery via `process.stdout` / ConPTY, gated on `isTTY`.\n- **Zero-tool, zero-UI footprint** - no tools registered with the model, no commands, no widgets, no token cost.\n\n## Install\n\n```bash\npi install npm:@juicesharp/rpiv-warp\n```\n\n`rpiv-warp` is **opt-in** - it is NOT auto-installed by `/rpiv-setup`. Install it explicitly only if you use Warp.\n\n## What you get\n\n| Pi event | Warp wire event | Effect on the tab badge |\n|---|---|---|\n| `session_start` (startup only) | `session_start` | records plugin version |\n| `agent_start` | `prompt_submit` | \u2192 **In progress** |\n| `agent_end` | `stop` | \u2192 **Success** (checkmark) |\n| `tool_call` (configured blocking tool) | `question_asked` | \u2192 **Blocked** (\"Waiting for your answer\") |\n| `tool_execution_end` (configured blocking tool) | `tool_complete` | Blocked \u2192 **In progress** |\n\n`session_start` is filtered to `reason === \"startup\"` only - `/new`, `/resume`, `/fork`, `/reload` do NOT emit (you're already looking at the terminal in those cases).\n\n## Config\n\nOptional file at `~/.config/rpiv-warp/config.json`:\n\n```json\n{\n  \"blockingTools\": [\"ask_user_question\", \"my_custom_blocking_tool\"]\n}\n```\n\n| Key | Default | Meaning |\n|---|---|---|\n| `blockingTools` | `[\"ask_user_question\"]` | Tool names that put the Warp tab badge into the **Blocked** state when called and clear it when the tool finishes. Use for tools that genuinely block the agent loop on user input. |\n\nMissing or malformed file falls back to defaults - no config required.\n\n## Detection\n\n`rpiv-warp` reads three environment variables Warp sets automatically:\n\n- `TERM_PROGRAM === \"WarpTerminal\"` - required. Outside Warp the extension is a no-op.\n- `WARP_CLI_AGENT_PROTOCOL_VERSION` - required for structured emission. If unset, `rpiv-warp` does nothing rather than falling back to a less-rich legacy format.\n- `WARP_CLIENT_VERSION` - used for broken-version gating. A short list of known-broken Warp builds (per release channel) suppresses emission until Warp ships a fix.\n\n## Edge cases\n\n| Case | Behavior |\n|---|---|\n| Not in Warp (`TERM_PROGRAM !== \"WarpTerminal\"`) | Silent no-op - extension loads, every handler short-circuits |\n| Pi in print mode (`pi -p \"...\"`) | **Toasts still fire** - print mode emits all four events at the agent layer |\n| `/dev/tty` unreachable (cron, no-tty SSH) | Silent no-op - `try/catch` around `openSync` |\n| Windows | Best-effort - writes OSC 777 to `process.stdout` so ConPTY forwards it to Warp ([Warp eng blog: \"ConPTY will send even unrecognized OSCs to the shell\"](https://www.warp.dev/blog/building-warp-on-windows)). Skipped when stdout is not a TTY (piped/redirected output). Untested in the wild - no Warp plugin currently ships a Windows transport |\n| Known-broken Warp build | Silent no-op - broken-version table gates emission per channel |\n\n## Why standalone (not a sibling)\n\n`rpiv-warp` is intentionally NOT registered in `rpiv-pi`'s sibling list. Not every Pi user uses Warp - auto-installing it everywhere would impose Warp-specific code on every install. If you don't use Warp, don't install it. If you do, install it explicitly. The package still joins the rpiv-mono lockstep version + shared release pipeline.\n\n## License\n\n[![npm version](https://img.shields.io/npm/v/@juicesharp/rpiv-warp.svg)](https://www.npmjs.com/package/@juicesharp/rpiv-warp)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)\n\nMIT - see [LICENSE](./LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "rpiv",
+    "warp",
+    "terminal",
+    "notifications",
+    "osc-777"
+  ],
+  "author": {
+    "name": "juicesharp"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-warp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juicesharp/rpiv-mono.git",
+    "directory": "packages/rpiv-warp"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-08T18:45:52.435Z",
+    "modified": "2026-06-15T12:35:42.394Z",
+    "1.0.19": "2026-05-03T10:58:30.104Z",
+    "1.3.0": "2026-05-08T18:45:52.775Z",
+    "1.3.1": "2026-05-10T00:31:43.183Z",
+    "1.4.0": "2026-05-10T18:56:02.087Z",
+    "1.4.1": "2026-05-11T12:47:30.250Z",
+    "1.4.2": "2026-05-11T13:07:33.434Z",
+    "1.5.0": "2026-05-12T16:37:41.031Z",
+    "1.5.1": "2026-05-13T00:15:04.678Z",
+    "1.5.2": "2026-05-13T17:02:24.960Z",
+    "1.6.0": "2026-05-14T17:13:40.110Z",
+    "1.6.1": "2026-05-14T20:15:26.488Z",
+    "1.7.0": "2026-05-15T17:47:03.788Z",
+    "1.8.0": "2026-05-16T14:40:52.730Z",
+    "1.8.1": "2026-05-17T17:01:10.530Z",
+    "1.8.2": "2026-05-17T22:12:32.742Z",
+    "1.8.3": "2026-05-18T02:42:44.234Z",
+    "1.9.0": "2026-05-18T18:11:34.748Z",
+    "1.9.1": "2026-05-19T10:45:10.939Z",
+    "1.9.2": "2026-05-19T13:49:13.406Z",
+    "1.10.0": "2026-05-19T21:03:02.594Z",
+    "1.10.1": "2026-05-19T23:29:29.082Z",
+    "1.10.2": "2026-05-20T03:02:12.300Z",
+    "1.11.0": "2026-05-20T21:04:01.739Z",
+    "1.12.0": "2026-05-21T13:16:07.822Z",
+    "1.13.0": "2026-05-25T19:36:56.102Z",
+    "1.14.0": "2026-05-28T01:45:44.660Z",
+    "1.14.1": "2026-05-28T02:02:40.449Z",
+    "1.14.2": "2026-05-28T02:12:32.251Z",
+    "1.14.3": "2026-05-28T02:33:59.714Z",
+    "1.14.4": "2026-05-28T02:45:42.966Z",
+    "1.14.5": "2026-05-28T04:48:04.367Z",
+    "1.14.6": "2026-05-28T10:13:00.672Z",
+    "1.14.7": "2026-05-28T12:16:26.659Z",
+    "1.15.0": "2026-05-28T15:21:48.122Z",
+    "1.16.0": "2026-05-30T14:56:55.962Z",
+    "1.16.1": "2026-05-30T15:03:24.057Z",
+    "1.17.0": "2026-06-01T02:33:17.693Z",
+    "1.17.1": "2026-06-01T13:13:19.247Z",
+    "1.18.0": "2026-06-04T14:56:35.180Z",
+    "1.18.1": "2026-06-04T16:04:05.803Z",
+    "1.18.2": "2026-06-04T16:30:25.566Z",
+    "1.19.0": "2026-06-09T13:23:55.436Z",
+    "1.19.1": "2026-06-10T03:41:37.581Z",
+    "1.20.0": "2026-06-15T12:35:42.277Z"
+  },
+  "versions_count": 43,
+  "downloads_last_week": null,
+  "download_trend": []
+}

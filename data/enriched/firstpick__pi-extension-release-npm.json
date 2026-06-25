@@ -1,0 +1,64 @@
+{
+  "name": "@firstpick/pi-extension-release-npm",
+  "latest_version": "0.4.0",
+  "description": "Pi command to run npm package release workflow with publish confirmation.",
+  "readme": "# @firstpick/pi-extension-release-npm\n\nRelease orchestration command for this npm-packages workspace.\n\n## What it does\n\n- Adds `/release-npm` command.\n- Adds `/release-npm-setup` command to configure the npm auth token via Pi native input.\n- Checks npm authentication with `npm whoami` before release preflight starts.\n- Runs release preflight checks before asking to publish.\n- Shows a summary of planned version changes and publish actions in the confirmation prompt.\n- Publishes only after explicit confirmation.\n- During preflight, uses version planning to shortlist publish candidates and runs publish checks only for that shortlist.\n- After confirmation, publishes only package targets detected in the pre-confirmation publish plan instead of scanning all packages again.\n- After a successful publish, updates installed Pi extensions only for packages detected in that same pre-confirmation publish plan.\n- Streams live release output in an above-editor panel, separate from the conversation transcript.\n- Shows exact helper commands and current publish target/progress in the live stream.\n- In Pi Web UI, renders the live stream as a scrollable release card with toggle/abort actions.\n- Keeps the normal Pi input row usable while the release is running.\n- Shows phase, output mode, elapsed time, and controls in a below-editor footer.\n- Toggles compact/expanded output with `Ctrl+O` or `/release-toggle` while `/release-npm` runs in the background.\n- Aborts the active release subprocess with `Ctrl+C` or `/release-abort` while `/release-npm` runs in the background.\n- Saves each release run log under `~/.pi/agent/release-npm-logs/`.\n- Shows saved logs with `/release-npm-logs` in an above-editor widget display that works in both TUI and Web UI.\n\n## Install\n\n```bash\npi install npm:@firstpick/pi-extension-release-npm\n```\n\n## Configuration\n\nPublishing requires valid npm credentials. `/release-npm` checks `npm whoami` before it starts preflight work and aborts immediately if npm is not authenticated.\n\nRun `/release-npm-setup`, paste an npm access token, and the extension will run:\n\n```bash\nnpm config set //registry.npmjs.org/:_authToken \"<token>\"\n```\n\nIt then verifies the token with `npm whoami`.\n\n## Expected workspace structure\n\nThis extension is intended for a package workspace, not a single arbitrary npm package. Run `/release-npm` from the workspace root.\n\nFor local development workspaces, release helper scripts live under `dev/scripts`:\n\n```text\nnpm-packages/\n  dev/\n    scripts/\n      release-workflow.sh\n      bump-package-versions.sh\n      check-publish-readiness.sh\n      publish-packages.sh\n\n  pi-extension-example/\n    package.json\n    README.md\n    LICENSE\n    index.ts\n\n  pi-skill-example/\n    package.json\n    README.md\n    LICENSE\n    ...\n```\n\nPackage discovery is shallow: only direct child directories of the current working directory that contain a `package.json` are considered. Nested packages and npm/yarn/pnpm workspace metadata are not scanned.\n\nEach package should include:\n\n```json\n{\n  \"name\": \"@scope/package-name\",\n  \"version\": \"0.1.0\",\n  \"license\": \"MIT\",\n  \"keywords\": [\"pi-package\"],\n  \"pi\": {\n    \"extensions\": [\"./index.ts\"]\n  },\n  \"files\": [\n    \"index.ts\",\n    \"README.md\",\n    \"LICENSE\"\n  ]\n}\n```\n\nReadiness checks require or verify:\n\n- valid `package.json`\n- `name`, `version`, and `license`\n- `README.md`\n- `pi.extensions` with entries pointing to existing files or matching globs\n- `keywords` containing `pi-package` is recommended for discoverability\n- `LICENSE` is recommended\n\n`/release-npm` runs `./dev/scripts/release-workflow.sh --plan --all` first. The plan step writes publish candidates from version planning to a temporary target list, applies planned version bumps in a temporary workspace, and runs publish checks only for those candidate directories. After confirmation it publishes only the package directories detected in that plan with `./dev/scripts/release-workflow.sh --publish --target <dir>`.\n\n## Commands\n\n- `/release-npm-setup` \u2014 prompts for an npm token with Pi native input, saves it using `npm config set //registry.npmjs.org/:_authToken <token>`, then verifies with `npm whoami`.\n- `/release-npm` \u2014 checks `npm whoami` first, runs `./dev/scripts/release-workflow.sh --plan --all`, shows the planned version/publish summary plus exact package targets, prompts for confirmation, then runs `./dev/scripts/release-workflow.sh --publish --target <dir>` only for those detected targets. It does not install packages after publishing.\n- `/release-toggle` \u2014 toggles active release output between compact and expanded mode (`Ctrl+O` also toggles in TUI).\n- `/release-abort` \u2014 aborts the active release subprocess (`Ctrl+C` also aborts in TUI while the release subprocess is active).\n- `/release-npm-logs` \u2014 select a saved release run and display it above the editor; press `Esc`/`q` in TUI or run `/release-npm-logs close` to close it.\n\n## Tools\n\nNone.\n\n## Example view\n\n```text\n/release-npm\nRelease preflight summary:\nVersion changes:\n  @firstpick/pi-extension-release-npm from 0.2.0: would bump up -> 0.2.1\nBump summary:\n  - would bump up: 1\n  - would reduce down: 0\n  - unchanged: 13\n  - first release (no npm version): 0\n  - errors: 0\nWill publish:\n  @firstpick/pi-extension-release-npm@0.2.1 -> publish-update\nWill skip:\n  none\nBlocked:\n  none\n\nPublish eligible packages now?  All eligible packages / Publish selected packages / [ ] package buttons / Cancel\n\nRelease workflow\n  Publish candidates from version planning:\n    - pi-extension-release-npm\n  Applying planned version bumps in temporary workspace for publish candidates: ./dev/scripts/bump-package-versions.sh --targets-file /tmp/.../publish-targets.txt --apply\n  Running publish plan for preselected targets against version-bumped temp workspace: ./dev/scripts/publish-packages.sh --targets-file /tmp/.../publish-targets.txt --publisher npm --access public --strict-auth\n\nPublish summary:\n  - published total: 3\n  - skipped: 11\n  - failed: 0\n```\n\nThe command checks first, asks only after showing the preflight summary, then shows an All button plus per-package toggle buttons so you can publish every eligible package or only selected publish/update targets. It keeps release output visible in Pi.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "npm",
+    "release"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/Firstp1ck/npm-packages/tree/main/pi-extension-release-npm#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Firstp1ck/npm-packages.git",
+    "directory": "pi-extension-release-npm"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-07T19:47:38.212Z",
+    "modified": "2026-06-08T21:35:05.341Z",
+    "0.1.0": "2026-05-07T19:47:38.438Z",
+    "0.1.1": "2026-05-07T20:28:49.092Z",
+    "0.1.2": "2026-05-07T20:53:39.898Z",
+    "0.1.3": "2026-05-07T21:21:58.848Z",
+    "0.1.4": "2026-05-10T22:22:33.681Z",
+    "0.1.5": "2026-05-10T22:47:54.086Z",
+    "0.1.6": "2026-05-10T22:52:32.054Z",
+    "0.1.7": "2026-05-10T22:57:22.226Z",
+    "0.1.8": "2026-05-12T20:53:38.665Z",
+    "0.1.9": "2026-05-12T21:20:08.110Z",
+    "0.2.0": "2026-05-12T21:26:10.770Z",
+    "0.2.1": "2026-05-14T21:46:42.350Z",
+    "0.2.2": "2026-05-15T10:11:47.423Z",
+    "0.2.3": "2026-05-15T10:29:26.704Z",
+    "0.2.4": "2026-05-15T23:42:36.988Z",
+    "0.2.5": "2026-05-16T12:07:42.376Z",
+    "0.2.6": "2026-05-18T13:06:21.084Z",
+    "0.2.7": "2026-05-18T13:58:41.977Z",
+    "0.2.8": "2026-05-20T19:22:24.118Z",
+    "0.2.9": "2026-05-27T15:18:15.495Z",
+    "0.3.0": "2026-05-27T20:45:33.389Z",
+    "0.3.1": "2026-05-31T18:35:49.635Z",
+    "0.3.2": "2026-06-02T21:32:14.222Z",
+    "0.3.3": "2026-06-02T22:43:55.785Z",
+    "0.3.4": "2026-06-04T13:25:26.339Z",
+    "0.3.5": "2026-06-05T18:04:45.619Z",
+    "0.3.6": "2026-06-06T09:59:11.465Z",
+    "0.3.7": "2026-06-07T00:07:27.258Z",
+    "0.3.8": "2026-06-07T17:20:28.478Z",
+    "0.3.9": "2026-06-07T18:38:34.786Z",
+    "0.4.0": "2026-06-08T21:35:05.226Z"
+  },
+  "versions_count": 31,
+  "downloads_last_week": 382,
+  "download_trend": []
+}

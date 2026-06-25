@@ -1,0 +1,47 @@
+{
+  "name": "@firstpick/pi-extension-safety-guard",
+  "latest_version": "0.2.3",
+  "description": "Interactive guardrails for dangerous bash commands and protected file edits in Pi.",
+  "readme": "# pi-extension-safety-guard\n\nInteractive safety prompts for high-risk operations in Pi.\n\n![Safety guard confirmation prompt](https://unpkg.com/@firstpick/pi-extension-safety-guard/images/safety_guard_v0.1.9.png)\n\n## What it does\n\n- Intercepts risky `bash` commands and requires confirmation.\n- Intercepts `write`/`edit` on protected paths and requires confirmation.\n- In non-interactive mode, blocks risky operations with explicit reasons.\n- Can be toggled per session with `/safety-guard on|off|status`.\n- Supports exact allow entries for the current session or permanently per cwd.\n\n## Guarded command categories\n\n### Git destruction / history rewriting\n\nExamples:\n\n- `git reset --hard`\n- `git reset --soft`, `git reset --mixed`, `git reset --merge`, `git reset --keep`\n- `git reset HEAD~...`, `git reset HEAD^...`, `git reset <commit>`\n- `git clean -f`, including `git clean -fd` / `git clean -xdf`\n- `git checkout -- <path>`, `git switch ...`, and `git restore ...`\n- `git branch -d/-D`, `git tag -d`\n- `git push --force`, `git push --force-with-lease`\n- `git push --delete`, `git push :refs/heads/...`\n- `git rebase`, including interactive rebases\n- `git commit --amend`, `git commit --fixup`, `git commit --squash`\n- `git filter-branch`, `git filter-repo`\n- `git replace`, `git update-ref`\n- `git notes remove`, `git notes prune`\n- `git reflog expire`, `git gc --prune`, `git prune`\n\n### Filesystem deletion / overwrite\n\nExamples:\n\n- recursive or force `rm`\n- `rm` targeting `/`, `~`, `$HOME`, `.`, or globs\n- `find ... -delete`\n- `find ... -exec rm ...`\n- `xargs ... rm`\n- `truncate -s 0`\n- `shred`\n- `dd`\n- `mkfs`, `wipefs`, `parted`, `fdisk`, `sfdisk`, `sgdisk`\n\n### Docker / Podman destruction\n\nExamples:\n\n- `docker rm`, `docker rmi`\n- `docker volume rm`, `docker volume prune`\n- `docker system prune`\n- `docker compose down -v` / `--volumes`\n- `docker-compose down -v` / `--volumes`\n- `podman rm`, `podman rmi`, `podman system prune`\n\n### Package removal\n\nExamples:\n\n- `npm uninstall/remove/rm/prune`\n- `pnpm remove/prune`\n- `yarn remove/autoclean`\n- `bun remove`\n- `pip uninstall`, `uv remove`, `cargo remove`\n- `pacman -R`, `paru -R`, `yay -R`\n- `apt remove/purge/autoremove`, `dnf remove`\n\n### System state / permissions\n\nExamples:\n\n- `sudo`\n- `shutdown`, `reboot`, `poweroff`\n- `systemctl stop/disable/mask/restart`\n- `killall`, `pkill`, `kill -9`\n- `mount`, `umount`, `swapon`, `swapoff`\n- recursive `chmod` / `chown`\n- `chmod 777`\n- `setfacl`\n- common fork-bomb signature\n\n### Dangerous SQL\n\nExamples:\n\n- `DROP DATABASE`, `DROP SCHEMA`\n- `DROP TABLE`, `DROP INDEX`\n- `TRUNCATE` / `TRUNCATE TABLE`\n- `DELETE FROM ...` without `WHERE`\n- `UPDATE ... SET ...` without `WHERE`\n- `ALTER TABLE ... DROP COLUMN/CONSTRAINT`\n\nSQL rules are matched against the full bash command, including heredoc bodies, so database client calls like `psql <<SQL ... SQL` can still be guarded.\n\n### Secret file access\n\nExamples of commands that may reveal or copy secrets are prompted when targeting sensitive files:\n\n- `cat`, `grep`, `rg`, `awk`, `sed`, `cp`\n- `.env`, `.env.*`, `.git-credentials`, `auth.json`\n- `id_rsa`, `id_ed25519`\n- `.npmrc`, `.pypirc`, `.netrc`\n- `.aws/credentials`, `.aws/config`, `.kube/config`\n- `.config/gh/hosts.yml`, `.config/gcloud/...`\n- `*.pem`, `*.key`, `*.p12`, `*.kdbx`\n\n## Protected paths\n\n`write` and `edit` prompts are triggered for sensitive paths including:\n\n- `.ssh/`\n- `.git-credentials`\n- `auth.json`\n- `id_rsa`, `id_ed25519`, and matching `.pub` files\n- `.env`, `.env.*`, `.envrc`\n- `.npmrc`, `.pypirc`, `.netrc`\n- `.kube/config`\n- `.aws/credentials`, `.aws/config`\n- `.config/gh/hosts.yml`\n- `.config/gcloud/`\n- `*.pem`, `*.key`, `*.p12`, `*.kdbx`\n\n## Install\n\n```bash\npi install npm:@firstpick/pi-extension-safety-guard\n```\n\n## Configuration\n\nNo required configuration.\n\nPermanent allows are stored in:\n\n```text\n~/.pi/agent/safety-guard-allow.json\n```\n\nAllow entries are exact matches scoped to the current working directory:\n\n- bash: exact command string + cwd\n- write/edit: resolved protected path + cwd\n\nWhen a guard prompt appears, choose one of:\n\n- `Block`\n- `Allow once`\n- `Allow for this session`\n- `Always allow in this cwd`\n\n## Commands\n\n```text\n/safety-guard status\n/safety-guard on\n/safety-guard off\n/safety-guard allow-list\n/safety-guard allow-clear-session\n/safety-guard allow-clear-permanent\n```\n\nWhen disabled, the status bar shows `\ud83d\udd13!`.\n\n`allow-list` shows both session and permanent entries. `allow-clear-session` clears only the in-memory list. `allow-clear-permanent` empties the persisted allow file.\n\n## Tools\n\nNone.\n\n## Example view\n\n```text\n!git reset --hard\nSafety guard: high-risk git command detected\nAllow this command?  No / Yes\n\nedit .env\nSafety guard: protected path detected (.env)\nAllow edit?  No / Yes\n```\n\nThe guard adds a pause before risky shell commands or sensitive file edits, while still letting you proceed intentionally.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/Firstp1ck/npm-packages/tree/main/pi-extension-safety-guard#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Firstp1ck/npm-packages.git",
+    "directory": "pi-extension-safety-guard"
+  },
+  "pi": {
+    "image": "https://unpkg.com/@firstpick/pi-extension-safety-guard/images/safety_guard_v0.1.9.png",
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-03T10:13:07.660Z",
+    "modified": "2026-06-08T21:35:11.842Z",
+    "0.1.0": "2026-05-03T10:13:07.871Z",
+    "0.1.1": "2026-05-03T10:28:48.733Z",
+    "0.1.2": "2026-05-07T19:47:39.834Z",
+    "0.1.3": "2026-05-12T20:53:42.328Z",
+    "0.1.4": "2026-05-12T21:20:12.951Z",
+    "0.1.5": "2026-05-15T09:58:04.218Z",
+    "0.1.6": "2026-05-15T23:23:25.287Z",
+    "0.1.7": "2026-05-17T23:40:19.375Z",
+    "0.1.8": "2026-05-19T19:33:04.295Z",
+    "0.1.9": "2026-05-22T17:59:17.877Z",
+    "0.2.0": "2026-06-05T18:27:52.707Z",
+    "0.2.1": "2026-06-05T19:00:36.506Z",
+    "0.2.2": "2026-06-07T18:38:42.303Z",
+    "0.2.3": "2026-06-08T21:35:11.755Z"
+  },
+  "versions_count": 14,
+  "downloads_last_week": null,
+  "download_trend": []
+}

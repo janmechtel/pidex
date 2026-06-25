@@ -1,0 +1,46 @@
+{
+  "name": "pi-btw",
+  "latest_version": "0.4.1",
+  "description": "A pi extension for parallel side conversations with /btw",
+  "readme": "# pi-btw\n\nA small [pi](https://github.com/earendil-works/pi-mono) extension that adds a `/btw` side conversation channel.\n\n`/btw` opens a real pi sub-session with coding-tool access, and it runs immediately even while the main agent is still busy.\n\n![BTW overlay example](docs/btw-overlay.png)\n\n## What it does\n\n- opens a parallel side conversation without interrupting the main run\n- runs that side conversation as a real pi sub-session with `read` / `bash` / `edit` / `write` tool access\n- keeps a continuous BTW thread by default\n- supports `/btw:tangent` for a contextless side thread that does not inherit the current main-session conversation\n- opens a focused BTW modal shell with its own composer and transcript\n- keeps the BTW overlay open while you switch focus back to the main editor with `Alt+/`\n- keeps BTW thread entries out of the main agent's future context\n- supports BTW-only model and thinking overrides without changing the main thread settings\n- lets you inject the full thread, or a summary of it, back into the main agent\n- optionally saves an individual BTW exchange as a visible session note with `--save`\n\n## Install\n\n### From npm (after publish)\n\n```bash\npi install npm:pi-btw\n```\n\n### From git\n\n```bash\npi install git:github.com/dbachelder/pi-btw\n```\n\nThen reload pi:\n\n```text\n/reload\n```\n\n### From a local checkout\n\n```bash\npi install /absolute/path/to/pi-btw\n```\n\n## Usage\n\n```text\n/btw what file defines this route?\n/btw how would you refactor this parser?\n/btw --save summarize the last error in one sentence\n/btw:new let's start a fresh thread about auth\n/btw:tangent brainstorm from first principles without using the current chat context\n/btw:model openai gpt-5-mini openai-responses\n/btw:thinking low\n/btw:inject implement the plan we just discussed\n/btw:summarize turn that side thread into a short handoff\n/btw:clear\n```\n\n## Commands\n\n### `/btw [--save] <question>`\n\n- runs right away\n- works while pi is busy\n- creates or reuses a real BTW sub-session instead of a one-off completion call\n- continues the current BTW thread\n- opens or refreshes the focused BTW modal shell\n- streams into the BTW modal transcript/status surface\n- persists the BTW exchange as hidden thread state\n- with `--save`, also saves that single exchange as a visible session note\n\n## Overlay controls\n\n- `Alt+/` toggles focus between BTW and the main editor without closing the overlay\n- `Ctrl+Alt+W` is a fallback focus toggle for terminals that do not deliver `Alt+/` as a usable shortcut\n- `Esc` still dismisses BTW immediately while the overlay is focused\n- BTW now opens top-centered so the main session remains visible underneath it\n\n### `/btw:new [question]`\n\n- clears the current BTW thread\n- starts a fresh thread that still inherits the current main-session context\n- optionally asks the first question in the new thread immediately\n- if no question is provided, opens a fresh BTW modal ready for the next prompt\n\n### `/btw:tangent [--save] <question>`\n\n- starts or continues a contextless tangent thread\n- does not inherit the current main-session conversation\n- if you switch from `/btw` to `/btw:tangent` (or back), the previous side thread is cleared so the modes do not mix\n- opens or refreshes the same focused BTW modal shell\n- with `--save`, also saves that single exchange as a visible session note\n\n### `/btw:clear`\n\n- dismisses the BTW modal/widget\n- clears the current BTW thread\n\n### `/btw:inject [instructions]`\n\n- sends the full BTW thread back to the main agent as a user message\n- if pi is busy, queues it as a follow-up\n- clears the BTW thread after sending\n\n### `/btw:summarize [instructions]`\n\n- summarizes the BTW thread with the current effective BTW model\n- always runs summarize with thinking off, even if BTW chat is using a thinking override\n- injects the summary into the main agent\n- if pi is busy, queues it as a follow-up\n- clears the BTW thread after sending\n\n### `/btw:model [<provider> <model> <api> | clear]`\n\n- with no args, shows the current effective BTW model and whether it is inherited or overridden\n- with values, sets a BTW-only model override\n- `clear` removes the override and returns BTW to inheriting the main thread model\n- if the configured BTW model has no credentials, BTW warns and falls back to the main thread model\n\n### `/btw:thinking [<level> | clear]`\n\n- with no args, shows the current effective BTW thinking level and whether it is inherited or overridden\n- with a value, sets a BTW-only thinking override for normal BTW chat\n- `clear` removes the override and returns BTW to inheriting the main thread thinking level\n- changing `/btw:model` or `/btw:thinking` disposes the current BTW sub-session and applies the new settings on the next BTW prompt while preserving the hidden thread\n\n## Behavior\n\n### Real sub-session model\n\nBTW is implemented as an actual pi sub-session with its own in-memory session state, transcript events, and tool surface.\n\n- contextual `/btw` threads seed that sub-session from the current main-session branch while filtering out BTW-visible notes from the parent context\n- `/btw:tangent` starts the same BTW UI in a contextless mode with no inherited main-session conversation\n- BTW can inherit the main thread model/thinking settings or use BTW-only overrides via `/btw:model` and `/btw:thinking`\n- `/btw:summarize` uses the current effective BTW model but keeps thinking off\n- the overlay transcript/status line is driven from sub-session events, so tool activity, streaming deltas, failures, and recovery are all visible without scraping rendered output\n- handoff commands (`/btw:inject` and `/btw:summarize`) read from the BTW sub-session thread rather than maintaining a separate manual transcript model\n\n### In-modal slash behavior\n\nInside the BTW modal composer, slash handling is split at the BTW/session boundary:\n\n- `/btw:new`, `/btw:tangent`, `/btw:clear`, `/btw:model`, `/btw:thinking`, `/btw:inject`, and `/btw:summarize` stay owned by BTW because they control BTW lifecycle, configuration, or handoff behavior\n- any other slash-prefixed input is routed through the BTW sub-session's normal `prompt()` path\n- this means ordinary pi slash commands like `/help` are handled by the sub-session instead of being rejected by a modal-only fallback\n- if the sub-session cannot handle a slash command, BTW surfaces the real sub-session failure through the transcript/status state instead of inventing an \"unsupported slash input\" warning\n\nThis keeps BTW-owned lifecycle commands explicit while giving the side conversation the same slash-command surface as the underlying sub-session.\n\n## Behavior\n\n### Hidden BTW thread state\n\nBTW exchanges are persisted in the session as hidden custom entries so they:\n\n- survive reloads and restarts\n- rehydrate the BTW modal shell for the current branch\n- preserve whether the current side thread is a normal `/btw` thread or a contextless `/btw:tangent`\n- preserve the current BTW-only model and thinking overrides for that session history\n- stay out of the main agent's LLM context\n\n### Visible saved notes\n\nIf you use `--save`, that one BTW exchange is also written as a visible custom message in the session transcript.\n\n## Why\n\nSometimes you want to:\n\n- ask a clarifying question while the main agent keeps working\n- think through next steps without derailing the current turn\n- explore an idea, then inject it back once it's ready\n\n## Included skill\n\nThis package also ships a small `btw` skill so pi can better recognize when a side-conversation workflow is appropriate.\n\nIt helps with discoverability and guidance, but it is not required for the extension itself to work.\n\n## Development\n\nThe extension entrypoint is:\n\n- `extensions/btw.ts`\n\nThe included skill is:\n\n- `skills/btw/SKILL.md`\n\nTo use it without installing:\n\n```bash\npi -e /path/to/pi-btw\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "agent",
+    "tui"
+  ],
+  "author": {
+    "name": "Dan Bachelder"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/dbachelder/pi-btw#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dbachelder/pi-btw.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/btw.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "image": "https://raw.githubusercontent.com/dbachelder/pi-btw/main/docs/btw-overlay.png"
+  },
+  "time": {
+    "created": "2026-03-11T04:00:30.700Z",
+    "modified": "2026-06-09T22:18:30.011Z",
+    "0.1.0": "2026-03-11T04:00:30.923Z",
+    "0.1.1": "2026-03-13T23:46:09.286Z",
+    "0.2.0": "2026-03-16T00:08:46.722Z",
+    "0.2.1": "2026-03-16T17:18:37.243Z",
+    "0.3.7": "2026-04-14T02:32:02.155Z",
+    "0.3.8": "2026-04-30T20:58:50.659Z",
+    "0.4.0": "2026-05-07T17:34:54.023Z",
+    "0.4.1": "2026-06-09T22:18:29.759Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": null,
+  "download_trend": []
+}

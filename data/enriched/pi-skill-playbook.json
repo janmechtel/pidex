@@ -1,0 +1,40 @@
+{
+  "name": "pi-skill-playbook",
+  "latest_version": "1.0.1",
+  "description": "Pi extension for passive, human-mediated Agent Skill playbooks.",
+  "readme": "# Pi Skill Playbook\n\n[![CI](https://github.com/eiei114/pi-skill-playbook/actions/workflows/auto-release.yml/badge.svg)](https://github.com/eiei114/pi-skill-playbook/actions/workflows/auto-release.yml)\n[![Publish](https://github.com/eiei114/pi-skill-playbook/actions/workflows/publish.yml/badge.svg)](https://github.com/eiei114/pi-skill-playbook/actions/workflows/publish.yml)\n[![npm version](https://img.shields.io/npm/v/pi-skill-playbook.svg)](https://www.npmjs.com/package/pi-skill-playbook)\n[![npm downloads](https://img.shields.io/npm/dt/pi-skill-playbook.svg)](https://www.npmjs.com/package/pi-skill-playbook)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)\n[![Pi package](https://img.shields.io/badge/Pi-package-blue)](https://github.com/eiei114/pi-skill-playbook)\n\nHuman-mediated Agent Skill playbooks for the [Pi coding agent](https://github.com/earendil-works/pi-coding-agent).\n\n## What this is\n\nPi Skill Playbook is a Pi extension that guides Agent Skill usage flows with **visible, human-controlled playbooks**. It shows the current workflow step, next recommended skill command, and completion criteria \u2014 but never runs skills automatically.\n\nDefine ordered skill workflows as YAML playbooks in your project, then drive them step by step from the Pi command palette.\n\n## Features\n\n- **Playbook-driven workflows** \u2014 Define multi-step skill sequences with named outcomes and transitions in YAML.\n- **Human-mediated** \u2014 Every step requires an explicit user action. No hidden automation.\n- **Marker-based auto advance** \u2014 Single-outcome steps advance automatically when the assistant emits a visible `PLAYBOOK_OUTCOME:` marker. Multi-outcome steps always require explicit confirmation.\n- **Active run widget** \u2014 Displays current step, skill command, completion criteria, and outcome labels below the editor.\n- **Strict YAML validation** \u2014 Playbooks are validated on load for structure, transitions, and skill references.\n- **Selection UI** \u2014 Playbook, run, and outcome selection use the Pi TUI selector instead of memorized ids.\n- **Local run state** \u2014 Run state is stored in `.pi/playbook-runs/` inside the target project, never in git.\n\n## Install\n\n### From npm\n\n```bash\npi install npm:pi-skill-playbook\n```\n\n### From GitHub\n\n```bash\npi install git:github.com/eiei114/pi-skill-playbook\n```\n\nOr with a full Git URL:\n\n```bash\npi install git+https://github.com/eiei114/pi-skill-playbook.git\n```\n\n### Locally (for development)\n\n```bash\ngit clone https://github.com/eiei114/pi-skill-playbook.git\ncd pi-skill-playbook\nnpm install\npi -e .\n```\n\n## Quick start\n\n1. **Copy a sample playbook** into your project:\n\n   ```bash\n   mkdir -p .pi/playbooks\n   cp node_modules/pi-skill-playbook/samples/feature-development.yml .pi/playbooks/\n   ```\n\n2. **Add run state to `.gitignore`** in the target project:\n\n   ```gitignore\n   .pi/playbook-runs/\n   ```\n\n3. **Start a run** from the Pi TUI:\n\n   ```\n   /playbook:list\n   /playbook:start\n   ```\n\n   When more than one playbook exists, Pi shows a selector with validation status for each playbook. The run id is generated automatically.\n\n4. **Drive the workflow**:\n\n   ```\n   /skill:grill-with-docs <feature idea>\n   /playbook:done\n   /playbook:choose\n   /playbook:status\n   ```\n\nThe widget displays the current step, exact skill command, completion criteria, and outcome labels.\n\n## Usage summary\n\n| Command | Description |\n|---|---|\n| `/playbook:list` | List available playbooks with validation status |\n| `/playbook:start` | Select a playbook and start a new run |\n| `/playbook:resume` | Select an active run to resume |\n| `/playbook:status` | Show current step and completion criteria |\n| `/playbook:done` | Complete the current step (auto-advances if single outcome) |\n| `/playbook:choose` | Select an outcome for multi-branch steps |\n| `/playbook:cancel` | Select and confirm an active run cancellation |\n\nAll commands are argument-free. Use the Pi TUI selection UI to pick playbooks, runs, and outcomes.\n\n### Auto advance\n\nPlaybooks default to `autoAdvance: auto`. When a user explicitly runs the current step's skill with `/skill:<name>`, Pi Skill Playbook injects a short prompt asking the assistant to emit a visible completion marker:\n\n```text\nPLAYBOOK_OUTCOME: ready-for-prd\n```\n\n| Mode | Behavior |\n|---|---|\n| `auto` (default) | Marker can advance single-outcome steps automatically |\n| `suggest` | Marker only suggests `/playbook:done` or `/playbook:choose` |\n| `off` | No prompt injection or completion detection |\n\n## Package contents\n\n```\npi-skill-playbook/\n\u251c\u2500\u2500 extensions/     Pi extension entry point\n\u251c\u2500\u2500 src/            Domain logic: validation, state, rendering, auto-advance\n\u251c\u2500\u2500 samples/        Example playbooks (feature-development.yml)\n\u251c\u2500\u2500 tests/          Node.js test suite\n\u251c\u2500\u2500 docs/adr/       Architecture decision records\n\u251c\u2500\u2500 LICENSE         MIT\n\u2514\u2500\u2500 README.md\n```\n\n### Playbook YAML structure\n\n```yaml\nversion: 1\nid: my-playbook\nname: My Playbook\nentry: first-step\nautoAdvance: auto        # auto | suggest | off\n\nskills:\n  my-skill:\n    role: entry\n\nsteps:\n  first-step:\n    primarySkill: my-skill\n    commandHint: \"/skill:my-skill <arg>\"\n    doneWhen:\n      - Criterion one.\n      - Criterion two.\n    transitions:\n      - outcome: done\n        to: complete        # \"complete\" ends the run\n```\n\nSee [`samples/feature-development.yml`](samples/feature-development.yml) for a full example.\n\n## Development\n\n```bash\nnpm install\nnpm run check     # TypeScript type check\nnpm test          # Run tests (Node.js built-in test runner + tsx)\n```\n\nRequires Node.js \u2265 24, TypeScript 5.8+, and tsx 4.20+.\n\n## Release\n\nReleases are automated via GitHub Actions:\n\n1. Bump `version` in `package.json` and merge to `main`.\n2. `auto-release.yml` detects the new version, creates a git tag and GitHub Release.\n3. `publish.yml` publishes to npm with provenance.\n\nManual dispatch is also available from the Actions tab.\n\n## Security\n\n- Run state is local-only (`.pi/playbook-runs/`). No data leaves the machine.\n- The extension does **not** inject system prompts for skill execution. It only adds a short playbook prompt describing the current step, valid outcomes, and expected marker format.\n- No automatic file edits \u2014 the extension warns with a `.gitignore` snippet instead of modifying files.\n- For vulnerability reporting, see [`SECURITY.md`](SECURITY.md).\n\n## Links\n\n- [npm package](https://www.npmjs.com/package/pi-skill-playbook)\n- [GitHub repository](https://github.com/eiei114/pi-skill-playbook)\n- [Pi coding agent](https://github.com/earendil-works/pi-coding-agent)\n- [Architecture decisions](docs/adr/)\n\n## License\n\n[MIT](LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "agent-skills",
+    "playbook"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/eiei114/pi-skill-playbook#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eiei114/pi-skill-playbook.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-25T13:44:58.385Z",
+    "modified": "2026-06-23T03:03:25.397Z",
+    "0.1.0": "2026-05-25T13:44:58.618Z",
+    "0.1.1": "2026-05-25T13:50:05.628Z",
+    "0.1.2": "2026-05-25T23:44:50.628Z",
+    "0.1.3": "2026-05-25T23:47:41.802Z",
+    "0.1.4": "2026-06-01T11:46:14.632Z",
+    "0.1.5": "2026-06-02T14:25:08.525Z",
+    "0.2.0": "2026-06-08T14:37:50.067Z",
+    "1.0.0": "2026-06-18T22:47:00.416Z",
+    "1.0.1": "2026-06-23T03:03:25.116Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": null,
+  "download_trend": []
+}

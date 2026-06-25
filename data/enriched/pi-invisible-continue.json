@@ -1,0 +1,47 @@
+{
+  "name": "pi-invisible-continue",
+  "latest_version": "0.3.3",
+  "description": "Invisible session continuation for pi \u2014 resume the agentic loop without sending ANY prompt the LLM can see",
+  "readme": "<div align=\"center\">\n\n# \ud83d\udc7b pi-invisible-continue\n\n**Invisible session continuation for [pi](https://github.com/earendil-works/pi-coding-agent)**\n\n_Resume the agentic loop without the LLM seeing any new prompt at all._\n\n[![pi extension](https://img.shields.io/badge/pi-extension-blueviolet)](https://github.com/earendil-works/pi-coding-agent)\n[![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)\n\n</div>\n\n---\n\n## The Problem\n\nEvery existing \"continue\" extension sends a **visible user message** to the LLM:\n\n| Package | What the LLM sees |\n|---------|-------------------|\n| `pi-continue` | `\"Continue from the same-session pi-continue/v3 handoff Pi just saved...\"` (full handoff doc) |\n| `pi-hodor` | `\"continue\"` (literal text) |\n| `pi-auto-continue` | `\"continue\"` (literal text) |\n| `pi-retry` | `\"Continue\"` on max-tokens, or hidden custom trigger on errors |\n\nEvery one of those **changes the LLM's context** with new user text. That text influences the next response, sometimes in unintended ways \u2014 model changes course, re-reads things it already processed, or treats a bare `\"continue\"` as a new task.\n\n---\n\n## The Solution\n\n`pi-invisible-continue` captures the internal `Agent` instance via a prototype monkey-patch on `Agent.prototype.prompt`. When `/continue` is invoked, it calls `agent.prompt([])` directly \u2014 starting a fresh agent loop with an **empty prompt array**. No message is injected into the context at all:\n\n- The agent loop restarts\n- The LLM receives **the exact same message list it had before**\n- No new text, no handoff, no pollution, no session artifact\n- Nothing in `convertToLlm`'s path \u2014 no filtering needed\n\n---\n\n## How It Works\n\n```\nExtension loads\n  \u2192 Monkey-patches Agent.prototype.prompt to capture the Agent instance\n  \u2192 First real prompt stores the reference\n\nUser types \"/continue\"\n  \u2192 agent.prompt([]) called directly\n  \u2192 runAgentLoop([], contextSnapshot, ...)\n  \u2192 prompts array is empty \u2014 no message emitted, no message pushed to context\n  \u2192 runLoop \u2192 streamAssistantResponse \u2192 convertToLlm(unmodified messages)\n  \u2192 LLM sees same messages as before \u2192 responds naturally\n```\n\n### Why `agent.prompt([])` and not `agent.continue()`?\n\n`agent.continue()` has a guard that throws `Cannot continue from message role: assistant` when the last message is from the assistant \u2014 which it always is when the agent stops. `agent.prompt([])` starts a fresh loop from the current context snapshot without that restriction.\n\n### Trade-off: bypasses AgentSession\n\n`agent.prompt([])` is called on the `Agent` directly, bypassing `AgentSession._runAgentPrompt()`. This means auto-compaction is not triggered after a `/continue`. Auto-retry is not a concern \u2014 [pi-retry](https://github.com/monotykamary/pi-retry) covers that gap by listening for `agent_end` events and re-triggering the loop on errors. Since the agent still emits events through `AgentSession`'s subscriber, pi-retry's handlers fire normally even after an `agent.prompt([])` continuation.\n\n---\n\n## Usage\n\nOnce loaded, use `/continue`:\n\n| Command | What it does |\n|---------|-------------|\n| `/continue` | Resume the loop invisibly. Waits for idle, then fires. |\n| `/continue status` | Show agent idle state, captured-agent status, and last assistant text (debug). |\n| `/continue help` | Show this reference. |\n\n---\n\n## Installation\n\n```bash\npi install npm:pi-invisible-continue\n```\n\nOr install from GitHub:\n\n```bash\npi install https://github.com/monotykamary/pi-invisible-continue\n```\n\nOr in `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\n    \"https://github.com/monotykamary/pi-invisible-continue\"\n  ]\n}\n```\n\nThen `/reload` or restart pi.\n\nFor quick one-off tests:\n\n```bash\npi -e ./continue.ts\n```\n\n---\n\n## Comparison with Other Packages\n\n| Feature | pi-invisible-continue | pi-continue | pi-hodor | pi-auto-continue |\n|---------|----------------------|-------------|----------|-------------------|\n| LLM sees new user text | \u274c No | \u2705 Handoff doc | \u2705 \"continue\" | \u2705 \"continue\" |\n| Session pollution | None | Full compaction entry + user message | 1 user message | 1 user message |\n| Mechanism | `agent.prompt([])` | `sendMessage` + handoff | `sendMessage` | `sendMessage` |\n| Auto-triggered | \u274c Manual only | \u2705 On compaction | \u2705 On error/length | \u2705 On agent_end |\n| Retry integration | \u274c | \u274c | \u2705 Error patterns | \u274c |\n| Complexity | Prototype patch + 1 call | 49 files, multi-stage | 2 files, config-driven | 1 file, loop-based |\n\n---\n\n## About the Hack\n\nThe extension uses the public `@earendil-works/pi-agent-core` package (which pi's extension loader resolves to the same module instance used internally) to import `Agent` and monkey-patch `Agent.prototype.prompt`. This captures the live `Agent` instance when pi first calls `agent.prompt()` during normal operation.\n\nThen `/continue` calls `agent.prompt([])` \u2014 an empty prompt array. The `runAgentLoop` function spreads the prompts into the context messages, so with an empty array, nothing is added. The loop starts from the unmodified context snapshot and the LLM continues naturally.\n\nThis is the approach discussed in [pi issue #3721](https://github.com/earendil-works/pi/issues/3721) (\"Feature request: Resume agentic loop without sending a message\"). The upstream fix would be exposing `agent.continue()` (or a variant that works from `assistant` last-message) on `AgentSession`, but this extension achieves the same effect without waiting for a core change.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "continue",
+    "continuation",
+    "invisible",
+    "no-prompt",
+    "resume",
+    "agent-loop"
+  ],
+  "author": {
+    "name": "Tom X Nguyen"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/monotykamary/pi-invisible-continue#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/monotykamary/pi-invisible-continue.git"
+  },
+  "pi": {
+    "extensions": [
+      "./continue.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-04T15:29:31.260Z",
+    "modified": "2026-06-19T15:01:48.109Z",
+    "0.2.0": "2026-06-04T15:29:31.548Z",
+    "0.2.1": "2026-06-09T00:31:29.045Z",
+    "0.2.2": "2026-06-09T01:12:57.975Z",
+    "0.2.3": "2026-06-09T01:19:10.897Z",
+    "0.3.0": "2026-06-10T03:58:39.177Z",
+    "0.3.1": "2026-06-10T04:04:31.983Z",
+    "0.3.2": "2026-06-15T19:56:24.601Z",
+    "0.3.3": "2026-06-19T15:01:47.983Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 205,
+  "download_trend": []
+}

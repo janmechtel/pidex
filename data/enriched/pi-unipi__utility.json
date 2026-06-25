@@ -1,0 +1,375 @@
+{
+  "name": "@pi-unipi/utility",
+  "latest_version": "2.0.13",
+  "description": "Utility commands and tools for Pi coding agent \u2014 lifecycle, diagnostics, cache, analytics, display, batch execution",
+  "readme": "# @pi-unipi/utility\n\nEnvironment info, diagnostics, cleanup, name badge, and diff rendering. The grab-bag package for maintaining your development environment and making tool output readable.\n\nThe diff rendering is the standout feature \u2014 Shiki-powered syntax-highlighted diffs for `write` and `edit` tool output. Side-by-side view for edits, unified view for writes, with color presets and auto-fallback on narrow terminals.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/unipi:env` | Show environment info (Node, Pi, OS, paths) |\n| `/unipi:doctor` | Run diagnostics across all modules |\n| `/unipi:status` | Show status of all unipi modules |\n| `/unipi:cleanup` | Clean stale DBs, temp files, old sessions |\n| `/unipi:reload` | Explain how to reload extensions |\n| `/unipi:name-badge` | Toggle name badge overlay |\n| `/unipi:badge-gen` | Generate session name via LLM and enable badge |\n| `/unipi:util-settings` | Unified settings for badge and diff rendering |\n\n### Examples\n\n```\n/unipi:env                 # Show environment\n/unipi:doctor              # Run diagnostics\n/unipi:cleanup             # Clean stale files\n/unipi:cleanup --dry-run   # Preview what would be cleaned\n/unipi:name-badge          # Toggle the session name badge\n/unipi:badge-gen           # Generate a session name via LLM\n```\n\n## Special Triggers\n\nUtility registers with the info-screen dashboard, showing module status and diagnostic results. The footer subscribes to utility events for its extension status segment.\n\nThe diff rendering feature wraps Pi's built-in `write` and `edit` tools. When enabled, these tools show syntax-highlighted diffs instead of plain output. This is a transparent replacement \u2014 the agent doesn't need to know about it.\n\n## Agent Tools\n\n| Tool | Description |\n|------|-------------|\n| `ctx_batch` | Atomic batch execution with rollback support |\n| `ctx_env` | Environment inspection for debugging |\n| `write` | Write file with syntax-highlighted diff (when diff enabled) |\n| `edit` | Edit file with split/unified diff view (when diff enabled) |\n\n### Batch Execution\n\n```typescript\nimport { BatchBuilder } from \"@pi-unipi/utility/tools/batch\";\n\nconst report = await new BatchBuilder()\n  .addCommand(\"search\", { query: \"refactor\" })\n  .addTool(\"memory_search\", { query: \"patterns\" })\n  .withOptions({ failFast: true, commandTimeoutMs: 30000 })\n  .execute(myExecutor);\n\nif (!report.success) {\n  console.log(\"Failed:\", report.results.find(r => !r.success)?.error);\n}\n```\n\n## Configurables\n\n### Diff Rendering\n\n```\n/unipi:util-settings        # Open unified settings TUI\n```\n\nOr edit `.unipi/config/util-settings.json` directly:\n\n```json\n{\n  \"diff\": {\n    \"enabled\": true,\n    \"theme\": \"default\",\n    \"shikiTheme\": \"github-dark\",\n    \"splitMinWidth\": 150\n  }\n}\n```\n\n| Setting | Default | Options |\n|---------|---------|---------|\n| `enabled` | true | true/false |\n| `theme` | \"default\" | default, midnight, subtle, neon |\n| `shikiTheme` | \"github-dark\" | github-dark, dracula, one-dark-pro, catppuccin-mocha, nord, tokyo-night |\n| `splitMinWidth` | 150 | Minimum terminal width for split view |\n\nEnvironment variable overrides: `DIFF_ADD_BG`, `DIFF_REM_BG`, etc.\n\nFeatures:\n- Split view (side-by-side) for `edit`, auto-falls back to unified on narrow terminals\n- Unified view (stacked) for `write` overwrites\n- LRU cache (192 entries) for Shiki highlights\n- Large diff fallback (skip highlighting above 80k chars)\n\n### Name Badge\n\nThe badge is a persistent HUD overlay in the top-right corner showing the current session name. It auto-restores visibility on session restart.\n\n## Programmatic API\n\n| Module | Path | Description |\n|--------|------|-------------|\n| ProcessLifecycle | `lifecycle/process` | Parent PID polling, orphan detection, signal handlers |\n| cleanupStale | `lifecycle/cleanup` | Stale DB/temp/session/cache cleanup with dry-run |\n| TTLCache | `cache/ttl-cache` | Memory or SQLite-backed TTL cache |\n| AnalyticsCollector | `analytics/collector` | Privacy-respecting event collection with daily rollup |\n| runDiagnostics | `diagnostics/engine` | Cross-module health checks with plugin architecture |\n| detectCapabilities | `display/capabilities` | Terminal feature detection (color, Nerd Font, unicode) |\n| Width Utilities | `display/width` | ANSI-aware clamp, wrap, collapse, pad, center |\n\n### TTL Cache\n\n```typescript\nimport { TTLCache } from \"@pi-unipi/utility/cache/ttl-cache\";\n\nconst cache = new TTLCache({ defaultTtlMs: 60000 });\nawait cache.set(\"key\", { data: \"value\" });\nconst value = await cache.get(\"key\");\n```\n\n### Terminal Capabilities\n\n```typescript\nimport { detectCapabilities, getIcon } from \"@pi-unipi/utility/display/capabilities\";\n\nconst caps = detectCapabilities();\nconsole.log(\"Nerd Font:\", caps.nerdFont);\nconsole.log(\"Truecolor:\", caps.truecolor);\nconsole.log(getIcon(\"\udb81\ude33\", \"[OK]\")); // Uses Nerd Font if available\n```\n\nCapability detection distinguishes basic color, xterm-256-compatible terminals, and truecolor-capable terminals. Apple Terminal is treated as color-capable but not truecolor-capable so renderers can fall back safely.\n\n## Privacy\n\nThe analytics collector is privacy-respecting:\n- No file contents recorded\n- No sensitive data (API keys, tokens, passwords) \u2014 redacted automatically\n- Strings truncated to 500 characters\n- All data stays local\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "unipi",
+    "utility",
+    "continue",
+    "diagnostics",
+    "cache",
+    "analytics"
+  ],
+  "author": {
+    "name": "Neuron Mr White"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Neuron-Mr-White/unipi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Neuron-Mr-White/unipi.git",
+    "directory": "packages/utility"
+  },
+  "pi": {
+    "extensions": [],
+    "skills": [],
+    "prompts": [],
+    "themes": []
+  },
+  "time": {
+    "created": "2026-04-27T07:45:27.699Z",
+    "modified": "2026-06-01T04:32:37.784Z",
+    "0.1.1": "2026-04-27T07:45:27.898Z",
+    "0.2.1": "2026-04-27T20:12:44.707Z",
+    "0.2.3": "2026-04-28T10:48:41.644Z",
+    "0.2.4": "2026-04-28T12:56:46.901Z",
+    "0.2.5": "2026-04-28T17:58:54.609Z",
+    "0.2.6": "2026-04-29T17:52:17.907Z",
+    "0.2.7": "2026-04-30T19:18:42.763Z",
+    "0.2.8": "2026-05-01T09:52:30.456Z",
+    "0.2.9": "2026-05-01T19:48:12.404Z",
+    "2.0.0": "2026-05-06T07:29:54.418Z",
+    "2.0.1": "2026-05-15T07:06:59.194Z",
+    "2.0.2": "2026-05-16T06:44:19.602Z",
+    "2.0.3": "2026-05-16T15:20:46.705Z",
+    "2.0.4": "2026-05-18T03:31:53.609Z",
+    "2.0.5": "2026-05-19T07:02:28.354Z",
+    "2.0.7": "2026-05-24T07:59:50.752Z",
+    "2.0.8": "2026-05-25T08:25:34.937Z",
+    "2.0.9": "2026-05-28T08:21:09.948Z",
+    "2.0.10": "2026-06-01T03:39:15.674Z",
+    "2.0.11": "2026-06-01T04:02:01.437Z",
+    "2.0.12": "2026-06-01T04:23:27.818Z",
+    "2.0.13": "2026-06-01T04:32:37.668Z"
+  },
+  "versions_count": 22,
+  "downloads_last_week": 41,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 532
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 589
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 184
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 827
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 424
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 800
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 169
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 82
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 65
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 4
+    }
+  ]
+}

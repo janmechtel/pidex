@@ -1,0 +1,44 @@
+{
+  "name": "pi-vimmode",
+  "latest_version": "0.5.0",
+  "description": "Vim mode for Pi coding agent",
+  "readme": "# pi-vimmode\n\nVim-style prompt editing for [Pi](https://pi.dev/).\n\n`pi-vimmode` replaces Pi's main input editor with a `CustomEditor`-based modal editor. It targets practical prompt editing for agent prompts, not full Vim parity.\n\n## Install / load\n\nInstall from npm:\n\n```sh\npi install npm:pi-vimmode\n```\n\nor Install from Git to install latest version:\n\n```sh\npi install git:https://github.com/pekochan069/pi-vimmode\n```\n\nFor local development from this checkout:\n\n```sh\nbun install\n```\n\nPi discovers the extension through `package.json`:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./index.ts\"]\n  }\n}\n```\n\nFor local testing, load this package as a Pi extension using Pi's normal extension loading flow.\n\n## Quick start\n\n1. Start Pi with the extension loaded.\n2. Type normally in insert mode.\n3. Press `Esc` to enter normal mode when autocomplete is inactive.\n4. Use supported Vim commands such as `h`, `j`, `k`, `l`, `w`, `b`, `e`, `0`, `$`, `i`, `a`, `x`, `dd`, `cw`, `p`, `/`, `n`, `N`, `v`, `V`, `Ctrl-v`, `:s`, `:d`, `:y`, `:pu`, `:t`, `:m`, `:j`, `:noh`, `q`, `@`, and `@@`.\n5. Press `i`, `a`, `I`, `A`, `o`, `O`, `C`, `s`, or `S` to return to insert mode after edits; use operator forms such as `cw`, `cc`, or `c$` when changing by motion.\n\nDefault modes:\n\n- **INSERT**: Pi-like text entry. Autocomplete, submit, newlines, image paste, external editor, and app shortcuts use Pi's default behavior.\n- **NORMAL**: supported Vim command mode. Unsupported printable keys are ignored.\n- **VISUAL**: characterwise selection.\n- **V-LINE**: linewise selection.\n- **V-BLOCK**: rectangular block selection.\n\n`Esc` in normal mode delegates to Pi so interrupt/abort behavior still works. `Esc` in visual modes cancels the selection and returns to normal mode.\n\n## Documentation\n\nCanonical user-facing docs live under `docs/`:\n\n- [`docs/features.md`](https://github.com/pekochan069/pi-vimmode/blob/main/docs/features.md): supported modes, motions, edits, operators, prompt-native text objects, prompt transforms, character search, prompt search, visual modes, Ex command-line commands, registers, marks, macros, UI/status rendering, Pi shortcut compatibility, limitations, recovery, and validation examples.\n- [`docs/settings.md`](https://github.com/pekochan069/pi-vimmode/blob/main/docs/settings.md): every supported `piVimMode` setting, defaults, accepted value shapes, merge behavior, key sequence syntax, protected-key validation, warnings, troubleshooting, and practical config examples.\n- [`docs/adr/0002-user-facing-pi-vimmode-docs.md`](https://github.com/pekochan069/pi-vimmode/blob/main/docs/adr/0002-user-facing-pi-vimmode-docs.md): documentation source-of-truth decision and maintenance rules.\n\nREADME is the quickstart and index. Keep detailed behavior and settings reference in the canonical docs above.\n\n## Common configuration\n\nMinimal startup override:\n\n```json\n{\n  \"piVimMode\": {\n    \"startMode\": \"normal\"\n  }\n}\n```\n\nExample keymap/UI override:\n\n```json\n{\n  \"piVimMode\": {\n    \"cursor\": {\n      \"normal\": \"block\",\n      \"insert\": \"bar\"\n    },\n    \"keymap\": {\n      \"commands\": {\n        \"startSearch\": [\"/\"]\n      }\n    },\n    \"ui\": {\n      \"status\": {\n        \"items\": [\"mode\", \"pending\", \"search\", \"macro\", \"cursorPosition\", \"warnings\"]\n      }\n    }\n  }\n}\n```\n\nSee [`docs/settings.md`](https://github.com/pekochan069/pi-vimmode/blob/main/docs/settings.md) for the full default reference and all settings.\n\n## Recover or disable\n\nIf the extension blocks editing or configuration goes wrong:\n\n- Run `/vimmode off` to restore Pi's previous editor for the current extension runtime.\n- Run `/vimmode on` or `/vimmode` to enable the Vim editor again.\n- Start with [`docs/features.md#disable-or-recover`](https://github.com/pekochan069/pi-vimmode/blob/main/docs/features.md#disable-or-recover).\n- Use `pi list` to inspect installed extensions.\n- Use `pi remove` or `pi uninstall` with the installed extension identifier to remove it.\n- Use `pi config` or edit Pi config files to remove `piVimMode` overrides.\n- Restart Pi after changing extension or config state.\n\n## Architecture\n\n`VimEditor` is the Pi adapter shell. It owns `CustomEditor` integration, snapshots, effect application, rendering bridge, public cursor restoration, and best-effort terminal cursor writes.\n\nModal editing behavior lives under `src/modal/`:\n\n- `engine.ts` owns mode transitions, finite semantic key dispatch, register updates, and supported Vim semantics.\n- `types.ts` defines adapter-applied effects such as delegation, edits, macro replay, cursor restoration, invalidation, and terminal cursor hints.\n- `view.ts` derives mode labels, status items, visual status text, and cursor position text without needing Pi TUI objects.\n\nThe parser in `src/commands.ts` and text transforms in `src/buffer.ts` remain pure helpers. Config maps keys to supported semantic actions; it does not add private Pi APIs, recursive mappings, `.vimrc`, Vimscript, or Neovim Lua support.\n\n## Project docs\n\n- `docs/features.md`: canonical feature guide.\n- `docs/settings.md`: canonical settings reference.\n- `docs/adr/`: documentation and architecture decisions.\n- `docs/plans/`: implementation plans for Vim editor work.\n- `docs/solutions/`: reusable learnings for parser, buffer, lifecycle, and visual-mode bugs.\n- `openspec/specs/`: durable OpenSpec requirements for supported Vim behavior.\n\n## Validate\n\n```sh\nbun test\nbun run check-types\nbun run lint\nbun run format:check\nbun run build\nbun pm pack --dry-run\n```\n\nBefore publishing, inspect dry-run package contents and confirm extension entrypoint plus runtime source/build output are included, not docs only.\n\nManual smoke checklist:\n\n1. Load extension in Pi.\n2. Type text in insert mode.\n3. Press `Esc`, use normal-mode motions and edits.\n4. Use `v`, `V`, and `Ctrl-v`; confirm visual highlighting and selection operations.\n5. Configure `piVimMode.startMode`, `piVimMode.cursor`, a keymap binding, and UI status items; confirm behavior changes.\n6. Confirm insert/normal submit and normal-mode `Esc` still delegate to Pi where expected.\n7. Record and replay a macro with `q{slot}`, `@{slot}`, and `@@`.\n8. Run `/query`, `n`, `N`, `:%s/old/new/g`, `:2,3copy$`, `:move0`, and `:noh`; confirm prompt-local search/Ex behavior.\n",
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "pi-package"
+  ],
+  "author": {
+    "name": "pekochan069"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/pekochan069/pi-vimmode#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pekochan069/pi-vimmode.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-06-04T13:27:17.863Z",
+    "modified": "2026-06-23T07:27:19.427Z",
+    "0.0.1": "2026-06-04T13:27:18.122Z",
+    "0.0.2": "2026-06-04T13:37:26.424Z",
+    "0.0.3": "2026-06-04T13:55:45.365Z",
+    "0.0.4": "2026-06-04T14:00:04.192Z",
+    "0.0.5": "2026-06-05T01:37:06.205Z",
+    "0.0.6": "2026-06-08T01:18:38.457Z",
+    "0.1.0": "2026-06-11T01:51:24.625Z",
+    "0.1.1": "2026-06-12T00:53:52.775Z",
+    "0.2.0": "2026-06-15T01:45:07.434Z",
+    "0.3.0": "2026-06-18T06:52:36.559Z",
+    "0.4.0": "2026-06-21T14:10:40.602Z",
+    "0.5.0": "2026-06-23T07:27:19.303Z"
+  },
+  "versions_count": 12,
+  "downloads_last_week": 476,
+  "download_trend": []
+}

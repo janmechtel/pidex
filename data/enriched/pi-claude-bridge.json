@@ -1,0 +1,46 @@
+{
+  "name": "pi-claude-bridge",
+  "latest_version": "0.5.0",
+  "description": "Pi extension that uses Claude Code (via Agent SDK) as a model provider and adds an AskClaude tool.",
+  "readme": "# pi-claude-bridge\n\n[![npm version](https://img.shields.io/npm/v/pi-claude-bridge)](https://www.npmjs.com/package/pi-claude-bridge)\n\nPi extension that integrates Claude Code via the [Agent SDK](https://github.com/anthropics/claude-agent-sdk-typescript). Based initially on [claude-agent-sdk-pi](https://github.com/prateekmedia/claude-agent-sdk-pi) by Prateek Sunal. This fork adds streaming, MCP tool bridging, custom pi tool bridging, session resume/persistence, context sync, thinking support, skills forwarding, and the AskClaude tool.\n\n1. **Provider** \u2014 Use Opus/Sonnet/Haiku as models in pi, with all tool calls flowing through pi's TUI\n2. **AskClaude tool** \u2014 Delegate tasks or questions to Claude Code when using another provider\n\n\n> **Important note:** Starting June 15, 2026 [Anthropic has announced](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan) they will no longer allow tools based on the Agent SDK (like this one) to pull from your regular subscription quota. Instead they pull from a monthly credit equal to your subscription fee (so $100 of usage credits on a $100/month Max plan). I'm not sure how valuable this extension will be once that happens. If there are easier ways to pull from that $100 bucket connecting to the API directly without the Agent SDK overhead, that's probably a better approach. (Alternatively there are other extensions focused on spoofing the official Claude Code client to keep using subscription quota.)\n\n<p>\n<a href=\"assets/claude-bridge1.png\"><img src=\"assets/claude-bridge1.png\" width=\"49%\"></a>&nbsp;\n<a href=\"assets/claude-bridge2.png\"><img src=\"assets/claude-bridge2.png\" width=\"49%\"></a>\n</p>\n\n## Install\n\n```\npi install npm:pi-claude-bridge\n```\n\n## Provider\n\nUse `/model` to select `claude-bridge/claude-opus-4-8`, `claude-bridge/claude-opus-4-7`, `claude-bridge/claude-opus-4-6`, `claude-bridge/claude-sonnet-4-6`, or `claude-bridge/claude-haiku-4-5`.\n\nBehind the scenes, pi's tools are bridged to Claude Code but it should all work like normal in pi. Bash commands get a 120-second default timeout (matching Claude Code's default) since pi's bash has no timeout by default. Skills in pi are copied over to Claude Code's system prompt so should work as they would with any other pi provider.\n\n## AskClaude Tool\n\nAvailable when using any non-claude-bridge provider. Pi's LLM can delegate tasks to Claude Code and wait for it to answer a question or perform a task. Examples of how to use:\n\n- \"Ask Claude to plan a fix\"\n- \"If you get stuck, ask claude for help\"\n- \"Ask claude to review the plan in @foo.md, implement it, then ask an isolated=true claude to review the implementation\"\n- \"Ask claude to poke holes in this theory\"\n- \"Find all the places in the codebase that handle auth\"\n\nYou could also create skills or add something to AGENTS.md to e.g. \"Always call Ask Claude to review complicated feature implementations before considering the task complete.\"\n\n### Parameters\n\n- **`prompt`** \u2014 the question or task for Claude Code\n- **`mode`** \u2014 `read` (default, read files and search/fetch on web), `none`, or `full` (read+write+bash, disable this mode with `allowFullMode: false` in config)\n- **`model`** \u2014 `opus` (default), `sonnet`, `haiku`, or a full model ID\n- **`thinking`** \u2014 effort level: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`\n- **`isolated`** \u2014 when `true`, Claude gets a clean session with no conversation history (default: `false`)\n\n## Configuration\n\nConfig: `~/.pi/agent/claude-bridge.json` (global) or `.pi/claude-bridge.json` (project; merged over global).\n\n```json\n{\n  \"askClaude\": {\n    \"enabled\": true,\n    \"allowFullMode\": true,\n    \"defaultIsolated\": false,\n    \"description\": \"Custom tool description override\"\n  },\n  \"provider\": {\n    \"strictMcpConfig\": true,\n    \"pathToClaudeCodeExecutable\": \"/home/you/.nix-profile/bin/claude\"\n  }\n}\n```\n\n`askClaude`:\n- `enabled` \u2014 register the AskClaude tool (default `true`)\n- `name`, `label`, `description` \u2014 overrides for the tool's pi-side name, TUI label, and description\n- `defaultMode` \u2014 `\"read\"` (default), `\"none\"`, or `\"full\"`\n- `defaultIsolated` \u2014 start each call in a fresh session (default `false`)\n- `allowFullMode` \u2014 allow `mode: \"full\"`; set `false` to lock it out\n- `appendSkills` \u2014 forward pi's skills block into the system prompt (default `true`)\n\n`provider` (low-level SDK plumbing, most users can ignore):\n- `appendSystemPrompt` \u2014 append pi's AGENTS.md and skills (default `true`)\n- `settingSources` \u2014 CC filesystem settings to load; only applied when `appendSystemPrompt: false`\n- `strictMcpConfig` \u2014 block MCP servers from `~/.claude.json` / `.mcp.json` (default `true`). Cloud MCP (Gmail/Drive via claude.ai OAuth) is always blocked.\n- `pathToClaudeCodeExecutable` \u2014 path to the `claude` binary. Required on **NixOS** (and other non-FHS systems) where the SDK's bundled musl/glibc binaries can't run. Set to your Nix-installed binary, e.g. `\"/home/you/.nix-profile/bin/claude\"`.\n\n## Tests\n\n`npm run test:unit` for offline tests (`tests/unit-*.mjs`: queue, import, skills). \n\n`npm test` for the full suite, which adds integration tests that hit APIs (`tests/int-*.{sh,mjs}`: smoke, multi-turn, cache, session-resume, session-rebuild, tool-message). Set `CLAUDE_BRIDGE_TESTING_ALT_MODEL` in `.env.test` for the alt-provider smoke test (e.g. `openrouter/z-ai/glm-4.7-flash`).\n\n## Debugging\n\nSet `CLAUDE_BRIDGE_DEBUG=1` to enable debug output:\n\n- **Bridge log** at `~/.pi/agent/claude-bridge.log` \u2014 every provider call, session sync decision, tool result delivery, and CC's stderr. Override location with `CLAUDE_BRIDGE_DEBUG_PATH`.\n- **Per-query Claude Code CLI logs** at `~/.pi/agent/cc-cli-logs/<timestamp>-<tag>-<seq>.log` \u2014 the CC subprocess's own debug stream, one file per `query()` call. Tags are `provider` (main turn), `continuation` (steer replay), or `askclaude` (sub-delegation). Useful when a resume fails or CC misbehaves internally \u2014 shows the CLI's own view of session loading, API requests, and tool calls.\n\nWhen filing a bug about a session-resume failure (e.g. \"No conversation found\"), the most useful attachments are the `syncResult:` lines from the bridge log plus the matching `cc-cli-logs/` file for the failing query.\n\n## Maintenance\n\nAfter a Claude Code release, review `MODE_DISALLOWED_TOOLS` in `src/index.ts` \u2014 it gates which CC tools the AskClaude subagent may invoke per mode (`read` / `full` / `none`). Add new agentic tools (PlanMode, Task spawning, etc.) to the appropriate mode lists if they shouldn't be available to subagents.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "claude-code",
+    "claude-agent-sdk"
+  ],
+  "author": {
+    "name": "Eli Dickinson"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/elidickinson/pi-claude-bridge#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elidickinson/pi-claude-bridge.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-29T04:22:29.006Z",
+    "modified": "2026-06-05T21:02:21.830Z",
+    "0.1.0": "2026-03-29T04:22:29.177Z",
+    "0.1.1": "2026-03-30T03:01:52.711Z",
+    "0.1.2": "2026-03-30T19:45:29.050Z",
+    "0.1.3": "2026-04-04T02:50:17.257Z",
+    "0.1.4": "2026-04-08T19:56:09.483Z",
+    "0.1.5": "2026-04-09T16:51:11.402Z",
+    "0.1.6": "2026-04-10T22:05:15.850Z",
+    "0.2.0": "2026-04-16T02:43:07.469Z",
+    "0.3.0": "2026-04-18T02:44:03.025Z",
+    "0.3.1": "2026-04-18T04:12:33.916Z",
+    "0.4.0": "2026-05-07T17:31:34.660Z",
+    "0.5.0": "2026-06-05T21:02:21.708Z"
+  },
+  "versions_count": 12,
+  "downloads_last_week": 261,
+  "download_trend": []
+}

@@ -1,0 +1,57 @@
+{
+  "name": "@xynogen/pix-optimizer",
+  "latest_version": "1.1.8",
+  "description": "Performance optimization suite for Pi Coding Agent - caveman mode + RTK tool rewriting + jq/TOON JSON compression + ponytail lazy-dev mode",
+  "readme": "# pix-optimizer\n\nToken-optimization suite for Pi Coding Agent. Four tools wired into one\nextension via `src/index.ts`, fronted by a single `/optimizer` command and one\nshared status-bar cell:\n\n- **Caveman** (`\udb81\udf10`) \u2014 terse-output system prompt\n- **RTK** (`\udb81\udce5`) \u2014 prefixes shell commands with `rtk` + injects RTK prompt\n- **TOON** (`\udb81\uddc0`) \u2014 jq + TOON guidance for dense JSON (skill lives in pix-skills)\n- **Ponytail** (`\udb80\udd90`) \u2014 lazy-senior-dev system prompt (minimal code, YAGNI)\n\n## Command\n\nOne command opens an interactive overlay that fronts every tool:\n\n```text\n/optimizer                 \u2192 open the overlay (\u2190\u2192 cycle value, \u2191\u2193 move, esc close)\n```\n\nThere is no text-arg form: the overlay is the only UI. Selecting a value calls\nthe tool's `run()` handler, which persists the new value and repaints the\nshared status cell. Headless/test fallbacks print a plain status summary.\n\nState persists to `~/.pi/agent/optimizer.json` (caveman/rtk/toon/ponytail).\n\n## Status bar\n\nA single cell always shows the enabled icons in a fixed order (`\udb81\udf10 \udb81\udce5 \udb81\uddc0 \udb80\udd90`), color-\ncoded by state: **accent** when the tool is enabled, **dim** when disabled.\n\n## Features\n\n### Caveman Mode (`\udb81\udf10`)\n\nCuts ~75% of output tokens while keeping full technical accuracy.\n\n| Level | Description                  |\n|-------|------------------------------|\n| lite  | Professional, no fluff       |\n| full  | Classic caveman              |\n| ultra | Maximum compression          |\n| micro | Experimental prompt-minimized |\n\nThe `/optimizer` overlay opens a settings dialog when needed. Default level\nfor new sessions is restored from `~/.pi/agent/optimizer.json`.\n\n### RTK Tool Rewriting (`\udb81\udce5`)\n\nTwo layers, both active automatically:\n\n1. **Prompt layer** \u2014 injects the RTK system prompt (tells the model to\n   prefix commands with `rtk`).\n2. **Execute layer** \u2014 rewrites `bash` tool calls, prefixing known commands\n   (`git`, `gh`, `cargo`, `npm`, `pnpm`, `docker`, `kubectl`, `ls`, `grep`, \u2026)\n   with `rtk` when the model forgets. **Command chains are split on `&&`,\n   `||`, `;` and `|`, and every known segment is prefixed** \u2014 e.g.\n   `git add . && git push` becomes `rtk git add . && rtk git push`.\n   Operators inside quotes are ignored, and unparseable commands are left\n   untouched. Falls back gracefully when the `rtk` binary is missing\n   (warns once).\n\n**Requirement:** the `rtk` binary must be on `PATH`.\n\n```bash\ncargo install rtk-ai\n```\n\n### TOON / JSON Compression (`\udb81\uddc0`)\n\nGuidance for handling information-dense JSON via `jq` (query/reshape) and\n`toon` (compress). The system-prompt nudge is injected **only when the user\nprompt mentions JSON** (`json`/`jsonl`/`jq`/`toon`/`openapi`/\u2026). TOON shines\non uniform/tabular arrays; deeply nested or array-of-arrays data and API\ncontracts stay as JSON.\n\nThe `toon-json` skill (full workflow + when-NOT-to-use guidance) is bundled in\n`pix-skills` and auto-discovered from there.\n\n**Requirement:** `jq` and `toon` on `PATH`.\n\n```bash\nnpm i -g @toon-format/cli\n```\n\n### Ponytail Mode (`\udb80\udd90`)\n\n\"Lazy senior dev\" mode. Governs **what** the agent builds (minimal code,\nYAGNI), orthogonal to Caveman which governs **how** it talks \u2014 they pair. Before\nwriting code the agent stops at the first rung that holds: does this need to\nexist \u2192 stdlib \u2192 native platform \u2192 installed dep \u2192 one line \u2192 minimum that\nworks. Validation, error handling, security, and accessibility are never cut.\n\n| Level | Description                          |\n|-------|--------------------------------------|\n| lite  | Name the lazier alternative, you pick |\n| full  | The ladder enforced (default)        |\n| ultra | YAGNI extremist                      |\n\n**No install required** \u2014 pure prompt injection, no external binary or PATH\ndependency (unlike RTK and TOON).\n\n## Installation\n\n```bash\npi install npm:@xynogen/pix-optimizer\n```\n\n> Also included in [`@xynogen/pix-core`](https://www.npmjs.com/package/@xynogen/pix-core):\n>\n> ```bash\n> pi install npm:@xynogen/pix-core\n> ```\n\n## Architecture\n\n| File              | Role                                                      |\n|-------------------|-----------------------------------------------------------|\n| `src/index.ts`    | Wires the four tools + shared status, registers `/optimizer` |\n| `src/opt.ts`      | The `/optimizer` overlay UI (keyboard nav + cycling)     |\n| `src/status.ts`   | Shared status-bar cell + `OptimizerHandle` contract       |\n| `src/caveman.ts`  | Caveman logic, levels, prompt                            |\n| `src/rtk.ts`      | RTK prompt + bash command rewriting                       |\n| `src/json.ts`     | jq+TOON guidance, heuristics, system-prompt injection     |\n| `src/ponytail.ts` | Ponytail logic, levels, prompt                            |\n| `src/persist.ts`  | Disk-backed `~/.pi/agent/optimizer.json` persistence      |\n| `src/tool-result-filter.ts` | Strips model-guidance warnings from tool_result |\n\nEach tool registers its own lifecycle hooks and exposes an `OptimizerHandle`\nthat `/optimizer` dispatches to. All four share one `OptimizerStatus`.\n\n## Development\n\n```bash\nbun test\n```\n\n## Origin\n\nThis package was built by merging two upstream Pi community packages:\n\n- **Caveman mode** \u2014 merged from `npm:pi-caveman`. Reimplemented here with\n  multiple compression levels and integration with the shared `/optimizer`\n  command.\n\n- **RTK rewriting** \u2014 merged from `npm:pi-rtk-optimizer`. Reimplemented here\n  with a two-layer approach: prompt injection + live bash command rewriting\n  that handles chained commands (`&&`, `||`, `;`, `|`).\n\n- **Ponytail mode** \u2014 ruleset adapted from [`git:github.com/DietrichGebert/ponytail`](https://github.com/DietrichGebert/ponytail),\n  the \"lazy senior dev\" skill. Reimplemented here as a native `/optimizer`\n  tool with three intensity levels \u2014 no external hooks or files. The\n  ruleset (the YAGNI ladder + safety carve-outs) is rewritten as a system-prompt fragment.\n\nAll upstreams are MIT licensed. No codebase was copied directly \u2014 the logic was\nrewritten and combined into a single extension with a unified `/optimizer`\ncommand and shared status bar. This package does not sync back to any upstream.\n\n## Full distro\n\nSource: [github.com/xynogen/pix-mono](https://github.com/xynogen/pix-mono)\n\nTo install the complete pix suite (all packages + Pi itself):\n\n```bash\ncurl -fsSL https://raw.githubusercontent.com/xynogen/pix-mono/main/scripts/install.sh | sh\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "optimizer",
+    "caveman",
+    "rtk",
+    "toon",
+    "jq",
+    "json",
+    "ponytail",
+    "performance"
+  ],
+  "author": {
+    "name": "xynogen"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/xynogen/pix-mono/tree/main/packages/pix-optimizer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xynogen/pix-mono.git",
+    "directory": "packages/pix-optimizer"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./src/skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-09T18:26:45.437Z",
+    "modified": "2026-06-25T14:19:59.539Z",
+    "1.0.0": "2026-06-09T18:26:45.738Z",
+    "1.0.1": "2026-06-18T10:07:59.042Z",
+    "1.0.2": "2026-06-19T03:11:15.628Z",
+    "1.0.6": "2026-06-19T03:26:45.026Z",
+    "1.0.7": "2026-06-20T09:51:09.108Z",
+    "1.1.0": "2026-06-20T17:25:05.058Z",
+    "1.1.1": "2026-06-20T19:56:23.795Z",
+    "1.1.2": "2026-06-20T20:03:58.507Z",
+    "1.1.3": "2026-06-22T01:43:10.148Z",
+    "1.1.4": "2026-06-22T18:03:03.378Z",
+    "1.1.6": "2026-06-23T23:11:44.486Z",
+    "1.1.7": "2026-06-24T01:21:29.535Z",
+    "1.1.8": "2026-06-25T14:19:59.259Z"
+  },
+  "versions_count": 13,
+  "downloads_last_week": null,
+  "download_trend": []
+}

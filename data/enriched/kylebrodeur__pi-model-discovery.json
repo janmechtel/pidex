@@ -1,0 +1,57 @@
+{
+  "name": "@kylebrodeur/pi-model-discovery",
+  "latest_version": "0.7.24",
+  "description": "Auto-discover local model providers (Ollama) and register their models with Pi on startup. Per-model context windows and capabilities, no /reload required.",
+  "readme": "# pi-model-discovery\n\nA [Pi](https://pi.dev) extension that auto-discovers local model providers (Ollama first) and registers their models with Pi on startup \u2014 no `/reload` required.\n\n## What it does\n\nOn every Pi session start, this extension:\n\n1. Queries your configured local provider(s) for installed models\n2. Pulls per-model metadata (context window, vision/reasoning/tools capabilities) from Ollama's `/api/show` endpoint\n3. Registers all discovered models via Pi's `registerProvider()` so they're immediately available\n4. Optionally adds them to `enabledModels` in `settings.json` so they appear in the model picker\n5. Caches capability data to avoid hammering `/api/show` on every startup\n\n## Install\n\n```bash\npi install npm:@kylebrodeur/pi-model-discovery\n```\n\nUpdate an existing install:\n\n```bash\npi update npm:@kylebrodeur/pi-model-discovery\n```\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/providers status` | Show current config, registered models, and capability counts |\n| `/providers sync` | Re-run the discovery sync (uses cache) |\n| `/providers sync --force` | Bypass the capability cache and refetch from Ollama |\n| `/providers info [model]` | Show model card (defaults to current model) |\n| `/providers card` | Open the model card popup for the current model |\n| `/providers footer on/off` | Toggle the footer status indicator |\n| `/providers init` | Create a default `local-providers.json` config file |\n| `/providers reload` | Reload config without restarting Pi |\n| `/providers debug on/off` | Toggle debug logging |\n| `/providers help` | Show command help |\n\n## Footer status\n\nA compact indicator in pi's footer that complements (not duplicates) the built-in model display. It shows only what pi doesn't already show \u2014 capabilities and special variant badges, plus context window size:\n\n```\n\u2601 \u25c9\u25c6\u23f5  ctx 524K\n```\n\n- `\u2601` cloud/remote model\n- `\u26a1` QAT (Quantization-Aware Training, e.g. Gemma 4)\n- `\u25c7` embedding model\n- `\u25c9` vision (dim when off)\n- `\u25c6` thinking (dim when off)\n- `\u23f5` tools (dim when off)\n- `ctx 524K` \u2014 context window size (not usage; pi's bar shows usage)\n\nIcons are dim when the capability is absent, green when present. Full capability words appear only in the model card.\n\nToggle with `/providers footer on/off` or set in config.\n\n## Model card popup\n\nFull details for the current model, opened as a popup. Triggered by:\n\n- **Keyboard shortcut**: `ctrl+i`\n- **Slash command**: `/providers card` (current model) or `/providers info [model]` (any model)\n\n```\nminimax-m3:cloud \u2601 cloud\n\nminimax \u00b7 550B\n\ncontext     524K tokens\nsize        384B (remote)\ndigest      6d55374b63bb\n\n\u25cf vision   \u25cf thinking   \u25cf tools\n```\n\nPress Escape to close.\n`/providers status` output looks like:\n\n```\nLocal Providers Status:\nSync on startup: yes\nAdd to scope: yes\nCleanup stale: no\nDebug: off\n\nProviders:\n  ollama: watching (http://127.0.0.1:11434)\n\nRegistered Ollama models: 21\n  5 vision | 7 reasoning | 21 tools\n  text-only: 0\n```\n\n## Configuration\n\nConfig file: `~/.pi/agent/local-providers.json` (global) or `./.pi/local-providers.json` (project, overrides global).\n\n```json\n{\n  \"debug\": false,\n  \"syncOnStartup\": true,\n  \"addToScope\": true,\n  \"providers\": {\n    \"ollama\": {\n      \"enabled\": true,\n      \"baseUrl\": \"http://127.0.0.1:11434\",\n      \"cleanupStale\": false,\n      \"cacheTtlHours\": 24\n    }\n  }\n}\n```\n\n### Provider fields\n\n| Field | Type | Default | Description |\n|-------|------|---------|-------------|\n| `enabled` | boolean | `true` | Set to `false` to skip this provider |\n| `baseUrl` | string | `http://127.0.0.1:11434` | Ollama HTTP API root |\n| `cleanupStale` | boolean | `false` | Remove this provider's entries from `enabledModels` if the model is no longer in Ollama |\n| `cacheTtlHours` | number | `24` | How long to cache `/api/show` results. `0` = always refetch |\n\n### Top-level fields\n\n| Field | Type | Default | Description |\n|-------|------|---------|-------------|\n| `debug` | boolean | `false` | Log extra info on session start |\n| `syncOnStartup` | boolean | `true` | Run discovery during the async factory (before `session_start`) |\n| `addToScope` | boolean | `true` | Push discovered models into `settings.json` `enabledModels` |\n| `showFooterStatus` | boolean | `true` | Show the footer status indicator with capabilities and context. Use `/providers footer off` to disable. |\n\n## Capability detection\n\nStarting with Ollama 0.30, all metadata is available directly from `/api/tags` \u2014 no separate `/api/show` call needed:\n\n- **context window** \u2014 from `details.context_length` (1M+ for models that support it)\n- **vision** \u2014 from `capabilities: [\"vision\"]`\n- **reasoning** \u2014 from `capabilities: [\"thinking\"]` or `[\"reasoning\"]`\n- **tools** \u2014 from `capabilities: [\"tools\"]`\n- **embedding** \u2014 from `capabilities: [\"embedding\"]`\n- **parameter size, family, quantization, format** \u2014 from `details.*`\n- **size, digest, modified_at** \u2014 from top-level tag fields\n- **remote/cloud** \u2014 when `remote_model`/`remote_host` are set\n- **QAT** \u2014 detected from `-qat` suffix (Gemma 4 quantization-aware training)\n\n## Cache\n\nCapability data is cached at `~/.pi/agent/ollama-model-cache.json`. Entries older than `cacheTtlHours` are refetched on the next sync. Use `/providers sync --force` to bypass the cache.\n\n## Troubleshooting\n\n**Models show in `--list-models` but not in the model picker**\n\n`addToScope: true` writes to `settings.json` `enabledModels` during `session_start`. If you started a session before installing the extension, restart the session (or run `/providers sync` and reload).\n\n**\"Ollama not reachable\" warnings on startup**\n\nOllama isn't running, or the `baseUrl` is wrong. Check with:\n\n```bash\ncurl http://127.0.0.1:11434/api/tags\n```\n\n**Capabilities seem wrong for a model**\n\nRun `/providers sync --force` to bypass the cache. If still wrong, check what `/api/show` returns directly:\n\n```bash\ncurl -X POST http://127.0.0.1:11434/api/show \\\n  -H 'content-type: application/json' \\\n  -d '{\"name\": \"gemma4:12b\"}'\n```\n\n**Stale entries in `enabledModels` after deleting models from Ollama**\n\nSet `cleanupStale: true` in the provider config, then `/providers sync`.\n\n## How it works\n\nThe extension uses Pi's async extension factory. On startup:\n\n1. Async factory queries Ollama's `/api/tags` and registers the provider via `pi.registerProvider()` \u2014 models are available **immediately** with no `/reload` needed.\n2. Per-model `/api/show` calls populate `contextWindow`, `input` (text/image), `reasoning`, and `tools` from the authoritative API.\n3. Capability results are cached to `~/.pi/agent/ollama-model-cache.json` (TTL configurable; default 24h).\n4. During `session_start`, the extension writes the discovered models into `settings.json` `enabledModels` so they appear in the model picker.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "ollama",
+    "model-discovery",
+    "local-models",
+    "pi"
+  ],
+  "author": {
+    "name": "Kyle Brodeur",
+    "email": "kylebrodeur@gmail.com",
+    "url": "https://github.com/kylebrodeur"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/kylebrodeur/pi-model-discovery",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kylebrodeur/pi-model-discovery.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-06-06T17:29:54.821Z",
+    "modified": "2026-06-09T02:43:51.569Z",
+    "0.2.1": "2026-06-06T17:29:55.137Z",
+    "0.2.2": "2026-06-06T19:12:21.369Z",
+    "0.2.3": "2026-06-06T19:18:30.905Z",
+    "0.2.4": "2026-06-06T19:21:09.589Z",
+    "0.2.5": "2026-06-06T19:27:40.119Z",
+    "0.2.6": "2026-06-06T19:30:23.564Z",
+    "0.3.1": "2026-06-06T19:53:16.033Z",
+    "0.3.2": "2026-06-06T20:22:53.440Z",
+    "0.3.3": "2026-06-06T20:26:54.211Z",
+    "0.3.4": "2026-06-06T21:10:33.243Z",
+    "0.4.0": "2026-06-06T21:26:09.550Z",
+    "0.5.0": "2026-06-07T04:18:03.195Z",
+    "0.5.1": "2026-06-07T04:30:42.889Z",
+    "0.6.0": "2026-06-08T02:31:53.010Z",
+    "0.7.15": "2026-06-08T06:24:22.667Z",
+    "0.7.18": "2026-06-08T14:50:01.811Z",
+    "0.7.19": "2026-06-08T15:04:12.834Z",
+    "0.7.21": "2026-06-08T15:23:11.756Z",
+    "0.7.23": "2026-06-08T22:11:05.680Z",
+    "0.7.24": "2026-06-09T02:43:51.470Z"
+  },
+  "versions_count": 20,
+  "downloads_last_week": null,
+  "download_trend": []
+}

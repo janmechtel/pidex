@@ -1,0 +1,70 @@
+{
+  "name": "@tungthedev/pi-extensions",
+  "latest_version": "2.6.4",
+  "description": "A Pi package containing editor, mermaid, workspace, web, skill, boomerang, goal, pi-modes, and ext-manager extensions.",
+  "readme": "# There are many Pi extensions, but this one is mine.\n\n`@tungthedev/pi-extensions` is a bundled Pi package that upgrades the default Pi experience with a better editor, inline Mermaid rendering, web research tools, skill loading, boomerang context summarization, tool-set/system prompt switching for Pi/Codex/Droid modes, and a TUI-first subagent manager.\n\nThe package currently ships these extensions:\n\n- `editor` custom composer UI with cleaner status row\n- `mermaid` for inline Mermaid rendering and a full diagram viewer\n- `web` for `WebSearch`, `WebSummary`, and `FetchUrl`\n- `skill` for loading local Pi skills with the `skill` tool\n- `boomerang` for autonomous task execution with context summarization\n- `goal` for Codex-style long-running goal tracking with token budgets\n- `pi-modes` for Codex/Droid tool-set switching, prompts, and subagents\n- `ext-manager` for managing extensions from inside Pi\n- `openai-responses-image-patch` for preserving OpenAI Responses generated images\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:@tungthedev/pi-extensions\n```\n\nFrom git:\n\n```bash\npi install https://github.com/tungthedev/pi-extensions\n```\n\n## What You Get\n\n### Editor\n\nThe `editor` extension replaces Pi's default composer with a boxed editor UI and an extensible status row. It also integrates with the package's file and skill discovery features so autocomplete can stay consistent across modes.\n\nFixed editor mode is available as an opt-in setting. It pins the editor and status rows at the bottom of the terminal while the conversation scrolls above them, including mouse and keyboard scrolling inside the transcript area.\n\n```json\n{\n  \"editor\": {\n    \"fixedEditor\": true\n  }\n}\n```\n\nYou can toggle it from `/pi-mode` > `Pin Editor`.\n\n### Mermaid\n\nThe `mermaid` extension detects Mermaid code blocks in chat, renders them inline, and keeps a session diagram index you can browse later.\n\n- Shortcut: `ctrl+shift+m`\n- Command: `/mermaid`\n\n### Better `grep` and `find`\n\nThe `workspace` extension extends Pi-native file tools and routing discovery-heavy operations through the shared FFF backend. FFF improves fuzzy path resolution, repository discovery, and editor `@path` autocomplete\n\nCommands:\n\n- `/fff-status` shows the current FFF index state and storage paths for the session\n- `/fff-reindex` triggers a rebuild of the current session index\n\n### Web Research\n\nThe `web` extension registers three tools:\n\n- `WebSearch` for web discovery and current documentation lookup\n- `WebSummary` for grounded summaries of a specific URL using Gemini URL Context\n- `FetchUrl` for scraping user-provided URLs into markdown via a configured fetch provider\n\nWeb tools become available when provider credentials are available.\n\nYou can use enviromnent variables:\n\n```bash\nexport GEMINI_API_KEY=your-gemini-key # for WebSearch and WebSummary\nexport EXA_API_KEY=your-exa-key # for WebSearch\nexport CLOUDFLARE_ACCOUNT_ID=your-account-id # for FetchUrl\nexport CLOUDFLARE_API_TOKEN=your-browser-rendering-token # need browser rendering edit permission\nexport FIRECRAWL_API_KEY=your-firecrawl-key # for FetchUrl\npi\n```\n\nOr via `/pi-mode` > Web Tools config:\n\n### Skills\n\nThe `skill` extension adds a global `skill` tool that resolves content from loaded Pi skills and returns the skill instructions directly to the agent.\n\n### Boomerang\n\nThe `boomerang` extension adds `/boomerang`, `/boomerang-cancel`, and `ctrl+alt+b` for running autonomous tasks and returning future context to compact handoff summaries. `ctrl+alt+b` cycles auto-boomerang through off, one-shot, always-on, and back to off.\n\nExamples:\n\n```bash\n/boomerang Fix the login bug\n```\n\n### Goal\n\nThe `goal` extension adds Codex-style long-running goal tracking with an above-editor progress widget, goal tools, and automatic continuation while a goal is active.\n\nCommands:\n\n- `/goal <objective>` starts or replaces the current goal\n- `/goal pause` pauses goal continuation\n- `/goal resume` resumes a paused goal\n- `/goal resume --budget N` resumes with a new token budget\n- `/goal budget N` sets the current goal token budget\n- `/goal budget 0` clears the token budget\n- `/goal clear` clears the current goal\n\n### Pi Modes And Subagents\n\nThe `pi-modes` extension bundles several mode-specific surfaces:\n\n- Pi/Codex/Droid tool-set switching\n- Pi mode settings and prompt toggles\n- Codex and Droid tools and system prompt\n- Builtin subagents. You can also add yours.\n\nCommands and shortcuts:\n\n- `/pi-mode` opens the Pi mode settings UI or updates package settings\n- `/subagents` opens the interactive subagent manager\n- `ctrl+alt+m` cycles the active tool set between Pi, Codex, and Droid\n- `ctrl+alt+k` toggles Load Skills for the current session without saving settings\n\n### Extension Manager\n\nThe `ext-manager` extension provides an in-app extension manager UI.\n\n- Command: `/extmgr`\n\n### OpenAI Responses Image Patch\n\nThis package includes a global `openai-responses` API override that preserves generated images returned as OpenAI Responses `image_generation_call` items.\n\nGenerated PNG files are saved under `~/.pi/generated-images/YYYY-MM-DD/`.\n\n### Themes\n\nThe package also ships bundled themes under `themes/`:\n\n- `ayu-dark`\n- `one-dark-pro`\n- `dracula`\n\n## Package Layout\n\n- `extensions/` contains the Pi extension entrypoints declared in `package.json`\n- `src/` contains the implementation for editor, web, workspace, FFF, modes, subagents, and shared utilities\n- `themes/` contains bundled Pi themes\n\n## Library Usage\n\nThis package can also be imported from Pi SDK-based hosts.\n\n- Root register APIs: `@tungthedev/pi-extensions`\n- Stable bundle APIs: `@tungthedev/pi-extensions/<module>`\n- Stable primitive APIs: `@tungthedev/pi-extensions/<module>/primitives`\n- Tool metadata: `@tungthedev/pi-extensions/metadata` and `@tungthedev/pi-extensions/<module>/metadata`\n- Direct source-level access: `@tungthedev/pi-extensions/<source-path>` maps to `src/<source-path>.ts`\n\nExamples:\n\n```ts\nimport { registerShellExtension } from \"@tungthedev/pi-extensions\";\nimport { registerCodexCompatibilityTools } from \"@tungthedev/pi-extensions/codex-content/primitives\";\nimport { registerShellTool } from \"@tungthedev/pi-extensions/shell/primitives\";\nimport { readPiModeSettings } from \"@tungthedev/pi-extensions/settings/config\";\n\nexport function registerCustomPack(pi: ExtensionAPI) {\n  registerShellExtension(pi);\n  registerCodexCompatibilityTools(pi);\n  registerShellTool(pi);\n}\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "codex",
+    "droid",
+    "mermaid",
+    "pi",
+    "pi-extension",
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/tungthedev/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tungthedev/pi-extensions.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/extensions/editor.js",
+      "./dist/extensions/mermaid.js",
+      "./dist/extensions/web.js",
+      "./dist/extensions/skill.js",
+      "./dist/extensions/boomerang.js",
+      "./dist/extensions/goal.js",
+      "./dist/extensions/workspace.js",
+      "./dist/extensions/pi-modes.js",
+      "./dist/extensions/ext-manager.js",
+      "./dist/extensions/openai-responses-image-patch.js"
+    ],
+    "themes": [
+      "./themes"
+    ]
+  },
+  "time": {
+    "created": "2026-03-19T08:17:09.246Z",
+    "modified": "2026-05-28T04:20:32.461Z",
+    "0.1.0": "2026-03-19T08:17:09.527Z",
+    "0.2.0": "2026-03-20T02:05:42.776Z",
+    "0.3.1": "2026-03-24T04:54:43.926Z",
+    "1.0.1": "2026-03-26T09:36:27.861Z",
+    "1.0.2": "2026-03-26T13:36:28.903Z",
+    "1.1.0": "2026-03-31T06:50:28.357Z",
+    "2.0.0-alpha.1": "2026-04-11T08:11:53.192Z",
+    "2.0.0-alpha.2": "2026-04-12T12:41:56.346Z",
+    "2.0.0-alpha.3": "2026-04-12T13:03:45.357Z",
+    "2.0.0-alpha.4": "2026-04-12T13:14:11.505Z",
+    "2.0.0-alpha.5": "2026-04-13T09:40:43.581Z",
+    "2.0.0-alpha.6": "2026-04-13T14:14:05.132Z",
+    "2.0.0-alpha.7": "2026-04-15T16:49:15.471Z",
+    "2.0.0": "2026-04-16T06:32:56.926Z",
+    "2.0.1": "2026-04-20T10:03:37.894Z",
+    "2.1.0": "2026-04-24T08:39:37.300Z",
+    "2.2.0": "2026-04-26T17:28:23.588Z",
+    "2.3.0": "2026-05-04T11:13:56.663Z",
+    "2.4.0": "2026-05-05T11:09:48.292Z",
+    "2.5.0": "2026-05-06T13:45:44.633Z",
+    "2.6.0": "2026-05-12T11:27:12.322Z",
+    "2.6.1": "2026-05-16T03:57:40.997Z",
+    "2.6.2": "2026-05-27T03:11:58.356Z",
+    "2.6.3": "2026-05-27T16:36:52.316Z",
+    "2.6.4": "2026-05-28T04:20:32.320Z"
+  },
+  "versions_count": 25,
+  "downloads_last_week": 172,
+  "download_trend": []
+}

@@ -1,0 +1,395 @@
+{
+  "name": "pi-antigravity-rotator",
+  "latest_version": "2.3.0",
+  "description": "Multi-account rotation proxy for Google Antigravity with per-model routing, real-time quota tracking, and infringement detection",
+  "readme": "![Pi Antigravity Rotator logo](./pi-antigravity-rotator_logo.png)\n\n# Pi Antigravity Rotator\n\nMulti-account rotation proxy for Google Antigravity. Distributes API usage across multiple Google accounts with per-model routing, real-time quota tracking, automatic token management, and infringement detection.\n\n> **\u26a0\ufe0f WARNING:** Using this proxy may put connected Google accounts at risk of Terms of Service enforcement, including restriction, suspension, or permanent bans. Use at your own risk.\n\n<details>\n<summary><strong>\u26a0\ufe0f Terms of Service Warning \u2014 Read Before Installing</strong></summary>\n\n> [!CAUTION]\n> This is an unofficial tool and is not endorsed by Google. Routing traffic through this proxy may violate Google's Terms of Service or trigger automated abuse or policy enforcement systems.\n>\n> **By using this proxy, you acknowledge:**\n> - Your account may be restricted, suspended, shadow-banned, or permanently banned\n> - Multi-account rotation and proxying can increase account risk compared to normal interactive usage\n> - You assume all responsibility for the accounts and traffic routed through this tool\n>\n> **Recommendation:** Do not use your primary Google account. Prefer disposable or lower-risk accounts, and keep account exposure conservative.\n\n</details>\n\n## Support Me\n\nIf this tool has helped you optimize your API usage and save costs, consider supporting its development!\n\n<a href=\"https://ko-fi.com/tuxevil\" target=\"_blank\"><img src=\"https://storage.ko-fi.com/cdn/kofi2.png?v=3\" height=\"36\" alt=\"Buy Me a Coffee at ko-fi.com\" /></a> <a href=\"https://discord.gg/GgwVqTaKgK\" target=\"_blank\"><img src=\"https://img.shields.io/badge/Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white\" height=\"36\" alt=\"Join Discord\" /></a>\n\n### Donate Account Quota\n\nAnother great way to support the development of this project is by donating an authorized Google account. This helps me test new features, debug rotation algorithms, and keep improving the rotator.\n\nTo donate a quota-enabled account safely:\n\n1. **Use a Secondary Account:** To protect your privacy and primary Google Cloud resources, we strongly recommend creating and using a disposable or \"throwaway\" Google account.\n2. **Authorize the Account:** Run `npm run login` (or `pi-antigravity-rotator login`) on your local machine and complete the Google sign-in.\n3. **Copy the Configuration:** Open your local `accounts.json` file and copy the JSON block of the newly added account from the `accounts` array. It will look like this:\n   ```json\n   {\n     \"email\": \"your-throwaway-account@gmail.com\",\n     \"refreshToken\": \"1//your_long_refresh_token_here...\",\n     \"projectId\": \"project-id-here\",\n     \"projectSource\": \"google\",\n     \"label\": \"donated-account\"\n   }\n   ```\n4. **Send the Block:** Send this JSON block to me via email at [tuxevil@dragont.ec](mailto:tuxevil@dragont.ec) or reach out directly on our official [Discord Server](https://discord.gg/GgwVqTaKgK).\n5. **Revoke Access Anytime:** You retain full control over your account. If you wish to stop donating, simply go to your [Google Account Settings](https://myaccount.google.com/) -> **Security** -> **Your connections to third-party apps & services**, find the authorized application (e.g., **Google Cloud SDK**), and click **Remove Access**. The rotator will immediately lose access and disable the account on the next refresh attempt.\n\n\n## v2.0 Highlights\n\n- Full dashboard config editor with import/export.\n- Official Docker and compose deployment.\n- `pi-antigravity-rotator doctor` for config/state validation.\n- Optional account `tier` metadata and runtime `healthScore`.\n- Strong security warnings when admin routes are open without `PI_ROTATOR_ADMIN_TOKEN`.\n\n## Features\n\n- **Compatibility Adapters** -- Includes standard OpenAI-compatible `/v1/chat/completions` and Anthropic-compatible `/v1/messages` APIs. Features comprehensive **OpenAI Responses API compatibility** (`/v1/responses`), enabling seamless integration with advanced agentic systems like Codex.\n- **Per-model routing** -- Each model (Gemini Pro, Flash, Claude) routes to its own active account independently. Multiple agents using different models won't interfere with each other.\n- **Real-time quota monitoring** -- Polls Google's quota API every 5 minutes to track remaining usage per model per account\n- **Per-model timer tracking** -- Timer classification (`fresh`/`7d`/`5h`) is evaluated per model using each model's actual `resetTime` from the quota API, not a per-account estimate\n- **Smart rotation** -- Rotates only the specific model whose quota dropped, leaving other models on their current accounts\n- **Infringement detection** -- On 403 with infringement/abuse/suspension keywords, the account is immediately flagged and excluded from routing\n- **Safer 429 handling** -- On provider `429`, stops the current request and avoids cascade-burning sibling accounts\n- **Concurrency guardrails** -- Limits each account to one in-flight request by default to avoid bursty pressure\n- **Operator fresh-window controls** -- You can block new `fresh` window starts globally, then selectively allow specific accounts to override that policy\n- **Protective pause** -- Pauses all routing for several hours after serious ToS/abuse-style flags so the rest of the pool is not burned\n- **Token auto-refresh** -- Tokens are refreshed automatically before expiry; no manual management\n- **Endpoint cascade** -- Tries daily, autopush, and prod API endpoints for resilience\n- **Advanced Telemetry & Statistics** -- Track exactly how much USD you save compared to a paid API plan, predict quota depletion with the Forecast grid, view Latency tracking (p50/p95), and explore 60-day historical usage heatmaps\n- **Web dashboard** -- Real-time view of model routing table, per-account quota bars with per-model timers, and flagged account alerts\n- **Auto-update notifications** -- The dashboard checks npm for new releases every 30 minutes and shows a banner with one-click update when a newer version is available\n- **Broadcast notifications** -- Operator-controlled announcements and alerts delivered directly to the dashboard\n- **State persistence** -- Survives restarts; routing assignments, per-model request counters, cooldowns, and flags are saved to disk\n\n## Quick Start\n\n### Option A: Install from npm\n\n```bash\nnpm install -g pi-antigravity-rotator\n\n# Add your first account\npi-antigravity-rotator login\n\n# Start the proxy\npi-antigravity-rotator start\n```\n\n### Option B: Clone from source\n\n```bash\ngit clone https://github.com/tuxevil/pi-antigravity-rotator.git\ncd pi-antigravity-rotator\nnpm install\n\n# Add your first account\nnpm run login\n\n# Start the proxy\nnpm start\n```\n\n### Option C: Docker\n\n```bash\ndocker compose up -d\n```\n\nThe included compose file persists runtime data under `./docker-data` and sets `PI_ROTATOR_DIR=/data`.\n\n## Adding Accounts\n\nRun `npm run login` once per Google account:\n\n1. A Google OAuth URL is printed to the terminal -- open it in your browser\n2. Complete the sign-in and grant permissions\n3. The browser redirects to a `localhost` URL that won't load -- this is expected\n4. Copy the **full URL** from the browser's address bar and paste it into the terminal\n5. If project discovery fails, open that same account in Antigravity IDE, send one message, then rerun login\n\nThe tool automatically:\n\n- Creates or updates `accounts.json` with the account credentials\n- Configures `~/.pi/agent/auth.json` with proxy-managed credentials\n\nRe-running with the same email updates the existing entry.\n\n### Connecting Agents to the Rotator\n\nThis package is not exclusive to Pi. It can be consumed by **any** agent or frontend (e.g. Pi, Hermes, OpenWebUI) by connecting via an **OpenAI-compatible** provider profile.\n\n1. Open your agent's Settings > Providers (or equivalent OpenAI configuration)\n2. Add a new generic/OpenAI-compatible provider\n3. Set the API Base URL to: `http://127.0.0.1:51200/v1/`\n4. Set the API Key to: `antigravity` (or any string, the proxy doesn't validate it)\n5. You can now use any of the models (e.g. `gemini-3.5-flash-low`, `gemini-3.5-flash-high`, `gemini-3.1-pro-low`, `claude-sonnet-4-6`, `claude-opus-4-6-thinking`, `gpt-oss-120b-medium`) directly in your agent.\n\n### Activation rule\n\nSome accounts do not expose a discoverable `projectId` until they are used once in the Antigravity IDE.\nIf login fails at project discovery:\n\n1. Open that exact Google account in Antigravity IDE.\n2. Send one message.\n3. Rerun `npm run login`.\n\n## Dashboard\n\nAfter starting the proxy, open `http://localhost:51200/dashboard` or `http://<your-server-ip>:51200/dashboard` from any machine on the same network (the proxy binds to `0.0.0.0`).\n\nIf `PI_ROTATOR_ADMIN_TOKEN` is unset, the proxy automatically generates a cryptographically secure token on first run and saves it to a `.admin-token` file in the root directory. This token will be printed to the console on first startup. You must append `?token=<your-token>` to the dashboard URL to access it, or set `PI_ROTATOR_ADMIN_TOKEN` in your environment to override it.\n\nThe dashboard shows:\n\n- **Top Status & Controls** -- Real-time routing state, uptime, requests, and PII masking toggle.\n- **Token Usage & Savings** -- Interactive chart (`1h`, `2h`, `4h`, `8h`, `12h`, `1d`, `7d`, `1m`) showing token consumption by model, with estimated USD savings and `CSV`/`JSON` export options.\n- **Activity Heatmap** -- 60-day responsive GitHub-style contribution grid showing request intensity hour by hour.\n- **Latency (p50/p95)** -- Real-time median and 95th percentile tracking for Time-to-First-Byte (TTFB) and Total Duration per model.\n- **Quota Forecast** -- Predictive modeling showing when each model's quota will run out based on the current requests/hour burn rate.\n- **Searchable Request Log** -- Live feed of the last 200 requests with exact timestamps, models, masked accounts, status codes, and latency.\n- **Account Cards** -- Sorted by total quota. Shows status (`active`, `ready`, `cooldown`, `flagged`, `disabled`), quota bars with timers, and precise error messages.\n- **Web-based Account Management** -- Add, remove, and manage account credentials and tier configurations directly from the UI without touching JSON files.\n- **Operator Panels** -- \"Attention Needed\" summaries for quarantined accounts, unroutable models, token-bucket pressure, and a real-time event feed of rotator actions.\n- **Routing Inspector** -- On-demand modal showing the active routing policy, candidate scores, local token bucket state, and rejection reasons per model.\n\n![Dashboard](dashboard.png)\n\n## How It Works\n\n### Proxying\n\n```\nAgent 1 (Gemini Pro)  --->  localhost:51200  --->  Account A\nAgent 2 (Claude)      --->  localhost:51200  --->  Account C\nAgent 3 (Flash)       --->  localhost:51200  --->  Account A\n                               (this proxy)          (per-model routing)\n```\n\n1. The agent sends a request to `localhost:51200` with a model name in the body\n2. The proxy resolves the model to a quota key (e.g., `gemini-3.1-pro`)\n3. The best available account for that specific model is selected\n4. The `Authorization` header and `project` field are swapped with real credentials\n5. The request is forwarded (trying daily, autopush, then prod endpoints)\n6. The SSE response streams back to the agent transparently\n\n### Per-Model Account Selection\n\nEach model maintains its own active account. When the proxy needs to rotate a model, it picks the next account using a priority system:\n\n| Priority | Badge | Condition | Rationale |\n|----------|-------|-----------|-----------|\n| 1 (first) | `5h` | Short reset window is already active for this model | Drain short-window quota before it recharges |\n| 2 | `7d` | Long reset window is already active for this model | Already ticking, so it is still worth using |\n| 3 (last) | `fresh` | No active reset window is known for this model yet | Save untouched quota for later if other timed pools exist |\n\nWithin the same priority tier, the account with the most remaining quota for that model wins. If multiple accounts tie on priority and quota, rotation advances circularly from the current account so equal candidates share traffic instead of always favoring the first configured match.\n\nTimer meanings:\n\n- `fresh` -- no future `resetTime` is currently reported for that model on that account. In practice, this means no active reset window is visible in quota polling yet. The dashboard labels this as `idle` to avoid implying that it is automatically safe to start.\n- `5h` -- `resetTime` is less than 6 hours away.\n- `7d` -- `resetTime` is 6 hours or more away.\n\n### Rotation Triggers\n\nThree mechanisms trigger rotation, scoped to the specific model:\n\n1. **Quota-based** (primary) -- Polls the Google quota API every 5 minutes. When a model's remaining quota drops by `rotateOnQuotaDrop` percentage points (default: 20%), that model rotates to the next account. Other models stay on their current accounts.\n\n2. **Request-count** (fallback) -- Before forwarding a request, the rotator checks how many requests the current account has already served for that specific model and rotates once it reaches `requestsPerRotation` (default: 5). Per-model counters are persisted so restarts do not reset the threshold. By default this fallback is only used when quota data for that model is still unknown; set `useRequestCountRotationWhenQuotaUnknownOnly` to `false` to keep request-count rotation active even when quota telemetry exists. If the threshold is reached but every replacement account is cooling down, flagged, disabled, busy, blocked by fresh-window policy, or out of quota for that model, the rotator stays on the current healthy account instead of returning `503`.\n\n3. **429 containment** (reactive) -- On provider rate limit, the account is marked exhausted with a parsed retry cooldown and the current request stops. Repeated unique-account `429`s trip project/model and model-wide circuit breakers so retries cannot burn through the pool.\n\n### Fresh Windows\n\nThe quota polling API only exposes one visible `quotaInfo` block per model. If a model has no visible `resetTime`, the rotator classifies it as `fresh` internally and the dashboard shows it as `idle`.\n\nOperationally, `idle` means:\n\n- no timer window is currently visible for that model in quota polling\n- starting that account may open a new quota window\n- because the provider does not expose all parallel buckets explicitly, the rotator cannot guarantee ahead of time whether that new visible window will behave like a short `5h` opportunity or a longer `7d` runway\n\nFor that reason, the rotator has two operator controls:\n\n- a **global fresh-window toggle** that blocks opening new `idle` windows by default\n- a **per-account override** that allows specific accounts to ignore the global block when you intentionally want them available\n\nWhen fresh-window starts are blocked:\n\n- visible `5h` timers still have highest priority\n- visible `7d` timers are still used normally\n- `idle` accounts are held back unless you explicitly enable their per-account override\n\n### Account Protection\n\nThe proxy detects blocked/suspended accounts at three levels:\n\n1. **Quota API check** (initial poll + every poll) -- If the quota API returns `401` or `403`, the account is immediately flagged.\n\n2. **API 401** (on request) -- If the prod endpoint rejects the token with `401 UNAUTHENTICATED`, the account is flagged.\n\n3. **API 403** (on request) -- If the response body contains enforcement keywords such as `infring`, `suspend`, `abus`, `terminat`, `violat`, `banned`, `policy`, `forbidden`, or `verif`, the account is flagged.\n\nFlagged accounts are **immediately excluded** from all model routing. If the reason looks serious enough (for example ToS, abuse, infringement, suspension, or ban language), the rotator also enables a global **protective pause** that stops all routing for `protectivePauseMs` (default: 6 hours). The dashboard shows a red `FLAGGED` badge with the error message and quarantine guidance. Flagged accounts are intentionally kept out of rotation until the provider explicitly restores access.\n\n### Cooldown Management\n\n- Cooldowns are capped at **30 minutes** max\n- Stale cooldowns from previous sessions are capped on startup\n- When every non-flagged account is cooling down, the routing state becomes `cooldown_wait`\n- The dashboard shows why routing is waiting, how long until the next retry window, and which accounts are cooling down\n- Quota-based rotation only triggers if a healthy account is available; the proxy won't rotate away from a working account if there's no better alternative\n\n### Error Handling\n\n- **429** (rate limit) -- account is marked exhausted with cooldown; request stops and returns `429`/`Retry-After` to force client backoff\n- **401** -- account is flagged and excluded from routing\n- **403** with enforcement keywords -- account is flagged and may trigger protective pause\n- **503** (no capacity) -- returned directly to the agent when all healthy accounts are cooling down, busy, flagged, or disabled\n- **5xx** (other server errors) -- account error counter incremented, rotates to next\n\n### Dashboard Visibility\n\nThe dashboard is intended to replace day-to-day `journalctl` digging for normal operations. The top status panel shows:\n\n- The current routing state (`healthy`, `cooldown_wait`, `busy`, `paused`, `stopped`)\n- The exact stop or wait reason\n- The next retry window when cooldowns are active\n- Protective pause remaining time and the provider signal that triggered it\n- The global fresh-window policy and a button to block or allow new `idle` window starts\n- Pool counts for available, ready, active, cooldown, busy, flagged, disabled, and error accounts\n- An `Attention Needed` section summarizing flagged, cooling, disabled, and error accounts\n- A recent event feed with the latest rotator/proxy incidents that led to the current state\n\n## Configuration\n\nConfig files (`accounts.json`, `state.json`) are stored in `~/.pi-antigravity-rotator/` by default. Override with:\n\n```bash\n\n# Environment variables\nexport PI_ROTATOR_DIR=/path/to/config\nexport PI_ROTATOR_QUOTA_USER_AGENT=\"antigravity/1.107.0 darwin/arm64\"\n\n# Postgres Storage Support (v2.3.0+)\n# Optional: Set this to use a Postgres database instead of local JSON files for persistence.\nexport PI_ROTATOR_DATABASE_URL=\"postgres://user:pass@localhost:5432/rotatordb\"\nexport DATABASE_URL=\"postgres://user:pass@localhost:5432/rotatordb\" # Fallback\n\n# Optional: require this token for dashboard/API access. If unset, a secure token is auto-generated.\n# Note: Upgrading to v2.3.0+ will regenerate your existing auto-generated token. Check logs!\nexport PI_ROTATOR_ADMIN_TOKEN=\"change-me\"\nexport PI_ROTATOR_BIND_HOST=\"127.0.0.1\"\n# Optional: max accepted proxy request body size in bytes. Default: 26214400 (25 MiB).\nexport PI_ROTATOR_MAX_BODY_BYTES=26214400\n# Optional: log verbosity. One of debug, info, warn, error, silent. Default: info.\nexport PI_ROTATOR_LOG_LEVEL=info\n# Optional override for Antigravity UA version used by quota fetches\nexport PI_AI_ANTIGRAVITY_VERSION=1.107.0\n\n# Or CLI flag\npi-antigravity-rotator start --config-dir /path/to/config\n```\n\nNew v2.0 config fields:\n\n- `bindHost`: interface to bind on. Default: `0.0.0.0`.\n- `routingPolicy`: current default is `timer-first`. Optional values now include `tier-first`, `quota-first`, and `hybrid`.\n- `tokenBucketEnabled`: enables the local per-account request bucket used by `hybrid`. Default: `false`.\n- `tokenBucketMaxTokens`: bucket capacity when enabled. Default: `50`.\n- `tokenBucketRefillPerMinute`: refill speed when enabled. Default: `6`.\n- `tokenBucketInitialTokens`: startup fill level when enabled. Default: `50`.\n- `accounts[].tier`: optional `ultra`, `pro`, `free`, or `unknown`.\n\n## Doctor\n\n```bash\npi-antigravity-rotator doctor\n```\n\nThis validates `accounts.json`, checks local state files, lists backups, and warns when admin auth is not configured.\n\n`accounts.json` is created automatically by the login command.\nLogin now fails if Google does not return a project ID. No shared fallback.\n\n```json\n{\n  \"proxyPort\": 51200,\n  \"requestsPerRotation\": 5,\n  \"rotateOnQuotaDrop\": 20,\n  \"quotaPollIntervalMs\": 300000,\n  \"maxConcurrentRequestsPerAccount\": 1,\n  \"maxConcurrentRequestsPerProjectModel\": 1,\n  \"projectCircuitBreaker429Threshold\": 3,\n  \"projectCircuitBreakerWindowMs\": 600000,\n  \"projectCircuitBreakerCooldownMs\": 3600000,\n  \"modelCircuitBreaker429Threshold\": 3,\n  \"modelCircuitBreakerCooldownMs\": 21600000,\n  \"dailyAccountSlowRequests\": 250,\n  \"dailyAccountStopRequests\": 350,\n  \"dailyProjectSlowRequests\": 900,\n  \"dailyProjectStopRequests\": 1200,\n  \"slowModeJitterMinMs\": 8000,\n  \"slowModeJitterMaxMs\": 25000,\n  \"protectivePauseMs\": 21600000,\n  \"useRequestCountRotationWhenQuotaUnknownOnly\": true,\n  \"accounts\": [\n    {\n      \"email\": \"user@gmail.com\",\n      \"refreshToken\": \"1//...\",\n      \"projectId\": \"project-abc123\",\n      \"label\": \"user\"\n    }\n  ]\n}\n```\n\n### Options\n\n| Field | Default | Description |\n|-------|---------|-------------|\n| `proxyPort` | `51200` | Port the proxy listens on |\n| `requestsPerRotation` | `5` | Max per-model requests before attempting request-count rotation |\n| `rotateOnQuotaDrop` | `20` | Rotate when a model's quota drops this many %. Set to `0` to disable |\n| `quotaPollIntervalMs` | `300000` | Quota poll interval in ms (5 minutes) |\n| `maxConcurrentRequestsPerAccount` | `1` | Max simultaneous requests allowed per account |\n| `maxConcurrentRequestsPerProjectModel` | `1` | Max simultaneous requests allowed across accounts sharing the same `projectId` for the same quota model |\n| `projectCircuitBreaker429Threshold` | `3` | Unique accounts from the same `projectId` that must hit provider `429` before pausing that project/model |\n| `projectCircuitBreakerWindowMs` | `600000` | Rolling window for the project/model `429` circuit breaker |\n| `projectCircuitBreakerCooldownMs` | `3600000` | Minimum project/model pause after the circuit breaker trips |\n| `modelCircuitBreaker429Threshold` | `3` | Unique accounts across all projects that must hit provider `429` for the same quota model before pausing that model globally |\n| `modelCircuitBreakerCooldownMs` | `21600000` | Minimum model-wide pause after the global model circuit breaker trips |\n| `dailyAccountSlowRequests` | `250` | Daily upstream attempts per account before slow-mode jitter starts |\n| `dailyAccountStopRequests` | `350` | Daily upstream attempts per account before routing stops for that account until the next UTC day |\n| `dailyProjectSlowRequests` | `900` | Daily upstream attempts per `projectId` before slow-mode jitter starts |\n| `dailyProjectStopRequests` | `1200` | Daily upstream attempts per `projectId` before routing stops for that project until the next UTC day |\n| `slowModeJitterMinMs` | `8000` | Minimum slow-mode delay before upstream request |\n| `slowModeJitterMaxMs` | `25000` | Maximum slow-mode delay before upstream request |\n| `protectivePauseMs` | `21600000` | Global routing pause after a serious provider enforcement signal |\n| `useRequestCountRotationWhenQuotaUnknownOnly` | `true` | Use request-count rotation only until quota telemetry exists for the request's model. Set to `false` to keep rotating by request count even with known quotas |\n\n### Account Fields\n\n| Field | Description |\n|-------|-------------|\n| `email` | Google account email (auto-filled by login) |\n| `refreshToken` | OAuth refresh token (auto-filled by login) |\n| `projectId` | Cloud project ID discovered from Google during login |\n| `projectSource` | Optional metadata: `google` when discovered from Google, `manual` if edited by hand |\n| `label` | Display name on the dashboard (auto-filled, defaults to email username) |\n\n## API Endpoints\n\n| Method | Path | Description |\n|--------|------|-------------|\n| `GET` | `/dashboard` | Web dashboard |\n| `GET` | `/login` | Hosted account-link landing page |\n| `GET` | `/api/status` | JSON status: accounts, quotas, model routing, flags |\n| `POST` | `/api/enable/<email>` | Re-enable a disabled account after its underlying issue is fixed |\n| `POST` | `/api/settings/fresh-window-starts/on` | Allow opening new `idle`/fresh windows globally |\n| `POST` | `/api/settings/fresh-window-starts/off` | Block opening new `idle`/fresh windows globally |\n| `POST` | `/api/account-fresh-window-starts/<email>/on` | Allow one account to override the global fresh-window block |\n| `POST` | `/api/account-fresh-window-starts/<email>/off` | Return one account to the global fresh-window policy |\n| `POST` | `/api/self-update` | Trigger npm self-update to latest version (admin-only) |\n| `POST` | `/v1internal:streamGenerateContent` | Native Antigravity proxy endpoint (used by pi) |\n| `GET` | `/v1/models` | OpenAI-compatible model list |\n| `POST` | `/v1/responses` | OpenAI Responses-compatible create endpoint |\n| `GET` | `/v1/responses/<id>` | Retrieve stored Responses result |\n| `DELETE` | `/v1/responses/<id>` | Delete stored Responses result |\n| `POST` | `/v1/responses/<id>/cancel` | Cancel an in-progress stored Responses result |\n| `GET` | `/v1/responses/<id>/input_items` | List stored input items for a Responses result |\n| `POST` | `/v1/chat/completions` | OpenAI-compatible non-streaming chat adapter |\n| `POST` | `/v1/messages` | Anthropic-compatible non-streaming messages adapter |\n\nDashboard and internal `/api/*` requests must include either `Authorization: Bearer <token>`, `X-Rotator-Admin-Token: <token>`, or `?token=<token>` for browser dashboard access. The native pi proxy endpoint and compatibility adapters (`/v1/*`) remain unauthenticated by design, so your AI agents and existing clients will keep working without requiring a token. Put this service behind a trusted local boundary if exposing beyond localhost/LAN.\n\n### Compatibility Adapters\n\nThe compatibility adapters are additive. They do not change the native `/v1internal:streamGenerateContent` route used by pi.\n\n**OpenAI-compatible example:**\n\n```bash\ncurl http://localhost:51200/v1/chat/completions \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n    \"model\": \"gemini-3-flash\",\n    \"messages\": [{\"role\": \"user\", \"content\": \"Say pong\"}],\n    \"stream\": false\n  }'\n```\n\n**OpenAI Responses-compatible example:**\n\n```bash\ncurl http://localhost:51200/v1/responses \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n    \"model\": \"gemini-3-flash\",\n    \"input\": [{\"role\": \"user\", \"content\": [{\"type\": \"input_text\", \"text\": \"Say pong\"}]}],\n    \"stream\": false\n  }'\n```\n\n**Anthropic-compatible example:**\n\n```bash\ncurl http://localhost:51200/v1/messages \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n    \"model\": \"claude-sonnet-4-6\",\n    \"system\": \"Be terse.\",\n    \"messages\": [{\"role\": \"user\", \"content\": \"Say pong\"}],\n    \"max_tokens\": 128,\n    \"stream\": false\n  }'\n```\n\nCurrent adapter scope:\n\n- Text chat/messages.\n- **Responses API compatibility**: Supports `POST /v1/responses` plus basic in-memory retrieve/delete/cancel/input-items endpoints for Codex-style agents.\n- **Developer and Model Role Support**: Fully supports the `\"developer\"` (mapped to system instructions) and `\"model\"` roles in chat message histories, validating and routing them correctly.\n- **Request Normalization**: Automatically normalizes loose inputs (non-array messages), legacy prompt/input fields (e.g. `prompt` strings/arrays or `input` structures), and raw native Antigravity requests (`request.contents`) into standard OpenAI/Anthropic format.\n- **Native Reasoning visibility**: Models with thinking capabilities (Gemini 3 Pro, Gemini 3.5 Flash, Claude Sonnet 4.6 Thinking) automatically expose their interleaved thinking blocks in real-time as OpenAI `reasoning_content` or Anthropic `thinking_delta` chunks.\n- Streaming mode is supported as compatibility SSE. The adapter buffers the upstream Antigravity stream, then emits one OpenAI/Anthropic-compatible final delta. Native token-by-token pass-through is not implemented yet.\n- Image input is supported when sent as base64 data URL (`OpenAI image_url.url = data:image/...;base64,...`) or Anthropic base64 source (`type=image`, `source.type=base64`).\n- **Tool/function calling is fully supported** (OpenAI `tools`/`tool_choice` format and Anthropic `tool_use`/`tool_result` via standard translation to Gemini `functionDeclarations`).\n- Responses-compatible tool support is currently limited to `type: \"function\"` tools. Built-in tools like `web_search`, `file_search`, `computer`, or `code_interpreter` are rejected explicitly.\n\n\n## Contributors\n\nThanks to these amazing people who have contributed to the project:\n\n- **[@josenicomaia](https://github.com/josenicomaia)** (Jos\u00e9 Nicodemos Maia Neto) \u2014 Modularized the compatibility layer architecture, added multimodal tool response support, and fixed streaming pass-through for tool executions. ([PR #8](https://github.com/tuxevil/pi-antigravity-rotator/pull/8), [PR #9](https://github.com/tuxevil/pi-antigravity-rotator/pull/9), [PR #11](https://github.com/tuxevil/pi-antigravity-rotator/pull/11))\n- **[@yashyadav711](https://github.com/yashyadav711)** (Yash) \u2014 Fixed Draft-2020-12 inline JSON-Schema union type mapping for Gemini tools support. ([PR #10](https://github.com/tuxevil/pi-antigravity-rotator/pull/10))\n- **[@javargasm](https://github.com/javargasm)** (Jeisson Alexander Vargas Marroquin) \u2014 Anthropic tool-use compatibility layer (`tool_use`/`tool_result` content block conversion), JSON schema round-trip fixes, and compat test suite expansion. ([PR #3](https://github.com/tuxevil/pi-antigravity-rotator/pull/3), [PR #7](https://github.com/tuxevil/pi-antigravity-rotator/pull/7))\n\n\n## Connecting Codex / VS Code Agents\n\n`pi-antigravity-rotator` can act as the multi-account rotation backend for agentic frameworks, including **Codex** executing in VS Code or in the terminal.\n\nSince Codex uses the standard **OpenAI Responses API**, it can seamlessly route its developer-agent workflows through the rotator.\n\n### Configuration for Codex\n\nTo connect Codex to your local rotator:\n\n1. **Configure the API Base URL**:\n   In Codex settings (e.g. in your `.codex` config or VS Code configuration), set the OpenAI API base URL to point to your rotator's compatibility adapter:\n   ```json\n   \"codex.openai.apiBase\": \"http://localhost:51200/v1\"\n   ```\n   *(Or set the environment variable `OPENAI_BASE_URL=http://localhost:51200/v1` in the workspace shell).*\n\n2. **Set the API Key / Admin Token**:\n   If you have set a `PI_ROTATOR_ADMIN_TOKEN` for your rotator, configure that token as the API key. Otherwise, any non-empty placeholder string (e.g., `sk-antigravity`) works:\n   ```json\n   \"codex.openai.apiKey\": \"your-rotator-admin-token-here\"\n   ```\n   *(Or set the environment variable `OPENAI_API_KEY=...` in the shell).*\n\n3. **Select a Supported Model**:\n   Configure Codex to target one of the following models supported by the rotator (which will be mapped to the best available Google Antigravity account/model under the hood):\n   - `gemini-3.5-flash` or `gemini-3.5-flash-high` / `gemini-3.5-flash-low` / `gemini-3.5-flash-medium` (Recommended for fast general reasoning)\n   - `gemini-3.1-pro` or `gemini-pro-agent` / `gemini-3.1-pro-high` / `gemini-3.1-pro-low` (For deep reasoning)\n   - `claude-sonnet-4-6` or `claude-opus-4-6-thinking` (Claude models via Vertex AI)\n   - `gpt-oss-120b` or `gpt-oss-120b-medium` (Open-source GPT model)\n\n   Example Codex configuration entry:\n   ```json\n   \"codex.model\": \"gemini-3.5-flash-high\"\n   ```\n\n### Features Enabled for Codex Agents\n\n- **Native Reasoning Visibility**: If using models with thinking enabled (e.g., `gemini-3.5-flash-high`), interleaved reasoning/thinking blocks are streamed back in real-time as OpenAI `reasoning_content` chunks. This lets Codex inspect the model's inner thoughts before it acts.\n- **Function / Tool Routing**: Function calls emitted by Codex are fully translated to Gemini `functionCalls` and returned back to Codex safely, enabling full agentic capabilities. Multi-turn tool conversations work correctly for all models including Claude (`claude-sonnet-4-6`, `claude-opus-4-6-thinking`) \u2014 parallel tool calls are batched into a single turn and tool results are properly grouped to satisfy Claude's strict `tool_use`/`tool_result` ordering requirements.\n- **Strict Validation**: The rotator strictly validates the Responses input contract and rejects unsupported tools (e.g., `web_search`) proactively to ensure Codex doesn't hit unexpected runtime exceptions.\n\n## Development Checks\n\n```bash\nnpm run typecheck\nnpm test\nnpm run check\n```\n\nThe test suite covers model resolution contracts and dashboard render/syntax smoke checks.\n\n## Running as a Service\n\n```bash\n# Using nohup\nnohup npm start > rotator.log 2>&1 &\n\n# Or with systemd (create /etc/systemd/system/pi-antigravity-rotator.service)\n[Unit]\nDescription=Pi Antigravity Rotator\nAfter=network.target\n\n[Service]\nType=simple\nWorkingDirectory=/path/to/pi-antigravity-rotator\nExecStart=/usr/bin/npm start\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\n```\n\n## Troubleshooting\n\n**Account shows `flagged` status**\nGoogle detected potential abuse or enforcement. Review the error message on the dashboard and resolve the provider-side block first. Flagged accounts are quarantined and are not re-enabled through `/api/enable/<email>` until the underlying provider issue is cleared by replacing or restoring the account.\n\n**Account keeps getting disabled after 5 errors**\nCheck the error message. Common causes: revoked OAuth consent, expired refresh token (re-run `npm run login`), or Google account suspension.\n\n**Quota bars not showing**\nQuota data appears after the first poll cycle (up to 5 minutes). Ensure accounts have valid tokens.\n\n**All accounts exhausted**\nIf the outage is temporary (cooldown, model breaker, or protective pause), the proxy returns `429` with `Retry-After` and `retryAfterMs`; clients must back off. The proxy returns terminal `503` only when there is no known retry time, for example all accounts are disabled/flagged.\n\n**Multiple agents on different models**\nThis is fully supported. Each model routes independently. Agent 1 using Gemini Pro and Agent 2 using Claude will each have their own active account and won't interfere with each other's rotation.\n\n## Telemetry\n\npi-antigravity-rotator collects **anonymous usage telemetry** to help understand how the tool is used and \u2014 most importantly \u2014 to improve the anti-flag algorithm that protects your accounts.\n\n### What is collected\n\n**Heartbeat** (at boot, every 1h, at shutdown):\n- Random install ID (UUID \u2014 not tied to any account or person)\n- Rotator version, Node.js version, OS, architecture\n- Account count, models in use, total request count, uptime\n- Routing health state (healthy/paused/stopped)\n- Flagged/disabled/pro/free account counts\n- Per-model token usage (input/output tokens + request count per model)\n- Feature usage flags (dashboard opened, login used, etc. \u2014 booleans only)\n\n**Flag events** (sent immediately when Google flags an account):\n- HTTP status that triggered the flag (401 or 403)\n- Which known patterns matched (e.g. `infring`, `abus`, `suspend` \u2014 from a fixed allowlist)\n- Model being requested, quota timer type, quota percentage\n- Account request velocity (requests/hour), concurrent requests, lifetime requests\n- Pool state: size, healthy count, whether protective pause triggered\n- Time since previous flag\n\nThe dashboard shows both raw `Flag Events` and deduped `Unique Flag Incidents` so repeated identical incidents don't inflate the signal.\n\nFlag data is the most valuable signal. It lets us study what behavior patterns lead to flags and improve the rotation algorithm to avoid them \u2014 benefiting everyone.\n\n### What is NEVER collected\n\n- \u274c Email addresses\n- \u274c OAuth tokens or API keys\n- \u274c IP addresses\n- \u274c Google project IDs\n- \u274c Request/response bodies\n- \u274c Error message text (only which known keywords matched)\n\n### Endpoint\n\nTelemetry posts to:\n\n```bash\nhttp://telemetry.dragont.ec:3800/v1/events\n```\n\n### Opt out\n\nSet the environment variable before starting:\n\n```bash\nexport PI_ROTATOR_TELEMETRY=off\n```\n\nOr use any of: `PI_ROTATOR_TELEMETRY=false`, `PI_ROTATOR_TELEMETRY=0`.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding",
+    "pi-coding-agent",
+    "antigravity",
+    "proxy",
+    "rotation",
+    "google",
+    "quota",
+    "gemini"
+  ],
+  "author": {
+    "name": "Sebasti\u00e1n Real",
+    "url": "tuxevil"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/tuxevil/pi-antigravity-rotator#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tuxevil/pi-antigravity-rotator.git"
+  },
+  "pi": {},
+  "time": {
+    "created": "2026-04-22T04:48:07.164Z",
+    "modified": "2026-06-22T15:24:21.217Z",
+    "1.0.0": "2026-04-22T04:48:07.306Z",
+    "1.0.1": "2026-04-22T05:07:15.559Z",
+    "1.1.0": "2026-04-22T14:35:07.675Z",
+    "1.2.0": "2026-04-22T18:01:03.176Z",
+    "1.3.0": "2026-04-22T20:27:00.440Z",
+    "1.3.1": "2026-04-22T22:21:19.970Z",
+    "1.3.2": "2026-04-23T15:42:47.419Z",
+    "1.3.3": "2026-04-23T22:02:56.399Z",
+    "1.3.4": "2026-04-24T13:19:39.246Z",
+    "1.3.5": "2026-04-24T13:54:55.624Z",
+    "1.3.6": "2026-04-24T17:43:24.625Z",
+    "1.3.7": "2026-04-25T16:55:56.279Z",
+    "1.3.8": "2026-04-26T17:36:53.457Z",
+    "1.3.9": "2026-04-28T00:06:44.072Z",
+    "1.4.0": "2026-04-28T15:31:46.493Z",
+    "1.4.5": "2026-04-28T16:50:54.315Z",
+    "1.5.0": "2026-04-28T22:53:51.987Z",
+    "1.6.0": "2026-04-29T00:32:49.676Z",
+    "1.7.0": "2026-04-29T13:31:51.610Z",
+    "1.8.1": "2026-04-29T15:17:48.901Z",
+    "1.8.3": "2026-04-29T15:43:34.746Z",
+    "1.8.6": "2026-04-29T16:03:46.023Z",
+    "1.9.0": "2026-04-29T18:23:43.936Z",
+    "1.9.1": "2026-04-29T20:38:50.567Z",
+    "1.9.2": "2026-04-29T21:14:21.793Z",
+    "1.9.3": "2026-04-29T21:44:51.061Z",
+    "1.10.0": "2026-04-30T14:20:49.807Z",
+    "1.10.1": "2026-04-30T23:06:33.082Z",
+    "1.11.0": "2026-05-17T13:10:11.403Z",
+    "1.12.0": "2026-05-17T20:43:36.140Z",
+    "1.12.1": "2026-05-18T14:50:38.831Z",
+    "1.12.2": "2026-05-18T15:30:43.474Z",
+    "1.12.4": "2026-05-19T00:17:48.454Z",
+    "1.13.0": "2026-05-19T12:03:01.295Z",
+    "1.14.0": "2026-05-19T23:55:01.854Z",
+    "2.0.0": "2026-05-20T13:46:38.372Z",
+    "2.1.0": "2026-05-21T16:23:15.401Z",
+    "2.1.1": "2026-05-21T17:40:48.994Z",
+    "2.1.2": "2026-05-25T12:21:32.441Z",
+    "2.1.3": "2026-05-27T13:05:29.247Z",
+    "2.1.4": "2026-05-27T13:48:33.460Z",
+    "2.1.5": "2026-05-27T20:32:39.805Z",
+    "2.1.6": "2026-06-12T15:18:41.748Z",
+    "2.2.1": "2026-06-20T18:20:26.452Z",
+    "2.2.2": "2026-06-21T22:24:13.922Z",
+    "2.3.0": "2026-06-22T15:24:21.091Z"
+  },
+  "versions_count": 46,
+  "downloads_last_week": null,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 2063
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 1572
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 183
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 976
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 910
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 588
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 123
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 291
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 569
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 124
+    }
+  ]
+}

@@ -1,0 +1,400 @@
+{
+  "name": "pi-powerline-footer",
+  "latest_version": "0.6.1",
+  "description": "Powerline-style status bar extension for pi coding agent",
+  "readme": "<p>\n  <img src=\"banner.png\" alt=\"pi-powerline-footer\" width=\"1100\">\n</p>\n\n# pi-powerline-footer\n\nCustomizes the default [pi](https://github.com/badlogic/pi-mono) editor with a powerline-style status bar, welcome overlay, and AI-generated \"vibes\" for loading messages. Inspired by [Powerlevel10k](https://github.com/romkatv/powerlevel10k) and [oh-my-pi](https://github.com/can1357/oh-my-pi).\n\n<img width=\"1261\" height=\"817\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/4cc43320-3fb8-4503-b857-69dffa7028f2\" />\n\n## Features\n\n**Editor stash** \u2014 Press `Alt+S` to save your editor content and clear the editor, type a quick prompt, and your stashed text auto-restores when the agent finishes. Toggles between stash, pop, and update-existing-stash. A `stash` indicator appears in the powerline bar while text is stashed.\n\n**Working Vibes** \u2014 AI-generated themed loading messages. Set `/vibe star trek` and your \"Working...\" becomes \"Running diagnostics...\" or \"Engaging warp drive...\". Supports any theme: pirate, zen, noir, cowboy, etc.\n\n**Welcome overlay** \u2014 Branded splash screen shown as centered overlay on startup. Shows gradient logo, model info, keyboard tips, loaded AGENTS.md/extensions/skills/templates counts, and recent sessions. Auto-dismisses after 30 seconds or on any key press.\n\n**Rounded box design** \u2014 Status renders directly in the editor's top border, not as a separate footer.\n\n**Fixed editor cluster** \u2014 In interactive TUI sessions, chat/feed content scrolls above the fixed Pi working/status line, powerline rows, editor, ghost suggestions, bash transcript, and last-prompt/status rows. Scroll chat with the mouse wheel, PageUp/PageDown, Command+PageUp/PageDown, Ctrl+Shift+Up/Down, or message-jump shortcuts; the editor stays put. Drag text to copy it, drag selection to the viewport edge to scroll, double-click a line to select it, and right-click to open the terminal menu. Use `/powerline fixed-editor off` for Pi\u2019s regular scrolling layout, or `/powerline mouse-scroll off` for native terminal selection.\n\n**Live thinking level indicator** \u2014 Shows current thinking level (`think:off`, `think:med`, etc.) with per-level colors. High and xhigh levels use a rainbow effect inspired by Claude Code's ultrathink.\n\n**Smart defaults** \u2014 Nerd Font auto-detection for iTerm, WezTerm, Kitty, Ghostty, and Alacritty with ASCII fallbacks. Colors matched to oh-my-pi's dark theme.\n\n**Git integration** \u2014 Async status fetching with 1s cache TTL. Automatically invalidates on file writes/edits. Shows branch, staged (+), unstaged (*), and untracked (?) counts.\n\n**Context awareness** \u2014 Color-coded warnings at 70% (yellow) and 90% (red) context usage. During streaming, the context segment refreshes from live assistant usage instead of waiting for the next turn. Auto-compact indicator when enabled. If `pi-custom-compaction` is installed and enabled, the powerline automatically hides native context segments so the footer does not show stale post-summary usage.\n\n**Token intelligence** \u2014 Smart formatting (1.2k, 45M), subscription detection (shows \"(sub)\" vs dollar cost).\n\n**Sticky bash mode** \u2014 Toggle bash mode with `ctrl+shift+b` or `/bash-mode`. It keeps a managed shell session alive for the current pi session, shows a dedicated `shell_mode` segment, streams command output into an embedded transcript below the editor, and lets `cd` or exported state persist across commands.\n\n**Shell ghost suggestions** \u2014 Bash mode is now ghost-first. Successful per-project shell history is the primary source, while deterministic path and git continuations can still extend an existing command. Shell-native completion probes are disabled so `!command` predictions never spawn interactive shell completion subprocesses. At command position, short stems first resolve from the newest successful local command, can use guarded global shell history for high-confidence heads like `git`, and finally fall back to a tiny curated default set when history is absent. Right now that curated set is `g` \u2192 `git status` and `c` \u2192 `cd ..`. If the bash prompt is empty, bash mode shows the newest successful project-history ghost suggestion when one exists, otherwise it stays empty. The same inline predictions now also kick in for one-off `!command` and `!!command` prompts. Right Arrow or Tab accepts ghost text into the editor, and Enter runs the current shell command.\n\n## Installation\n\n```bash\npi install npm:pi-powerline-footer\n```\n\nRestart pi to activate.\n\n## Usage\n\nActivates automatically. Toggle with `/powerline`, switch presets with `/powerline <name>`, fixed-editor mode with `/powerline fixed-editor on|off|toggle`, and wheel mode with `/powerline mouse-scroll on|off|toggle`.\n\nFixed editor is on by default.\n\n- `/powerline fixed-editor off` \u2014 return to Pi\u2019s regular scrolling layout\n- `/powerline fixed-editor on` \u2014 re-enable the fixed editor\n- `/powerline fixed-editor toggle` \u2014 switch between the two\n\nYou can also set it in `~/.pi/agent/settings.json` or project-local `.pi/settings.json`:\n\n```json\n{\n  \"powerline\": {\n    \"preset\": \"default\",\n    \"fixedEditor\": false\n  }\n}\n```\n\nUse `\"fixedEditor\": true` to enable it again. Add `\"mouseScroll\": false` if you want native terminal selection instead of fixed-editor mouse handling.\n\n| Preset | Description |\n|--------|-------------|\n| `default` | Model, thinking, path (basename), git, context, tokens, cost |\n| `minimal` | Just path (basename), git, context |\n| `compact` | Model, git, cost, context |\n| `full` | Everything including hostname, time, abbreviated path |\n| `nerd` | Maximum detail for Nerd Font users |\n| `ascii` | Safe for any terminal |\n\n**Environment:** `POWERLINE_NERD_FONTS=1` to force Nerd Fonts, `=0` for ASCII.\n\nPreset selection is saved to `~/.pi/agent/settings.json` under `powerline` and restored on startup.\nRun `/powerline default` to switch back to the default preset.\n\n### Custom items from extension statuses\n\nYou can promote any extension status key into its own dedicated powerline item. This gives you a general way to register your own status items without changing this extension.\n\n1. Any extension can publish status text through `ctx.ui.setStatus(\"my-key\", \"...value...\")`.\n2. Configure `powerline.customItems` to place those keys on the left, right, or secondary row.\n\n```json\n{\n  \"powerline\": {\n    \"preset\": \"default\",\n    \"customItems\": [\n      {\n        \"id\": \"ci\",\n        \"statusKey\": \"ci-status\",\n        \"position\": \"right\",\n        \"prefix\": \"CI\",\n        \"color\": \"warning\"\n      },\n      {\n        \"id\": \"review\",\n        \"position\": \"secondary\",\n        \"hideWhenMissing\": false,\n        \"prefix\": \"review\"\n      }\n    ]\n  }\n}\n```\n\n`customItems` fields:\n\n- `id` (required): unique item id (`a-z`, `A-Z`, `0-9`, `_`, `-`)\n- `statusKey` (optional): extension status key to read, defaults to `id`\n- `position` (optional): `left`, `right`, or `secondary` (default `right`)\n- `prefix` (optional): text shown before the live status value\n- `color` (optional): any Pi theme color (`warning`, `accent`, etc.) or hex (`#RRGGBB`)\n- `hideWhenMissing` (optional): hide item when no status is present (default `true`)\n- `excludeFromExtensionStatuses` (optional): omit this key from the aggregate `extension_statuses` segment (default `true`)\n\nIf you still prefer the old style, `\"powerline\": \"default\"` continues to work.\n\n## Bash mode\n\nToggle bash mode with either:\n\n- `ctrl+shift+b`\n- `/bash-mode on`\n- `/bash-mode off`\n- `/bash-mode toggle`\n\nReset the managed shell with `/bash-reset`.\n\nWhile bash mode is active:\n\n- Enter runs the current shell command\n- Right Arrow accepts ghost text into the editor without running it\n- Tab accepts the current ghost suggestion when one exists; otherwise it does nothing\n- Up and Down browse matching shell history\n- `escape` exits bash mode and returns to normal prompt mode\n- `ctrl+c` interrupts the active shell job before falling back to normal pi behavior\n\nThe managed shell is persistent for the current pi session. Command output appears in a transcript below the editor, and shell cwd changes are reflected in the footer path and `shell_mode` segment. If the bash prompt is empty, bash mode shows the newest successful project-history ghost suggestion immediately when one exists, including right after mode entry or after the prompt is cleared again. One-off `!command` and `!!command` prompts reuse the same shell prediction pipeline, including ghost text. Mode entry stays quiet: there is no automatic or manual dropdown completion surface, and ghost suggestions do not run shell-native completion probes.\n\n### Bash mode configuration\n\nIn `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"bashMode\": {\n    \"toggleShortcut\": \"ctrl+shift+b\",\n    \"transcriptMaxLines\": 2000,\n    \"transcriptMaxBytes\": 524288\n  }\n}\n```\n\n## Editor Stash\n\nUse `Alt+S` / `Option+S` as a quick stash toggle while drafting. It keeps one active stash and clears the editor when stashing.\n\n| Editor | Stash | `Alt+S` result |\n|--------|-------|----------------|\n| Has text | Empty | Stash current text, clear editor |\n| Empty | Has stash | Restore stash into editor |\n| Has text | Has stash | Update stash with current text, clear editor |\n| Empty | Empty | Show \"Nothing to stash\" |\n\nAuto-restore after an agent run only happens when the editor is still empty. If you typed meanwhile, the stash is preserved.\n\nThe `stash` indicator appears in the powerline bar (on presets with `extension_statuses`). Active stash is still session-local and resets on session switch / disable, but stash history is persisted to `~/.pi/agent/powerline-footer/stash-history.json` so it survives restarts.\n\n### Stash history\n\nOpen prompt history with either:\n\n- `ctrl+alt+h`\n- `/stash-history`\n\nPrompt history now has two sources:\n\n- stashed prompts \u2014 up to 12 recent stashed prompts (newest first)\n- recent project prompts \u2014 up to 50 recent user-submitted prompts pulled from pi sessions in the current project folder\n\nSelecting an entry inserts it into the editor. If the editor already has text, you can choose `Replace`, `Append`, or `Cancel`.\n\n### Editor clipboard and chat shortcuts\n\n- `ctrl+alt+c` \u2014 copy full editor content\n- `ctrl+alt+x` \u2014 cut full editor content (copy, then clear)\n- `cmd+up` \u2014 scroll the fixed-editor chat viewport up\n- `cmd+down` \u2014 scroll the fixed-editor chat viewport down\n- `cmd+shift+up` \u2014 move the editor cursor to the start of the first line\n- `cmd+shift+down` \u2014 move the editor cursor to the end of the last line\n- `ctrl+shift+u` \u2014 jump the fixed-editor chat viewport to the previous user message\n- `ctrl+shift+i` \u2014 jump the fixed-editor chat viewport to the next user message\n- `ctrl+alt+,` \u2014 jump the fixed-editor chat viewport to the previous LLM message\n- `ctrl+alt+.` \u2014 jump the fixed-editor chat viewport to the next LLM message\n- `ctrl+shift+g` \u2014 jump the fixed-editor chat viewport to the bottom\nCopy/cut actions do not modify stash state or stash history. Dragging files, folders, images, or screenshots from Finder into the custom editor inserts their path strings. Chat jumps require fixed-editor mode because they use its app-owned scroll viewport. Submitting editor text also returns that viewport to the bottom so new output stays in view.\n\n### Shortcut configuration\n\nYou can override shortcut keys in `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"powerlineShortcuts\": {\n    \"stashHistory\": \"ctrl+alt+h\",\n    \"copyEditor\": \"ctrl+alt+c\",\n    \"cutEditor\": \"ctrl+alt+x\",\n    \"jumpPreviousUserMessage\": \"ctrl+shift+u\",\n    \"jumpNextUserMessage\": \"ctrl+shift+i\",\n    \"jumpPreviousLlmMessage\": \"ctrl+alt+,\",\n    \"jumpNextLlmMessage\": \"ctrl+alt+.\",\n    \"jumpChatBottom\": \"ctrl+shift+g\",\n    \"scrollChatUp\": \"cmd+up\",\n    \"scrollChatDown\": \"cmd+down\",\n    \"editorStart\": \"cmd+shift+up\",\n    \"editorEnd\": \"cmd+shift+down\"\n  }\n}\n```\n\nAfter changing bindings, run `/reload`. Invalid bindings, reserved key conflicts (like `Alt+S`), or duplicate conflicts automatically fall back to safe defaults. `cmd` and `command` are accepted aliases for Pi's `super` modifier for the documented Command navigation keys; unsupported Command-letter bindings such as `cmd+c` are ignored instead of matching plain text input. Some terminals, including Ghostty, bind Command+Arrow themselves; remap those terminal keys to send `\\x1b[1;9A` / `\\x1b[1;9B` for chat scrolling and `\\x1b[1;10A` / `\\x1b[1;10B` for editor-boundary navigation if you want Pi to receive them.\n\n## Working Vibes\n\nTransform boring \"Working...\" messages into themed phrases that match your style:\n\n```\n/vibe star trek    \u2192 \"Running diagnostics...\", \"Engaging warp drive...\"\n/vibe pirate       \u2192 \"Hoisting the sails...\", \"Charting course...\"\n/vibe zen          \u2192 \"Breathing deeply...\", \"Finding balance...\"\n/vibe noir         \u2192 \"Following the trail...\", \"Checking the angles...\"\n/vibe              \u2192 Shows current theme, mode, and model\n/vibe off          \u2192 Disables (back to \"Working...\")\n/vibe model        \u2192 Shows current model\n/vibe model openai/gpt-4o-mini \u2192 Use a different model\n/vibe mode         \u2192 Shows current mode (generate or file)\n/vibe mode file    \u2192 Switch to file-based mode (instant, no API calls)\n/vibe mode generate \u2192 Switch to on-demand generation (contextual)\n/vibe generate mafia 200 \u2192 Pre-generate 200 vibes and save to file\n```\n\n### Configuration\n\nIn `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"workingVibe\": \"star trek\",                              // Theme phrase\n  \"workingVibeMode\": \"generate\",                           // \"generate\" (on-demand) or \"file\" (pre-generated)\n  \"workingVibeModel\": \"openai-codex/gpt-5.4-mini\",         // Optional: model to use (default)\n  \"workingVibeFallback\": \"Working\",                        // Optional: fallback message\n  \"workingVibeRefreshInterval\": 30,                        // Optional: seconds between refreshes (default 30)\n  \"workingVibePrompt\": \"Generate a {theme} loading message for: {task}\",  // Optional: custom prompt template\n  \"workingVibeMaxLength\": 65                         // Optional: max message length (default 65)\n}\n```\n\n### Modes\n\n| Mode | Description | Pros | Cons |\n|------|-------------|------|------|\n| `generate` | On-demand AI generation (default) | Contextual, hints at actual task | Model-dependent cost and latency |\n| `file` | Pull from pre-generated file | Instant, zero cost, works offline | Not contextual |\n\n**File mode setup:**\n```bash\n/vibe generate mafia 200    # Generate 200 vibes, save to ~/.pi/agent/vibes/mafia.txt\n/vibe mode file             # Switch to file mode\n/vibe mafia                 # Now uses the file\n```\n\n**How file mode works:**\n1. Vibes are loaded from `~/.pi/agent/vibes/{theme}.txt` into memory\n2. Uses seeded shuffle (Mulberry32 PRNG) \u2014 cycles through all vibes before repeating\n3. New seed each session \u2014 different order every time you restart pi\n4. Zero latency, zero cost, works offline\n\n**Prompt template variables (generate mode only):**\n- `{theme}` \u2014 the current vibe theme (e.g., \"star trek\", \"mafia\")\n- `{task}` \u2014 context hint (user prompt initially, then agent's response text or tool info on refresh)\n- `{exclude}` \u2014 recent vibes to avoid (auto-populated, e.g., \"Don't use: vibe1, vibe2...\")\n\n**How it works:**\n1. When you send a message, shows \"Channeling {theme}...\" placeholder\n2. AI generates a themed message in the background (3s timeout)\n3. Message updates to the themed version (e.g., \"Engaging warp drive...\")\n4. During long tasks, refreshes on tool calls (rate-limited, default 30s)\n5. Cost and latency depend on your configured `workingVibeModel`\n\n## Thinking Level Display\n\nThe thinking segment shows live updates when you change thinking level:\n\n| Level | Display | Color |\n|-------|---------|-------|\n| off | `think:off` | gray |\n| minimal | `think:min` | purple-gray |\n| low | `think:low` | blue |\n| medium | `think:med` | teal |\n| high | `think:high` | rainbow |\n| xhigh | `think:xhigh` | rainbow |\n\n## Path Display\n\nThe path segment supports three modes:\n\n| Mode | Example | Description |\n|------|---------|-------------|\n| `basename` | `powerline-footer` | Just the directory name (default) |\n| `abbreviated` | `\u2026/extensions/powerline-footer` | Full path with home abbreviated and length limit |\n| `full` | `~/.pi/agent/extensions/powerline-footer` | Complete path with home abbreviated |\n\nConfigure via preset options: `path: { mode: \"full\" }`\n\n## Git polling\n\nBy default the git segment polls both branch and dirty state. If background `git status --porcelain` calls interfere with your workflow, use branch-only polling:\n\n```json\n{\n  \"powerline\": {\n    \"git\": { \"polling\": \"branch\" }\n  }\n}\n```\n\nUse `\"off\"` to disable extension-owned git polling entirely and only show the branch reported by Pi when available.\n\n## Segments\n\n`model` \u00b7 `thinking` \u00b7 `shell_mode` \u00b7 `path` \u00b7 `git` \u00b7 `subagents` \u00b7 `token_in` \u00b7 `token_out` \u00b7 `token_total` \u00b7 `cost` \u00b7 `context_pct` \u00b7 `context_total` \u00b7 `time_spent` \u00b7 `time` \u00b7 `session` \u00b7 `hostname` \u00b7 `cache_read` \u00b7 `cache_write`\n\n## Separators\n\n`powerline` \u00b7 `powerline-thin` \u00b7 `slash` \u00b7 `pipe` \u00b7 `dot` \u00b7 `chevron` \u00b7 `star` \u00b7 `block` \u00b7 `none` \u00b7 `ascii`\n\n## Theming\n\nColors are configurable via pi's theme system. Each preset defines its own color scheme, and you can override individual colors and icons with a `theme.json` file in the extension directory.\n\n### Default Colors\n\n| Semantic | Theme Color | Description |\n|----------|-------------|-------------|\n| `model` | `#d787af` | Model name |\n| `shellMode` | `accent` | Bash mode segment |\n| `path` | `#00afaf` | Directory path |\n| `gitClean` | `success` | Git branch (clean) |\n| `gitDirty` | `warning` | Git branch (dirty) |\n| `thinking` | `thinkingOff` | Thinking level (`off`) |\n| `thinkingMinimal` | `thinkingMinimal` | Thinking level (`minimal`) |\n| `thinkingLow` | `thinkingLow` | Thinking level (`low`) |\n| `thinkingMedium` | `thinkingMedium` | Thinking level (`medium`) |\n| `context` | `dim` | Context usage |\n| `contextWarn` | `warning` | Context usage >70% |\n| `contextError` | `error` | Context usage >90% |\n| `cost` | `text` | Cost display |\n| `tokens` | `muted` | Token counts |\n\n### Custom Theme Override\n\nCreate `~/.pi/agent/extensions/powerline-footer/theme.json`:\n\n```json\n{\n  \"colors\": {\n    \"pi\": \"#ff5500\",\n    \"model\": \"accent\",\n    \"shellMode\": \"accent\",\n    \"path\": \"#00afaf\",\n    \"gitClean\": \"success\",\n    \"thinking\": \"thinkingOff\",\n    \"thinkingMinimal\": \"thinkingMinimal\",\n    \"thinkingLow\": \"thinkingLow\",\n    \"thinkingMedium\": \"thinkingMedium\"\n  },\n  \"icons\": {\n    \"auto\": \"\u21af\",\n    \"warning\": \"\"\n  }\n}\n```\n\nColors can be:\n- **Theme color names**: `accent`, `muted`, `dim`, `text`, `success`, `warning`, `error`, `border`, `borderAccent`, `borderMuted`\n- **Hex colors**: `#ff5500`, `#d787af`\n\nIcons can be any string, including `\"\"` when you want to suppress a specific glyph entirely.\n\nSee `theme.example.json` for all available options.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "coding-agent",
+    "powerline",
+    "status-bar",
+    "extension"
+  ],
+  "author": {
+    "name": "Nico Bailon"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/nicobailon/pi-powerline-footer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicobailon/pi-powerline-footer.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-01-16T02:18:21.148Z",
+    "modified": "2026-06-08T13:22:48.972Z",
+    "0.2.2": "2026-01-16T02:18:21.351Z",
+    "0.2.3": "2026-01-16T02:18:57.739Z",
+    "0.2.4": "2026-01-16T04:21:37.949Z",
+    "0.2.5": "2026-01-16T19:09:48.347Z",
+    "0.2.6": "2026-01-16T19:13:29.823Z",
+    "0.2.8": "2026-01-17T03:39:47.485Z",
+    "0.2.9": "2026-01-17T14:27:35.653Z",
+    "0.2.10": "2026-01-17T14:48:00.372Z",
+    "0.2.11": "2026-01-26T18:38:28.695Z",
+    "0.2.12": "2026-01-27T08:44:13.435Z",
+    "0.2.13": "2026-01-27T17:40:37.164Z",
+    "0.2.14": "2026-01-27T17:58:02.095Z",
+    "0.2.16": "2026-01-28T15:57:08.192Z",
+    "0.2.17": "2026-01-28T18:19:01.220Z",
+    "0.2.18": "2026-01-28T18:59:56.722Z",
+    "0.2.19": "2026-01-28T23:30:56.403Z",
+    "0.2.20": "2026-01-31T07:06:25.941Z",
+    "0.2.21": "2026-02-01T02:20:51.901Z",
+    "0.2.22": "2026-02-01T03:00:04.522Z",
+    "0.2.23": "2026-02-07T06:47:34.761Z",
+    "0.2.24": "2026-02-16T02:49:02.118Z",
+    "0.3.0": "2026-02-28T08:20:27.465Z",
+    "0.3.1": "2026-02-28T08:48:40.388Z",
+    "0.4.0": "2026-03-12T05:32:50.863Z",
+    "0.4.1": "2026-03-12T23:41:23.065Z",
+    "0.4.2": "2026-03-15T07:22:03.064Z",
+    "0.4.3": "2026-03-19T02:52:03.383Z",
+    "0.4.5": "2026-03-21T00:24:29.076Z",
+    "0.4.6": "2026-03-22T05:11:31.231Z",
+    "0.4.7": "2026-03-25T04:20:02.534Z",
+    "0.4.8": "2026-03-27T23:07:13.037Z",
+    "0.4.9": "2026-04-03T22:13:22.449Z",
+    "0.4.10": "2026-04-12T05:05:13.947Z",
+    "0.4.11": "2026-04-14T18:11:59.275Z",
+    "0.4.12": "2026-04-20T06:42:41.450Z",
+    "0.4.13": "2026-04-20T07:17:58.147Z",
+    "0.4.14": "2026-04-21T19:33:20.109Z",
+    "0.4.15": "2026-04-21T19:56:30.558Z",
+    "0.4.16": "2026-04-21T22:25:21.770Z",
+    "0.4.17": "2026-04-23T20:14:27.629Z",
+    "0.4.18": "2026-04-24T06:56:28.996Z",
+    "0.4.19": "2026-04-25T05:32:43.903Z",
+    "0.4.20": "2026-04-26T18:06:36.274Z",
+    "0.5.0": "2026-05-03T05:01:50.664Z",
+    "0.5.1": "2026-05-03T06:43:36.815Z",
+    "0.5.2": "2026-05-10T07:16:51.559Z",
+    "0.5.3": "2026-05-10T14:53:49.410Z",
+    "0.5.4": "2026-05-12T05:34:13.952Z",
+    "0.5.5": "2026-05-27T05:36:39.974Z",
+    "0.5.6": "2026-05-27T06:22:32.276Z",
+    "0.6.0": "2026-06-05T20:39:01.653Z",
+    "0.6.1": "2026-06-08T13:22:48.869Z"
+  },
+  "versions_count": 52,
+  "downloads_last_week": 1636,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 666
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 409
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 1006
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 380
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 359
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 241
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 699
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 518
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 1492
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 1930
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 1301
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 1176
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 1630
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 2539
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 3734
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 2916
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 4000
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 2740
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 2717
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 4127
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 3871
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 2738
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 1792
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 231
+    }
+  ]
+}

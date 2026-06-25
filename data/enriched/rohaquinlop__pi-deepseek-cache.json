@@ -1,0 +1,47 @@
+{
+  "name": "@rohaquinlop/pi-deepseek-cache",
+  "latest_version": "0.5.1",
+  "description": "DeepSeek prefix cache optimization for pi \u2014 date/CWD freeze, hit-rate telemetry, cache-friendly compaction, and TUI overlays",
+  "readme": "# pi-deepseek-cache\n\n**Reduce DeepSeek API costs by 95%+** through multi-layered prefix cache optimization. Zero configuration \u2014 auto-detects DeepSeek models and applies best practices transparently.\n\n## The Problem\n\nDeepSeek's API uses [prefix caching](https://api-docs.deepseek.com/guides/kv_cache/) \u2014 identical prompt prefixes served from disk cache at **50\u2013120\u00d7 lower cost** than fresh computation. But the cache only works when every byte from position 0 is identical across requests.\n\nPi's default system prompt embeds `Current date: YYYY-MM-DD` and `Current working directory: <cwd>` \u2014 dynamic values that change daily and per session, silently busting the entire prefix cache.\n\n## What This Extension Does\n\n| Layer | Feature | Impact |\n|-------|---------|--------|\n| **P0** | Date & CWD freeze | Root-cause fix \u2014 locks session date and directory, preventing daily/per-session cache bust |\n| **P1** | Hit-rate telemetry | Per-session hit rate shown as dimmed footer status line; /cache-stats & /cache-graph for detail |\n| **P2** | Prefix guard | SHA-256 hash diagnostics \u2014 tracks prefix breaks (viewable in /cache-stats) |\n| **P3** | Cache-friendly compaction | Deterministic summarization via deepseek-v4-flash at temperature 0, SHA-256 cached for stable replays |\n| **P4** | TUI overlays | `/cache-stats` popup with hit rate, tokens, cost savings. `/cache-graph` ASCII trend chart |\n\n## Cost Impact\n\n| | Without Extension | With Extension |\n|---|---|---|\n| **deepseek-v4-flash** input | $0.14/M tokens | $0.003/M tokens (98% less) |\n| **deepseek-v4-pro** input | $3.00/M tokens | $0.025/M tokens (99% less) |\n\n## Installation\n\n```bash\npi install npm:@rohaquinlop/pi-deepseek-cache\n```\n\nOr via git:\n\n```bash\npi install git:github.com/rohaquinlop/pi-deepseek-cache\n```\n\nThe extension activates automatically. No configuration needed. The per-session\ncache hit rate appears as a dimmed status line (`Cache 96.2%`) in Pi's footer.\nPi's native `CH:XX.X%` shows the per-turn rate in the stats line. Detailed\nstats are available via /cache-stats and /cache-graph commands.\n\nEach pi session writes its own `stats-{sessionId}.json` and\n`history-{sessionId}.json` files, so concurrent sessions never race on the\nsame file. Session files older than 30 days are cleaned up automatically.\n\n## Provider Support\n\nWorks with any provider serving DeepSeek models:\n- **Any provider** with `deepseek-*` model IDs (NaN Builders, OpenRouter, custom proxies, etc.)\n- **DeepSeek API** (`deepseek` provider) \u2014 direct API users\n\nNon-DeepSeek models pass through unchanged.\n\n## Subagent Compatibility\n\nThis extension automatically applies to subagent processes that use DeepSeek\nmodels. It declares `appliesToModels: [\"deepseek-*\", \"deepseek\"]` in its\n`package.json`, which the [pi-subagents](https://github.com/rohaquinlop/pi-subagents)\nextension detects and loads into child processes \u2014 no configuration needed.\n\nFor the best cache performance, ensure both extensions are installed:\n\n```bash\npi install npm:@rohaquinlop/pi-subagents\npi install npm:@rohaquinlop/pi-deepseek-cache\n```\n\n## Commands\n\n### `/cache-stats`\nOverlay popup showing two sections: **this session's** stats and an **aggregate across all sessions** (N sessions). Each section shows hit rate, cache read/write/input tokens, turns, and estimated cost savings.\n\n### `/cache-graph`\nASCII trend chart of hit rate over turns \u2014 helps spot regressions.\n\n### `/cache-reset`\nClears all cached statistics, history, and summary cache \u2014 deletes all per-session `stats-*.json` and `history-*.json` files plus the summary cache. Useful after major prompt changes.\n\n## How It Works\n\n**P0 (Date/CWD freeze):** On `before_agent_start`, replaces the dynamic `Current date` and `Current working directory` lines with values frozen at session start. The system prompt prefix stays byte-identical across the entire session.\n\n**P1 (Telemetry):** Accumulates `cacheRead`, `input`, `cacheWrite`, and `turns` from every assistant message's usage data. Each session stores its stats in `stats-{sessionId}.json` so concurrent sessions never race. `/cache-stats` shows both this session's stats and an aggregate across all sessions.\n\n**P2 (Prefix guard):** On `before_provider_request`, SHA-256 hashes all messages except the last to fingerprint the prefix. Tracks when the hash changes \u2014 the break count is visible in `/cache-stats`.\n\n**P3 (Compaction):** On `session_before_compact`, summarizes conversation history with deepseek-v4-flash at temperature 0. Summaries are SHA-256 hashed and cached \u2014 identical histories produce byte-identical summaries, keeping compaction cache-stable.\n\n**P4 (Overlays):** `/cache-stats` and `/cache-graph` render as TUI overlay popups (Esc to dismiss) with formatted hit-rate data and ASCII trend charts.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "deepseek",
+    "cache",
+    "prefix-cache",
+    "coding-agent",
+    "extension"
+  ],
+  "author": {
+    "name": "rohaquinlop"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/rohaquinlop/pi-deepseek-cache#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rohaquinlop/pi-deepseek-cache.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ],
+    "appliesToModels": [
+      "deepseek-*",
+      "deepseek"
+    ]
+  },
+  "time": {
+    "created": "2026-06-20T19:58:32.192Z",
+    "modified": "2026-06-23T04:12:19.548Z",
+    "1.0.0": "2026-06-20T19:58:32.487Z",
+    "1.1.0": "2026-06-20T20:03:36.643Z",
+    "1.1.1": "2026-06-20T20:09:01.099Z",
+    "1.2.0": "2026-06-20T20:38:05.357Z",
+    "1.3.0": "2026-06-20T23:15:30.569Z",
+    "1.3.1": "2026-06-21T00:56:04.395Z",
+    "0.5.0": "2026-06-22T01:43:07.789Z",
+    "0.5.1": "2026-06-23T04:12:19.424Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 1187,
+  "download_trend": []
+}

@@ -1,0 +1,41 @@
+{
+  "name": "@pi-stef/atlassian",
+  "latest_version": "0.4.1",
+  "description": "Pi extension and CLI for verified Atlassian Jira and Confluence tools.",
+  "readme": "# @pi-stef/atlassian\n\nPi extension and development CLI for Atlassian Jira and Confluence Cloud tools.\n\nThis package is implemented against the current Atlassian Cloud REST APIs:\n\n- Confluence REST v2 for page, space, comment, and label reads/writes where v2 covers the operation.\n- Jira platform REST v3 for project, issue, search, comment, worklog, link, version, field, user, and attachment operations.\n- Jira Software REST for Agile board, sprint, backlog, ranking, and epic operations.\n\n## Installation\n\n```bash\nnpx pi-cli plugins install npm:@pi-stef/atlassian\n```\n\n## Contents\n\n- [Natural Language Usage](#natural-language-usage)\n- [Slash Commands](#slash-commands)\n- [Auth](#auth)\n- [Development CLI](#development-cli)\n- [Jira Context](#jira-context)\n- [Endpoint Notes](#endpoint-notes)\n\n## Natural Language Usage\n\nAfter credentials are configured, ask the agent for Jira or Confluence context in plain language:\n\n```text\npi \"Use the Atlassian tools to summarize Jira issue ABC-123 and any linked Confluence requirements before planning.\"\npi \"Read this Confluence page and list implementation constraints before touching code: https://your-site.atlassian.net/wiki/...\"\n```\n\nFor exact local reads during development, use the CLI:\n\n```bash\npnpm exec tsx packages/atlassian/bin/atlassian.ts jira ABC-123 --context\npnpm exec tsx packages/atlassian/bin/atlassian.ts confluence \"https://your-site.atlassian.net/wiki/...\"\n```\n\n## Slash Commands\n\nFive slash commands are available in the agent session:\n\n### Jira\n\n| Command | Description |\n|---------|-------------|\n| `/jira-issue <KEY>` | Fetch a Jira issue with full context |\n| `/get-jira-issue <KEY>` | Get a Jira issue by key |\n| `/story-context <KEY>` | Build implementation context from a Jira story |\n\n### Confluence\n\n| Command | Description |\n|---------|-------------|\n| `/confluence-page <URL or ID>` | Fetch a Confluence page with context by URL or page ID |\n| `/get-confluence-page <ID>` | Get a Confluence page by ID |\n\nThese commands post prompts to the agent session, which then invoke the corresponding tools.\n\n## Auth\n\nSet environment variables:\n\n```bash\nexport ATLASSIAN_BASE_URL=\"https://your-site.atlassian.net\"\nexport ATLASSIAN_EMAIL=\"you@example.com\"\nexport ATLASSIAN_API_TOKEN=\"...\"\n```\n\n`ATLASSIAN_DOMAIN=your-site.atlassian.net` may be used instead of `ATLASSIAN_BASE_URL`.\n\nThe package also supports config files. Config is read from:\n\n1. `~/.pi/sf/atlassian/config.json` \u2014 Pi-conventional path\n\nMalformed files fail fast. New setups should put credentials in `~/.pi/sf/atlassian/config.json`.\n\n### Config file shape\n\nEither `baseUrl` or `domain` is required (not both). `email` and `apiToken` are always required. Trailing slashes on `baseUrl` are normalized.\n\n```json\n{\n  \"baseUrl\": \"https://your-site.atlassian.net\",\n  \"email\": \"you@example.com\",\n  \"apiToken\": \"...\"\n}\n```\n\nOr the upstream-MCP-compatible `domain` form:\n\n```json\n{\n  \"domain\": \"your-site.atlassian.net\",\n  \"email\": \"you@example.com\",\n  \"apiToken\": \"...\"\n}\n```\n\nTo create the recommended config file:\n\n```bash\nmkdir -p ~/.pi/sf/atlassian\ncat > ~/.pi/sf/atlassian/config.json <<'JSON'\n{\n  \"baseUrl\": \"https://your-site.atlassian.net\",\n  \"email\": \"you@example.com\",\n  \"apiToken\": \"...\"\n}\nJSON\nchmod 600 ~/.pi/sf/atlassian/config.json\n```\n\nThe `chmod 600` step is recommended so the file is only readable by your user \u2014 the API token grants full Jira and Confluence access for the email's account.\n\n## Development CLI\n\n`tsx` is a workspace dev-dependency, not a global binary. Run the CLI through `pnpm exec` from the repo root so the local install is picked up:\n\n```bash\npnpm exec tsx packages/atlassian/bin/atlassian.ts jira ABC-123\npnpm exec tsx packages/atlassian/bin/atlassian.ts jira ABC-123 --context\npnpm exec tsx packages/atlassian/bin/atlassian.ts story ABC-123\npnpm exec tsx packages/atlassian/bin/atlassian.ts confluence \"https://your-site.atlassian.net/wiki/...\"\npnpm exec tsx packages/atlassian/bin/atlassian.ts --stdin\n```\n\nHuman subcommands print compact Markdown. `--stdin` accepts `{ \"tool\": \"<toolName>\", ...params }` and prints structured JSON.\n\n## Jira Context\n\nUse `story_context` when a Jira story should drive implementation work. It returns compact issue details, related Jira issues, linked Confluence pages, Figma URLs, external URL inventory, inaccessible same-site links, and traversal metadata under bounded caps.\n\n```json\n{\n  \"tool\": \"story_context\",\n  \"key\": \"ABC-123\",\n  \"maxDepth\": 1,\n  \"maxJiraIssues\": 10,\n  \"maxConfluencePages\": 3,\n  \"includeExternalUrls\": true\n}\n```\n\n`jira_issue` remains available for compact single-issue context. Pass `includeContext: true` to use the same bounded traversal. `jira_get_issue` also accepts `includeContext: true` when a raw issue read should be upgraded to implementation context.\n\nThe walker follows same-site Jira browse links, Jira keys, and Confluence page links. It keeps Figma URLs as design-link inventory and, when `~/.pi/sf/figma/config.json` is configured, also fetches compact linked Figma context automatically.\n\nFigma enrichment is bounded for Jira latency:\n\n- `includeFigmaContext` defaults to auto: enabled only when Figma auth is configured.\n- `includeFigmaContext: false` keeps only the URL inventory.\n- `includeFigmaContext: true` records missing-auth feedback in `inaccessibleLinks` instead of failing the Jira context.\n- `maxFigmaLinks` defaults to `2`, and links are fetched with concurrency `2`.\n- Individual Figma failures are isolated; Jira and Confluence context still returns.\n\nThe walker does not fetch arbitrary non-Figma external sites by default.\n\n## Endpoint Notes\n\n- Confluence v2 does not currently cover every operation from the old API-key MCP package. CQL search, Confluence user search, and adding labels remain isolated in a legacy Confluence client using verified v1 endpoints.\n- `jira_update_board` is registered for old MCP tool-name parity, but it always fails fast. Current Jira Software Cloud REST APIs document board configuration reads, not board name/filter updates. Create a new board with the desired filter, or update the underlying Jira filter separately.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "atlassian",
+    "jira",
+    "confluence"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://sfiorini.github.io/pi-stef/packages/atlassian.html",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sfiorini/pi-stef.git",
+    "directory": "packages/atlassian"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-11T23:37:54.063Z",
+    "modified": "2026-06-18T03:27:27.208Z",
+    "0.2.2": "2026-06-11T23:37:54.367Z",
+    "0.3.0": "2026-06-12T00:04:13.588Z",
+    "0.3.1": "2026-06-12T01:04:28.027Z",
+    "0.3.2": "2026-06-14T21:43:40.477Z",
+    "0.3.3": "2026-06-15T21:24:19.903Z",
+    "0.3.4": "2026-06-17T03:34:22.672Z",
+    "0.4.0": "2026-06-18T01:53:23.685Z",
+    "0.4.1": "2026-06-18T03:27:27.098Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 1597,
+  "download_trend": []
+}

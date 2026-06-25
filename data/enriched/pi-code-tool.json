@@ -1,0 +1,45 @@
+{
+  "name": "pi-code-tool",
+  "latest_version": "0.6.1",
+  "description": "Code-mode tool for the pi coding agent: a sandboxed Python meta-tool (via @pydantic/monty) that lets the agent write code against host tools and build ephemeral code tools",
+  "readme": "# pi-code-tool\n\nA code-mode meta-tool for agent harnesses: the agent writes sandboxed Python (via\n[@pydantic/monty](https://github.com/pydantic/monty)) that calls host tools as plain\nfunctions \u2014 and can save working code as named, reusable ephemeral tools. First target\nharness: [pi](https://pi.dev).\n\n- **Plan**: [PLAN.md](PLAN.md) \u2014 M0\u2013M5 (MVP) complete\n- **Research notes**: [docs/research/](docs/research/)\n\n## Install (as a pi package)\n\n```bash\npi install npm:pi-code-tool\npi install /path/to/checkout   # or straight from a local clone (builds dist/ first: npm run build)\n```\n\n`@pydantic/monty` (including its platform-specific native binary) and `typebox` are\nregular npm `dependencies`, so pi's installer pulls them in automatically;\n`@earendil-works/pi-coding-agent` is a peer dependency satisfied by pi itself.\n\n## Why\n\nLLMs compose code better than they compose chained JSON tool calls: loops, filtering,\nand aggregation happen inside the sandbox, and intermediate data never enters model\ncontext \u2014 only what the code `print()`s. See `docs/research/01-code-mode-articles.md`\nfor the evidence (Cloudflare Code Mode, Anthropic programmatic tool calling, smolagents).\n\n## What you get\n\nInstalling registers a `code` tool. **pi's own tools are bridged into the sandbox**\nas plain Python functions: `read`, `grep`, `find`, `ls` dispatch directly, so the\nmodel can loop/filter/compose them in one snippet instead of one model round-trip\nper call. The workspace is also **mounted read-only at `/workspace`** for plain\n`open()`/`pathlib` reads (monty enforces read-only mode, symlink-escape and\n`..`-traversal protection), plus `http_get` (host-side fetch) and\n`save_tool`/`delete_tool`/`list_saved_tools`/`read_tool` for building a toolbox in\n`.pi/code-tools/*.py` (plain, user-editable Python files that auto-load into future\nsessions). Variables persist across calls; state rides in tool-result `details`, so\nit survives session restore and branching.\n\n**Mutating tools (`bash`, `edit`, `write`) are approval-gated**: the script freezes\nmid-execution at the call, pi shows a confirm dialog with the exact invocation, and\nyour answer resumes the script in place \u2014 deny and the sandbox raises a catchable\n`PermissionError`, or pick **\"Decide later\"** to suspend the run entirely: completed\nwork stays cached, the suspension survives pi restarts, and `{\"resume\": true}`\ncontinues the script from the exact gated call \u2014 even days later; `{\"abandon\": true}`\ndiscards the pending gated call without resetting the rest of the session. The model writes a\n30-line codemod; you approve each mutation without it burning a single extra token.\nReplayed (already-approved) calls never re-prompt. Headless runs deny gated calls\nunless you opt in with `autoApprove`.\n\nCode is **statically type-checked before execution** (monty's bundled `ty`) against\ntyped stubs of every host tool \u2014 wrong argument types, bad methods on tool results,\nand undefined names come back as compiler diagnostics *before any side effects run*,\ninstead of as tracebacks after three tool calls already happened.\n\n## Example pi session\n\n```text\n$ pi\n> Use the code tool to fetch https://api.github.com/repos/pydantic/monty,\n  report the star count, and save a reusable tool gh_stars(repo) for next time.\n\n  \u25cf Code\n    data = json.loads(http_get(\"https://api.github.com/repos/pydantic/monty\"))\n    print(f\"stars: {data['stargazers_count']}\")\n    tool_code = (\n        \"def gh_stars(repo):\\n\"\n        \"    import json\\n\"\n        \"    url = f'https://api.github.com/repos/{repo}'\\n\"\n        \"    return json.loads(http_get(url))['stargazers_count']\\n\"\n    )\n    save_tool(\"gh_stars\", tool_code, \"Return the GitHub star count for owner/repo.\")\n\npydantic/monty currently has 1,234 stars. I saved gh_stars(repo) for future use.\n```\n\nIn a later session \u2014 no redefinition needed, `gh_stars` auto-loads:\n\n```text\n> how many stars does josephkern/pi-code-tool have?\n\n  \u25cf Code\n    gh_stars(\"josephkern/pi-code-tool\")\n```\n\nBecause the work happens in one sandboxed snippet, intermediate data (the full API\nresponse, loop iterations, file contents) never enters the model's context \u2014 only\nwhat the code prints comes back.\n\n## Configuration\n\nThe default export works out of the box. For custom host tools or a different tool\nname, re-export from your own extension file (e.g. `.pi/extensions/code.ts`):\n\n```ts\nimport { createPythonExtension } from 'pi-code-tool/pi'\n\nexport default createPythonExtension({\n  toolName: 'code',              // rename if your model responds better to e.g. 'python'\n  root: process.cwd(),           // workspace root for mounts, file tools, and the default store\n  mountWorkspace: true,          // false: no /workspace mount, read_file tool instead\n  bridgePiTools: true,           // false: don't expose pi's read/grep/find/ls/bash/edit/write\n  noBuiltins: false,             // true: skip read_file/list_files/http_get starter tools\n  toolStore: '.pi/code-tools',   // false: disable save_tool/delete_tool/list/read helpers\n  typeCheck: true,               // false: skip the pre-execution type-check gate\n  autoApprove: false,            // true: run bash/edit/write without asking (headless automation)\n  limits: { maxDurationSecs: 5, maxMemory: 64 * 1024 * 1024 },\n  tools: [\n    {\n      name: 'query_db',\n      description: 'Run a read-only SQL query.',\n      params: [{ name: 'sql', type: 'str' }],\n      returns: 'list[dict]',\n      returnsDescription: 'rows as dicts',\n      execute: async ([sql]) => db.query(String(sql)),\n    },\n  ],\n})\n```\n\n## Develop against this repo\n\n```bash\npi -e src/pi/extension.ts        # load straight from source, no build needed\n```\n\n## Use as a library\n\n```ts\nimport { CodeRunner, createBuiltinTools } from 'pi-code-tool'\n\nconst runner = new CodeRunner({ tools: createBuiltinTools({ root: process.cwd() }) })\nconst result = await runner.run('len(list_files(\".\"))')\nif (result.status === 'ok') console.log(result.output)\n```\n\n`RunResult` is a discriminated union with `status: 'ok' | 'error' | 'suspended'`,\n`stdout`, `stdoutTruncated`, and per-call traces. `Session` adds persistent state\nacross runs (replay with a tool-call cache \u2014 earlier side effects never repeat) and\nserializes to JSON with `dump()` / `Session.load()`. If an approval gate suspends a\nrun, call `session.resume()` to continue or `session.abandon()` to discard it before\nrunning new code. `ToolStore` adds the saved-tools layer.\n\n## Develop\n\n```bash\nnpm install\nnpm test            # vitest (111 tests)\nnpm run typecheck\nnpm run smoke       # verifies monty primitives on your machine\nnpx tsx examples/demo.ts\n```\n\n## Architecture\n\n```\nsrc/core/    runner.ts    CodeRunner: owns monty's start/resume loop; tool dispatch,\n                          tracebacks, limits, abort, per-call traces\n             registry.ts  ToolRegistry + Python/typecheck stub rendering + prompt rules\n             builtins.ts  read_file / list_files / http_get starter tools\n             session.ts   Persistent state via transcript replay + tool-call cache\n             toolstore.ts Agent-saved tools as plain .py files + manage-from-sandbox\nsrc/pi/      extension.ts pi adapter: `code` tool (configurable name), streaming output, branch-safe state\n             bridge.ts    pi built-in tools \u2192 Python stubs; bash/edit/write approval-gated\n```\n\nKnown monty 0.0.18 quirks we code around are documented in\n[docs/research/03-monty.md](docs/research/03-monty.md).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "python",
+    "sandbox",
+    "code-mode",
+    "monty",
+    "code-execution"
+  ],
+  "author": {
+    "name": "Joseph Kern",
+    "email": "joseph.a.kern@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/josephkern/pi-code-tool#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/josephkern/pi-code-tool.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-06-11T04:14:37.010Z",
+    "modified": "2026-06-13T19:30:50.573Z",
+    "0.2.0": "2026-06-11T04:14:37.250Z",
+    "0.3.0": "2026-06-11T17:05:59.152Z",
+    "0.3.1": "2026-06-11T17:40:30.502Z",
+    "0.4.0": "2026-06-11T17:55:25.885Z",
+    "0.4.1": "2026-06-11T18:27:23.838Z",
+    "0.5.0": "2026-06-12T03:25:02.270Z",
+    "0.5.1": "2026-06-13T13:15:26.818Z",
+    "0.6.1": "2026-06-13T19:30:50.431Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": null,
+  "download_trend": []
+}

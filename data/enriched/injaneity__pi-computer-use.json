@@ -1,0 +1,50 @@
+{
+  "name": "@injaneity/pi-computer-use",
+  "latest_version": "0.3.2",
+  "description": "Pi extension that brings token-efficient desktop & browser automation on macOS.",
+  "readme": "# pi-computer-use\n\n<p align=\"center\">\n  <img src=\"./assets/logo/logo3.png\" width=\"50%\" alt=\"pi-computer-use\">\n</p>\n\n<p align=\"center\">\n  <a href=\"https://www.npmjs.com/package/@injaneity/pi-computer-use\"><img alt=\"npm\" src=\"https://img.shields.io/npm/v/@injaneity/pi-computer-use?style=flat-square\"></a>\n  <a href=\"./LICENSE\"><img alt=\"license\" src=\"https://img.shields.io/github/license/injaneity/pi-computer-use?style=flat-square\"></a>\n  <img alt=\"platform\" src=\"https://img.shields.io/badge/platform-macOS-lightgrey?style=flat-square\">\n  <a href=\"https://github.com/injaneity/pi-computer-use/actions/workflows/ci.yml\"><img alt=\"ci\" src=\"https://img.shields.io/github/actions/workflow/status/injaneity/pi-computer-use/ci.yml?branch=main&style=flat-square\"></a>\n</p>\n\nCodex-style computer use for [Pi](https://pi.dev/) on macOS.\n\n`pi-computer-use` gives Pi agents a semantic computer-use surface for visible macOS windows. It prefers Accessibility (AX) targets such as `@e1`, returns semantic state after every action, and attaches screenshots only when AX coverage is too weak for reliable operation.\n\n## Table of Contents\n\n- [Quick Start](#quick-start)\n- [What It Adds to Pi](#what-it-adds-to-pi)\n- [Examples](#examples)\n- [How It Works](#how-it-works)\n- [Documentation](#documentation)\n- [Development & Benchmarks](#development--benchmarks)\n- [Release & Install Notes](#release--install-notes)\n- [License](#license)\n- [See Also](#see-also)\n\n## Quick Start\n\nInstall the Pi package:\n\n```bash\npi install git:github.com/injaneity/pi-computer-use@v0.3.2\n```\n\nStart Pi in interactive mode. On the first session, grant macOS permissions to:\n\n```text\n~/.pi/agent/helpers/pi-computer-use/bridge\n```\n\nRequired permissions:\n\n- Accessibility\n- Screen Recording\n\nSome browser automation paths use JavaScript from Apple Events. If the browser blocks that, Pi surfaces a model-readable hint asking the user to enable **Allow JavaScript from Apple Events** in the browser's developer menu, then retry.\n\nThen call `screenshot` first in a Pi session. It selects the controlled window and returns the latest semantic state, including AX refs such as `@e1` when available. If the target app/window is ambiguous, use `list_apps` and `list_windows` first.\n\n```ts\nlist_apps()\nlist_windows({ app: \"Safari\" })\nscreenshot({ window: \"@w1\" })\nclick({ window: \"@w1\", ref: \"@e1\" })\nset_text({ ref: \"@e2\", text: \"hello\" })\n```\n\nUse `/computer-use` in Pi to inspect the effective config and config sources.\n\n## What It Adds to Pi\n\n- Public tools: `list_apps`, `list_windows`, `screenshot`, `click`, `double_click`, `move_mouse`, `drag`, `scroll`, `keypress`, `type_text`, `set_text`, `wait`, `arrange_window`, `navigate_browser`, `computer_actions`.\n- AX target refs in tool results, with capabilities such as `canSetValue`, `canPress`, `canFocus`, `canScroll`, and `adjust`.\n- Stable window refs from `list_windows`, with explicit targeting such as `screenshot({ window: \"@w1\" })` and `click({ window: \"@w1\", ref: \"@eN\" })`.\n- State IDs for stale-action detection.\n- Deterministic window layout through `arrange_window` presets or explicit frames.\n- Optional screenshot attachment mode with `image: \"auto\" | \"always\" | \"never\"`.\n- Ref-first actions such as `click({ ref: \"@eN\" })`, `scroll({ ref: \"@eN\" })`, and `set_text({ ref: \"@eN\", text })`.\n- Batched actions through `computer_actions`, with one post-action semantic state update plus per-action execution metadata.\n- Execution metadata that reports `stealth` for background-safe AX paths and `default` for focus/raw-event fallbacks.\n- Full pointer and keyboard primitive coverage for common GUI flows, with AX-first equivalents where available.\n- Browser-aware targeting that prefers a dedicated browser window for agent work.\n- Optional [CDP acceleration](./docs/configuration.md#optional-cdp-acceleration) for Chromium-family browsers: event-driven `navigate_browser` and browser console output in tool results, with no change to the tool surface.\n- Optional strict AX mode for background-safe operation without foreground focus, raw pointer events, raw keyboard events, or cursor takeover.\n- Official QA benchmark harness; see [Development](./docs/development.md#benchmarks).\n\n## Examples\n\nPrefer AX refs over coordinates when a matching target exists:\n\n```ts\nclick({ ref: \"@e1\" })\nscroll({ ref: \"@e3\", scrollY: 600 })\n```\n\nUse coordinates from the latest screenshot only when there is no suitable AX target:\n\n```ts\nclick({ x: 320, y: 180, stateId: \"...\" })\n```\n\nReplace text through AX value semantics:\n\n```ts\nset_text({ ref: \"@e2\", text: \"https://example.com\" })\nkeypress({ keys: [\"Enter\"] })\n```\n\nBatch obvious actions when no intermediate inspection is needed:\n\n```ts\ncomputer_actions({\n  stateId: \"...\",\n  actions: [\n    { type: \"click\", ref: \"@e1\" },\n    { type: \"set_text\", ref: \"@e2\", text: \"https://example.com\" },\n    { type: \"keypress\", keys: [\"Enter\"] }\n  ]\n})\n```\n\nSee [docs/usage.md](./docs/usage.md) for the full workflow and tool patterns.\n\n## How It Works\n\n`pi-computer-use` has three pieces:\n\n1. The Pi extension in [`extensions/computer-use.ts`](./extensions/computer-use.ts) registers the public tools and `/computer-use` command.\n2. The TypeScript bridge in [`src/bridge.ts`](./src/bridge.ts) manages the current window, capture IDs, AX refs, fallback policy, batching, and execution metadata.\n3. The native Swift helper in [`native/macos/bridge.swift`](./native/macos/bridge.swift) talks to macOS Accessibility, AppKit, and CoreGraphics. On macOS 14+, the modern helper also uses ScreenCaptureKit for window capture.\n\nThe result is semantic-first GUI control: Pi sees useful AX targets first, falls back to screenshots only when needed, and reports whether each action stayed background-safe.\n\n## Documentation\n\n- [Usage guide](./docs/usage.md): tool workflow, AX refs, text input, browser flows, batching, and strict AX mode.\n- [Configuration](./docs/configuration.md): config files, environment overrides, browser control, and stealth mode.\n- [Development](./docs/development.md): local setup, helper builds, benchmarks, validation, release signing notes, and PR workflow.\n- [Troubleshooting](./docs/troubleshooting.md): permissions, helper setup, stale refs, browser refusal, and strict mode errors.\n- [Contributing](./CONTRIBUTING.md): issue-first contribution rules and PR checklist.\n\n## Development & Benchmarks\n\nInstall dependencies:\n\n```bash\nnpm install\n```\n\nRun checks:\n\n```bash\nnpm test\n```\n\nRun the local checkout in Pi without loading another installed copy:\n\n```bash\npi --no-extensions -e .\n```\n\nRun the default QA benchmark:\n\n```bash\nnpm run benchmark:qa\n```\n\nRun the wider benchmark that may open apps, while still skipping browser tab navigation by default:\n\n```bash\nnpm run benchmark:qa:full\n```\n\nBenchmark details and opt-in flags are in [Development](./docs/development.md#benchmarks).\n\n## Release & Install Notes\n\nThe package is published on npm as `@injaneity/pi-computer-use`.\n\n```bash\nnpm install @injaneity/pi-computer-use\nnpm install @injaneity/pi-computer-use@0.3.2\n```\n\nPi installs should pin a GitHub release tag:\n\n```bash\npi install git:github.com/injaneity/pi-computer-use@v0.3.2\npi install -l git:github.com/injaneity/pi-computer-use@v0.3.2\npi install /absolute/path/to/pi-computer-use\n```\n\nRemove:\n\n```bash\npi remove git:github.com/injaneity/pi-computer-use@v0.3.2\nnpm remove @injaneity/pi-computer-use\n```\n\nFor a different release, replace `v0.3.2` or `0.3.2` with the version you want to pin.\n\n## Screenshots\n\n![pi-computer-use screenshot](./assets/reference/img.jpg)\n\n## License\n\nMIT\n\n## See Also\n\n- [Pi](https://pi.dev/)\n- [`@earendil-works/pi-coding-agent`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)\n- [`@earendil-works/pi-ai`](https://www.npmjs.com/package/@earendil-works/pi-ai)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "computer-use",
+    "macos",
+    "screenshot",
+    "automation"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/injaneity/pi-computer-use#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/injaneity/pi-computer-use.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "image": "./assets/reference/img.jpg"
+  },
+  "time": {
+    "created": "2026-04-22T08:33:40.932Z",
+    "modified": "2026-06-18T13:25:50.608Z",
+    "0.1.3": "2026-04-22T08:33:41.127Z",
+    "0.1.4": "2026-04-23T03:28:27.646Z",
+    "0.1.5": "2026-04-23T09:50:35.252Z",
+    "0.1.6": "2026-04-23T10:39:07.220Z",
+    "0.1.7": "2026-04-24T06:34:13.790Z",
+    "0.2.0": "2026-04-24T07:16:32.760Z",
+    "0.2.1": "2026-04-25T11:10:08.169Z",
+    "0.2.2": "2026-04-28T05:40:44.650Z",
+    "0.2.3": "2026-05-07T06:41:58.306Z",
+    "0.2.4": "2026-05-08T12:38:03.172Z",
+    "0.2.5": "2026-05-22T03:59:31.216Z",
+    "0.2.6": "2026-06-05T10:36:00.558Z",
+    "0.3.0": "2026-06-11T16:26:07.485Z",
+    "0.3.1": "2026-06-12T13:36:01.890Z",
+    "0.3.2": "2026-06-18T13:25:50.326Z"
+  },
+  "versions_count": 15,
+  "downloads_last_week": 472,
+  "download_trend": []
+}

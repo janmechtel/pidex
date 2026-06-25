@@ -1,0 +1,53 @@
+{
+  "name": "pi-openmodel-provider",
+  "latest_version": "0.2.17",
+  "description": "pi custom provider for OpenModel.ai - Multi-model AI gateway",
+  "readme": "# pi-openmodel-provider\n\nA [pi](https://github.com/earendil-works/pi-mono) custom provider that connects pi to [OpenModel.ai](https://www.openmodel.ai) \u2014 a unified AI API gateway.\n\n[![npm version](https://img.shields.io/npm/v/pi-openmodel-provider)](https://www.npmjs.com/package/pi-openmodel-provider)\n[![CI](https://github.com/IvanGabrielYarupaitanRivera/pi-openmodel-provider/actions/workflows/ci.yml/badge.svg)](https://github.com/IvanGabrielYarupaitanRivera/pi-openmodel-provider/actions/workflows/ci.yml)\n\n> **Disclaimer:** This is an unofficial, community-maintained package. I am not affiliated with, endorsed by, or connected to OpenModel in any way. This provider simply forwards requests to the public OpenModel API using your own API key.\n\n> **Note:** This package only provides a model _provider_. It does **not** include an API key. You must bring your own OpenModel API key.\n\n[\u25b6\ufe0f Watch the video tutorial](https://youtu.be/aUaXznGVuzg) \u2014 See the full installation and usage walkthrough.\n\n## Install + Quick start\n\n```sh\npi install npm:pi-openmodel-provider\n```\n\n![pi-openmodel-provider thumbnail](https://raw.githubusercontent.com/IvanGabrielYarupaitanRivera/pi-openmodel-provider/master/media/thumbnail.jpeg)\n\n| Step | What to do |\n|------|------------|\n| 1\ufe0f\u20e3 | `/reload` (so OpenModel appears in /login) |\n| 2\ufe0f\u20e3 | `/login` \u2192 \"Use a subscription\" \u2192 **OpenModel** \u2192 \"Paste API key manually\" \u2192 paste your key |\n| 3\ufe0f\u20e3 | `/reload` (so models load) |\n| 4\ufe0f\u20e3 | `Ctrl + L` or `/model openmodel/deepseek-v4-flash` to select your model |\n\nDone! You can now use OpenModel in pi.\n\n## Usage\n\nAfter setup, select any OpenModel model:\n\n```txt\n/model openmodel/deepseek-v4-flash\n```\n\nPress **Ctrl + L** to open the model selector and browse available models.\n\n## Models\n\nModels are fetched live from OpenModel's API at startup, so new models show up without a package release.\n\n### Supported Providers\n\n| Provider | Models |\n|----------|--------|\n| OpenAI | GPT-5.x family |\n| Anthropic | Claude Opus/Sonnet/Haiku |\n| Google Gemini | Gemini Flash/Pro |\n| DeepSeek | DeepSeek V4 (1M context) |\n| Alibaba Qwen | Qwen3.x family |\n| Xiaomi (MiMo) | Mimo v2.x |\n| Moonshot (Kimi) | Kimi K2.x |\n| MiniMax | MiniMax M2.x/M3 |\n| ZAI (GLM) | GLM-4.x/5.x |\n\n## Model discovery\n\nOn startup, the provider fetches models from two endpoints:\n\n- **Pricing & capabilities:** `https://api.openmodel.ai/web/v1/models` (public, no auth needed)\n- **Protocol info:** `https://api.openmodel.ai/v1/models` (requires API key \u2014 if unavailable, protocols are inferred from the provider)\n\nPricing, context window, reasoning support, and vision capabilities are all provided by the API \u2014 no hardcoded data.\n\n### Caching\n\nModels are cached locally at `~/.pi/agent/cache/openmodel-models.json` with a **5-minute TTL**. On subsequent startups or `/reload`, the cached list is used instead of hitting the API again. The `/openmodel` command shows `(cached)` when the cache is active.\n\nTo force a fresh fetch, wait 5 minutes or delete the cache file manually.\n\n## Pricing\n\nModel pricing is fetched live from OpenModel's public API (`/web/v1/models`). Each model returns its real per-token rates in microdollars, converted to dollars per million tokens for display.\n\n- Input and output tokens are billed at separate rates\n- Cache reads and writes are billed at reduced rates\n- A `price_multiplier` may apply (e.g., 0.95 = 5% discount)\n- Free models have zero cost\n\n## Features\n\n- **41+ models** from 9+ providers (dynamically fetched)\n- **3 protocols**: Messages (Anthropic), Responses (OpenAI), Gemini (Google)\n- **Model stability metrics** via `/openmodel-stability`\n- **1M context window** for DeepSeek V4 models\n- **Thinking levels** for reasoning models (DeepSeek, Claude, GPT, Gemini, etc.)\n- **Compat flags** per provider for optimal protocol compatibility\n- **Local caching** with 5-minute TTL to reduce API calls\n- **AbortSignal support** in stability commands for cancellation\n- **Friendly error messages** with emojis and actionable guidance\n- **No hardcoding** \u2014 new models, pricing, and capabilities appear automatically\n- **CI workflow** \u2014 typecheck and tests run on every push and PR\n- **Modular architecture** \u2014 each module has a single responsibility (SRP), making the codebase easy to maintain and extend\n\n## Error handling\n\nErrors from OpenModel's API are shown with friendly messages:\n\n| HTTP Status | What you'll see |\n|-------------|-----------------|\n| 401 | \ud83d\udd11 Invalid API key. Check your credentials or run /login again. |\n| 402 | \ud83d\udcb3 Insufficient balance. Top up at console.openmodel.ai |\n| 429 | \u23f3 Rate limited. Try again later. |\n| 404 | \ud83d\udd0d Resource not found. Check the model name. |\n| 5xx | \ud83d\udd27 OpenModel API error. Try again later. |\n\nFor stability endpoints, errors include context about what went wrong.\n\n## Commands\n\n```txt\n/openmodel                Show provider status\n/openmodel-stability      Show health metrics for all models\n/openmodel-stability <model>  Show detailed metrics for a specific model\n```\n\n## Stability explained\n\nThe `/openmodel-stability` command shows how healthy each model is:\n\n| Symbol | Meaning | Condition |\n|--------|---------|-----------|\n| \u2705 Operational | Healthy | \u226599.9% success + enough data |\n| \ud83d\udfe2 Healthy | Good | \u226599% success |\n| \ud83d\udfe1 Degraded | Some issues | \u226595% success |\n| \ud83d\udd34 Unstable | Problems | <95% success |\n| \u26aa No Data | Not enough info | <10 requests (low confidence) |\n\n```\n\u2705 deepseek-v4-flash  100.0%   8541ms   136.4 t/s\n   \u2191         \u2191          \u2191        \u2191          \u2191\n   |         |          |        |          \u2514\u2500\u2500 Tokens per second\n   |         |          |        \u2514\u2500\u2500 Average latency (ms)\n   |         |          \u2514\u2500\u2500 Success rate\n   |         \u2514\u2500\u2500 Model name\n   \u2514\u2500\u2500 Health status\n```\n\n## Development\n\n```sh\n# Clone the repo\ngit clone https://github.com/IvanGabrielYarupaitanRivera/pi-openmodel-provider\ncd pi-openmodel-provider\n\n# Install dependencies\nnpm install\n\n# Type check\nnpm run typecheck\n\n# Run all tests\nnpm test\n\n# Run specific tests\nnpm run test:models\nnpm run test:auth\nnpm run test:pricing\nnpm run test:stability\nnpm run test:edge\n```\n\n### Codebase Architecture\n\nThe source code is organized by responsibility following the Single Responsibility Principle:\n\n```\nsrc/\n\u251c\u2500\u2500 api/                    # Network fetching (models, stability)\n\u2502   \u251c\u2500\u2500 models.ts           #   fetchOpenModelModels() \u2014 model discovery orchestration\n\u2502   \u2514\u2500\u2500 stability.ts        #   fetchModelStabilitySummary/Detail()\n\u251c\u2500\u2500 providers/              # Provider-specific business logic\n\u2502   \u251c\u2500\u2500 compat.ts           #   compatForProvider() \u2014 per-provider compatibility flags\n\u2502   \u251c\u2500\u2500 protocols.ts        #   determineApi() + thinkingLevelMapForApi()\n\u2502   \u2514\u2500\u2500 pricing.ts          #   pricePerMillion() \u2014 cost-per-token conversion\n\u251c\u2500\u2500 auth/                   # Authentication flow\n\u2502   \u251c\u2500\u2500 login.ts            #   login() + refreshToken() + getApiKey()\n\u2502   \u2514\u2500\u2500 validate.ts         #   sanitizeApiKey() + isValidApiKey()\n\u251c\u2500\u2500 formatters/             # Pure display formatting\n\u2502   \u2514\u2500\u2500 stability.ts        #   formatHealthStatus() + formatConfidence()\n\u251c\u2500\u2500 cache.ts                # Local model cache (read/write)\n\u251c\u2500\u2500 errors.ts               # API error parsing + friendly messages\n\u2514\u2500\u2500 stub.d.ts               # Type stubs for pi peer dependency\n```\n\n**Key principles:**\n- Each file has exactly one responsibility\n- `api/` modules only handle HTTP \u2014 no business logic\n- `providers/` modules are pure functions \u2014 no side effects\n- `formatters/` modules are pure \u2014 no network calls\n- `auth/` separates input validation from login orchestration\n- Tests mirror the source structure and mock network boundaries\n\n## Contributing\n\nSee [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, PR expectations, and commit message rules.\n\n## Release\n\nSee [RELEASE.md](RELEASE.md) for prerelease, npm smoke-test, stable publish, git tag, and GitHub follow-up checklist.\n\n## License\n\nMIT\n\n---\n\n**Maintained by** [Ivan Gabriel Yarupaitan Rivera](https://www.vanchi.pro/)",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "openmodel",
+    "provider",
+    "ai-gateway"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/IvanGabrielYarupaitanRivera/pi-openmodel-provider#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IvanGabrielYarupaitanRivera/pi-openmodel-provider.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./.agents/skills"
+    ],
+    "image": "https://raw.githubusercontent.com/IvanGabrielYarupaitanRivera/pi-openmodel-provider/master/media/thumbnail.jpeg",
+    "video": "https://youtu.be/aUaXznGVuzg"
+  },
+  "time": {
+    "created": "2026-06-20T23:09:21.326Z",
+    "modified": "2026-06-24T01:47:31.100Z",
+    "0.2.0": "2026-06-20T23:09:21.537Z",
+    "0.2.1": "2026-06-20T23:12:55.055Z",
+    "0.2.2": "2026-06-20T23:45:59.600Z",
+    "0.2.3": "2026-06-21T00:00:37.600Z",
+    "0.2.5": "2026-06-21T00:02:59.712Z",
+    "0.2.6": "2026-06-21T00:12:51.552Z",
+    "0.2.7": "2026-06-21T00:17:41.190Z",
+    "0.2.8": "2026-06-21T03:53:12.889Z",
+    "0.2.9": "2026-06-21T05:09:25.405Z",
+    "0.2.10": "2026-06-22T04:51:53.716Z",
+    "0.2.11": "2026-06-22T17:49:56.758Z",
+    "0.2.13": "2026-06-22T18:25:47.341Z",
+    "0.2.14": "2026-06-22T18:31:20.015Z",
+    "0.2.15": "2026-06-22T18:49:16.809Z",
+    "0.2.16": "2026-06-24T01:20:27.094Z",
+    "0.2.17": "2026-06-24T01:47:30.798Z"
+  },
+  "versions_count": 16,
+  "downloads_last_week": 2378,
+  "download_trend": []
+}

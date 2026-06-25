@@ -1,0 +1,45 @@
+{
+  "name": "tau-mirror",
+  "latest_version": "1.0.9",
+  "description": "Web UI that mirrors your Pi terminal session in the browser",
+  "readme": "# Tau\n\nA web UI that mirrors your [Pi](https://github.com/badlogic/pi-mono) terminal session in the browser. No separate server \u2014 it runs as a Pi extension inside your existing process.\n\n![Tau dark mode](docs/images/dark.png)\n\n![Tau terracotta theme](docs/images/terracotta.png)\n\n![Settings](docs/images/settings.png)\n\n![Commands](docs/images/commands.png)\n\n## What it does\n\nTau connects to your running Pi TUI and gives you a second view in the browser. Same session, same messages, same tools \u2014 just a different screen. Type in the terminal or the browser, both stay in sync.\n\n- **Live mirroring** \u2014 streams messages, tool calls, and thinking blocks in real-time\n- **Works on any device** \u2014 open it on your phone, tablet, or another monitor\n- **Session browser** \u2014 view history from any past session\n- **No extra process** \u2014 the Pi extension *is* the server\n\n## Install\n\n```bash\npi install npm:tau-mirror\n```\n\nOr from git:\n\n```bash\npi install git:github.com/deflating/tau\n```\n\n## Usage\n\n1. Start Pi normally in your terminal\n2. Open the URL shown in the status bar (default: `http://localhost:3001`)\n3. That's it\n\nType `/qr` in the terminal to show a QR code and scan it to access via your phone.\n\n## Features\n\n### Chat\n- Full markdown rendering with syntax-highlighted code blocks\n- Streaming responses with typing indicator\n- Image attachments (paste, drag & drop, or button)\n- Copy any message with one click\n- Inline diff viewer for edit tool calls (red/green lines)\n- Scroll-to-bottom button with new message indicator\n- Message queuing \u2014 type while the agent is working, messages queue and auto-send\n\n### Session Management\n- Browse all past sessions grouped by project\n- Full-text search across all session history with highlighted snippets\n- Sorted by last modified (most recent first)\n- Live session marked with a green dot\n- Historical sessions are read-only\n- Inline session rename\n- Favourite sessions, tags, and filtering\n\n### Model & Thinking\n- Model picker with search/filter and keyboard support\n- Thinking level toggle (off/low/medium/high)\n- Token usage percentage with context window visualiser\n- Cost tracking per session\n\n### Voice Input\n- Mic button in the input area using Web Speech API (on-device dictation)\n- Live transcription into the textarea\n- Pulses red while recording\n\n### File Browser\n- Right sidebar with lazy-loaded file tree\n- Navigate directories, open files natively\n- Drag files onto the input to insert their path\n\n### Compaction\n- Manual context compaction with status display\n- Auto-compaction support\n\n### PWA\n- Installable as a standalone app on iOS, Android, and macOS\n- Custom app icons\n- Service worker with network-first caching\n\n## Configuration\n\nEnvironment variables (set before starting Pi):\n\n| Variable          | Default     | Description                                                                  |\n|-------------------|-------------|------------------------------------------------------------------------------|\n| `TAU_MIRROR_PORT` | `3001`      | Server port                                                                  |\n| `TAU_HOST`        | `0.0.0.0`   | Bind address. Set to `127.0.0.1` to restrict to localhost only               |\n| `TAU_STATIC_DIR`  | *(bundled)* | Override static files path                                                   |\n| `TAU_DISABLED`    | `0`         | Set to `1` to disable Tau (it stays installed but won't start the server)    |\n| `TAU_USER`        | *(none)*    | HTTP Basic Auth username (both `TAU_USER` and `TAU_PASS` required to enable) |\n| `TAU_PASS`        | *(none)*    | HTTP Basic Auth password                                                     |\n\n### Authentication\n\nTau supports optional HTTP Basic Auth (browser-native login popup).\n\n**1. Set credentials** \u2014 add to `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"tau\": {\n    \"user\": \"pi\",\n    \"pass\": \"your-password\"\n  }\n}\n```\n\nOr via environment variables: `TAU_USER=pi TAU_PASS=secret pi`\n\n**2. Toggle on/off** \u2014 once credentials are configured, a \"Require login\" toggle appears in Settings within the Tau web UI. Flip it on to start requiring authentication, off to open it back up. The setting persists across restarts.\n\nBoth HTTP and WebSocket connections are gated when enabled. The `/api/health` endpoint remains open for monitoring.\n\n### Start / Stop\n\nControl Tau at runtime without uninstalling:\n\n```\n/tau-stop     Stop the mirror server\n/tau-start    Start it again\n```\n\nTo prevent Tau from auto-starting (e.g. in multi-session or dev container workflows):\n\n```bash\nTAU_DISABLED=1 pi\n```\n\nYou can still start it manually with `/tau-start` in that session.\n\n## How it works\n\nTau is a [Pi extension](https://github.com/badlogic/pi-mono#extensions) that starts an HTTP + WebSocket server inside the Pi process. The extension subscribes to all Pi events and forwards them to connected browser clients. Commands from the browser are executed via the extension API against the same agent session.\n\n```\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502  Pi TUI     \u2502     \u2502  Pi Process                  \u2502     \u2502  Browser    \u2502\n\u2502  (terminal) \u2502\u25c4\u2500\u2500\u2500\u25ba\u2502                              \u2502\u25c4\u2500\u2500\u2500\u25ba\u2502  (Tau)      \u2502\n\u2502             \u2502     \u2502  tau extension               \u2502     \u2502             \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518     \u2502    \u21b3 HTTP + WS on :3001      \u2502     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n                    \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\nThere's no separate server to run. The extension auto-loads when Pi starts and shuts down when Pi exits.\n\n## Development\n\nClone and point the extension at the local static files:\n\n```bash\ngit clone https://github.com/deflating/tau.git\ncd tau\nTAU_STATIC_DIR=$(pwd)/public pi\n```\n\nEdit the files in `public/` \u2014 refresh the browser to see changes.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "coding-agent",
+    "web-ui",
+    "mirror"
+  ],
+  "author": {
+    "name": "deflating"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/deflating/tau#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deflating/tau.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/mirror-server.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/deflating/tau/main/docs/images/dark.png"
+  },
+  "time": {
+    "created": "2026-03-02T23:39:12.122Z",
+    "modified": "2026-06-22T07:19:47.103Z",
+    "1.0.0": "2026-03-02T23:39:12.315Z",
+    "1.0.1": "2026-03-02T23:41:06.038Z",
+    "1.0.2": "2026-03-02T23:45:01.333Z",
+    "1.0.3": "2026-03-04T01:20:16.808Z",
+    "1.0.4": "2026-03-06T06:16:35.221Z",
+    "1.0.5": "2026-03-06T06:24:36.711Z",
+    "1.0.6": "2026-03-11T07:03:16.059Z",
+    "1.0.7": "2026-03-11T07:47:53.282Z",
+    "1.0.8": "2026-05-29T01:04:07.797Z",
+    "1.0.9": "2026-06-22T07:19:47.000Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": 364,
+  "download_trend": []
+}

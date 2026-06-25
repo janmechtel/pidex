@@ -1,0 +1,72 @@
+{
+  "name": "@dreki-gg/pi-plan-mode",
+  "latest_version": "0.27.3",
+  "description": "Two-phase planning workflow for pi \u2014 plan with claude-opus-4-6:medium, execute with gpt-5.5:low, with .plans/ file-based handoff",
+  "readme": "# @dreki-gg/pi-plan-mode\n\nTwo-phase planning workflow for [pi](https://github.com/badlogic/pi-mono).\n\nPlan with `claude-opus-4-6:medium`, execute with `gpt-5.5:low`. Plans are persisted as files in `.plans/` for clean context handoff between models.\n\n## Install\n\n```bash\npi install npm:@dreki-gg/pi-plan-mode\n```\n\nRecommended companions:\n\n```bash\npi install npm:@dreki-gg/pi-questionnaire\n```\n\n## What it provides\n\n| Feature  | Name           | Notes                                          |\n| -------- | -------------- | ---------------------------------------------- |\n| Flag     | `--plan`       | Start pi in plan mode                          |\n| Command  | `/plan [prompt]` | Enter plan mode, optionally with a starting prompt |\n| Command  | `/plan resume` | Pick up an in-progress plan from disk          |\n| Command  | `/plan focus <name>` | Pin a plan so tracking calls default to it (multi-plan repos) |\n| Command  | `/plans`       | List/filter/sort plans                          |\n| Command  | `/initiatives` | List initiatives with member-plan rollup        |\n| Command  | `/todos`       | Show current plan progress                     |\n| Shortcut | `Ctrl+Alt+P`   | Toggle plan mode                               |\n| Tool     | `revise_plan`  | Rewrite an existing plan in place (title/handoff/tasks) |\n| Tool     | `update_task`  | Mark a task done / skipped / blocked           |\n| Tool     | `update_tasks` | Mark several tasks done / skipped in one call  |\n| Tool     | `add_task`     | Capture a discovered follow-up (deferred)      |\n| Tool     | `plan_status`  | Read-only snapshot; progress table when many plans are active |\n| Tool     | `set_active_plan` | Pin a plan as active (tool form of `/plan focus`) so tracking calls target it |\n| Tool     | `update_plan`  | Close/reopen a plan: done, superseded, abandoned, in-progress |\n| Tool     | `submit_initiative` | Create an initiative that groups multiple plans          |\n| Tool     | `update_initiative` | Close/reopen an initiative: done, superseded, abandoned, in-progress |\n| Tool     | `initiative_status` | Snapshot an initiative: member plans, progress, ready/blocked |\n| Tool     | `reconcile_plans` | Detect & repair drift between tasks.jsonl and the registry (plans **and** initiatives) |\n\n## Initiatives \u2014 grouping large work\n\nWhen a body of work is too large for a single plan, group it under an **initiative**.\nAn initiative is one level above a plan; the same projection rule applies one level up:\n\n```\nInitiative  status = projection of its member plans' statuses\n   Plan     status = projection of its tasks' statuses\n      Task  base state\n```\n\nAn initiative is `done` when it has \u22651 member plan and every member is terminal\n(`done` / `superseded` / `abandoned`). Member plans link to the initiative by name and\ncarry **plan-level** `depends_on` (cross-initiative allowed), so the extension can compute\n*ready work* \u2014 plans whose dependencies are all `done`. `initiative_status` surfaces, per\nmember plan, whether it is **ready** or **blocked by** which plans \u2014 the view you want when\nsplitting an initiative across sessions or subagents.\n\n```text\n# 1. Create the initiative\nsubmit_initiative(name: \"auth-overhaul\", title: \"Auth Overhaul\", overview: \"...\")\n\n# 2. Submit member plans linked + ordered\nsubmit_plan(name: \"auth-schema\",  initiative: \"auth-overhaul\")\nsubmit_plan(name: \"auth-jwt\",     initiative: \"auth-overhaul\", depends_on_plans: [\"auth-schema\"])\nsubmit_plan(name: \"auth-ui\",      initiative: \"auth-overhaul\", depends_on_plans: [\"auth-jwt\"])\n\n# 3. See what's ready to pick up\ninitiative_status(initiative: \"auth-overhaul\")\n```\n\nInitiative lifecycle mirrors plans: `done` is projected automatically, while `superseded` /\n`abandoned` (and reopen) are explicit via `update_initiative` with a `reason`. The `clean`\nCLI archives closed initiatives the same way it archives closed plans.\n\n### Plan lifecycle status\n\nThe registry (`.plans/plans.jsonl`) `status` is a **projection of task state**, not a\nhand-maintained flag. Marking every task `done`/`skipped` (via `update_task`, in any\nsession or model) automatically flips the plan to `done` \u2014 completion is no longer\ncoupled to a formal in-session execution run.\n\n| Status        | Meaning                                            | Active? |\n| ------------- | -------------------------------------------------- | ------- |\n| `in-progress` | Active, tracked, eligible for auto-resolution      | \u2705      |\n| `done`        | All tasks resolved                                 | \u2014       |\n| `superseded`  | Another plan absorbed the work                     | \u2014       |\n| `abandoned`   | Won't do / rejected                                | \u2014       |\n\n`superseded` / `abandoned` are set explicitly via `update_plan` (with a `reason`) and are\nnever auto-overridden by task reconciliation. Only `in-progress` plans participate in\nactive-plan resolution.\n\nIn repos with **many** in-progress plans, an explicit `{ plan: \"<name>\" }` on\n`update_task` / `add_task` / `plan_status` **always** targets that plan \u2014 it is never\nsilently overridden by whatever plan was last submitted in the session.\n\n## Workflow\n\n### 1. Plan (`claude-opus-4-6:medium`)\n\n```text\n/plan add authentication middleware with JWT support\n```\n\nThe planner has access to read-only tools plus `edit`/`write` restricted to `.plans/` files. Bash is locked to a strict allowlist of safe commands.\n\nThe planner:\n- Inspects the codebase using read-only tools\n- Uses `questionnaire` when requirements are underspecified\n- Creates `.plans/<kebab-name>/PLAN.md` with the full numbered plan\n- Creates `.plans/<kebab-name>/START-PROMPT.md` \u2014 a self-contained handoff prompt with all context needed to execute without the planning conversation\n- Can add supporting files in the same directory for extra context\n\n### 2. Choose next step\n\nWhen the planner finishes, a menu appears:\n\n| Option           | Description                                                            |\n| ---------------- | ---------------------------------------------------------------------- |\n| **Execute Plan** | Extract todos from PLAN.md, switch to gpt-5.5:low, start with START-PROMPT.md |\n| **Refine Plan**  | Adversarial review \u2014 planner critiques its own plan and updates files  |\n| **Follow up**    | Open an editor for additional instructions to the planner              |\n| **Exit plan mode** | Disable plan mode and restore original model                        |\n\n### 3. Execute (`gpt-5.5:low`)\n\nWhen **Execute Plan** is selected:\n1. Todos are extracted from `PLAN.md`\n2. Model switches to `gpt-5.5:low` with full tool access\n3. The executor starts with a **clean context window** using `START-PROMPT.md`\n4. Each step must be marked with `[DONE:n]` before moving to the next\n5. Progress is tracked in a widget in the status bar\n6. When all steps complete, the original model and thinking level are restored\n\n## Plan directory structure\n\n```\n.plans/\n\u251c\u2500\u2500 plans.jsonl               # Plan registry \u2014 plan status lifecycle\n\u251c\u2500\u2500 initiatives.jsonl         # Initiative registry \u2014 groups member plans\n\u251c\u2500\u2500 auth-overhaul/            # An initiative directory\n\u2502   \u2514\u2500\u2500 INITIATIVE.md         # Initiative overview + plan breakdown\n\u2514\u2500\u2500 auth-jwt/                 # A member plan (linked by name in the registry)\n    \u251c\u2500\u2500 HANDOFF.md            # Self-contained executor handoff\n    \u251c\u2500\u2500 tasks.jsonl           # Tasks (gains optional initiative + plan-level depends_on)\n    \u2514\u2500\u2500 ...                   # Optional supporting files\n```\n\n### plans.json\n\nThe extension automatically maintains `.plans/plans.json` to track plan lifecycle:\n\n```json\n{\n  \"add-auth-middleware\": {\n    \"status\": \"in-progress\",\n    \"title\": \"Add Authentication Middleware with JWT Support\",\n    \"created\": \"2026-05-08T12:00:00.000Z\",\n    \"completed\": null\n  },\n  \"fix-ci-flakes\": {\n    \"status\": \"done\",\n    \"title\": \"Fix CI Flaky Tests\",\n    \"created\": \"2026-05-07T10:00:00.000Z\",\n    \"completed\": \"2026-05-07T14:30:00.000Z\"\n  }\n}\n```\n\nPlans start as `\"in-progress\"` when created and are marked `\"done\"` when all execution steps complete. This prevents accidental deletion of in-flight plans.\n\n## Cleaning completed plans\n\nUse the CLI to clean closed plans (`done` / `superseded` / `abandoned`). By default it\n**archives** plan directories to `.plans/.archive/<name>/` \u2014 keeping HANDOFF.md and\ntasks.jsonl as a record \u2014 rather than deleting them:\n\n```bash\n# Preview what would be cleaned (no changes)\nnpx @dreki-gg/pi-plan-mode clean --dry-run\n\n# Archive closed plans to .plans/.archive/ and update plans.jsonl\nnpx @dreki-gg/pi-plan-mode clean\n\n# Permanently delete instead of archiving\nnpx @dreki-gg/pi-plan-mode clean --purge\n```\n\nIn-flight plans (`\"status\": \"in-progress\"`) are never touched. Archiving is the default so\nthat closing out a finished plan never silently destroys its handoff + task ledger.\n\n### GitHub Actions\n\nClean done plans automatically after merge \u2014 similar to changesets:\n\n```yaml\nname: Clean Plans\n\non:\n  push:\n    branches: [main]\n    paths: ['.plans/**']\n\njobs:\n  clean:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v5\n      - uses: actions/setup-node@v4\n        with:\n          node-version: '24'\n      - run: npx @dreki-gg/pi-plan-mode clean\n      - name: Commit cleanup\n        run: |\n          git config user.name \"github-actions[bot]\"\n          git config user.email \"github-actions[bot]@users.noreply.github.com\"\n          git add .plans/\n          git diff --cached --quiet || git commit -m \"chore: clean completed plans\"\n          git push\n```\n\n### Should you gitignore `.plans/`?\n\n**No.** Commit your plans \u2014 they provide decision history and execution context. Use the `clean` CLI to remove done plans after merge, keeping the directory lean. Plans are execution blueprints, not permanent documentation; for lasting decisions, use ADRs.\n\n## Footer indicators\n\n- `\ud83d\udcdd plan` \u2014 plan mode active (opus-4-6:medium, strict bash)\n- `\ud83d\udccb exec 2/5` \u2014 executing plan with gpt-5.5:low, 2 of 5 steps done\n\n## Bash safety\n\nIn plan mode, bash is restricted to read-only commands (ls, grep, git status, cat, rg, etc.). Destructive commands (rm, mv, git commit, etc.) are blocked.\n\n## CLI reference\n\n```\npi-plan-mode clean [--dry-run] [--purge]\n```\n\n| Option      | Description                                                        |\n| ----------- | ----------------------------------------------------------------- |\n| `clean`     | Archive closed plan directories to `.plans/.archive/`, update manifest |\n| `--dry-run` | Show what would be cleaned without changing anything              |\n| `--purge`   | Permanently delete instead of archiving                           |\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "Juan Albarran",
+    "email": "jalbarrandev@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/dreki-gg/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dreki-gg/pi-extensions.git",
+    "directory": "packages/plan-mode"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/plan-mode"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-04-29T17:34:13.851Z",
+    "modified": "2026-06-23T23:22:33.883Z",
+    "0.1.0": "2026-04-29T17:34:14.132Z",
+    "0.2.0": "2026-04-29T17:45:26.558Z",
+    "0.3.0": "2026-05-08T05:29:08.973Z",
+    "0.3.1": "2026-05-08T06:37:10.116Z",
+    "0.4.0": "2026-05-08T17:37:32.381Z",
+    "0.5.0": "2026-05-09T06:39:45.241Z",
+    "0.5.1": "2026-05-09T07:01:23.788Z",
+    "0.6.0": "2026-05-13T08:27:20.029Z",
+    "0.6.1": "2026-05-13T17:35:05.892Z",
+    "0.6.2": "2026-05-23T04:34:55.231Z",
+    "0.6.3": "2026-05-23T04:41:18.718Z",
+    "0.6.4": "2026-05-23T05:46:02.556Z",
+    "0.7.2": "2026-05-27T00:08:08.365Z",
+    "0.10.1": "2026-05-27T03:20:34.049Z",
+    "0.13.0": "2026-05-27T07:10:15.756Z",
+    "0.14.0": "2026-05-27T18:41:15.076Z",
+    "0.14.2": "2026-05-28T18:19:00.554Z",
+    "0.14.5": "2026-05-28T19:05:24.914Z",
+    "0.15.0": "2026-05-28T21:06:22.129Z",
+    "0.15.1": "2026-05-30T06:02:52.861Z",
+    "0.16.0": "2026-05-30T20:33:29.155Z",
+    "0.17.0": "2026-05-31T01:04:03.469Z",
+    "0.17.1": "2026-05-31T02:47:09.725Z",
+    "0.18.0": "2026-06-02T05:51:30.002Z",
+    "0.19.0": "2026-06-02T18:46:17.187Z",
+    "0.20.0": "2026-06-03T18:32:19.574Z",
+    "0.20.1": "2026-06-03T20:12:50.024Z",
+    "0.21.0": "2026-06-04T00:29:27.757Z",
+    "0.23.0": "2026-06-06T04:51:31.276Z",
+    "0.24.0": "2026-06-08T02:08:32.168Z",
+    "0.24.1": "2026-06-08T06:55:30.451Z",
+    "0.25.0": "2026-06-09T01:06:00.725Z",
+    "0.26.0": "2026-06-14T01:31:21.757Z",
+    "0.26.1": "2026-06-15T20:33:38.982Z",
+    "0.26.2": "2026-06-16T02:01:28.399Z",
+    "0.27.0": "2026-06-19T17:02:28.558Z",
+    "0.27.3": "2026-06-23T23:22:33.555Z"
+  },
+  "versions_count": 37,
+  "downloads_last_week": 740,
+  "download_trend": []
+}

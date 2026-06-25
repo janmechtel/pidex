@@ -1,0 +1,42 @@
+{
+  "name": "pi-goal",
+  "latest_version": "0.1.7",
+  "description": "Persistent autonomous goals for pi \u2014 /goal loops until complete, paused, or budget-limited",
+  "readme": "# pi-goal\n\n![pi-goal](docs/assets/pi-goal-poster.png)\n\nPersistent autonomous goals for [pi](https://github.com/badlogic/pi-mono).\n\n`pi-goal` adds a `/goal` command and goal tools so Pi can keep working toward a long-running, thread-scoped objective until the goal is complete, paused, cleared, or token-budget-limited.\n\n## Install\n\n```bash\npi install npm:pi-goal\n```\n\nOr from git:\n\n```bash\npi install git:github.com/Michaelliv/pi-goal\n```\n\n## Usage\n\n```text\n/goal improve benchmark coverage until the suite has strong evidence\n/goal --tokens 50k finish the migration and verify tests\n/goal\n/goal status\n/goal pause\n/goal resume\n/goal clear\n/goal statusbar off\n```\n\nWhen a goal is active, the extension shows compact visible lifecycle markers like `Goal active` and `Goal continuing`; expand them with `ctrl+o` to inspect the objective and usage. The full continuation instructions ride along as the content of that custom message, so the model always has the objective and audit guidance in the transcript while the renderer keeps the visible UI compact.\n\nThe same Pi agent keeps running normal turns in the same session context until it calls `update_goal({ status: \"complete\" })`, the user pauses/clears it, or the token budget is reached. Reloading Pi pauses an active goal instead of silently resuming it; use `/goal resume` to continue.\n\n## What it adds\n\n- `pi-goal-writer` skill: draft and review strong `/goal` objectives with evidence-based success criteria\n- `/goal [--tokens 50k] <objective>`: set or replace a goal\n- `/goal` or `/goal status`: show the current goal\n- `/goal pause`: stop autonomous continuation without deleting the goal\n- `/goal resume`: reactivate a paused goal\n- `/goal clear`: remove the goal\n- `/goal statusbar on|off`: show or hide the footer status line\n- `create_goal` tool: model can set or replace the current goal only when explicitly requested\n- `get_goal` tool: read current goal state\n- `update_goal` tool: model can only mark the goal `complete`\n- `get_goal` and `update_goal` are only exposed to the model while a goal is `active`; paused, cleared, complete, and budget-limited goals hide them so unrelated sessions are not tempted to call them\n- footer status: `Pursuing goal`, `Goal paused`, `Goal achieved`, or `Goal unmet`\n\n## Flow\n\n```text\n/goal <objective>\n  -> persist goal in the current Pi session\n  -> show compact Goal marker and footer status\n  -> deliver continuation instructions as the marker's message content\n  -> trigger an agent turn\n  -> account time/tokens on turn_end\n  -> queue another continuation on agent_end while active\n  -> stop when update_goal marks complete, user pauses/clears, or budget is hit\n```\n\n## Completion behavior\n\nThe model is instructed to audit completion against real evidence before calling `update_goal`. The `update_goal` tool deliberately accepts only `status: \"complete\"`; pausing, resuming, clearing, and budget limiting are controlled by the user or extension runtime. The final turn is still accounted even when the model completes the goal mid-turn.\n\n## State\n\nGoal state is stored as Pi custom session entries with `customType: \"pi-goal\"`. It follows the active session branch, survives reloads, and does not require an external database.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "coding-agent",
+    "goal",
+    "automation"
+  ],
+  "author": {
+    "name": "michaelliv"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      ".pi/extensions/pi-goal"
+    ],
+    "skills": [
+      "skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-04T01:27:52.568Z",
+    "modified": "2026-06-21T06:29:18.528Z",
+    "0.1.0": "2026-05-04T01:27:52.855Z",
+    "0.1.1": "2026-05-04T02:15:25.601Z",
+    "0.1.2": "2026-05-04T04:14:36.692Z",
+    "0.1.3": "2026-05-06T09:25:06.010Z",
+    "0.1.4": "2026-05-07T06:31:25.421Z",
+    "0.1.5": "2026-05-24T10:54:03.026Z",
+    "0.1.6": "2026-06-20T19:48:03.448Z",
+    "0.1.7": "2026-06-21T06:29:18.401Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": null,
+  "download_trend": []
+}

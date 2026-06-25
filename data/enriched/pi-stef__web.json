@@ -1,0 +1,354 @@
+{
+  "name": "@pi-stef/web",
+  "latest_version": "0.3.4",
+  "description": "Pi extension for no-key web search, URL fetch, rendered scraping, browser sessions, login flows, and CloakBrowser-backed page access.",
+  "readme": "# SF Web Access\n\n`@pi-stef/web` provides no-key web search, URL fetch, browser automation, login sessions, and CloakBrowser-backed page rendering as a Pi extension.\n\n## Installation\n\n```bash\npi install npm:@pi-stef/web\n```\n\nFor project-local install:\n\n```bash\npi install -l npm:@pi-stef/web\n```\n\nAfter installation, verify runtime dependencies:\n\n```bash\npnpm --filter web check-runtime\n```\n\nInstall the CloakBrowser browser binary when needed:\n\n```bash\npnpm --filter web install-browser\n```\n\n## Contents\n\n- [Natural Language Usage](#natural-language-usage)\n- [Slash Commands](#slash-commands)\n- [Tools](#tools)\n- [Configuration](#configuration)\n- [No-Key Search Setup](#no-key-search-setup)\n- [Browser Identity](#browser-identity)\n- [Security Notes](#security-notes)\n- [Browser Tests](#browser-tests)\n- [License](#license)\n\n## Natural Language Usage\n\nThe agent understands natural-language requests and routes them to the correct tool. Examples:\n\n**Search the web:**\n```text\n\"Search for current browser automation options and summarize the top sources.\"\n\"What's the latest news on DFW weather?\"\n\"Find recent articles about Rust web frameworks.\"\n```\nThe agent calls `sf_web_search`.\n\n**Fetch a specific URL:**\n```text\n\"Fetch this URL as markdown: https://example.com/docs\"\n\"Read the content of https://example.com and summarize it.\"\n\"Use the browser to fetch https://example.com (it needs JavaScript).\"\n```\nThe agent calls `sf_web_fetch`. Asking to \"use the browser\" forces `mode='browser'`.\n\n**Run a browser flow:**\n```text\n\"Use the browser to go to google.com, search for 'espresso machines', and extract the results.\"\n\"Open walmart.com, search for 'laptop deals', and click the first result.\"\n\"Navigate to example.com/login, fill in the username and password, and submit.\"\n```\nThe agent calls `sf_web_flow`.\n\n**Create a login session:**\n```text\n\"Log into https://example.com using my credentials.\"\n\"Create a browser login session for the staging site.\"\n```\nThe agent calls `sf_web_login`.\n\n**Manage sessions:**\n```text\n\"List my browser sessions.\"\n\"Clear the 'staging' browser session profile.\"\n```\nThe agent calls `sf_web_session`.\n\n## Slash Commands\n\nSlash commands inject a prompt into the agent conversation. The agent then calls the corresponding tool.\n\n| Command | Args | Example |\n|---------|------|---------|\n| `/sf-web-search` | `<query>` | `/sf-web-search DFW weather forecast` |\n| `/sf-web-fetch` | `<url>` | `/sf-web-fetch https://example.com/docs` |\n| `/sf-web-flow` | `<instruction>` | `/sf-web-flow go to google.com and search for Rust` |\n| `/sf-web-login` | `<url>` | `/sf-web-login https://example.com/login` |\n| `/sf-web-session` | `[action] [name]` | `/sf-web-session list` |\n| `/sf-web` | `status` | `/sf-web status` |\n\nIf `/sf-web-search` is already registered by another package, the extension falls back to `/sf-search`.\n\n## Tools\n\nAll tools use the `sf_web_` prefix to avoid collisions with other Pi extensions.\n\n### sf_web_search\n\nSearch the web through a no-key provider cascade.\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `query` | string | yes | Search query |\n| `maxResults` | integer (1-20) | no | Maximum results to return (default: 10) |\n| `providers` | string[] | no | Ordered provider list: `searxng`, `searxng-html`, `duckduckgo`, `google`, `bing` |\n| `searxngUrl` | string | no | SearXNG instance URL override |\n| `headless` | boolean | no | Headless browser mode (default: true) |\n| `profile` | string | no | Browser profile name for browser-backed providers |\n\n### sf_web_fetch\n\nFetch a specific URL. Defaults to fast HTTP; falls back to CloakBrowser for JS-heavy pages.\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `url` | string | yes | URL to fetch |\n| `format` | string | no | Output format: `markdown`, `text`, `html`, `json`, `raw` (default: `markdown`) |\n| `mode` | string | no | Fetch mode: `auto`, `fast`, `browser` (default: `auto`) |\n| `headless` | boolean | no | Headless browser mode (default: true) |\n| `profile` | string | no | Browser profile name for rendered fetches |\n| `screenshot` | boolean | no | Capture a screenshot when browser mode is used |\n| `selector` | string | no | CSS selector to extract from HTML pages |\n\n`mode` values:\n- `auto` \u2014 tries fast HTTP first, falls back to browser if JS-heavy or blocked\n- `fast` \u2014 HTTP only, no browser fallback\n- `browser` \u2014 always uses CloakBrowser rendering\n\n### sf_web_flow\n\nAutomate multi-step browser interactions in CloakBrowser. Accepts natural-language instructions or structured step arrays.\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `instruction` | string | no | Natural-language flow instruction |\n| `steps` | array | no | Structured step array (see below) |\n| `headless` | boolean | no | Headless browser mode (default: true) |\n| `profile` | string | no | Browser profile name |\n\nEither `instruction` or `steps` must be provided.\n\n**Natural-language instruction examples:**\n```text\n\"go to google.com and search for espresso machines\"\n\"open example.com then click 'About' then wait 2s\"\n\"navigate to https://example.com/login; type 'user@example.com' in input[name='email']; press Enter\"\n```\n\n**Structured step actions:**\n\n| Action | Fields | Description |\n|--------|--------|-------------|\n| `goto` / `navigate` / `open` | `url` | Navigate to URL |\n| `click` | `selector`, or `role` + `name`, or `text` | Click an element |\n| `type` / `fill` | `text`, optional `selector` | Type text into an input |\n| `press` / `keypress` / `key` | `key`, optional `selector` | Press a keyboard key |\n| `wait` | `ms` | Wait in milliseconds (0-120000) |\n| `screenshot` | `path` | Capture screenshot to file |\n| `extract` | `selector`, optional `count` | Extract text content from matching elements |\n\n### sf_web_login\n\nCreate or refresh a named CloakBrowser login profile. Credentials come from environment variables.\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `url` | string | yes | Login page URL |\n| `profile` | string | no | Browser profile name (default: `default`) |\n| `interactive` | boolean | no | Open a headed browser for manual login |\n| `interactiveWaitMs` | integer (1000-600000) | no | Wait time for interactive login |\n| `usernameEnv` | string | no | Env var name containing username (default: `SF_WEB_USERNAME`) |\n| `passwordEnv` | string | no | Env var name containing password (default: `SF_WEB_PASSWORD`) |\n| `headless` | boolean | no | Headless browser mode (default: true) |\n\n### sf_web_session\n\nList, inspect, locate, or clear CloakBrowser session profiles.\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `action` | string | no | `list`, `inspect`, `locate`, or `clear` (default: `list`) |\n| `profile` | string | no | Profile name (default: `default`) |\n| `yes` | boolean | no | Confirm destructive clear action |\n\n## Configuration\n\nConfiguration is loaded from four layers, merged with later layers overriding earlier:\n\n1. **Hardcoded defaults**\n2. **Config file**: `~/.pi/web/config.json` (or `$SF_WEB_CONFIG`)\n3. **Environment variables**: `SF_WEB_*`\n4. **Runtime parameters**: passed directly to tool calls\n\n### Config File\n\nLocation: `~/.pi/web/config.json` (override with `SF_WEB_CONFIG`).\n\n```json\n{\n  \"maxResults\": 10,\n  \"searchProviders\": [\"searxng\", \"duckduckgo\", \"google\", \"bing\"],\n  \"searxngUrl\": \"https://search.example.com\",\n  \"allowPrivateNetworks\": false,\n  \"fetchMaxBytes\": 2097152,\n  \"fetchTimeoutMs\": 15000,\n  \"maxBytes\": 51200,\n  \"maxLines\": 2000,\n  \"outputDir\": \"/tmp/sf-web\",\n  \"profilesDir\": \"~/.pi/web/profiles\",\n  \"userAgent\": \"Mozilla/5.0 ...\",\n  \"browserFingerprintSeed\": \"42\",\n  \"browserHumanPreset\": \"default\",\n  \"browserLocale\": \"en-US\",\n  \"browserTimezone\": \"America/New_York\",\n  \"browserProxy\": \"socks5://proxy:1080\",\n  \"browserGeoip\": false\n}\n```\n\n### Environment Variables\n\n| Env Var | Config Key | Type | Default | Description |\n|---------|-----------|------|---------|-------------|\n| `SF_WEB_CONFIG` | \u2014 | string | `~/.pi/web/config.json` | Config file path |\n| `SF_WEB_SEARXNG_URL` | `searxngUrl` | string | \u2014 | SearXNG instance URL |\n| `SF_WEB_SEARCH_PROVIDERS` | `searchProviders` | CSV | `searxng,duckduckgo,google,bing` | Ordered search providers |\n| `SF_WEB_MAX_RESULTS` | `maxResults` | integer | 10 | Default max search results |\n| `SF_WEB_MAX_BYTES` | `maxBytes` | integer | 51200 | Max tool output bytes |\n| `SF_WEB_MAX_LINES` | `maxLines` | integer | 2000 | Max tool output lines |\n| `SF_WEB_FETCH_MAX_BYTES` | `fetchMaxBytes` | integer | 2097152 | Max HTTP body bytes |\n| `SF_WEB_FETCH_TIMEOUT_MS` | `fetchTimeoutMs` | integer | 15000 | HTTP fetch timeout (ms) |\n| `SF_WEB_ALLOW_PRIVATE_NETWORKS` | `allowPrivateNetworks` | boolean | false | Allow private/loopback IPs |\n| `SF_WEB_OUTPUT_DIR` | `outputDir` | string | `$TMPDIR/sf-web` | Output file directory |\n| `SF_WEB_PROFILES_DIR` | `profilesDir` | string | `~/.pi/web/profiles` | Browser profiles directory |\n| `SF_WEB_USER_AGENT` | `userAgent` | string | Chrome 124 UA | HTTP user-agent (fast fetch only) |\n| `SF_WEB_BROWSER_FINGERPRINT_SEED` | `browserFingerprintSeed` | string | auto | Fingerprint seed (positive integer) |\n| `SF_WEB_BROWSER_HUMAN_PRESET` | `browserHumanPreset` | string | \u2014 | `default` or `careful` |\n| `SF_WEB_BROWSER_LOCALE` | `browserLocale` | string | \u2014 | Browser locale (e.g., `en-US`) |\n| `SF_WEB_BROWSER_TIMEZONE` | `browserTimezone` | string | \u2014 | Browser timezone (e.g., `America/New_York`) |\n| `SF_WEB_BROWSER_PROXY` | `browserProxy` | string | \u2014 | Proxy URL (`http:`, `https:`, or `socks5:`) |\n| `SF_WEB_BROWSER_GEOIP` | `browserGeoip` | boolean | \u2014 | Enable GeoIP (requires CloakBrowser support) |\n| `SF_WEB_USERNAME` | \u2014 | string | \u2014 | Default username for `sf_web_login` |\n| `SF_WEB_PASSWORD` | \u2014 | string | \u2014 | Default password for `sf_web_login` |\n| `SF_WEB_SENSITIVE_QUERY_KEYS` | `sensitiveQueryKeys` | CSV | built-in list | Additional URL params to redact from errors |\n\n## No-Key Search Setup\n\nSearch works without API keys by default. Configure a SearXNG instance for best results:\n\n```bash\nexport SF_WEB_SEARXNG_URL=\"https://search.example.com\"\n```\n\nProvider cascade:\n\n```text\nSearXNG JSON \u2192 SearXNG HTML \u2192 DuckDuckGo HTML/Lite \u2192 Google (browser) \u2192 Bing (browser)\n```\n\nEach provider is tried in order. The first to return results wins. Google and Bing require CloakBrowser and are last-resort fallbacks.\n\n## Browser Identity\n\nBrowser mode uses CloakBrowser for fingerprint management. Named profiles get a stable derived fingerprint seed.\n\nFor first-run challenges, use headed mode once, complete the challenge manually, then reuse the profile in headless mode.\n\nBrowser hardening is config-only (not tool parameters):\n\n| Setting | Config Key | Notes |\n|---------|-----------|-------|\n| Fingerprint seed | `browserFingerprintSeed` | Positive integer; auto-derived from profile name if omitted |\n| Human preset | `browserHumanPreset` | `default` or `careful` |\n| Locale | `browserLocale` | e.g., `en-US` |\n| Timezone | `browserTimezone` | e.g., `America/New_York` |\n| Proxy | `browserProxy` | `http:`, `https:`, or `socks5:` URL |\n| GeoIP | `browserGeoip` | Requires CloakBrowser's optional GeoIP support |\n\n## Security Notes\n\n- Only `http:` and `https:` URLs are allowed.\n- Private, loopback, link-local, multicast, and reserved IP ranges are blocked by default.\n- Fast fetch re-validates redirects before reading the body.\n- Browser profiles contain cookies and session tokens. Clear them when no longer needed.\n- `sf_web_login` does not accept raw passwords. Use interactive login or environment variable names.\n\n## Browser Tests\n\nReal browser tests are skipped by default. Run them when intentionally testing CloakBrowser:\n\n```bash\nSF_WEB_RUN_BROWSER_TESTS=1 pnpm exec vitest run packages/web/tests/browserSmoke.test.ts\nSF_WEB_RUN_BROWSER_TESTS=1 pnpm exec vitest run packages/web/tests/tools.e2e.test.ts\n```\n\n## License\n\nRuntime dependencies:\n\n| Package | Purpose | License |\n|---------|---------|---------|\n| `cloakbrowser` | CloakHQ browser launcher/runtime | MIT |\n| `playwright-core` | Browser automation API | Apache-2.0 |\n| `defuddle` | Clean article extraction | MIT |\n| `@mozilla/readability` | Readability fallback extraction | Apache-2.0 |\n| `turndown` | HTML to Markdown conversion | MIT |\n| `jsdom` | Server-side DOM for extraction | MIT |\n| `@sinclair/typebox` | JSON schema type builder | MIT |\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "web",
+    "web-search",
+    "web-fetch",
+    "cloakbrowser",
+    "browser-automation"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://sfiorini.github.io/pi-stef/packages/web.html",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sfiorini/pi-stef.git",
+    "directory": "packages/web"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-11T23:37:46.971Z",
+    "modified": "2026-06-17T03:34:36.811Z",
+    "0.2.2": "2026-06-11T23:37:47.289Z",
+    "0.3.0": "2026-06-12T00:04:15.010Z",
+    "0.3.1": "2026-06-12T01:04:29.306Z",
+    "0.3.2": "2026-06-14T22:04:41.496Z",
+    "0.3.3": "2026-06-15T21:24:45.675Z",
+    "0.3.4": "2026-06-17T03:34:36.656Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 524,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 1193
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 746
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 50
+    }
+  ]
+}

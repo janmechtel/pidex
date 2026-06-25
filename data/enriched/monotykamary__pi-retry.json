@@ -1,0 +1,374 @@
+{
+  "name": "@monotykamary/pi-retry",
+  "latest_version": "0.6.2",
+  "description": "Extension suite for pi coding agent that handles 400/413 errors and connection errors with automatic retry",
+  "readme": "<div align=\"center\">\n\n# \ud83d\udd04 pi-retry\n\n**Automatic retry for every error in [pi](https://github.com/earendil-works/pi-coding-agent)**\n\n_400/413, connection errors, credit errors, stream exhaustion \u2014 retry them all._\n\n[![pi extension](https://img.shields.io/badge/pi-extension-blueviolet)](https://github.com/earendil-works/pi-coding-agent)\n[![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)\n\n</div>\n\n---\n\n---\n\n## Overview\n\nThis extension automatically detects and retries **all** errors by default, with only a tiny blacklist of known permanent failures (invalid API key, missing model, etc.).\n\n| Error Type | Retry Behavior | Use Case |\n|------------|----------------|----------|\n| **Any retryable error** (catch-all) | **Indefinite** with capped backoff | Everything else \u2014 provider hiccups, stream exhaustion, credit issues, unknown errors |\n| HTTP 400/413 | **Indefinite** with capped backoff, NO compaction | Transient context overflow that might resolve |\n| Credit / payment errors | **Indefinite** with capped backoff | \"Not Enough Credits\", insufficient balance, 402 |\n| Connection errors | **Indefinite** with capped backoff | Network hiccups, connection drops, socket errors, stream exhaustion |\n| Max tokens (`stopReason: \"length\"`) | **Auto-continue** indefinitely (invisible \u2014 no prompt pollution) | Model hits output token limit mid-generation |\n\n---\n\n## The Problem\n\nBy default, pi has built-in retry for some errors (rate limits, 5xx, overloaded), but:\n\n1. **400/413 errors** are treated as context overflow \u2192 triggers compaction but NO retry\n2. **Connection errors** sometimes get only limited retries before giving up\n3. **Credit errors** (\"Not Enough Credits\") are never retried\n4. **Stream exhaustion** (\"Max outbound streams\") and other provider-specific errors are never retried\n5. **Any unknown error** from a new provider is silently ignored\n\n## The Solution\n\nThis extension provides **automatic** infinite retry with sensible exponential backoff (2s \u2192 4s \u2192 8s \u2192 ... \u2192 60s max).\n\n**Philosophy: retry EVERYTHING by default.** The only things we skip are a tiny blacklist of known permanent failures (invalid API key, model not found, unsupported model, etc.).\n\n**Features:**\n- **Catch-all retry** \u2014 Any `stopReason: \"error\"` is retried, regardless of error message\n- Automatic detection of 400/413, connection, credit, and stream exhaustion errors\n- **Auto-continuation** when the model hits its max output tokens (`stopReason: \"length\"`) \u2014 indefinite, no cap, **invisible** to the LLM\n- **Indefinite retry** \u2014 Keeps retrying until success\n- Exponential backoff with cap: max 60s between retries\n- **ALL triggers are invisible** \u2014 custom messages with `display: false`, stripped by context handler (no TUI clutter, no conversation pollution)\n- Manual controls via unified `/retry` command\n- Non-retryable errors are explicitly logged so you know why we didn't retry\n\n---\n\n## Installation\n\n### Option 1: Install via pi package (Recommended)\n\nInstall directly from GitHub as a pi package:\n\n```bash\npi install https://github.com/monotykamary/pi-retry\n```\n\nOr add to your `settings.json`:\n\n```json\n{\n  \"packages\": [\n    \"https://github.com/monotykamary/pi-retry\"\n  ]\n}\n```\n\n### Option 2: Global Installation\n\nCopy the extension to pi's global extensions directory:\n\n```bash\ncp retry.ts ~/.pi/agent/extensions/\n```\n\n### Option 3: Project-Local Installation\n\nCopy to your project's `.pi/extensions/` directory:\n\n```bash\nmkdir -p .pi/extensions\ncp retry.ts .pi/extensions/\n```\n\n### Option 4: Quick Test\n\n```bash\npi -e ./retry.ts\n```\n\n---\n\n## Usage\n\nOnce loaded, the extension **automatically** detects and retries all errors.\n\n### Manual Controls\n\n| Command | Description |\n|---------|-------------|\n| `/retry` | Manually trigger immediate retry (auto-detects: 400/413, credit, connection, max_tokens, or any other error) |\n| `/retry status` | Show current retry diagnostics for all error types + continuation state |\n| `/retry reset` | Reset all retry counters and state |\n\n---\n\n## Configuration\n\nEdit the constants at the top of `retry.ts`:\n\n```typescript\nconst BASE_DELAY_MS = 2000;        // Start with 2 seconds\nconst MAX_DELAY_MS = 60000;        // Cap at 60 seconds\nconst BACKOFF_MULTIPLIER = 2;      // Double each time\n// Continuation is now invisible \u2014 no CONTINUATION_PROMPT needed\n```\n\n---\n\n## How It Works\n\n1. **Listen to `agent_end` event** \u2014 Fires after each agent turn completes\n2. **Check for any error** \u2014 Examine the last assistant message for `stopReason === \"error\"`\n3. **Blacklist check** \u2014 Skip known permanent failures (invalid API key, model not found, etc.)\n4. **Categorize for messaging** \u2014 Classify into 400/413, credit, connection, or other for nice UI notifications\n5. **Retry or continue (both invisible)** \u2014 Wait (exponential backoff for errors), then trigger a new turn via `pi.sendMessage()` with `customType`, `display: false`, and `triggerTurn: true`\n6. **Context cleanup** \u2014 The `context` event strips all custom-type triggers before the LLM sees them (insurance against custom `convertToLlm` overrides)\n7. **Indefinite continuation** \u2014 Max_tokens auto-continues are uncapped; each continuation produces valid output and the model naturally terminates when done\n\nThe pi's built-in `transform-messages` already strips aborted/errored assistant messages from the LLM context, so the model never sees the failed attempts.\n\n---\n\n## Detected Error Patterns\n\n### Catch-All (Any Error)\n- **Any** assistant message with `stopReason === \"error\"` is retried by default\n- Unknown provider errors, stream errors, unexpected failures \u2014 all handled automatically\n- Only skipped if it matches a known permanent failure (invalid API key, missing model, etc.)\n\n### Non-Retryable (Permanent Failures)\nThese are explicitly **not** retried:\n- Invalid API key / invalid authentication\n- API key not found / missing / revoked\n- Model not found / unknown model / no such model / model does not exist\n- Unsupported model\n\n### Max Tokens (stopReason: \"length\")\n- The model hit its `max_tokens` / output token limit\n- The model's response was truncated mid-generation\n- Auto-continuation sends an invisible custom message \u2014 no visible \"Continue\" prompt in the conversation\n\n### 400/413 Errors\n- HTTP 400 Bad Request\n- HTTP 413 Payload Too Large\n- \"bad request\" messages\n- \"payload too large\" messages\n\n### Credit / Payment Errors\n- \"Not Enough Credits\"\n- \"insufficient credits\"\n- \"insufficient balance\"\n- \"out of credits\"\n- \"Payment Required\"\n- HTTP 402 status code\n\n### Connection Errors\n- Connection / network errors\n- Fetch failures\n- Socket hang up / socket errors\n- `ECONNRESET`, `ECONNREFUSED`, `ETIMEDOUT`, `ENOTFOUND`\n- DNS lookup failures\n- \"Request ended without sending any chunks\"\n- Upstream connect errors\n- TLS handshake errors\n- Timeouts awaiting response\n- Stream exhaustion (\"Max outbound streams is 100, 100 open\")\n- Stream limit errors\n\n---\n\n## Development\n\n### Running Tests\n\n```bash\n# Run all tests\nnpm test\n\n# Run tests in watch mode\nnpm run test:watch\n\n# Run tests with coverage\nnpm run test:coverage\n\n# Type check\nnpm run typecheck\n\n# Dead code detection\nnpm run lint:dead\n```\n\n### Project Structure\n\n```\n.\n\u251c\u2500\u2500 retry.ts                   # Main unified extension\n\u251c\u2500\u2500 src/                       # Shared utilities (testable, DRY)\n\u2502   \u251c\u2500\u2500 error-patterns.ts      # Error pattern matching, custom types, hasMaxTokensStop\n\u2502   \u251c\u2500\u2500 retry-logic.ts         # Retry utilities (calculateDelay, RetryState, ContinuationState, etc.)\n\u2502   \u2514\u2500\u2500 index.ts               # Barrel exports\n\u251c\u2500\u2500 __tests__/                 # Unit tests\n\u2502   \u2514\u2500\u2500 unit/\n\u2502       \u251c\u2500\u2500 error-patterns.test.ts\n\u2502       \u2514\u2500\u2500 retry-logic.test.ts\n\u251c\u2500\u2500 vitest.config.ts           # Test configuration\n\u2514\u2500\u2500 knip.json                  # Dead code detection config\n```\n\n### Code Quality\n\n```bash\n# Run all quality checks\nnpm test              # 99 unit tests\nnpm run typecheck     # TypeScript type checking\nnpm run lint:dead     # Dead code detection with knip\n```\n\n---\n\n## Troubleshooting\n\n### Extension not working?\n\nCheck that it's loaded in the startup header:\n```\nLoaded extensions: retry.ts\n```\n\n### Retry not triggering?\n\nUse the status command to diagnose:\n```\n/retry status\n```\n\n### Want to see what's happening?\n\nThe extensions send notifications on retry attempts. Look at the footer status line for retry status updates. Non-retryable errors are logged as errors so you know why we stopped.\n\n### Too many retries?\n\nUse `/retry reset` to clear the counters, or press `Ctrl+C` to abort the session.\n\n---\n\n## Comparison with @georgebashi/pi-retry\n\nThe npm package `@georgebashi/pi-retry` handles \"aborted\" streaming errors but explicitly excludes \"connection error\" (assuming pi's built-in retry handles it). This extension:\n\n1. **Handles ALL errors** via a catch-all \u2014 no more playing whack-a-mole with new error patterns\n2. **Handles connection errors** that pi might not retry sufficiently\n3. **Handles 400/413 errors** without compaction\n4. **Handles credit errors** and stream exhaustion\n\nThey can work together for maximum coverage:\n\n```bash\npi install npm:@georgebashi/pi-retry\n# Plus install this extension\n```\n\n---\n\n## Limitations\n\n- Extensions cannot override pi's internal `isRetryableError()` check \u2014 they run *after* pi decides not to auto-retry\n- Error messages remain in the session history (but are invisible to the LLM)\n- May hit the same error repeatedly if the issue is persistent (use `Ctrl+C` to abort)\n- **Warning**: Retrying 400/413 without reducing context may fail repeatedly if the payload is genuinely too large\n- Non-retryable errors (invalid API key, missing model) are logged but not retried \u2014 you'll need to fix the underlying issue\n\n---\n\n## Related\n\n- [Pi Coding Agent Extensions Docs](https://github.com/badlogic/pi/tree/main/packages/coding-agent/docs/extensions.md)\n- [@georgebashi/pi-retry](https://github.com/georgebashi/pi-retry) \u2014 Handles \"aborted\" streaming errors\n- [Issue #252: Connection error with no retry](https://github.com/badlogic/pi-mono/issues/252)\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "retry",
+    "error-handling",
+    "http-400",
+    "http-413",
+    "connection-error",
+    "network-error",
+    "infinite-retry",
+    "cli"
+  ],
+  "author": {
+    "name": "Tom X Nguyen"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/monotykamary/pi-retry#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/monotykamary/pi-retry.git"
+  },
+  "pi": {
+    "extensions": [
+      "./retry.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-04T13:29:17.267Z",
+    "modified": "2026-06-19T15:01:50.210Z",
+    "0.2.0": "2026-06-04T13:29:17.566Z",
+    "0.3.0": "2026-06-04T15:29:36.768Z",
+    "0.3.1": "2026-06-05T06:49:08.084Z",
+    "0.3.2": "2026-06-05T09:24:56.074Z",
+    "0.3.3": "2026-06-05T23:40:53.924Z",
+    "0.3.4": "2026-06-05T23:42:42.132Z",
+    "0.3.5": "2026-06-05T23:44:22.276Z",
+    "0.3.6": "2026-06-07T15:14:26.164Z",
+    "0.3.7": "2026-06-08T01:04:14.894Z",
+    "0.3.8": "2026-06-08T09:39:20.666Z",
+    "0.3.9": "2026-06-08T10:04:49.972Z",
+    "0.3.10": "2026-06-09T01:13:14.067Z",
+    "0.3.11": "2026-06-09T01:19:24.611Z",
+    "0.3.12": "2026-06-09T02:25:03.280Z",
+    "0.4.0": "2026-06-09T15:32:08.914Z",
+    "0.5.0": "2026-06-10T03:59:04.060Z",
+    "0.5.1": "2026-06-10T04:13:35.410Z",
+    "0.6.0": "2026-06-13T03:37:35.876Z",
+    "0.6.1": "2026-06-15T19:56:46.941Z",
+    "0.6.2": "2026-06-19T15:01:50.081Z"
+  },
+  "versions_count": 20,
+  "downloads_last_week": 251,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 1430
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 834
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 264
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 27
+    }
+  ]
+}

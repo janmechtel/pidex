@@ -1,0 +1,51 @@
+{
+  "name": "pi-provider-litellm",
+  "latest_version": "1.2.8",
+  "description": "LiteLLM proxy provider extension for Pi",
+  "readme": "# pi-provider-litellm\n\nLiteLLM proxy provider extension for [Pi](https://pi.dev).\n\nDiscovers models from a self-hosted LiteLLM proxy and registers them under the `litellm` provider. Supports `/login litellm`, `/litellm-refresh`, LiteLLM MCP tools, LiteLLM Skills Gateway prompt injection, and Google ADC token auth. Tries `/model/info` first (admin endpoint with rich metadata), falls back to `/v1/models` (OpenAI-compatible) on 401/403/404, then tries `/health` plus per-endpoint `/model/info` for older LiteLLM proxies.\n\n## Install\n\n```bash\npi install npm:pi-provider-litellm\n```\n\nPi fetches the package from npm and registers it. Add `-l` to install into project settings (`.pi/settings.json`) instead of global.\n\nTo try it without installing (one-off, current run only):\n\n```bash\npi -e npm:pi-provider-litellm\n```\n\n<details>\n<summary>Alternative: install from source</summary>\n\n```bash\ngit clone https://github.com/balcsida/pi-provider-litellm.git ~/.pi/agent/extensions/pi-provider-litellm\ncd ~/.pi/agent/extensions/pi-provider-litellm\nnpm ci\nnpm run clean && npm run build\n```\n\n</details>\n\n## Configure\n\n### Option A \u2014 interactive login\n\nInside pi:\n\n```\n/login litellm\n```\n\nYou can also run `/login`, select `Use a subscription`, then select `LiteLLM`.\n\nYou'll be prompted for the base URL and API key. Credentials are persisted to `~/.pi/agent/auth.json`.\n\n#### Enterprise SSO login\n\nIf your LiteLLM proxy requires SSO/OAuth authentication (enterprise deployments), you can authenticate via a browser SSO flow and optionally pair the resulting JWT with a stable virtual key:\n\n1. Run `/login litellm` inside pi\n2. Enter the proxy URL\n3. At the login method prompt, enter `2` for SSO / Enterprise JWT\n4. Your default browser opens the LiteLLM SSO login URL (e.g. `https://litellm.your-domain.com/sso/key/generate`) automatically \u2014 the URL is also displayed in case it can't be opened. Authenticate via SSO\n5. Copy your token from the LiteLLM UI and paste it at the prompt (copying a full `Bearer ...` header value is fine \u2014 the prefix is stripped automatically)\n6. When prompted to generate a virtual key, press Enter to accept (recommended) or enter `n` to use the JWT directly\n\nWhen you generate a virtual key, the resulting `sk-...` key is stored as your credential and used for all API requests. If the proxy's key policy attaches an expiry to the generated key, Pi will prompt you to re-authenticate when it nears expiry; otherwise the key is treated as permanent until revoked in LiteLLM.\n\nWhen using a JWT directly, the extension reads its `exp` claim and Pi will prompt you to re-authenticate when the token nears expiry. Run `/login litellm` again to refresh.\n\n### Option B \u2014 environment variables\n\n```bash\nexport LITELLM_BASE_URL=\"https://litellm.your-domain.com\"\nexport LITELLM_API_KEY=\"sk-...\"\n```\n\nStored pi credentials for `litellm` take precedence over `LITELLM_API_KEY`; the environment key is used when no saved credential exists. `LITELLM_BASE_URL` is used when no saved login base URL exists.\n\n## Use\n\n```\n/model\n```\n\n## Optional environment variables\n\n| Variable | Default | Effect |\n|---|---|---|\n| `LITELLM_API_KEY_HELPER` | unset | Command that prints a fresh LiteLLM bearer token. Takes precedence over `LITELLM_API_KEY`. Registered as a `!command` provider key; Pi re-runs it on every request (the per-request auth path is uncached), so rotating/short-lived tokens stay fresh. |\n| `LITELLM_GCLOUD_TOKEN_AUTH` | unset | If set to a non-empty value other than `0`, use Google Application Default Credentials as the LiteLLM bearer token source when no stored `/login litellm` credential exists. If ADC is unavailable, the extension falls back to `LITELLM_API_KEY_HELPER` or `LITELLM_API_KEY`. |\n| `GOOGLE_APPLICATION_CREDENTIALS` | Google default ADC path | Optional path to an ADC JSON file used by `LITELLM_GCLOUD_TOKEN_AUTH`. If unset, the extension checks the default gcloud ADC locations. |\n| `LITELLM_OFFLINE` | unset | If `1`, skip discovery on this start; use cache only |\n| `LITELLM_DISCOVERY_TIMEOUT_MS` | `5000` | Discovery fetch timeout in ms; `0` to skip discovery |\n\n`LITELLM_DISCOVERY_TIMEOUT_MS=0` only disables startup and refresh model discovery. It does not replace the base URL or API key settings required to send requests when you are not using `/login litellm`.\n\n### Google ADC token auth\n\nWhen your LiteLLM proxy accepts Google OAuth access tokens, you can let the extension refresh tokens from Application Default Credentials:\n\n```bash\ngcloud auth application-default login\nexport LITELLM_BASE_URL=\"https://litellm.your-domain.com\"\nexport LITELLM_GCLOUD_TOKEN_AUTH=1\n```\n\nOnly `authorized_user` ADC files are supported. Service account JSON files are rejected with a warning. Tokens are cached in memory for 50 minutes and are keyed by the ADC identity, so switching `GOOGLE_APPLICATION_CREDENTIALS` or changing `gcloud auth application-default login` users refreshes both request auth and model discovery cache identity. When ADC is available, the registered provider key is a Pi `!command`, so request-time auth resolves a fresh token when Pi sends model requests. If ADC cannot be read, provider registration uses the same helper or environment API key that discovery used.\n\n## LiteLLM MCP tools\n\nIf your LiteLLM proxy exposes MCP REST endpoints, this extension discovers tools from:\n\n- `GET /mcp-rest/tools/list`\n- `POST /mcp-rest/tools/call`\n\nEach discovered tool is registered as a native Pi tool named `mcp_<server>_<tool>`, with simple JSON Schema parameters mapped to Pi/TypeBox parameters. Complex schemas fall back to a single `args` object. The extension accepts LiteLLM's `tools` response shape with `inputSchema` and `mcp_info`, and executes tools with LiteLLM's `server_id`, `name`, and `arguments` fields. MCP discovery runs after successful live model discovery, `/login litellm`, or `/litellm-refresh`; it does not force network or helper-token access when a fresh model cache is used.\n\n## LiteLLM Skills Gateway\n\nIf your LiteLLM proxy exposes `/v1/skills`, enabled skills are fetched before each agent turn and appended to the system prompt as a `litellm_skills` section. The extension also registers Pi tools for basic Skills Gateway management:\n\n- `litellm_skill_list`\n- `litellm_skill_create`\n- `litellm_skill_delete`\n\n## Slash commands\n\n- `/litellm-refresh` \u2014 force re-fetch the model list, ignoring cache\n\n## Cache\n\nThe model list is cached at `~/.pi/agent/litellm-models.json` with the base URL and a keyed fingerprint of the selected auth source. Changing the base URL, API key, helper command, or Google ADC identity invalidates the cache automatically.\n\nIf the cache is older than 24 hours, the extension refreshes it in the background on session start (non-blocking). Failures are silent \u2014 the cached models remain in use. Run `/litellm-refresh` to force an immediate refresh.\n\n## Troubleshooting\n\n| Symptom | Likely cause |\n|---|---|\n| \"no credentials\" warning at startup | Env vars not set and no OAuth credential \u2014 run `/login litellm` |\n| \"discovered no models\" | Proxy returned an empty list \u2014 check pi's startup log and verify `/model/info`, `/v1/models`, or `/health` responds |\n| `/model/info` returning 401/403/404 | Expected behavior with virtual keys \u2014 extension falls back to `/v1/models` |\n| Discovery times out | Increase `LITELLM_DISCOVERY_TIMEOUT_MS` or set `LITELLM_OFFLINE=1` to fall back on cached models |\n| `401 Token expired` | Set `LITELLM_API_KEY_HELPER`. |\n| No models with gcloud auth | Verify `gcloud auth application-default login` has been run or set `GOOGLE_APPLICATION_CREDENTIALS` to an `authorized_user` ADC file |\n| Enterprise SSO login shows \"virtual key generation failed\" | The LiteLLM instance may lack a database (`/key/generate` requires one), your user account may lack key-generation permission, or the request timed out; the JWT is used directly as a fallback |\n| Enterprise SSO token prompt fails with \"SSO token is required\" | The token field was left empty \u2014 paste the token copied from the LiteLLM UI |\n| MCP tools not showing | Verify the proxy exposes `/mcp-rest/tools/list` and run `/litellm-refresh` after fixing the proxy |\n| Skills not affecting prompts | Verify the proxy exposes `/v1/skills` and returns enabled skills |\n\n## License\n\nMIT \u2014 see [LICENSE](./LICENSE).\n",
+  "keywords": [
+    "pi-mono",
+    "pi-package",
+    "litellm",
+    "llm",
+    "extension",
+    "provider",
+    "proxy"
+  ],
+  "author": {
+    "name": "D\u00e1vid Balatoni",
+    "email": "balcsida@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/balcsida/pi-provider-litellm",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/balcsida/pi-provider-litellm.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "image": "https://raw.githubusercontent.com/balcsida/pi-provider-litellm/refs/heads/main/assets/pi_litellm_gallery.png"
+  },
+  "time": {
+    "created": "2026-04-28T09:09:40.429Z",
+    "modified": "2026-06-18T07:24:37.638Z",
+    "0.1.1": "2026-04-28T09:09:40.568Z",
+    "0.1.2": "2026-05-11T10:06:59.258Z",
+    "0.1.3": "2026-05-11T10:35:26.084Z",
+    "0.1.4": "2026-05-11T10:41:20.963Z",
+    "1.2.0": "2026-05-11T15:31:35.928Z",
+    "1.2.1": "2026-05-13T12:05:36.392Z",
+    "1.2.2": "2026-05-19T15:15:46.522Z",
+    "1.2.3": "2026-05-26T22:05:47.868Z",
+    "1.2.4": "2026-06-07T18:01:21.511Z",
+    "1.2.5": "2026-06-09T15:42:24.980Z",
+    "1.2.6": "2026-06-10T08:48:56.512Z",
+    "1.2.7": "2026-06-10T23:04:17.975Z",
+    "1.2.8": "2026-06-18T07:24:37.393Z"
+  },
+  "versions_count": 13,
+  "downloads_last_week": null,
+  "download_trend": []
+}

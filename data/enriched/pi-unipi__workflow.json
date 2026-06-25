@@ -1,0 +1,65 @@
+{
+  "name": "@pi-unipi/workflow",
+  "latest_version": "2.0.13",
+  "description": "Structured development workflow commands for Pi coding agent",
+  "readme": "# @pi-unipi/workflow\n\n20 slash commands that take work from idea to shipped code. Each command loads a skill file that tells the agent exactly what to do \u2014 brainstorm, plan, execute, review, or fix.\n\nThe core loop: brainstorm an idea, plan the implementation, execute in a worktree, review the result, consolidate what you learned. Everything else supports this cycle.\n\n## Commands\n\n| Command | Description | Format |\n|---------|-------------|--------|\n| `/unipi:brainstorm` | Collaborative discovery, write design spec | `<string>` |\n| `/unipi:plan` | Create implementation plan from specs | `specs:<path> <string>` |\n| `/unipi:work` | Execute plan in worktree | `worktree:<branch> specs:<path> <string>` |\n| `/unipi:review-work` | Review work, run checks, mark remarks | `plan:<path> <string>` |\n| `/unipi:consolidate` | Save learnings, craft skills | `<string>` |\n| `/unipi:worktree-create` | Create git worktree | `<string>` |\n| `/unipi:worktree-list` | List all unipi worktrees | \u2014 |\n| `/unipi:worktree-merge` | Merge worktrees to main | `<branch> <string>` |\n| `/unipi:consultant` | Expert advisory | `<string>` |\n| `/unipi:quick-work` | Fast single-task execution | `<string>` |\n| `/unipi:gather-context` | Research codebase, prepare for brainstorm | `<string>` |\n| `/unipi:document` | Generate documentation | `<string>` |\n| `/unipi:scan-issues` | Find bugs, anti-patterns, security issues (passive scan) | `<string>` |\n| `/unipi:debug` | Active bug investigation, root-cause analysis | `<string>` |\n| `/unipi:fix` | Fix bugs using debug reports | `debug:<path> <string>` |\n| `/unipi:quick-fix` | Fast bug fix without debug report | `<string>` |\n| `/unipi:research` | Read-only research with bash access | `<string>` |\n| `/unipi:chore-create` | Create reusable chore definition | `<string>` |\n| `/unipi:chore-execute` | Execute a saved chore | `chore:<path> <string>` |\n\n## Typical Flow\n\n```\nbrainstorm \u2192 plan \u2192 work \u2192 review-work \u2192 consolidate\n    \u2191                                        \u2502\n    \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\n```bash\n# 1. Brainstorm an idea\n/unipi:brainstorm redesign auth system\n\n# 2. Create implementation plan\n/unipi:plan specs:2026-04-26-auth-redesign-design\n\n# 3. Execute plan in worktree\n/unipi:work worktree:feat/auth specs:2026-04-26-auth-redesign-plan\n\n# 4. Review what was built\n/unipi:review-work plan:2026-04-26-auth-redesign-plan\n\n# 5. Consolidate learnings\n/unipi:consolidate\n```\n\n### Quick Tasks\n\nFor small tasks that skip the full flow:\n\n```bash\n/unipi:quick-work fix typo in README\n```\n\n### Research and Advisory\n\n```bash\n/unipi:gather-context how we handle errors\n/unipi:consultant should we use GraphQL or REST?\n/unipi:document the auth module\n/unipi:research TypeScript 5.0 migration path\n/unipi:scan-issues focus on security\n```\n\n### Bug Fixing\n\n```bash\n# Full debug flow\n/unipi:debug TypeError in auth middleware\n/unipi:fix debug:2026-04-28-auth-typeerror-debug\n\n# Quick fix for simple bugs\n/unipi:quick-fix fix null check in user validation\n```\n\n### Chores\n\n```bash\n/unipi:chore-create push to github main\n/unipi:chore-execute chore:push-github-main\n```\n\n### Worktree Management\n\n```bash\n/unipi:worktree-create feat/new-feature\n/unipi:worktree-list\n/unipi:worktree-merge feat/new-feature\n```\n\nWorktree command arguments autocomplete from `.unipi/worktrees`. Suggestions are cached after the first scan in a Pi session so large worktree directories do not slow down repeated `/unipi:worktree-merge` completions.\n\n## Special Triggers\n\nWorkflow skills detect installed packages and enhance their behavior automatically. This is the coexists system \u2014 each package adds capabilities without requiring configuration.\n\n| Package Present | Skills Affected | What Changes |\n|-----------------|-----------------|--------------|\n| `@pi-unipi/ask-user` | All skills | Structured user input for decisions |\n| `@pi-unipi/subagents` | brainstorm, document, gather-context, review-work, scan-issues, work | Parallel execution with file locking |\n| `@pi-unipi/mcp` | All skills | MCP server tools available |\n| `@pi-unipi/web-api` | research, gather-context, consultant | Web search and page reading |\n| `@pi-unipi/compactor` | All skills (main agent) | Context tools available |\n| `@pi-unipi/ralph` | work, review-work | Ralph loop for 3+ tasks |\n\nWhen `@pi-unipi/ask-user` is installed, skills use `ask_user` for decision gates \u2014 presenting options instead of guessing. When `@pi-unipi/subagents` is installed, investigation skills spawn parallel agents to explore code faster.\n\nThe footer package subscribes to workflow events (`WORKFLOW_START`, `WORKFLOW_END`) to show current command and duration. Info-screen displays workflow state in its dashboard.\n\n## How Skills Work\n\nEach command maps to a skill file in `packages/workflow/skills/{name}/SKILL.md`. When you run `/unipi:brainstorm`, Pi loads the brainstorm skill and follows its instructions.\n\nSkills define:\n- What the agent should do step by step\n- What tools to use (subagents, web search, ask-user)\n- What output to produce (specs, plans, reviews)\n- Where to save results (`.unipi/docs/`)\n\nThe agent reads the skill, executes the steps, and produces artifacts in the `.unipi/` directory.\n\n## Directory Structure\n\n```\n.unipi/\n\u251c\u2500\u2500 docs/\n\u2502   \u251c\u2500\u2500 specs/          \u2190 brainstorm output (design specs)\n\u2502   \u251c\u2500\u2500 plans/          \u2190 plan output (implementation plans)\n\u2502   \u251c\u2500\u2500 generated/      \u2190 document output (docs, guides)\n\u2502   \u251c\u2500\u2500 reviews/        \u2190 review remarks (in plan docs)\n\u2502   \u251c\u2500\u2500 debug/          \u2190 debug reports\n\u2502   \u251c\u2500\u2500 fix/            \u2190 fix reports\n\u2502   \u251c\u2500\u2500 quick-work/     \u2190 quick-work summaries\n\u2502   \u2514\u2500\u2500 chore/          \u2190 reusable chore definitions\n\u251c\u2500\u2500 memory/             \u2190 consolidate memory\n\u251c\u2500\u2500 ralph/              \u2190 ralph loop state\n\u2514\u2500\u2500 worktrees/          \u2190 git worktrees\n    \u251c\u2500\u2500 feat/auth/\n    \u2514\u2500\u2500 fix/login-bug/\n```\n\n## Configuration\n\nWorkflow has no configuration. Skills are static files \u2014 the agent follows them as-is. Behavior changes come from which packages are installed (see Special Triggers above).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "unipi",
+    "workflow"
+  ],
+  "author": {
+    "name": "Neuron Mr White"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Neuron-Mr-White/unipi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Neuron-Mr-White/unipi.git",
+    "directory": "packages/workflow"
+  },
+  "pi": {
+    "extensions": [],
+    "skills": [],
+    "prompts": [],
+    "themes": []
+  },
+  "time": {
+    "created": "2026-04-26T07:45:43.995Z",
+    "modified": "2026-06-01T04:32:44.134Z",
+    "0.1.0": "2026-04-26T07:45:44.309Z",
+    "0.1.1": "2026-04-26T07:50:04.719Z",
+    "0.1.2": "2026-04-26T13:47:44.054Z",
+    "0.1.3": "2026-04-26T15:03:50.574Z",
+    "0.1.4": "2026-04-26T17:09:06.933Z",
+    "0.1.5": "2026-04-26T17:14:45.931Z",
+    "0.1.6": "2026-04-26T17:17:21.895Z",
+    "0.1.7": "2026-04-26T17:21:58.822Z",
+    "0.1.8": "2026-04-27T10:30:36.748Z",
+    "0.1.9": "2026-04-27T20:12:50.650Z",
+    "0.1.11": "2026-04-28T10:48:46.459Z",
+    "0.1.12": "2026-04-28T12:56:52.328Z",
+    "0.1.13": "2026-04-28T17:58:59.562Z",
+    "0.1.14": "2026-04-29T17:52:23.129Z",
+    "0.1.15": "2026-04-30T19:18:47.543Z",
+    "0.1.16": "2026-05-01T09:52:35.193Z",
+    "0.1.17": "2026-05-01T19:48:17.299Z",
+    "2.0.0": "2026-05-06T07:29:59.274Z",
+    "2.0.1": "2026-05-15T07:07:03.423Z",
+    "2.0.2": "2026-05-16T06:44:24.150Z",
+    "2.0.3": "2026-05-16T15:20:51.514Z",
+    "2.0.4": "2026-05-18T03:31:58.442Z",
+    "2.0.5": "2026-05-19T07:02:31.855Z",
+    "2.0.7": "2026-05-24T07:59:56.370Z",
+    "2.0.8": "2026-05-25T08:25:39.214Z",
+    "2.0.9": "2026-05-28T08:21:14.915Z",
+    "2.0.10": "2026-06-01T03:39:19.938Z",
+    "2.0.11": "2026-06-01T04:02:05.637Z",
+    "2.0.12": "2026-06-01T04:23:31.488Z",
+    "2.0.13": "2026-06-01T04:32:43.994Z"
+  },
+  "versions_count": 30,
+  "downloads_last_week": 102,
+  "download_trend": []
+}

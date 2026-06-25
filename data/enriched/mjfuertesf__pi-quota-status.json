@@ -1,0 +1,46 @@
+{
+  "name": "@mjfuertesf/pi-quota-status",
+  "latest_version": "0.1.8",
+  "description": "Pi extension that shows quota usage in the footer for supported providers.",
+  "readme": "# pi-quota-status\n\nPi extension that shows quota usage for the active provider in the footer and exposes a command-first JSON interface for scripts.\n\n![Footer showing quota status](./assets/screenshots/quota-status-footer.png)\n\n## What is shipped to npm\n\nThe npm package is intentionally small. It ships only what Pi needs to load the extension:\n\n- `src/` production TypeScript files\n- `README.md`\n- `package.json`\n- `assets/screenshots/` for README/gallery images\n\nIt does **not** ship repository-only artifacts, local menu-bar helper scripts/icons, or tests. Those live in the repo for development/manual install, but they are not part of the npm runtime package.\n\n## Install\n\n```bash\npi install npm:@mjfuertesf/pi-quota-status\n```\n\nFrom git or a local checkout:\n\n```bash\npi install git:gitlab.com/mjfuertesf/pi-quota-status\npi install ./relative/path/to/pi-quota-status\n```\n\nPi loads the extension from the explicit package manifest entry:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./src/extension.ts\"]\n  }\n}\n```\n\nNo root `index.ts` shim or build step is required.\n\n## Supported providers\n\n| Runtime provider | Footer label | Source |\n|---|---|---|\n| `openai-codex` | `5h(XX%, Yh) Wk(ZZ%, Wd)` | ChatGPT backend quota API |\n| `opencode-go` | `5h(XX%, Yh) Wk(ZZ%, Wd)` | opencode.ai dashboard scrape |\n| `claude-bridge` | `5h(XX%, Yh) Wk(ZZ%, Wd)` | Claude web usage API via the Anthropic quota adapter path |\n| `anthropic` | `5h(XX%, Yh) Wk(ZZ%, Wd)` | Claude web usage API via the Anthropic quota adapter path |\n\n`claude-bridge` deliberately uses the same Anthropic quota adapter and `quota-status.anthropic-subscription` auth entry as `anthropic`.\n\nUnsupported provider or no active session renders `n/a`. Supported provider with unresolved quota data renders `unknown`.\n\n## Commands\n\n### Usage\n\n```txt\n/quota-status-usage\n```\n\nPrints the display string, for example:\n\n```txt\n5h(82%, 1h30m) Wk(91%, 3.00d)\n```\n\nFor structured output:\n\n```txt\n/quota-status-usage --json\n```\n\nManual smoke test:\n\n```bash\npi --print --no-session --no-context-files --model anthropic/claude-haiku-4-5 \"/quota-status-usage --json\"\n```\n\n`--model <provider>/<model>` determines the active runtime provider seen by the command.\n\nStable result states:\n\n- `ok`: provider is supported and both quota windows were resolved\n- `partial`: provider is supported and at least one quota window was resolved\n- `unknown`: provider is supported, but config/auth/network/API data was unusable\n- `unsupported`: active provider is not handled by this extension\n\nJSON results include the same display format plus normalized quota fields.\n\n### HAR extraction\n\n```txt\n/quota-status-extract <har_filepath>\n```\n\nFlags:\n\n- `--write`: save extracted secrets to `~/.pi/agent/auth.json`\n- `--no-verify`: skip live credential verification\n- `--provider <anthropic-subscription|opencode-go>`: force provider when a HAR is ambiguous\n\nExamples:\n\n```txt\n/quota-status-extract @~/Downloads/claude-usage.har\n/quota-status-extract --write ~/Downloads/opencode-session.har\n/quota-status-extract --write --no-verify @~/Downloads/claude-usage.har\n/quota-status-extract --provider opencode-go /path/to/mixed-capture.har\n```\n\nPath handling supports `@/path`, `~/path`, and paths with spaces.\n\n## Auth storage\n\nSaved secrets live in `~/.pi/agent/auth.json`.\n\nClaude / Anthropic quota:\n\n```json\n{\n  \"quota-status\": {\n    \"anthropic-subscription\": {\n      \"organizationUuid\": \"...\",\n      \"authCookie\": \"...\",\n      \"headers\": {\n        \"anthropic-device-id\": \"...\",\n        \"user-agent\": \"...\"\n      }\n    }\n  }\n}\n```\n\nOpenAI Codex quota:\n\n```json\n{\n  \"openai-codex\": {\n    \"access\": \"<bearer-token>\",\n    \"accountId\": \"<account-id>\"\n  }\n}\n```\n\nopencode-go quota:\n\n```json\n{\n  \"quota-status\": {\n    \"opencode-go\": {\n      \"workspaceId\": \"...\",\n      \"authCookie\": \"...\"\n    }\n  }\n}\n```\n\nHAR files and extracted auth entries contain active session secrets. Treat them like credentials and never commit or share them.\n\n## Development\n\n```bash\nnpm test\n```\n\nThe recursive test suite covers command parsing/execution, provider adapters, provider registry, footer refresh behavior, HAR extraction, and script smoke tests.\n\n## Credits\n\n- [BlockLune/pi-chatgpt-usage-status](https://github.com/BlockLune/pi-chatgpt-usage-status) \u2014 original compact format and extension skeleton\n- [mattleong/pi-better-openai](https://github.com/mattleong/pi-better-openai) \u2014 `wham/usage` endpoint discovery and header shape for OpenAI Codex quota reads\n- [donrami/pi-go-bars](https://github.com/donrami/pi-go-bars) \u2014 opencode-go adapter inspiration\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "footer",
+    "quota",
+    "openai",
+    "codex",
+    "claude",
+    "claude-bridge",
+    "anthropic",
+    "opencode"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://gitlab.com/mjfuertesf/pi-quota-status#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitlab.com/mjfuertesf/pi-quota-status.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/extension.ts"
+    ],
+    "image": "https://gitlab.com/mjfuertesf/pi-quota-status/-/raw/main/assets/screenshots/quota-status-footer.png"
+  },
+  "time": {
+    "created": "2026-05-27T20:59:45.057Z",
+    "modified": "2026-06-20T15:59:10.570Z",
+    "0.1.1": "2026-05-27T20:59:45.454Z",
+    "0.1.2": "2026-05-28T07:18:04.866Z",
+    "0.1.3": "2026-05-31T20:16:24.804Z",
+    "0.1.4": "2026-06-10T18:00:30.378Z",
+    "0.1.5": "2026-06-10T18:03:04.379Z",
+    "0.1.6": "2026-06-14T21:49:27.979Z",
+    "0.1.7": "2026-06-15T16:54:03.709Z",
+    "0.1.8": "2026-06-20T15:59:10.453Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 278,
+  "download_trend": []
+}

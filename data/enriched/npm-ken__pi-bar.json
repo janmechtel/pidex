@@ -1,0 +1,65 @@
+{
+  "name": "@npm-ken/pi-bar",
+  "latest_version": "1.3.2",
+  "description": "Configurable status bar extension for the pi coding agent.",
+  "readme": "# pi-bar\n\nConfigurable [pi](https://pi.dev) status bar extension.\n\n![pi-bar screenshot](./screenshot.png)\n\n## Install\n\n```sh\npi install npm:@npm-ken/pi-bar\n```\n\npi-bar works immediately after install using the bundled default config.\n\n## Customize\n\nCreate this file and edit it:\n\n```text\n~/.pi/pi-bar/config.toml\n```\n\nTo start from the default config, copy `config.toml` from this repository or from the installed npm package and paste it to ~/.pi/pi-bar/config.toml\n\n## Common edits\n\n### Colors\n\n```toml\n[colors]\ntext_fg = \"#cdd6f4\"\nmodel_bg = \"#005b95\"\nthinking_bg = \"#005b95\"\nactivity_bg = \"#313244\"\nactivity_fg = \"#2dd4bf\"\nok = \"#006b1d\"\nwarn = \"#a17a00\"\nalert = \"#972e2d\"\n```\n\nUse `#rrggbb` hex colors. Segments use these names with `fg` and `bg`.\n\n### Separators\n\nPowerline/Nerd Font separators:\n\n```toml\n[statusbar.separators]\nleading = \"\\uE0BA\"\ntrailing = \"\\uE0BC\"\n```\n\nPlain separators:\n\n```toml\n[statusbar.separators]\nleading = \"\"\ntrailing = \"\"\n```\n\n### Segments\n\nSegments are listed as `[[statusbar.segments]]`. Reorder, remove, or add them in\nthat file.\n\n```toml\n[[statusbar.segments]]\ntype = \"value\"\ntemplate = \"{model}\"\nempty_text = \"no model\"\nfg = \"text_fg\"\nbg = \"model_bg\"\n```\n\nSegment types:\n\n- `value` \u2014 text from `template`\n- `meter` \u2014 numeric value with threshold colors\n- `dir` \u2014 current working directory\n- `status` \u2014 pi extension status, like MCP or LSP\n- `activity` \u2014 tool activity / working spinner\n\n`template` replaces `{tokens}` with values for that segment type. Tokens are scoped per type, so `{value}` in a `meter` segment is not the same as `{value}` in an `activity` segment.\n\nTemplate tokens:\n\n- `value`: `{value}` / `{model}` = full model id or `empty_text`, `{short_model}` = model id after the final `/`, `{thinking}` = current thinking level.\n- `dir`: `{value}` / `{dir}` = current directory name, `{path}` = full current working directory.\n- `git`: `{remote_icon}` = remote service icon, `{branch_icon}` = branch icon, `{branch}` = current branch, `{staged}` / `{unstaged}` = dirty booleans, `{ahead}` / `{behind}` = upstream counts, `{service}` = remote service, `{service_icon}` = default remote service icon, `{remote}` = origin URL, `{staged_count}` / `{modified_count}` / `{untracked_count}` / `{conflict_count}` = per-type file counts, `{counts}` = zero-suppressed summary of those counts (notation set via `count_style = \"symbol\"` (default) or `\"letter\"`, with optional `count_labels = { staged = \"...\", ... }` and `count_separator`). Set `icons = { remote = \"...\", branch = \"...\" }` on a git segment to override icons. Git `states` support `id = \"unstaged\"`, `id = \"staged\"`, `id = \"ahead\"`, and `id = \"behind\"` with `fg`/`bg` colors. The segment `bg` is used when no state matches.\n- `meter`: `{value}` = raw numeric meter value, `{percent}` = rounded value, `{context_window}` = human-readable model context window.\n- `status`: `{value}` / `{text}` = normalized status text, `{key}` = status key, plus numeric tokens parsed from status text such as `{errors}` or `{warnings}`. MCP statuses also expose `{servers}` for the `connected/total` count.\n- `activity`: `{source}` = `tools` or `streaming`, `{spinner}` = current spinner frame, `{tools}` = comma-separated tool names, `{streaming}` = streaming state, `{value}` = source display value.\n\n`eval`, `collapsed_eval`, and state-level `eval` still work for backwards compatibility. Prefer `template` and `collapsed_template` for new configs.\n\nStatus segments can set `ignore = [\"regex\"]` to skip matching status text. This is useful on `key = \"*\"` catch-all segments when a known status should not be rendered.\n\n### Adaptive / Responsive Collapsing\n\npi-bar supports optional configuration attributes to gracefully scale down the status bar on constrained terminal widths instead of truncating abruptly:\n\n- A segment is eligible for collapse when it sets `collapse_order`, `collapsed_template`, or `collapsed_eval`.\n- `collapse_order`: integer group number for responsive collapse order. `1` is the first group collapsed; higher groups are kept longer.\n- `collapsed_template`: alternative template rendered when the segment is collapsed. When `collapsed_template` is set without `collapse_order`, the segment collapses with order `1`.\n- If `collapse_order` is set without `collapsed_template` or `collapsed_eval`, the segment is hidden when its collapse order comes up.\n\n#### Example Config\n\n```toml\n# A later-collapsing context utilization meter that collapses to a shorter format\n[[statusbar.segments]]\ntype = \"meter\"\nvalue_eval = \"ctx.getContextUsage()?.percent ?? 0\"\ntemplate = \"{percent}% of {context_window}\"\nfg = \"text_fg\"\ncollapse_order = 4\ncollapsed_template = \"{percent}%\"\n\n# An early-collapsing thinking indicator that hides entirely when space is limited\n[[statusbar.segments]]\ntype = \"value\"\ntemplate = \"{thinking}\"\nshow_if = \"model?.reasoning\"\nfg = \"text_fg\"\nbg = \"thinking_bg\"\ncollapse_order = 2\n\n# A first-collapsing status segment can omit collapse_order when collapsed_eval is present\n[[statusbar.segments]]\ntype = \"status\"\nkey = \"whatsapp\"\ntemplate = \" \uf232 \"\nfg = \"text_fg\"\ncollapsed_template = \" WA \"\n\n# A last-collapsing active tool spinner that collapses to just the spinner glyph\n[[statusbar.segments]]\ntype = \"activity\"\nfg = \"activity_fg\"\nbg = \"activity_bg\"\nmin_width = 11\ntemplate = \"{spinner} {value}\"\ncollapsed_template = \"{spinner}\"\ncollapse_order = 5\n```\n\n\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "coding-agent",
+    "extension",
+    "pi",
+    "pi-bar",
+    "statusbar",
+    "status-bar",
+    "statusline",
+    "footer",
+    "footer-bar",
+    "model",
+    "context-window"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/kenbanks-peng/pi-bar#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kenbanks-peng/pi-bar.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/kenbanks-peng/pi-bar/main/screenshot.png"
+  },
+  "time": {
+    "created": "2026-05-19T15:39:57.102Z",
+    "modified": "2026-06-20T23:52:44.762Z",
+    "0.1.0": "2026-05-19T15:39:57.345Z",
+    "0.1.1": "2026-05-19T16:05:05.926Z",
+    "0.1.2": "2026-05-19T16:12:19.009Z",
+    "0.1.3": "2026-05-19T16:21:49.235Z",
+    "0.1.4": "2026-05-19T16:29:06.675Z",
+    "0.1.5": "2026-05-19T16:34:53.762Z",
+    "0.1.6": "2026-05-19T16:41:33.115Z",
+    "0.1.7": "2026-05-19T17:22:29.158Z",
+    "0.1.8": "2026-05-19T17:36:57.836Z",
+    "0.1.9": "2026-05-19T17:42:39.713Z",
+    "0.1.10": "2026-05-21T00:15:38.231Z",
+    "0.1.11-dev.0": "2026-05-22T13:53:31.319Z",
+    "0.1.11-dev-2": "2026-05-22T14:30:57.807Z",
+    "0.1.11-dev.3": "2026-05-22T15:11:29.171Z",
+    "0.1.12": "2026-05-22T15:16:19.178Z",
+    "0.1.13": "2026-05-22T19:29:47.773Z",
+    "1.0.0": "2026-05-23T18:57:36.685Z",
+    "1.1.0": "2026-05-24T00:08:49.069Z",
+    "1.2.0": "2026-05-24T01:34:11.688Z",
+    "1.2.1": "2026-05-24T01:52:41.664Z",
+    "1.3.0": "2026-06-17T22:29:11.176Z",
+    "1.3.1": "2026-06-18T20:50:43.155Z",
+    "1.3.2": "2026-06-20T23:52:44.651Z"
+  },
+  "versions_count": 23,
+  "downloads_last_week": 514,
+  "download_trend": []
+}

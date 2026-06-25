@@ -1,0 +1,364 @@
+{
+  "name": "@javargasm/pi-kiro",
+  "latest_version": "0.4.12",
+  "description": "Kiro provider for the pi coding agent: AWS Builder ID / IAM Identity Center login and the CodeWhisperer streaming API, exposing the Kiro Claude model family.",
+  "readme": "# pi-kiro\n\n[Kiro](https://kiro.dev) provider for [pi](https://github.com/earendil-works/pi).\n\nAdds the Kiro model family (AWS Builder ID login, CodeWhisperer streaming API)\nto pi's coding agent.\n\n## Install\n\n```bash\npi install npm:@javargasm/pi-kiro\n```\n\n## Login\n\n```bash\npi /login kiro\n```\n\nTwo methods are supported:\n\n- **AWS Builder ID** \u2014 leave the prompt blank. Opens the standard Builder ID\n  device-authorization page.\n- **IAM Identity Center (IdC / SSO)** \u2014 paste your company start URL\n  (e.g. `https://mycompany.awsapps.com/start`). You can supply a specific\n  AWS region or leave it blank to auto-detect.\n\nTokens are stored in `~/.pi/agent/auth.json`.\n\n## Supported models\n\nAll Claude models available through the Kiro service, including:\n\n- `claude-fable-5`\n- `claude-opus-4-8`\n- `claude-opus-4-7`\n- `claude-sonnet-4-6`\n- `claude-sonnet-4-5`\n\nRun `pi --list-models` for the full list once the extension is loaded.\n\n## Region support\n\nRegion is inferred from your Builder ID profile. Kiro API regions currently\navailable: `us-east-1`, `eu-central-1`, and others. See `src/models.ts` for\nthe authoritative region-to-model map.\n\n## Development\n\n```bash\nbun install\nbun run typecheck\nbun run test\n```\n\n## Using outside pi (standalone)\n\nThe provider logic (OAuth + streaming) is also exposed at\n`@javargasm/pi-kiro/core` so you can embed it into your own UI \u2014 e.g. an\n[opentui](https://github.com/sst/opentui) frontend, a backend service, or a\ncustom CLI \u2014 without pulling `pi-coding-agent`.\n\n```ts\nimport {\n  loginKiro,\n  refreshKiroToken,\n  streamKiro,\n  kiroModels,\n  type KiroCredentials,\n} from \"@javargasm/pi-kiro/core\";\n\n// 1. Login. Your app implements pi-ai's OAuthLoginCallbacks (onPrompt,\n//    onAuth, onProgress, signal) however it wants \u2014 a TUI dialog, a web\n//    modal, stdin, etc.\nconst creds: KiroCredentials = await loginKiro({\n  onPrompt: async ({ message }) => await myUi.ask(message),\n  onAuth: ({ url, instructions }) => myUi.showDeviceCode(url, instructions),\n  onProgress: (msg) => myUi.setStatus(msg),\n  signal: abortController.signal,\n});\n\n// 2. Persist `creds` in secure storage. `creds.clientSecret` and\n//    `creds.refresh` are sensitive \u2014 treat them like passwords. Call\n//    refreshKiroToken(creds) when `Date.now() > creds.expires`.\n\n// 3. Stream a turn. streamKiro(model, context, options?) returns an\n//    AssistantMessageEventStream that's both async-iterable for events\n//    and awaitable via .result() for the final AssistantMessage.\nconst model = kiroModels[0];\nconst stream = streamKiro(\n  model,\n  {\n    messages: [\n      { role: \"user\", content: \"hello\", timestamp: Date.now() },\n    ],\n  },\n  { apiKey: creds.access },\n);\n\nfor await (const event of stream) {\n  // event.type: \"start\" | \"text_delta\" | \"toolcall_start\" | ... | \"done\" | \"error\"\n  if (event.type === \"text_delta\") process.stdout.write(event.delta);\n}\n\nconst finalMessage = await stream.result();\n```\n\nOnly `@earendil-works/pi-ai` is required at runtime for this path.\n\n### Requirements\n\n- **Published `dist/`** is plain ESM JavaScript with `.d.ts` files. Any\n  Node >= 20 or bundler (Vite, webpack, esbuild) that supports ESM works.\n- **From source** (e.g. if you're importing `./src/core` from a monorepo\n  sibling) you need Bun, or Node with a TS loader (tsx, ts-node), or a\n  bundler \u2014 the source is TypeScript with no file extensions on relative\n  imports.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "provider",
+    "kiro",
+    "aws",
+    "codewhisperer",
+    "amazon-q",
+    "claude"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/javargasm/pi-kiro#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/javargasm/pi-kiro.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/extension.js"
+    ]
+  },
+  "time": {
+    "created": "2026-06-09T15:55:07.931Z",
+    "modified": "2026-06-24T11:52:25.811Z",
+    "0.2.0": "2026-06-09T15:55:08.295Z",
+    "0.2.1": "2026-06-09T17:05:07.016Z",
+    "0.3.0": "2026-06-09T18:27:47.918Z",
+    "0.4.2": "2026-06-16T23:28:00.913Z",
+    "0.4.3": "2026-06-16T23:55:29.412Z",
+    "0.4.4": "2026-06-17T02:33:30.515Z",
+    "0.4.5": "2026-06-17T04:20:09.234Z",
+    "0.4.6": "2026-06-17T04:37:46.627Z",
+    "0.4.7": "2026-06-17T23:56:45.724Z",
+    "0.4.8": "2026-06-18T01:11:34.810Z",
+    "0.4.9": "2026-06-18T04:18:31.660Z",
+    "0.4.10": "2026-06-19T18:33:33.910Z",
+    "0.4.11": "2026-06-21T19:17:47.306Z",
+    "0.4.12": "2026-06-24T11:52:25.438Z"
+  },
+  "versions_count": 14,
+  "downloads_last_week": 859,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 446
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 257
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 1279
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 158
+    }
+  ]
+}

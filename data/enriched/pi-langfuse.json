@@ -1,0 +1,55 @@
+{
+  "name": "pi-langfuse",
+  "latest_version": "1.5.4",
+  "description": "Langfuse extension for Pi coding agent",
+  "readme": "# pi-langfuse\n\n[![npm version](https://img.shields.io/npm/v/pi-langfuse)](https://www.npmjs.com/package/pi-langfuse)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)\n\n[**English**](./README.md) | [**\u7b80\u4f53\u4e2d\u6587**](./README_CN.md)\n\nLangfuse observability extension for [Pi Coding Agent](https://github.com/earendil-works/pi-coding-agent). It sends complete Pi runs to [Langfuse](https://langfuse.com) so the prompt, agent workflow, LLM generations, tool calls, final response, usage, cost, and health scores appear in one trace.\n\n## What This Adds to Pi\n\n- One Langfuse trace per user prompt, grouped by Pi session.\n- Root `agent`, per-request `generation`, and per-tool `tool` observations.\n- Final assistant output capture, tool error visibility, and trace-level scores.\n- Privacy controls for inputs, outputs, tool I/O, system prompt, and cwd.\n- Secret redaction and local path hashing before upload.\n- REST fallback for self-hosted Langfuse setups where OTel spans arrive but traces do not materialize.\n\n## Prerequisites\n\n- **Node.js** >= 22\n- **Pi Coding Agent** installed and configured\n- A **Langfuse** account ([cloud](https://cloud.langfuse.com) or self-hosted)\n\n## Quick Start\n\n1. Install the extension:\n\n   ```bash\n   pi install npm:pi-langfuse\n   ```\n\n2. Run Pi once. If no credentials are configured yet, Pi prompts for:\n   - Langfuse public key, starting with `pk-lf-...`\n   - Langfuse secret key, starting with `sk-lf-...`\n   - Langfuse host, defaulting to `https://cloud.langfuse.com`\n\n3. Run Pi normally:\n\n   ```bash\n   pi \"Explain the architecture of Redis\"\n   ```\n\n4. Open Langfuse and inspect the new trace.\n\n## Configuration\n\nLangfuse API keys are available in **Langfuse Cloud** -> **Settings** -> **API Keys**.\n\n### Method 1: Interactive setup\n\nRun any `pi` command with the extension loaded. On first run without configuration, Pi prompts in the CLI or TUI and saves the result to `~/.pi/agent/pi-langfuse/config.json`.\n\nTo run setup again:\n\n```text\n/langfuse-setup\n```\n\n### Method 2: Environment variables\n\nSet these before starting Pi:\n\n```bash\nexport LANGFUSE_PUBLIC_KEY=\"pk-lf-xxxx\"\nexport LANGFUSE_SECRET_KEY=\"sk-lf-xxxx\"\nexport LANGFUSE_BASE_URL=\"https://cloud.langfuse.com\"  # optional; LANGFUSE_HOST is also supported\n```\n\nSaved config takes precedence. Environment variables are only used when `~/.pi/agent/pi-langfuse/config.json` is missing or incomplete.\n\nPrivacy controls can also be set through environment variables:\n\n```bash\nexport LANGFUSE_PRIVACY_PRESET=\"full-debug\"\n```\n\nAvailable presets:\n\n| Preset | Captures |\n|--------|----------|\n| `metadata-only` | Metadata only; omits inputs, outputs, tool I/O, system prompt, and cwd |\n| `prompts-only` | Prompt/provider inputs plus metadata |\n| `conversations` | Inputs and assistant outputs, but omits tool I/O, system prompt, and cwd |\n| `full-debug` | Full trace detail; this is the default |\n\nFine-grained flags override presets:\n\n```bash\nexport LANGFUSE_CAPTURE_INPUTS=true\nexport LANGFUSE_CAPTURE_OUTPUTS=true\nexport LANGFUSE_CAPTURE_TOOL_IO=false\nexport LANGFUSE_CAPTURE_SYSTEM_PROMPT=false\nexport LANGFUSE_CAPTURE_CWD=false\n```\n\nAll captured payloads are redacted before upload. The extension masks common API keys, bearer tokens, passwords, cookies, private keys, Langfuse keys, GitHub/npm/AWS-style tokens, and local absolute paths.\n\n### Method 3: Persistent `config.json`\n\nCreate or update `~/.pi/agent/pi-langfuse/config.json`:\n\n```json\n{\n  \"publicKey\": \"pk-lf-xxxx\",\n  \"secretKey\": \"sk-lf-xxxx\",\n  \"host\": \"https://cloud.langfuse.com\",\n  \"privacyPreset\": \"conversations\"\n}\n```\n\nFine-grained capture flags can also be persisted:\n\n```json\n{\n  \"publicKey\": \"pk-lf-xxxx\",\n  \"secretKey\": \"sk-lf-xxxx\",\n  \"host\": \"https://cloud.langfuse.com\",\n  \"capture\": {\n    \"LANGFUSE_PRIVACY_PRESET\": \"metadata-only\",\n    \"LANGFUSE_CAPTURE_INPUTS\": \"true\"\n  }\n}\n```\n\n> **Security**: Keep `~/.pi/agent/pi-langfuse/config.json` private. Never commit API keys to version control.\n\n## Verify the Extension\n\nCheck that Pi has loaded the package:\n\n```bash\npi list\n```\n\n`pi-langfuse` should appear in the installed package list.\n\n## What Appears in Langfuse\n\n- Each Pi session gets its own Langfuse session ID.\n- Each user prompt within that session becomes a separate trace.\n- The trace contains the final assistant output shown in Pi.\n- Tool runs appear as tool observations with arguments, results, and error state.\n- LLM requests appear as generation observations, including usage and cost when the provider exposes them.\n- Trace-level scores include tool counts, tool success rate, and whether the run had errors.\n\nThe package also includes a Langfuse CLI skill, so Langfuse data can be queried directly from Pi:\n\n```text\n/pi-langfuse-langfuse <your-query>\n```\n\n## Source Metadata\n\nLocal prototype note: source metadata support in this installed package is a local prototype patch. A durable solution should be shipped through an upstream PR, a fork, or a maintained package version so reinstalling the extension does not lose the behavior.\n\nFor Git-backed runs, the extension attaches safe source metadata to traces:\n\n```json\n{\n  \"source_type\": \"git-repo\",\n  \"repo_identity\": \"owner/repo\",\n  \"repo_owner\": \"owner\",\n  \"repo_name\": \"repo\",\n  \"repo_root_name\": \"repo\",\n  \"git_branch\": \"main\",\n  \"git_commit\": \"abc123\",\n  \"git_remote_host\": \"github.com\",\n  \"git_remote_path\": \"owner/repo\",\n  \"metadata_source\": \"git-detection\"\n}\n```\n\n`repo_identity` is `owner/repo`. `repo_name` is the repo name only and must not contain a slash.\n\nA Git repo may optionally provide `.pi-langfuse.metadata.json`. Overrides are whitelist-only; unknown keys are ignored. Allowed keys are:\n\n```text\nrepo_identity\nrepo_owner\nrepo_name\nsource_type\nservice_name\nproject_slug\nenvironment\nobservability_owner\n```\n\nRepo-local overrides are used only after the working directory is confirmed to be inside a usable Git repo. If Git detection fails for any reason, including a missing Git command, corrupted repo, or non-Git folder, the extension ignores repo-local identity files and emits only:\n\n```json\n{\n  \"source_type\": \"non-git\",\n  \"metadata_source\": \"non-git\"\n}\n```\n\nThe extension must not upload raw absolute local paths, credentialed remotes, tokens, unknown override keys, or folder names for non-Git folders.\n\n## Troubleshooting\n\n### No traces appearing?\n\n- Verify the API keys and run `/langfuse-setup` again if needed.\n- Confirm the Langfuse project is active and accepts writes.\n- Confirm the keys have write permission.\n- Look for `\ud83d\udcca Langfuse:` log messages in Pi output.\n\n### Extension not loading?\n\n```bash\npi list\npi install npm:pi-langfuse\n```\n\n### \"Missing config\" on startup?\n\n- Run `/langfuse-setup`.\n- Or set `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` before starting Pi.\n\n### Model or cost not showing?\n\n- Some providers do not expose cost information.\n- Inspect the raw observation data in Langfuse traces.\n- The `model` field can come from provider events, finalized assistant messages, `model_select`, or `ctx.model`.\n\n### API key errors?\n\n- Public keys start with `pk-lf-`.\n- Secret keys start with `sk-lf-`.\n- For self-hosted deployments, verify the host URL.\n\n## Development Docs\n\nDevelopment setup, source installation, runtime architecture, trace model, tracked fields, and validation steps are documented in [DEVELOPMENT.md](./DEVELOPMENT.md) and [DEVELOPMENT_CN.md](./DEVELOPMENT_CN.md).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "langfuse",
+    "observability",
+    "tracing",
+    "monitoring",
+    "pi-coding-agent",
+    "extension"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/gooyoung/pi-langfuse#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gooyoung/pi-langfuse.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://github.com/gooyoung/pi-langfuse/blob/main/image.png?raw=true"
+  },
+  "time": {
+    "created": "2026-05-13T03:40:52.872Z",
+    "modified": "2026-06-21T03:58:36.415Z",
+    "1.0.0": "2026-05-13T03:40:53.163Z",
+    "1.1.0": "2026-05-19T08:56:27.505Z",
+    "1.2.0": "2026-05-19T10:25:52.562Z",
+    "1.3.0": "2026-05-20T01:14:43.615Z",
+    "1.3.1": "2026-05-20T01:15:26.611Z",
+    "1.3.2": "2026-05-20T10:39:13.404Z",
+    "1.3.3": "2026-05-21T02:20:46.597Z",
+    "1.4.0": "2026-05-21T02:50:54.593Z",
+    "1.4.1": "2026-05-29T08:10:53.972Z",
+    "1.4.2": "2026-05-29T09:20:33.897Z",
+    "1.4.3": "2026-05-29T10:05:48.536Z",
+    "1.4.4": "2026-06-04T06:12:09.161Z",
+    "1.4.5": "2026-06-08T01:24:31.512Z",
+    "1.4.7": "2026-06-08T02:23:48.228Z",
+    "1.4.8": "2026-06-08T02:35:35.243Z",
+    "1.5.0": "2026-06-08T02:52:11.788Z",
+    "1.5.1": "2026-06-08T03:03:26.825Z",
+    "1.5.2": "2026-06-17T02:31:51.494Z",
+    "1.5.3": "2026-06-18T06:30:26.432Z",
+    "1.5.4": "2026-06-21T03:58:36.171Z"
+  },
+  "versions_count": 20,
+  "downloads_last_week": 616,
+  "download_trend": []
+}

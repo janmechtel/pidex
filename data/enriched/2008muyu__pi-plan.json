@@ -1,0 +1,49 @@
+{
+  "name": "@2008muyu/pi-plan",
+  "latest_version": "1.4.2",
+  "description": "Configurable two-phase planning workflow for pi \u2014 plan with a strong model, execute with a light model",
+  "readme": "# @2008muyu/pi-plan\n\n> Configurable two-phase planning workflow for [pi coding agent](https://github.com/earendil-works/pi-coding-agent).\n> Plan with a **strong model**, execute with a **light model** \u2014 all models fully configurable.\n\n[\u4e2d\u6587\u7248](#\u4e2d\u6587\u8bf4\u660e)\n\n## Why?\n\nExisting plan-mode extensions hardcode model settings. `@2008muyu/pi-plan` lets you choose:\n\n- **Planning model** \u2014 strong reasoning (e.g. `claude-opus-4-6`, `gemini-3-pro`, `deepseek-r1`)\n- **Execution model** \u2014 lightweight for saving tokens (e.g. `gpt-5.5`, `claude-sonnet-4`)\n\nConfigure once via `/plan-settings`, then just `/plan` and go.\n\n## Install\n\n```bash\npi install npm:@2008muyu/pi-plan\n```\n\nOr from GitHub:\n```bash\npi install git:github.com/2008muyu/pi-plan\n```\n\nRestart pi (or run `:reload`).\n\n## Usage\n\n### `/plan` \u2014 Enter plan mode\n\n```bash\n/plan add authentication middleware with JWT support\n```\n\nPi switches to your configured **plan model**, restricts tools to read-only (read/grep/find/ls), and the agent analyzes the codebase. Once ready, it calls `submit_plan` to create `.plans/<name>/PLAN.md`.\n\nWhen the plan is done, you get a menu:\n- **Execute the plan** \u2014 switches to the **execution model**, restores full tools\n- **Stay in plan mode** \u2014 keep refining\n- **Refine the plan** \u2014 edit the plan interactively\n\n### `/plan resume` \u2014 Resume a saved plan\n\n```bash\n/plan resume\n```\n\nLists all in-progress plans from disk. Pick one to continue execution or re-enter planning.\n\n### `/plan list` \u2014 Show all plans\n\n```bash\n/plan list   # or /plan ls\n```\n\nShows all saved plans with status and progress. Select one to resume, abandon, switch to, or delete.\n\n### `/plan clean` \u2014 Delete completed plans\n\n```bash\n/plan clean\n```\n\nLists all done / superseded / abandoned plans for deletion. Select which to remove.\n\n### `/plan abandon` \u2014 Abandon current plan\n\n```bash\n/plan abandon\n```\n\nMarks the current plan as abandoned (without deleting its files).\n\n### `/plan-settings` \u2014 Unified settings\n\nOpens an interactive menu for:\n- Plan model provider + ID + thinking level\n- Exec model provider + ID + thinking level\n- Bash safety mode (blacklist / allowlist)\n- Plan blocked tools (project-level, saved to `.pi/pi-plan.json`)\n\n### `/todos` \u2014 View progress\n\nShows all tasks with status icons.\n\n| Icon | Status |\n|------|--------|\n| \u25cb | Pending |\n| \u2713 | Done |\n| \u2298 | Skipped |\n| \u2717 | Blocked |\n| \u23f8 | Deferred (discovered) |\n\n### Shortcuts\n\n| Shortcut | Action |\n|----------|--------|\n| `Ctrl+Alt+P` | Toggle plan mode |\n\n## Configuration\n\nConfig stored in `~/.pi/agent/pi-plan.json`. Also supports environment variables:\n\n| Env variable | Default | Description |\n|-------------|---------|-------------|\n| `PI_PLAN_PROVIDER` | `anthropic` | Planning model provider |\n| `PI_PLAN_MODEL` | `claude-opus-4-6` | Planning model ID |\n| `PI_PLAN_THINKING` | `medium` | Planning thinking level |\n| `PI_EXEC_PROVIDER` | `openai` | Execution model provider |\n| `PI_EXEC_MODEL` | `gpt-5.5` | Execution model ID |\n| `PI_EXEC_THINKING` | `low` | Execution thinking level |\n\n## Tools\n\n| Tool | Phase | Purpose |\n|------|-------|---------|\n| `submit_plan` | Plan | Submit finalized plan with tasks |\n| `revise_plan` | Plan | Revise an existing plan |\n| `update_task` | Exec | Mark task done/skipped/blocked |\n| `update_tasks` | Exec | Batch task update |\n| `add_task` | Exec | Capture discovered follow-up |\n| `plan_status` | Any | Read-only snapshot |\n| `reconcile_plans` | Any | Repair task/registry drift |\n\n## Plan Lifecycle\n\nPlans have a lifecycle with automatic state transitions:\n\n| State | Trigger |\n|-------|---------|\n| `in-progress` | Plan submitted via `submit_plan` |\n| `done` | All tasks completed (auto-detected) |\n| `superseded` | New plan started while another was in-progress (auto-detected) |\n| `abandoned` | User marks via `/plan abandon`, or prompted on exit if plan was never executed |\n\nTracked in `.plans/plans.jsonl`. Use `/plan list` to view, `/plan clean` to remove completed ones.\n\n## Project-Level Tool Blocking\n\nIn addition to the default blocked tools (edit/write, exec-only), you can block project-specific tools in plan mode:\n\n```json\n// .pi/pi-plan.json\n{ \"planBlockedTools\": [\"godot_create_node\", \"godot_set_cell\"] }\n```\n\nConfigured via `/plan-settings` \u2192 option 6, or edit the file manually. This is project-scoped \u2014 different projects can have different blocked tools.\n\n## Blocked Task Handling\n\nWhen a task is blocked during execution, a menu appears:\n1. **Skip** \u2014 skip and continue\n2. **Provide instructions** \u2014 give guidance, retry\n3. **Re-plan** \u2014 go back to plan mode\n4. **Abort** \u2014 exit plan mode\n\n## How it works\n\n```\n/plan \u2192 enterPlanMode()\n  \u2192 save current model\n  \u2192 switch to plan model\n  \u2192 restrict to read-only tools\n  \u2192 inject plan prompt\n\nAgent analyzes \u2192 submit_plan\n  \u2192 .plans/<name>/ files created\n\nExecute \u2192 startExecution()\n  \u2192 switch to exec model\n  \u2192 restore full tools\n  \u2192 inject execution prompt\n\nAgent completes tasks \u2192 update_task\n  \u2192 blocked? \u2192 menu \u2192 skip/instruct/re-plan/abort\n  \u2192 done? \u2192 exit or stay\n```\n\n---\n\n# \u4e2d\u6587\u8bf4\u660e\n\n## \u7b80\u4ecb\n\n**@2008muyu/pi-plan** \u662f\u4e00\u4e2a\u53ef\u914d\u7f6e\u7684\u53cc\u9636\u6bb5\u89c4\u5212\u6269\u5c55\u3002\u89c4\u5212\u7528\u5f3a\u6a21\u578b\uff08\u601d\u8003\u6df1\u5165\uff09\uff0c\u6267\u884c\u7528\u8f7b\u6a21\u578b\uff08\u7701 token\uff09\uff0c\u6240\u6709\u6a21\u578b\u5747\u53ef\u901a\u8fc7 `/plan-settings` \u7edf\u4e00\u8bbe\u7f6e\u3002\n\n## \u5b89\u88c5\n\n```bash\npi install npm:@2008muyu/pi-plan\n```\n\n\u6216\u4ece GitHub \u5b89\u88c5\uff1a\n```bash\npi install git:github.com/2008muyu/pi-plan\n```\n\n\u91cd\u542f pi\uff08\u6216\u8fd0\u884c `:reload`\uff09\u3002\n\n## \u4f7f\u7528\u65b9\u6cd5\n\n### `/plan` \u2014 \u8fdb\u5165\u89c4\u5212\u6a21\u5f0f\n\n```bash\n/plan \u6dfb\u52a0 JWT \u8ba4\u8bc1\u4e2d\u95f4\u4ef6\n```\n\npi \u81ea\u52a8\u5207\u6362\u5230\u914d\u7f6e\u7684**\u89c4\u5212\u6a21\u578b**\uff0c\u5de5\u5177\u9650\u5236\u4e3a\u53ea\u8bfb\u6a21\u5f0f\u3002Agent \u5206\u6790\u4ee3\u7801\u540e\u8c03\u7528 `submit_plan` \u63d0\u4ea4\u65b9\u6848\u3002\u786e\u8ba4\u540e\u53ef\u9009\u62e9\u6267\u884c\u3001\u7ee7\u7eed\u89c4\u5212\u6216\u4fee\u6539\u65b9\u6848\u3002\n\n### `/plan resume` \u2014 \u6062\u590d\u5df2\u4fdd\u5b58\u7684\u65b9\u6848\n\n\u663e\u793a\u78c1\u76d8\u4e0a\u6240\u6709\u8fdb\u884c\u4e2d\u7684\u65b9\u6848\uff0c\u9009\u62e9\u7ee7\u7eed\u6267\u884c\u6216\u91cd\u65b0\u89c4\u5212\u3002\n\n### `/plan-settings` \u2014 \u7edf\u4e00\u8bbe\u7f6e\n\n\u4ea4\u4e92\u83dc\u5355\u7edf\u4e00\u914d\u7f6e\u89c4\u5212/\u6267\u884c\u6a21\u578b\u7684 provider\u3001ID\u3001\u601d\u8003\u5f3a\u5ea6\uff0c\u4ee5\u53ca bash \u5b89\u5168\u6a21\u5f0f\u3002\n\n### `/todos` \u2014 \u67e5\u770b\u8fdb\u5ea6\n\n\u663e\u793a\u6240\u6709\u4efb\u52a1\u53ca\u5176\u72b6\u6001\u3002\n\n### Blocked \u4efb\u52a1\u5904\u7406\n\n\u6267\u884c\u9636\u6bb5\u5982\u679c\u4efb\u52a1\u88ab\u963b\u585e\uff0c\u5f39\u83dc\u5355\uff1a\u8df3\u8fc7\u3001\u63d0\u4f9b\u8bf4\u660e\u91cd\u8bd5\u3001\u91cd\u65b0\u89c4\u5212\u3001\u7ec8\u6b62\u6267\u884c\u3002\n\n## \u914d\u7f6e\n\n\u914d\u7f6e\u6587\u4ef6 `~/.pi/agent/pi-plan.json`\uff0c\u4e5f\u652f\u6301\u73af\u5883\u53d8\u91cf\uff08\u89c1\u4e0a\u65b9\u82f1\u6587\u8868\u683c\uff09\u3002\n\n## \u8bb8\u53ef\u8bc1\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "plan-mode",
+    "planning"
+  ],
+  "author": {
+    "name": "2008muyu"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/2008muyu/pi-plan#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/2008muyu/pi-plan.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/pi-plan.ts"
+    ],
+    "image": "https://github.com/2008muyu/pi-plan/raw/main/docs/screenshot.png"
+  },
+  "time": {
+    "created": "2026-06-04T12:37:33.065Z",
+    "modified": "2026-06-08T05:36:26.782Z",
+    "1.1.0": "2026-06-04T12:37:33.339Z",
+    "1.1.2": "2026-06-04T13:18:38.668Z",
+    "1.1.3": "2026-06-04T13:52:28.065Z",
+    "1.1.4": "2026-06-05T02:45:34.357Z",
+    "1.1.5": "2026-06-05T02:59:48.002Z",
+    "1.1.6": "2026-06-05T03:09:29.363Z",
+    "1.1.7": "2026-06-05T05:20:54.874Z",
+    "1.1.8": "2026-06-07T14:23:16.425Z",
+    "1.2.0": "2026-06-07T14:28:26.184Z",
+    "1.3.0": "2026-06-07T15:26:55.195Z",
+    "1.3.1": "2026-06-07T16:57:16.314Z",
+    "1.3.2": "2026-06-07T17:01:13.204Z",
+    "1.4.0": "2026-06-07T17:33:36.051Z",
+    "1.4.1": "2026-06-08T03:54:30.387Z",
+    "1.4.2": "2026-06-08T05:36:26.654Z"
+  },
+  "versions_count": 15,
+  "downloads_last_week": null,
+  "download_trend": []
+}

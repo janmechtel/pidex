@@ -1,0 +1,47 @@
+{
+  "name": "pi-c2c",
+  "latest_version": "0.4.8",
+  "description": "Native c2c for Pi \u2014 anywhere-to-anywhere messaging between AI coding agents. Adds c2c send/list/rooms tools, slash commands, and background auto-delivery of inbound messages straight into pi's transcript.",
+  "readme": "# pi-c2c\n\nNative [c2c](https://github.com/clankercode/c2c) integration for\n[pi](https://pi.dev).\n\npi-c2c makes a pi session a c2c peer:\n\n- registers a c2c alias on session start;\n- exposes c2c send, list, inbox, and room tools to the model;\n- exposes `/c2c-*` slash commands for the human;\n- polls for inbound c2c messages and injects them into the pi transcript.\n\n## pi-subagents\n\nWhen `pi-c2c` is loaded in a parent pi session that also uses\n`pi-subagents`, every non-isolated subagent becomes its own c2c peer. The\nchild registers an independent c2c session id derived from the child pi\nsession, so parent and child inboxes stay separate.\n\nChild aliases are parent-scoped:\n\n```text\n<parentAlias>-a<hash6>\n```\n\nThe hash is derived from the subagent id when `pi-subagents` provides one,\notherwise from the child pi session id. Subagents do not reuse the parent\n`C2C_MCP_SESSION_ID`, and they do not claim the raw `C2C_PI_ALIAS`; that value\nis treated only as a parent-alias hint when no live parent alias is available.\n\nThe child system prompt includes its own c2c alias, the parent alias, and the\nexact `c2c_pi_send(target=\"<parent>\", body=\"<message>\")` pattern for reporting\nback. The parent transcript also receives a quiet local notice when a child\nregisters, for example:\n\n```text\nSubagent Plan#abc123 registered as `pi-abcd-a012345`.\n```\n\nThat notice is process-local UI context, not a real c2c direct message.\n\n## Requirements\n\n- pi `0.79` or newer\n- Node.js and pnpm for local development\n\npi-c2c depends on the `@clanker-code/c2c` npm package and will use its\nplatform binary by default. If you maintain a local/source c2c build, or if the\nnpm binary is not compatible with your Linux distribution, launch pi with\n`C2C_BIN=/path/to/c2c` to override the bundled binary.\n\n## Install\n\nInstall from npm:\n\n```bash\npi install npm:pi-c2c\n```\n\nFor local development:\n\n```bash\npi install /path/to/pi-c2c\n```\n\n## Configuration\n\nCommon environment variables:\n\n- `C2C_BIN`: c2c binary path, defaults to `c2c`\n- `C2C_PI_ALIAS`: preferred alias for this pi session\n- `C2C_PI_POLL_INTERVAL_MS`: inbox polling interval, defaults to `5000`\n\n## Footer support\n\npi-c2c publishes a `c2c` status (a colored `\u25cf` + your alias) via\n`ctx.ui.setStatus`. It renders correctly across pi's footers:\n\n- **Default pi footer** \u2014 preserves ANSI; the colored dot shows as-is.\n- **pi-bar / tm-bar** \u2014 these strip ANSI from extension statuses and prepend a\n  `c2c:` key. pi-c2c installs a runtime `Theme.prototype.fg` patch on\n  `session_start` that re-colorizes the indicator (green = registered,\n  yellow = not). No configuration needed.\n- **pi-powerline-footer** \u2014 does *not* strip embedded ANSI, so the `c2c`\n  status already shows with color + glyph in powerline's aggregate\n  `extension_statuses` segment with no configuration.\n\n### Promoting `c2c` to a dedicated powerline segment (optional)\n\nTo give c2c its own powerline segment (instead of the aggregate\n`extension_statuses` group), add a `powerline.customItems` entry to\n`~/.pi/agent/settings.json` (or project-local `.pi/settings.json`) and run\n`/reload`:\n\n```json\n{\n  \"powerline\": {\n    \"customItems\": [\n      { \"id\": \"c2c\", \"statusKey\": \"c2c\", \"position\": \"right\", \"prefix\": \"c2c\" }\n    ]\n  }\n}\n```\n\nNote: pi-c2c's `c2c` status already carries its own ANSI color (the\ngreen/yellow dot), so the dot stays correctly colored in a dedicated segment.\nAdding a `color` to the custom item is **not** recommended \u2014 powerline applies\nthat color over the whole value, but the embedded color codes win per-run, so\nit would not recolor the alias and only risks leaving a dangling color. Omit\n`color` to keep pi-c2c's built-in green/yellow coloring. The aggregate\n`extension_statuses` segment shows the same coloring with no config at all.\n\n## Development\n\n```bash\npnpm install\npnpm check\npnpm test\n```\n\nThe test suite fixtures the c2c CLI boundary for unit coverage and includes\nisolated integration tests for real c2c binaries.\n\nSee [RELEASE.md](RELEASE.md) for the current manual release flow.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "c2c",
+    "messaging",
+    "agents",
+    "swarm"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/clankercode/pi-c2c",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/clankercode/pi-c2c.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-18T13:35:53.324Z",
+    "modified": "2026-06-22T08:32:16.183Z",
+    "0.1.0": "2026-06-18T13:35:53.646Z",
+    "0.3.0": "2026-06-20T03:39:44.998Z",
+    "0.3.1": "2026-06-20T06:27:47.462Z",
+    "0.3.2": "2026-06-20T07:30:39.771Z",
+    "0.4.0": "2026-06-21T06:32:42.130Z",
+    "0.4.1": "2026-06-22T06:40:25.451Z",
+    "0.4.2": "2026-06-22T06:47:04.752Z",
+    "0.4.3": "2026-06-22T06:58:23.862Z",
+    "0.4.4": "2026-06-22T07:11:35.181Z",
+    "0.4.5": "2026-06-22T07:18:53.666Z",
+    "0.4.6": "2026-06-22T07:39:12.201Z",
+    "0.4.7": "2026-06-22T07:52:01.565Z",
+    "0.4.8": "2026-06-22T08:32:15.751Z"
+  },
+  "versions_count": 13,
+  "downloads_last_week": 1910,
+  "download_trend": []
+}

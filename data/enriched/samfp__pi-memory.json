@@ -1,0 +1,53 @@
+{
+  "name": "@samfp/pi-memory",
+  "latest_version": "1.5.0",
+  "description": "Persistent memory for pi \u2014 learns corrections, preferences, and patterns from sessions and injects them into future conversations.",
+  "readme": "# pi-memory\n\nPersistent memory for [pi](https://github.com/badlogic/pi-mono). Learns corrections, preferences, and project patterns from sessions and injects them into future conversations.\n\n## Features\n\n- **Automatic learning** \u2014 Extracts preferences, project patterns, and corrections from conversations at session end via LLM consolidation\n- **Context injection** \u2014 Automatically adds relevant memory into every new session's system prompt\n- **Corrections stick** \u2014 Mistakes you correct once become permanent lessons (e.g. \"use sed for daily notes, not echo >>\")\n- **Complements session-search** \u2014 session-search finds *what you did*, pi-memory remembers *what you learned*\n\n## Install\n\n**Recommended:** Install [pi-total-recall](https://github.com/samfoy/pi-total-recall) to get the complete context stack \u2014 persistent memory, session history search, and local knowledge search in one package:\n\n```bash\npi install pi-total-recall\n```\n\nOr install pi-memory standalone:\n\n```bash\npi install npm:@samfp/pi-memory\n```\n\nOr add to `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\"npm:@samfp/pi-memory\"]\n}\n```\n\n> **Note:** Make sure you use the `@samfp/` scope. There is an unrelated `pi-memory` package on npm that will install instead if you omit the scope.\n\n## Memory Types\n\n| Type | Key prefix | Example |\n|------|-----------|---------|\n| Preferences | `pref.*` | `pref.commit_style` \u2192 \"conventional commits\" |\n| Project patterns | `project.*` | `project.rosie.di` \u2192 \"Dagger dependency injection\" |\n| Tool preferences | `tool.*` | `tool.sed` \u2192 \"use for daily note insertion\" |\n| User identity | `user.*` | `user.timezone` \u2192 \"US/Pacific\" |\n| Lessons | *(table)* | \"DON'T: use echo >> for vault notes, use sed\" |\n\n## Tools\n\n| Tool | Description |\n|------|-------------|\n| `memory_search` | Search semantic memory by keyword |\n| `memory_remember` | Manually store a fact or lesson |\n| `memory_forget` | Delete a fact or lesson |\n| `memory_lessons` | List learned corrections |\n| `memory_stats` | Show memory statistics |\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/memory-consolidate` | Manually trigger memory extraction from current session |\n\n## How It Works\n\n1. **`session_start`** \u2014 Opens the SQLite store, shows memory stats briefly in the status bar, and injects a `<memory>` context block as a hidden custom message (customType `pi-memory-context`, `display: false`) **before** any user message. One-shot per session.\n2. **`agent_end`** \u2014 Collects conversation messages for later consolidation\n3. **`session_shutdown`** \u2014 Runs LLM consolidation (via `pi -p --print`) to extract structured knowledge, then closes the store\n\n### Consolidation\n\nAt session end, if there were \u22653 user messages, the extension sends the conversation to an LLM and asks it to extract:\n\n- **Preferences** \u2014 coding style, workflow habits, tool choices\n- **Project patterns** \u2014 languages, frameworks, architecture decisions\n- **Corrections** \u2014 things you corrected, mistakes to avoid\n\nOnly facts with confidence \u2265 0.8 are stored. Lessons are deduplicated using exact match and Jaccard similarity (\u2265 0.7 threshold).\n\n### Injection\n\nAt session start, stored memory is organized into sections (preferences, project context scoped to cwd, tool preferences, lessons, user identity) and injected **once** as a hidden `<memory>` custom message that sits before the first user message in history. The block is capped at 8KB.\n\nThe injection happens at `session_start` via `pi.sendMessage`, not per-turn. This is deliberate:\n\n- **Correctness.** A per-turn injection via `before_agent_start` places the memory block *after* the user's question in the message list, so the model ends up responding to the memory block instead of the user. One-shot at the top of history avoids that ordering trap.\n- **Cache stability.** Mutating the system prompt per turn (as earlier versions did) invalidates the provider's prefix cache after the system block (Bedrock / Anthropic `cache_control`), forcing the conversation suffix to be re-written at `cacheWrite` rates on every turn boundary.\n- **Simplicity.** One block, one time, cached for the whole session.\n\nTradeoff: per-user-message selective injection is off by default \u2014 the fallback dump covers preferences, project context for the cwd, tool preferences, lessons, and user identity, which is enough for typical workflows given the 8KB cap. Users with large memory stores who want per-query relevance can opt in (see \"Per-turn injection\" below).\n\n### Per-turn injection (opt-in)\n\nSet `perTurnInjection: true` to restore v1.0.x per-turn behavior:\n\n```json\n{\n  \"memory\": {\n    \"perTurnInjection\": true\n  }\n}\n```\n\nWhen enabled:\n\n- The session_start fallback dump is skipped.\n- Each user turn runs a semantic search against the current prompt, and the result is appended to the system prompt (not sent as a custom message \u2014 that would place it after the user's question in history).\n- Pro: facts outside the 8KB fallback dump reach the model when they match the current prompt.\n- Con: the system prompt mutates per turn, invalidating the provider's prefix cache after the system block (Bedrock / Anthropic `cache_control`). The conversation suffix gets re-cached at `cacheWrite` rates on every user-turn boundary (~12.5x `cacheRead` on Claude).\n\nCorrectness is preserved either way: `systemPrompt` is a separate field from the messages list, so the user's question remains the last user-role message.\n\n**Lesson filtering in per-turn mode** \u2014 When `perTurnInjection: true`, the `lessonInjection` config takes effect:\n\n```json\n{\n  \"memory\": {\n    \"perTurnInjection\": true,\n    \"lessonInjection\": \"selective\"\n  }\n}\n```\n\nIn `selective` lesson mode, lessons are filtered by:\n\n1. **Prompt relevance** \u2014 FTS search against the user's first message\n2. **Project context** \u2014 lessons matching the current working directory's project\n3. **Category inference** \u2014 keywords in the prompt trigger relevant categories (e.g. \"pentest\" pulls in `bug-bounty` lessons, \"blog post\" pulls in `writing` lessons)\n4. **General lessons** \u2014 always included regardless of prompt\n\nThe result is capped at 15 most relevant lessons instead of all of them.\n\n| `lessonInjection` | Behavior (only when `perTurnInjection: true`) |\n|------|----------|\n| `\"all\"` (default) | All lessons injected every turn |\n| `\"selective\"` | Only relevant lessons based on prompt, project, and category |\n\n**Consolidation model** \u2014 At session end, pi-memory spawns a lightweight `pi -p --print` process to extract facts and lessons from the conversation. By default it uses `claude-sonnet-4-20250514`, which is a no-op for users on non-Anthropic providers. Override it with any model string your `pi` binary accepts:\n\n```json\n{\n  \"memory\": {\n    \"lessonInjection\": \"selective\",\n    \"consolidationModel\": \"openai/gpt-4.1-mini\"\n  }\n}\n```\n\nSet this in `~/.pi/agent/settings.json` for a user-wide default, or in `{project}/.pi/settings.json` (either under `memory` or `pi-memory`) to override per project. Examples: `openai/gpt-4.1-mini`, `ollama/qwen3:8b`, `anthropic/claude-haiku-4-5-20251001`. If the model string is invalid the consolidation sub-process fails silently and the session's memory is simply not consolidated \u2014 no data is lost from previous sessions.\n\n## Storage\n\nSQLite database at `~/.pi/memory/memory.db` (WAL mode). Three tables:\n\n- `semantic` \u2014 key-value facts with confidence scores\n- `lessons` \u2014 learned corrections with dedup\n- `events` \u2014 audit log of all memory operations\n\n### Project-local storage\n\nTo keep a project's memory isolated from your user-global memory, add one of the following to `{project}/.pi/settings.json`:\n\n```jsonc\n{\n  // Package-specific \u2014 wins over the cascade below.\n  \"pi-memory\": {\n    \"localPath\": \".pi/memory\"   // resolves to {project}/.pi/memory/memory.db\n  }\n}\n```\n\nOr, if installed via [`pi-total-recall`](https://github.com/samfoy/pi-total-recall), a single cascade key covers all three bundled packages:\n\n```jsonc\n{\n  \"pi-total-recall\": {\n    \"localPath\": \".pi/total-recall\"\n    // pi-memory             \u2192 {project}/.pi/total-recall/memory/memory.db\n    // pi-session-search     \u2192 {project}/.pi/total-recall/session-search/\n    // pi-knowledge-search   \u2192 {project}/.pi/total-recall/knowledge-search/\n  }\n}\n```\n\n**Resolution order (highest priority first):**\n\n1. `pi-memory.localPath` in `{cwd}/.pi/settings.json`\n2. `pi-total-recall.localPath` cascade \u2192 `{localPath}/memory/memory.db`\n3. Global default: `~/.pi/memory/memory.db`\n\nExisting global installs are unaffected \u2014 this is strictly additive.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "extension",
+    "memory",
+    "learning",
+    "preferences"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/samfoy/pi-memory#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/samfoy/pi-memory.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-03-19T21:53:20.886Z",
+    "modified": "2026-06-16T19:42:04.772Z",
+    "0.1.0": "2026-03-19T21:53:21.160Z",
+    "0.1.1": "2026-03-19T22:18:20.210Z",
+    "0.2.0": "2026-03-31T20:06:25.205Z",
+    "0.3.0": "2026-04-17T22:28:29.747Z",
+    "0.3.2": "2026-04-19T09:12:08.402Z",
+    "0.4.0": "2026-04-21T13:58:59.046Z",
+    "1.0.0": "2026-04-21T20:03:44.814Z",
+    "1.0.1": "2026-04-24T13:38:12.912Z",
+    "1.0.2": "2026-04-24T13:41:37.491Z",
+    "1.0.3": "2026-05-03T17:07:15.477Z",
+    "1.0.4": "2026-05-05T21:14:28.069Z",
+    "1.0.5": "2026-05-11T22:29:51.524Z",
+    "1.1.0": "2026-05-11T22:37:38.597Z",
+    "1.1.1": "2026-05-11T23:13:18.070Z",
+    "1.2.0": "2026-05-12T14:16:41.304Z",
+    "1.3.0": "2026-05-12T14:31:25.542Z",
+    "1.3.1": "2026-05-12T16:07:30.760Z",
+    "1.3.2": "2026-05-12T18:34:26.344Z",
+    "1.3.4": "2026-06-02T18:39:19.980Z",
+    "1.3.5": "2026-06-10T18:28:13.814Z",
+    "1.5.0": "2026-06-16T19:42:04.646Z"
+  },
+  "versions_count": 21,
+  "downloads_last_week": 708,
+  "download_trend": []
+}

@@ -1,0 +1,40 @@
+{
+  "name": "pi-nvim",
+  "latest_version": "0.2.4",
+  "description": "Bridge between pi coding agent and Neovim",
+  "readme": "# pi-nvim\n\nBridge between [pi](https://github.com/badlogic/pi) coding agent and Neovim. Run pi in one terminal pane and Neovim in another \u2014 send files, selections, and prompts from Neovim directly into your running pi session.\n\n![demo](./demo/demo.gif)\n\n## How it works\n\nThe repo contains two components:\n\n1. **Pi extension** (`extension.ts`) \u2014 opens a unix socket when pi starts. External tools can send JSON messages to inject prompts into the active pi session.\n2. **Neovim plugin** (`lua/pi-nvim/`) \u2014 connects to that socket via libuv. Sends context from your editor to pi.\n\nDiscovery is automatic: the extension writes socket info to `/tmp/pi-nvim-sockets/`, and the Neovim plugin scans that directory, preferring sessions matching your cwd.\n\n## Install\n\n### Pi side\n\n```bash\npi install npm:pi-nvim\n```\n\nOr add to `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\"https://github.com/carderne/pi-nvim\"]\n}\n```\n\nThen `/reload` in pi.\n\n### Neovim side\n\nWith [lazy.nvim](https://github.com/folke/lazy.nvim):\n\n```lua\n{ \"carderne/pi-nvim\" }\n```\n\nThen in your config:\n\n```lua\nrequire(\"pi-nvim\").setup()\n```\n\nOptions (defaults):\n\n```lua\nrequire(\"pi-nvim\").setup({\n  socket_path = nil, -- auto-discover\n  set_default_keymaps = true,\n})\n```\n\n## Usage\n\nStart pi in one terminal. Start Neovim in another. The pi extension automatically opens a socket on session start.\n\n### Commands\n\n| Command | Description |\n|---|---|\n| `:Pi` | Open the Send to pi dialog (works in normal and visual mode) |\n| `:PiSend` | Type a prompt and send to pi |\n| `:PiSendFile` | Send current file path + prompt |\n| `:PiSendSelection` | Send visual selection + prompt |\n| `:PiSendBuffer` | Send entire buffer + prompt |\n| `:PiPing` | Check if pi is reachable |\n| `:PiSessions` | List/switch between running pi sessions |\n\n### Default keybindings\n\n`<leader>p` is mapped to `:Pi` in both normal and visual mode by default.\n\nTo disable the default mappings:\n\n```lua\nrequire(\"pi-nvim\").setup({\n  set_default_keymaps = false,\n})\n```\n\n### The `:Pi` dialog\n\nOpens a floating window in the center of the screen:\n\n- Shows the current **file name** (always sent)\n- If you had a **visual selection**, it shows the line range and sends the selected text\n- If no selection, you can press **Tab** to toggle sending the **entire buffer**\n- Type a prompt and press **Enter** to send (or just Enter with no prompt)\n- Press **Esc** or **Ctrl-C** to cancel\n\n### Additional keybindings\n\n```lua\nvim.keymap.set(\"n\", \"<leader>pp\", \":PiSend<CR>\")\nvim.keymap.set(\"n\", \"<leader>pf\", \":PiSendFile<CR>\")\nvim.keymap.set(\"v\", \"<leader>ps\", \":PiSendSelection<CR>\")\nvim.keymap.set(\"n\", \"<leader>pb\", \":PiSendBuffer<CR>\")\nvim.keymap.set(\"n\", \"<leader>pi\", \":PiPing<CR>\")\n```\n\n## Protocol\n\nThe socket accepts newline-delimited JSON:\n\n```json\n{\"type\": \"prompt\", \"message\": \"your prompt here\"}\n{\"type\": \"ping\"}\n```\n\nResponses:\n\n```json\n{\"ok\": true}\n{\"ok\": true, \"type\": \"pong\"}\n{\"ok\": false, \"error\": \"...\"}\n```\n\nThis means you can also send prompts from any tool:\n\n```bash\necho '{\"type\":\"prompt\",\"message\":\"hello\"}' | socat - UNIX-CONNECT:/tmp/pi-nvim-sockets/<hash>.sock\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension"
+  ],
+  "author": {
+    "name": "Chris Arderne",
+    "email": "chris@rdrn.me"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/carderne/pi-nvim",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/carderne/pi-nvim.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extension.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-01T12:27:14.552Z",
+    "modified": "2026-06-15T19:44:21.866Z",
+    "0.1.0": "2026-03-01T12:27:14.819Z",
+    "0.1.1": "2026-03-01T13:02:12.431Z",
+    "0.1.2": "2026-03-02T10:39:33.395Z",
+    "0.2.0": "2026-03-20T12:43:23.172Z",
+    "0.2.1": "2026-05-27T07:16:03.931Z",
+    "0.2.2": "2026-06-15T19:22:59.913Z",
+    "0.2.3": "2026-06-15T19:24:44.044Z",
+    "0.2.4": "2026-06-15T19:44:21.609Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 161,
+  "download_trend": []
+}

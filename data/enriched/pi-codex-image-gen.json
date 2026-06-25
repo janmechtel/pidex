@@ -1,0 +1,49 @@
+{
+  "name": "pi-codex-image-gen",
+  "latest_version": "0.1.10",
+  "description": "Image generation for Pi using the ChatGPT Images 2.0 model.",
+  "readme": "# pi-codex-image-gen\n\nImage generation for [Pi](https://pi.dev) using the ChatGPT Images 2.0 model via the OpenAI Codex Responses backend.\n\n## Install\n\n```sh\npi install npm:pi-codex-image-gen\n```\n\nDuring local development from this monorepo:\n\n```sh\npi install /path/to/pi-mono/packages/pi-codex-image-gen\n```\n\nFor a one-off test run without installing:\n\n```sh\npi -e /path/to/pi-mono/packages/pi-codex-image-gen\n```\n\nTo uninstall:\n\n```sh\npi remove npm:pi-codex-image-gen\n```\n\n## Quick usage\n\nIn a Pi session:\n\n```\n> Generate a pixel-art sword icon, 32\u00d732, with a blue blade and gold hilt\n```\n\nThe agent will invoke `codex_generate_image` with your prompt, stream the response from the Codex backend, and save the resulting image to disk. The `model` parameter controls the Codex routing model; image generation is always performed by **gpt-image-2** on the backend.\n\n## Authentication\n\nUses your existing **openai-codex** login \u2014 no `OPENAI_API_KEY` required. If you haven't logged in yet:\n\n```\n> /login\n```\n\nSelect **ChatGPT Plus/Pro (Codex)** and complete the OAuth flow.\n\n## Configuration\n\nCreate a JSON config file at one (or both) of these locations:\n\n| Scope   | Path                                                    |\n| ------- | ------------------------------------------------------- |\n| Global  | `~/.pi/agent/extensions/codex-image-gen.json`           |\n| Project | `<project-root>/.pi/extensions/codex-image-gen.json`    |\n\nProject config overrides global config. Example:\n\n```json\n{\n  \"save\": \"global\",\n  \"saveDir\": \"~/Pictures/generated\",\n  \"model\": \"gpt-5.5\"\n}\n```\n\n### Config keys\n\n| Key       | Type   | Default    | Description                              |\n| --------- | ------ | ---------- | ---------------------------------------- |\n| `save`    | string | `\"global\"` | Default save mode (see below).           |\n| `saveDir` | string | \u2014          | Directory used when `save=custom`.       |\n| `model`   | string | `\"gpt-5.5\"`| Codex routing model. Image generation is always handled by gpt-image-2. |\n\n### Environment variables\n\n| Variable                     | Description                                      |\n| ---------------------------- | ------------------------------------------------ |\n| `PI_CODEX_IMAGE_SAVE_MODE`   | Overrides the `save` config key.                 |\n| `PI_CODEX_IMAGE_SAVE_DIR`    | Overrides the `saveDir` config key (custom mode).|\n| `PI_OFFLINE=1`               | Disables install/update telemetry.              |\n| `PI_TELEMETRY=0`             | Disables install/update telemetry.              |\n\n## Save modes\n\n| Mode      | Behavior                                                         |\n| --------- | ---------------------------------------------------------------- |\n| `none`    | Image is returned inline but not written to disk.                |\n| `project` | Saves to `<project>/.pi/generated-images/<session-id>/`.         |\n| `global`  | Saves to `~/.pi/agent/generated-images/<session-id>/`.           |\n| `custom`  | Saves to a user-specified directory (requires `saveDir` or env). |\n\n## Tool parameters\n\n| Parameter      | Type   | Required | Description                                                        |\n| -------------- | ------ | -------- | ------------------------------------------------------------------ |\n| `prompt`       | string | \u2705        | The image generation prompt.                                       |\n| `model`        | string | \u2014        | Override the Codex model. Defaults to config or `gpt-5.5`.         |\n| `outputFormat` | string | \u2014        | `png` (default), `jpeg`, or `webp`.                                |\n| `save`         | string | \u2014        | Override save mode for this call.                                  |\n| `saveDir`      | string | \u2014        | Directory when `save=custom`. Relative paths resolve under CWD.    |\n\n## How it works\n\n1. Resolves auth via Pi's `openai-codex` provider (ChatGPT session token).\n2. Sends a Codex Responses API request to the routing model (default `gpt-5.5`) with the `image_generation` tool enabled.\n3. The backend invokes **gpt-image-2** to generate the image.\n4. Parses the SSE stream for `response.output_item.done` events containing the base64 image.\n5. Saves the image to disk according to the active save mode.\n6. Returns the image data inline plus metadata (model, format, path, revised prompt, usage).\n\n## Troubleshooting\n\n| Symptom | Cause | Fix |\n| --- | --- | --- |\n| \"Missing openai-codex credentials\" | Not logged in | Run `/login` and select **ChatGPT Plus/Pro (Codex)** |\n| 401 / 403 response | Token expired | Re-run `/login` for openai-codex |\n| 429 response | Rate limited | Wait and retry; the extension retries automatically with backoff |\n| \"Codex did not return an image\" | Backend refused the prompt | Rephrase the prompt and try again |\n| \"save=custom requires saveDir\" | Missing config | Set `saveDir` in config or `PI_CODEX_IMAGE_SAVE_DIR` env var |\n\n## License\n\nApache-2.0. See [LICENSE](./LICENSE).\n\nThis package includes imagegen skill helper files derived from [OpenAI Codex](https://github.com/openai/codex), including `skills/imagegen/scripts/image_gen.py`. Those files remain under the Apache License, Version 2.0. See [NOTICE](./NOTICE) and `skills/imagegen/LICENSE.txt`.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "codex",
+    "image-generation",
+    "gpt-image-2"
+  ],
+  "author": {
+    "name": "Jose Mocito"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/jvm/pi-mono/tree/main/packages/pi-codex-image-gen#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jvm/pi-mono.git",
+    "directory": "packages/pi-codex-image-gen"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-04-26T21:41:26.463Z",
+    "modified": "2026-06-06T00:03:50.507Z",
+    "0.1.0": "2026-04-26T21:41:26.649Z",
+    "0.1.1": "2026-04-26T21:53:18.917Z",
+    "0.1.2": "2026-04-26T22:01:22.676Z",
+    "0.1.4": "2026-05-07T16:15:51.700Z",
+    "0.1.5": "2026-05-07T16:28:29.171Z",
+    "0.1.6": "2026-05-09T15:43:39.114Z",
+    "0.1.7": "2026-05-10T00:57:10.350Z",
+    "0.1.8": "2026-05-10T02:10:06.503Z",
+    "0.1.9": "2026-05-20T22:51:58.846Z",
+    "0.1.10": "2026-06-06T00:03:50.257Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": null,
+  "download_trend": []
+}

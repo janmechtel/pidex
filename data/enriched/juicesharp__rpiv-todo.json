@@ -1,0 +1,450 @@
+{
+  "name": "@juicesharp/rpiv-todo",
+  "latest_version": "1.20.0",
+  "description": "Pi extension. A todo list for the model, rendered as a live overlay that survives /reload and conversation compaction.",
+  "readme": "# rpiv-todo\n\n<div align=\"center\">\n  <a href=\"https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-todo\">\n    <picture>\n      <img src=\"https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-todo/docs/cover.png\" alt=\"rpiv-todo cover\" width=\"50%\">\n    </picture>\n  </a>\n</div>\n\nGive the model a todo list it can keep across long sessions. `rpiv-todo` adds the `todo` tool, the `/todos` slash command, and a live overlay above the editor to [Pi Agent](https://github.com/badlogic/pi-mono) - tasks survive `/reload` and conversation compaction, so the model picks up where it left off.\n\n![Todo overlay widget above the Pi editor](https://raw.githubusercontent.com/juicesharp/rpiv-mono/main/packages/rpiv-todo/docs/overlay.jpg)\n\n## Features\n\n- **Live overlay above the editor** - see the model's plan at all times; completed items stay visible until the next agent response starts, then fall away; auto-hides when empty.\n- **Survives `/reload` and compaction** - tasks replay from the conversation branch, not disk.\n- **Status states** - pending, in_progress, completed, plus a deleted tombstone for audit.\n- **Dependency tracking** - `blockedBy` with cycle detection, so the model can sequence work.\n- **Smart truncation** - 12-line collapse threshold; completed tasks drop first, pending tasks stay visible last.\n\n## Install\n\n```bash\npi install npm:@juicesharp/rpiv-todo\n```\n\nThen restart your Pi session.\n\n### Optional: localization\n\n`rpiv-todo` works standalone - install only this package and you get the full English UI. Install `@juicesharp/rpiv-i18n` alongside it to flip the overlay heading, `/todos` section headers, and status words to your active locale:\n\n```bash\npi install npm:@juicesharp/rpiv-i18n\n```\n\nWith the SDK present, locale resolves from `--locale <code>` \u2192 `~/.config/rpiv-i18n/locale.json` \u2192 `LANG` / `LC_ALL` \u2192 English. The `/languages` interactive picker and `pi --locale <code>` startup flag are also enabled. Without the SDK, the extension stays online and renders English at every call site - no warning, no crash. Users who installed via `pi install npm:@juicesharp/rpiv-pi` + `/rpiv-setup` get the SDK automatically.\n\n## Tool\n\n- **`todo`** - create / update / list / get / delete / clear tasks. 4-state\n  machine (pending \u2192 in_progress \u2192 completed, plus deleted tombstone).\n  Supports `blockedBy` dependency tracking with cycle detection. Tasks persist\n  via branch replay - survive session compact and `/reload`.\n\n### Schema\n\n```ts\ntodo({\n  action: \"create\" | \"update\" | \"list\" | \"get\" | \"delete\" | \"clear\",\n\n  // create-only\n  subject?: string,                // required for create\n  blockedBy?: number[],            // initial dependency ids\n\n  // create + update\n  description?: string,\n  activeForm?: string,             // present-continuous label shown while in_progress\n  owner?: string,\n  metadata?: Record<string, unknown>, // pass null per key to delete that key on update\n\n  // update-only\n  addBlockedBy?: number[],         // additive merge into blockedBy\n  removeBlockedBy?: number[],      // additive removal from blockedBy\n\n  // update / get / delete\n  id?: number,                     // task id\n\n  // update (target) or list (filter)\n  status?: \"pending\" | \"in_progress\" | \"completed\" | \"deleted\",\n\n  // list-only\n  includeDeleted?: boolean,        // default false - hides tombstones\n})\n```\n\nValid status transitions: `pending \u21c4 in_progress`, either \u2192 `completed`, any \u2192 `deleted` (terminal). `delete` keeps the task as a tombstone so historic `blockedBy` references still resolve.\n\nReturns:\n\n```ts\n{\n  content: [{ type: \"text\", text: string }], // human-readable summary of the op\n  details: {                                 // full snapshot - replay reads this back\n    action: TaskAction,\n    params: Record<string, unknown>,\n    tasks: Array<{\n      id: number,\n      subject: string,\n      description?: string,\n      activeForm?: string,\n      status: \"pending\" | \"in_progress\" | \"completed\" | \"deleted\",\n      blockedBy?: number[],\n      owner?: string,\n      metadata?: Record<string, unknown>,\n    }>,\n    nextId: number,\n    error?: string,                          // present only on validation/transition failures\n  }\n}\n```\n\n## Commands\n\n- **`/todos`** - print the current todo list grouped by status.\n\n## Overlay\n\nThe aboveEditor widget auto-renders whenever any overlay-visible tasks exist.\nCompleted tasks stay visible after completion until the next agent response\nstarts, then disappear from later overlay renders. 12-line collapse\nthreshold; completed tasks still drop first on overflow, pending tasks\ntruncate last. Auto-hides when the list is empty.\n\n## Localization\n\n`rpiv-todo` localizes its TUI chrome (overlay heading, `/todos` section headers, status words) through `@juicesharp/rpiv-i18n` when the SDK is installed. Bundled locales: `de`, `en`, `es`, `fr`, `pt`, `pt-BR`, `ru`, `uk`. LLM-facing output (tool response envelope, reducer errors, schema descriptions) stays English by design.\n\nThe SDK is a soft optional peer - `rpiv-todo` loads it via dynamic import at module init. If the SDK isn't installed, every render call site returns its inline English fallback and the extension stays online with English UI; no warning, no crash. See the Install section for adding the SDK after the fact. To contribute or override translations, see the `@juicesharp/rpiv-i18n` README \"Contributing translations\" section.\n\n## License\n\n[![npm version](https://img.shields.io/npm/v/@juicesharp/rpiv-todo.svg)](https://www.npmjs.com/package/@juicesharp/rpiv-todo)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "rpiv",
+    "todo"
+  ],
+  "author": {
+    "name": "juicesharp"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-todo#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juicesharp/rpiv-mono.git",
+    "directory": "packages/rpiv-todo"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-13T22:36:09.037Z",
+    "modified": "2026-06-15T12:35:38.896Z",
+    "0.1.0": "2026-04-13T22:36:09.316Z",
+    "0.1.1": "2026-04-13T23:13:40.136Z",
+    "0.1.2": "2026-04-15T13:20:15.325Z",
+    "0.6.1": "2026-04-18T15:35:37.925Z",
+    "0.7.0": "2026-04-18T20:40:32.412Z",
+    "0.8.0": "2026-04-19T00:14:28.567Z",
+    "0.8.1": "2026-04-19T14:17:48.773Z",
+    "0.8.2": "2026-04-19T14:37:16.098Z",
+    "0.8.3": "2026-04-19T19:35:24.119Z",
+    "0.9.0": "2026-04-19T23:09:11.581Z",
+    "0.9.1": "2026-04-20T01:56:50.539Z",
+    "0.10.0": "2026-04-20T02:30:17.484Z",
+    "0.11.0": "2026-04-20T14:43:15.124Z",
+    "0.11.1": "2026-04-20T17:28:07.601Z",
+    "0.11.2": "2026-04-21T20:11:58.700Z",
+    "0.11.3": "2026-04-21T20:26:59.549Z",
+    "0.11.4": "2026-04-21T21:18:21.760Z",
+    "0.11.5": "2026-04-22T03:10:29.711Z",
+    "0.11.6": "2026-04-22T19:53:17.968Z",
+    "0.11.7": "2026-04-23T17:44:47.178Z",
+    "0.12.0": "2026-04-24T16:37:58.636Z",
+    "0.12.1": "2026-04-24T17:35:53.256Z",
+    "0.12.2": "2026-04-24T17:43:24.406Z",
+    "0.12.3": "2026-04-24T18:21:17.335Z",
+    "0.12.4": "2026-04-24T22:10:38.935Z",
+    "0.12.5": "2026-04-24T22:33:01.840Z",
+    "0.12.6": "2026-04-26T00:41:01.464Z",
+    "0.12.7": "2026-04-26T05:56:03.108Z",
+    "0.13.0": "2026-04-28T02:09:05.904Z",
+    "0.13.1": "2026-04-28T02:28:31.946Z",
+    "0.13.2": "2026-04-28T02:33:16.884Z",
+    "0.13.3": "2026-04-28T12:14:00.033Z",
+    "1.0.0": "2026-04-28T13:30:37.254Z",
+    "1.0.1": "2026-04-28T13:34:21.260Z",
+    "1.0.2": "2026-04-28T15:59:12.315Z",
+    "1.0.3": "2026-04-28T20:32:10.208Z",
+    "1.0.4": "2026-04-28T20:34:15.478Z",
+    "1.0.5": "2026-04-29T12:50:57.439Z",
+    "1.0.6": "2026-04-29T16:21:30.934Z",
+    "1.0.7": "2026-04-29T19:57:13.839Z",
+    "1.0.8": "2026-04-29T21:09:57.402Z",
+    "1.0.9": "2026-04-30T00:08:43.944Z",
+    "1.0.10": "2026-04-30T12:46:38.581Z",
+    "1.0.11": "2026-04-30T14:40:37.402Z",
+    "1.0.12": "2026-05-01T14:15:23.241Z",
+    "1.0.13": "2026-05-01T16:51:23.335Z",
+    "1.0.14": "2026-05-01T21:31:44.400Z",
+    "1.0.15": "2026-05-02T20:02:47.623Z",
+    "1.0.16": "2026-05-02T20:11:03.197Z",
+    "1.0.17": "2026-05-02T20:18:32.112Z",
+    "1.0.18": "2026-05-02T21:19:26.241Z",
+    "1.0.19": "2026-05-03T10:58:28.768Z",
+    "1.1.0": "2026-05-03T14:14:51.277Z",
+    "1.1.1": "2026-05-03T14:22:18.150Z",
+    "1.1.2": "2026-05-03T15:34:05.865Z",
+    "1.1.3": "2026-05-03T16:04:00.013Z",
+    "1.1.4": "2026-05-03T17:54:06.642Z",
+    "1.1.5": "2026-05-05T21:31:11.258Z",
+    "1.2.0": "2026-05-07T05:29:55.275Z",
+    "1.2.1": "2026-05-07T15:28:24.522Z",
+    "1.3.0": "2026-05-08T18:45:48.615Z",
+    "1.3.1": "2026-05-10T00:31:41.780Z",
+    "1.4.0": "2026-05-10T18:56:00.548Z",
+    "1.4.1": "2026-05-11T12:47:29.153Z",
+    "1.4.2": "2026-05-11T13:07:30.251Z",
+    "1.5.0": "2026-05-12T16:37:38.672Z",
+    "1.5.1": "2026-05-13T00:15:01.822Z",
+    "1.5.2": "2026-05-13T17:02:21.377Z",
+    "1.6.0": "2026-05-14T17:13:36.275Z",
+    "1.6.1": "2026-05-14T20:15:22.105Z",
+    "1.7.0": "2026-05-15T17:46:58.581Z",
+    "1.8.0": "2026-05-16T14:40:48.640Z",
+    "1.8.1": "2026-05-17T17:01:07.270Z",
+    "1.8.2": "2026-05-17T22:12:28.926Z",
+    "1.8.3": "2026-05-18T02:42:40.243Z",
+    "1.9.0": "2026-05-18T18:11:30.912Z",
+    "1.9.1": "2026-05-19T10:45:07.666Z",
+    "1.9.2": "2026-05-19T13:49:09.896Z",
+    "1.10.0": "2026-05-19T21:02:58.618Z",
+    "1.10.1": "2026-05-19T23:29:25.235Z",
+    "1.10.2": "2026-05-20T03:02:07.964Z",
+    "1.11.0": "2026-05-20T21:03:58.322Z",
+    "1.12.0": "2026-05-21T13:16:00.295Z",
+    "1.13.0": "2026-05-25T19:36:52.320Z",
+    "1.14.0": "2026-05-28T01:45:40.914Z",
+    "1.14.1": "2026-05-28T02:02:37.497Z",
+    "1.14.2": "2026-05-28T02:12:28.411Z",
+    "1.14.3": "2026-05-28T02:33:56.159Z",
+    "1.14.4": "2026-05-28T02:45:39.390Z",
+    "1.14.5": "2026-05-28T04:47:59.548Z",
+    "1.14.6": "2026-05-28T10:12:57.682Z",
+    "1.14.7": "2026-05-28T12:16:22.468Z",
+    "1.15.0": "2026-05-28T15:21:44.146Z",
+    "1.16.0": "2026-05-30T14:56:52.725Z",
+    "1.16.1": "2026-05-30T15:03:20.772Z",
+    "1.17.0": "2026-06-01T02:33:14.142Z",
+    "1.17.1": "2026-06-01T13:13:15.834Z",
+    "1.18.0": "2026-06-04T14:56:31.481Z",
+    "1.18.1": "2026-06-04T16:04:02.341Z",
+    "1.18.2": "2026-06-04T16:30:21.342Z",
+    "1.19.0": "2026-06-09T13:23:51.972Z",
+    "1.19.1": "2026-06-10T03:41:33.547Z",
+    "1.20.0": "2026-06-15T12:35:38.790Z"
+  },
+  "versions_count": 103,
+  "downloads_last_week": 5115,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 206
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 1958
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 3087
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 4314
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 5758
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 13791
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 10707
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 14865
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 7720
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 10369
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 5802
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 650
+    }
+  ]
+}

@@ -1,0 +1,374 @@
+{
+  "name": "pi-web-access",
+  "latest_version": "0.13.0",
+  "description": "Web search, URL fetching, GitHub repo cloning, PDF extraction, YouTube video understanding, and local video analysis for Pi coding agent. Supports OpenAI, Brave, Parallel, Tavily, Exa, Perplexity, and Gemini.",
+  "readme": "<p>\n  <img src=\"banner.png\" alt=\"pi-web-access\" width=\"1100\">\n</p>\n\n# Pi Web Access\n\n**Web search, content extraction, and video understanding for Pi agent. OpenAI/Codex search, zero-config Exa search, Brave, Parallel, Tavily, optional browser-cookie Gemini Web, or bring your own API keys.**\n\n[![npm version](https://img.shields.io/npm/v/pi-web-access?style=for-the-badge)](https://www.npmjs.com/package/pi-web-access)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)\n[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows*-blue?style=for-the-badge)]()\n\nhttps://github.com/user-attachments/assets/cac6a17a-1eeb-4dde-9818-cdf85d8ea98f\n\n## Why Pi Web Access\n\n**Zero Config** \u2014 Works out of the box with Exa MCP (no API key needed). If you're signed into Pi with a Codex subscription, OpenAI web search can reuse that auth. Add API keys for OpenAI, Brave, Parallel, Tavily, Exa, Perplexity, or Gemini API for more control, or opt into browser-cookie access for Gemini Web.\n\n**Video Understanding** \u2014 Point it at a YouTube video or local screen recording and ask questions about what's on screen. Full transcripts, visual descriptions, and frame extraction at exact timestamps.\n\n**Smart Fallbacks** \u2014 Every capability has a fallback chain. Search tries OpenAI when suitable and available, then Exa, Brave, Parallel, Tavily, Perplexity, Gemini API, and Gemini Web when browser cookies are enabled. YouTube tries Gemini Web when enabled, then API, then Perplexity. Blocked pages retry through Jina Reader, Parallel, and Gemini extraction. Something always works.\n\n**GitHub Cloning** \u2014 GitHub URLs are cloned locally instead of scraped. The agent gets real file contents and a local path to explore, not rendered HTML.\n\n## Install\n\n```bash\npi install npm:pi-web-access\n```\n\nWorks immediately with no API keys \u2014 Exa MCP provides zero-config search. If Pi has Codex auth from `/login`, OpenAI search can also work without a separate key. For more providers or direct API access, add keys to `~/.pi/web-search.json`:\n\n```json\n{\n  \"openaiApiKey\": \"sk-...\",\n  \"braveApiKey\": \"BSA_...\",\n  \"exaApiKey\": \"exa-...\",\n  \"perplexityApiKey\": \"pplx-...\",\n  \"geminiApiKey\": \"AIza...\"\n}\n```\n\nIn `auto` mode (default), `web_search` tries OpenAI when suitable and available, then Exa (direct API if keyed, MCP if not), Brave, Parallel, Tavily, Perplexity, Gemini API, then Gemini Web when browser-cookie access is enabled.\n\nOptional dependencies for video frame extraction:\n\n```bash\nbrew install ffmpeg   # frame extraction, video thumbnails, local video duration\nbrew install yt-dlp   # YouTube stream URLs for frame extraction\n```\n\nWithout these, video content analysis (transcripts, visual descriptions via Gemini) still works. The binaries are only needed for extracting individual frames as images.\n\nRequires Pi v0.37.3+.\n\n## Quick Start\n\n```typescript\n// Search the web\nweb_search({ query: \"TypeScript best practices 2025\" })\n\n// Fetch a page\nfetch_content({ url: \"https://docs.example.com/guide\" })\n\n// Clone a GitHub repo\nfetch_content({ url: \"https://github.com/owner/repo\" })\n\n// Understand a YouTube video\nfetch_content({ url: \"https://youtube.com/watch?v=abc\", prompt: \"What libraries are shown?\" })\n\n// Analyze a screen recording\nfetch_content({ url: \"/path/to/recording.mp4\", prompt: \"What error appears on screen?\" })\n```\n\n## Tools\n\n### web_search\n\nSearch the web via OpenAI, Brave, Parallel, Tavily, Exa, Perplexity AI, or Gemini. Returns a synthesized answer with source citations.\n\n```typescript\nweb_search({ query: \"rust async programming\" })\nweb_search({ queries: [\"query 1\", \"query 2\"] })\nweb_search({ query: \"latest news\", numResults: 10, recencyFilter: \"week\" })\nweb_search({ query: \"...\", domainFilter: [\"github.com\"] })\nweb_search({ query: \"...\", provider: \"openai\" })\nweb_search({ query: \"...\", includeContent: true })\nweb_search({ queries: [\"query 1\", \"query 2\"], workflow: \"none\" })\nweb_search({ queries: [\"query 1\", \"query 2\"], workflow: \"summary-review\" })\nweb_search({ queries: [\"query 1\", \"query 2\"], workflow: \"auto-summary\" })\n```\n\n| Parameter | Description |\n|-----------|-------------|\n| `query` / `queries` | Single query or batch of queries |\n| `numResults` | Results per query (default: 5, max: 20) |\n| `recencyFilter` | `day`, `week`, `month`, or `year` |\n| `domainFilter` | Limit to domains (prefix with `-` to exclude) |\n| `provider` | `auto` (default), `openai`, `brave`, `parallel`, `tavily`, `exa`, `perplexity`, or `gemini` |\n| `includeContent` | Fetch full page content from sources in background |\n| `workflow` | `none` (skip curator), `summary-review` (open curator and auto-generate a summary draft, default), or `auto-summary` (generate a summary without opening the curator) |\n\n### fetch_content\n\nFetch URL(s) and extract readable content as markdown. Automatically detects and handles GitHub repos, YouTube videos, PDFs, local video files, and regular web pages.\n\n```typescript\nfetch_content({ url: \"https://example.com/article\" })\nfetch_content({ urls: [\"url1\", \"url2\", \"url3\"] })\nfetch_content({ url: \"https://github.com/owner/repo\" })\nfetch_content({ url: \"https://youtube.com/watch?v=abc\", prompt: \"What libraries are shown?\" })\nfetch_content({ url: \"/path/to/recording.mp4\", prompt: \"What error appears on screen?\" })\nfetch_content({ url: \"https://youtube.com/watch?v=abc\", timestamp: \"23:41-25:00\", frames: 4 })\n```\n\n| Parameter | Description |\n|-----------|-------------|\n| `url` / `urls` | Single URL/path or multiple URLs |\n| `prompt` | Question to ask about a YouTube video or local video file |\n| `timestamp` | Extract frame(s) \u2014 single (`\"23:41\"`), range (`\"23:41-25:00\"`), or seconds (`\"85\"`) |\n| `frames` | Number of frames to extract (max 12) |\n| `forceClone` | Clone GitHub repos that exceed the 350MB size threshold |\n\n### get_search_content\n\nRetrieve stored content from previous searches or fetches. Content over 30,000 chars is truncated in tool responses but stored in full for retrieval here.\n\n```typescript\nget_search_content({ responseId: \"abc123\", urlIndex: 0 })\nget_search_content({ responseId: \"abc123\", url: \"https://...\" })\nget_search_content({ responseId: \"abc123\", query: \"original query\" })\n```\n\n## Capabilities\n\n### GitHub repos\n\nGitHub URLs are cloned locally instead of scraped. The agent gets real file contents and a local path to explore with `read` and `bash`. Root URLs return the repo tree + README, `/tree/` paths return directory listings, `/blob/` paths return file contents.\n\nRepos over 350MB get a lightweight API-based view instead of a full clone (override with `forceClone: true`). Commit SHA URLs are handled via the API. Clones are cached for the session and wiped on session change. Private repos require the `gh` CLI.\n\n### YouTube videos\n\nYouTube URLs are processed via Gemini for full video understanding \u2014 visual descriptions, transcripts with timestamps, and chapter markers. Pass a `prompt` to ask specific questions about the video. Results include the video thumbnail so the agent gets visual context alongside the transcript.\n\nFallback: Gemini Web when browser cookies are enabled \u2192 Gemini API \u2192 Perplexity (text summary only). Handles all URL formats: `/watch?v=`, `youtu.be/`, `/shorts/`, `/live/`, `/embed/`, `/v/`.\n\n### Local video files\n\nPass a file path (`/`, `./`, `../`, or `file://` prefix) to analyze video content via Gemini. Supports MP4, MOV, WebM, AVI, and other common formats up to 50MB. Pass a `prompt` to ask about specific content. If ffmpeg is installed, a thumbnail frame is included alongside the analysis.\n\nFallback: Gemini API (Files API upload) \u2192 Gemini Web when browser cookies are enabled.\n\n### Video frame extraction\n\nUse `timestamp` and/or `frames` on any YouTube URL or local video file to extract visual frames as images.\n\n```typescript\nfetch_content({ url: \"...\", timestamp: \"23:41\" })                       // single frame\nfetch_content({ url: \"...\", timestamp: \"23:41-25:00\" })                 // range, 6 frames\nfetch_content({ url: \"...\", timestamp: \"23:41-25:00\", frames: 3 })      // range, custom count\nfetch_content({ url: \"...\", timestamp: \"23:41\", frames: 5 })            // 5 frames at 5s intervals\nfetch_content({ url: \"...\", frames: 6 })                                // sample whole video\n```\n\nRequires `ffmpeg` (and `yt-dlp` for YouTube). Timestamps accept `H:MM:SS`, `MM:SS`, or bare seconds.\n\n### PDFs\n\nPDF URLs are extracted as text and saved to `~/Downloads/` as markdown. The agent can then `read` specific sections without loading the full document into context. Text-based extraction only \u2014 no OCR.\n\n### Blocked pages\n\nWhen Readability fails or returns only a cookie notice, the extension retries via Jina Reader (handles JS rendering server-side, no API key needed), then Gemini URL Context API, then Gemini Web extraction when browser cookies are enabled. Handles SPAs, JS-heavy pages, and anti-bot protections transparently. Also parses Next.js RSC flight data when present.\n\n## How It Works\n\n```\nweb_search(query)\n  \u2192 Exa (direct API with key, MCP without) \u2192 Perplexity \u2192 Gemini API \u2192 Gemini Web (if browser cookies enabled)\n\nfetch_content(url)\n  \u2192 Video file?  Gemini API (Files API) \u2192 Gemini Web (if browser cookies enabled)\n  \u2192 GitHub URL?  Clone repo, return file contents + local path\n  \u2192 YouTube URL? Gemini Web (if browser cookies enabled) \u2192 Gemini API \u2192 Perplexity\n  \u2192 HTTP fetch \u2192 PDF? Extract text, save to ~/Downloads/\n               \u2192 HTML? Readability \u2192 RSC parser \u2192 Jina Reader \u2192 Gemini fallback\n               \u2192 Text/JSON/Markdown? Return directly\n```\n\n## Skills\n\n### librarian\n\nBundled research workflow for investigating open-source libraries. Combines GitHub cloning, web search, and git operations (blame, log, show) to produce evidence-backed answers with permalinks. Pi loads it automatically based on your prompt. Also available via `/skill:librarian` with [pi-skill-palette](https://github.com/nicobailon/pi-skill-palette).\n\n## Commands\n\n### /websearch\n\nOpen the search curator directly. Runs searches and lets you review, add, select results, and approve a summary before it is sent back to the agent \u2014 no LLM round-trip needed.\n\n```\n/websearch                                               # empty page, type your own searches\n/websearch react hooks, next.js caching                  # pre-fill with comma-separated queries\n```\n\nResults get injected into the conversation when you approve the summary or click \"Send selected results without summary\". On timeout, the curator auto-submits and falls back to a deterministic summary if no approved draft is present.\n\n### /curator\n\nToggle or configure the curator workflow at runtime.\n\n```\n/curator                    # toggle on/off\n/curator on                 # enable curator (summary-review)\n/curator off                # disable curator (raw results only)\n/curator summary-review     # explicit workflow\n```\n\nPersists to `~/.pi/web-search.json` and takes effect on the next `web_search` call. When disabled, `web_search` returns raw results without opening the curator window.\n\n### /search\n\nBrowse stored search results interactively. Lists all results from the current session with their response IDs for easy retrieval.\n\n### /google-account\n\nShow the active Google account currently authenticated for Gemini Web. Useful when multiple Chromium profiles exist or `chromeProfile` is set in config.\n\n## Activity Monitor\n\nToggle with **Ctrl+Shift+W** to see live request/response activity:\n\n```\n\u2500\u2500\u2500 Web Search Activity \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  API  \"typescript best practices\"     200    2.1s \u2713\n  GET  docs.example.com/article        200    0.8s \u2713\n  GET  blog.example.com/post           404    0.3s \u2717\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n```\n\n## Configuration\n\nConfig defaults to `~/.pi/web-search.json`, or `web-search.json` under `PI_CODING_AGENT_DIR` / `XDG_CONFIG_HOME/pi` when set. Every field is optional.\n\n```json\n{\n  \"openaiApiKey\": \"sk-...\",\n  \"braveApiKey\": \"BSA_...\",\n  \"exaApiKey\": \"exa-...\",\n  \"parallelApiKey\": \"...\",\n  \"tavilyApiKey\": \"tvly-...\",\n  \"perplexityApiKey\": \"pplx-...\",\n  \"geminiApiKey\": \"AIza...\",\n  \"geminiBaseUrl\": \"https://my-gateway.example.com/gemini\",\n  \"cloudflareApiKey\": \"...\",\n  \"provider\": \"openai\",\n  \"webSearch\": {\n    \"enabled\": true\n  },\n  \"chromeProfile\": \"Profile 2\",\n  \"allowBrowserCookies\": false,\n  \"searchModel\": \"gemini-2.5-flash\",\n  \"summaryModel\": \"anthropic/claude-haiku-4-5\",\n  \"workflow\": \"summary-review\",\n  \"curatorTimeoutSeconds\": 20,\n  \"githubClone\": {\n    \"enabled\": true,\n    \"maxRepoSizeMB\": 350,\n    \"cloneTimeoutSeconds\": 30,\n    \"clonePath\": \"/tmp/pi-github-repos\"\n  },\n  \"youtube\": {\n    \"enabled\": true,\n    \"preferredModel\": \"gemini-3-flash-preview\"\n  },\n  \"video\": {\n    \"enabled\": true,\n    \"preferredModel\": \"gemini-3-flash-preview\",\n    \"maxSizeMB\": 50\n  },\n  \"shortcuts\": {\n    \"curate\": \"ctrl+shift+s\",\n    \"activity\": \"ctrl+shift+w\"\n  },\n  \"ssrf\": {\n    \"allowRanges\": [\"198.18.0.0/15\"]\n  }\n}\n```\n\n`OPENAI_API_KEY`, `BRAVE_API_KEY`, `PARALLEL_API_KEY`, `TAVILY_API_KEY`, `EXA_API_KEY`, `GEMINI_API_KEY`, `PERPLEXITY_API_KEY`, `GOOGLE_GEMINI_BASE_URL`, and `CLOUDFLARE_API_KEY` env vars take precedence over config file values. Configured Exa API keys use Exa's own account limits directly; any legacy local `exa-usage.json` file is ignored. `GOOGLE_GEMINI_BASE_URL` overrides the Gemini API host for Gemini generate-content calls such as search, URL context, YouTube, and local video analysis. Set it to a bare host with no trailing slash and no version segment, for example `https://my-gateway.example.com/gemini`; `geminiBaseUrl` is the config-file equivalent. When the configured host contains `gateway.ai.cloudflare.com`, authentication uses `cf-aig-authorization: Bearer <token>` from `CLOUDFLARE_API_KEY` or `cloudflareApiKey`, and `GEMINI_API_KEY` is not required for generate-content calls. Local video file upload still uses Google's Files API directly, so gateway-only video extraction falls back to Gemini Web unless a `GEMINI_API_KEY` is also configured. `provider` sets the default search provider: `\"openai\"`, `\"brave\"`, `\"parallel\"`, `\"tavily\"`, `\"exa\"`, `\"perplexity\"`, or `\"gemini\"`. This is also updated automatically when you change the provider in the curator UI. Set `webSearch.enabled` to `false` to unregister the `web_search` tool while leaving fetch/content tools available. `workflow` sets the default search workflow: `\"summary-review\"` (default, opens curator with auto-generated summary draft), `\"auto-summary\"` (returns a model-generated summary without opening the curator), or `\"none\"` (raw results, no curator). Overridden per-call via the `workflow` parameter on `web_search`, or toggled at runtime with `/curator`. `chromeProfile` overrides the Chromium profile directory used for Gemini Web cookie lookup. `allowBrowserCookies` enables Chromium cookie extraction for Gemini Web; it defaults to `false` to avoid surprise macOS Keychain prompts. You can also set `PI_ALLOW_BROWSER_COOKIES=1`. `searchModel` overrides the Gemini API model used by `web_search` without changing URL, YouTube, or video extraction defaults. `summaryModel` sets the default model used for generating summary drafts in the curator UI and `auto-summary` mode (e.g. `\"anthropic/claude-haiku-4-5\"`, `\"openai-codex/gpt-5.3-codex-spark\"`, or `\"openrouter/nvidia/nemotron-3-super-120b-a12b:free\"`). When Pi `enabledModels` is configured, summaries are limited to that allowlist; if no enabled summary model is available, the tool returns a deterministic summary instead of calling an unrelated model. `curatorTimeoutSeconds` controls the initial curator idle timeout (default `20`, max `600`); users can still adjust the timer in the curator UI. `ssrf.allowRanges` lists CIDR ranges (e.g. `\"198.18.0.0/15\"`, `\"fd00::/8\"`) exempted from the SSRF guard that otherwise blocks private/reserved IP ranges. This unblocks `fetch_content`/`web_search` on hosts whose network proxy runs in TUN + fake-IP mode (Surge, Clash, Mihomo, Stash, ...), where public domains resolve into a synthetic reserved range. It is **off by default** \u2014 the guard stays fully enabled unless you list ranges here. Use the narrowest range that covers your proxy's fake-IP pool. All-address CIDRs such as `0.0.0.0/0` and `::/0` are rejected.\n\n### Shortcuts\n\nBoth shortcuts are configurable via `~/.pi/web-search.json`:\n\n```json\n{\n  \"shortcuts\": {\n    \"curate\": \"ctrl+shift+s\",\n    \"activity\": \"ctrl+shift+w\"\n  }\n}\n```\n\nValues use the same format as pi keybindings (e.g. `ctrl+s`, `ctrl+shift+s`, `alt+r`). Changes take effect on next pi restart.\n\nSet `\"enabled\": false` under any feature to disable it. Config changes require a Pi restart.\n\nRate limits: Perplexity is capped at 10 requests/minute (client-side). Content fetches run 3 concurrent with a 30s timeout per URL.\n\n## Limitations\n\n- If the curator cannot open a browser automatically, such as in Docker, WSL, SSH, or headless environments, the running curator URL is shown in the tool output. Copy it into a browser that can reach the Pi host, or use a tunnel/port-forward when needed.\n- Chromium cookie extraction for Gemini Web is opt-in via `allowBrowserCookies: true` or `PI_ALLOW_BROWSER_COOKIES=1`. On macOS, enabling it may trigger a Keychain dialog; Linux uses `secret-tool` when available and falls back to Chromium's default password otherwise.\n- YouTube private/age-restricted videos may fail on all extraction paths.\n- Gemini can process videos up to ~1 hour; longer videos may be truncated.\n- PDFs are text-extracted only (no OCR for scanned documents).\n- GitHub branch names with slashes may misresolve file paths; the clone still works and the agent can navigate manually.\n- Non-code GitHub URLs (issues, PRs, wiki) fall through to normal web extraction.\n\n<details>\n<summary>Files</summary>\n\n| File | Purpose |\n|------|---------|\n| `index.ts` | Extension entry, tool definitions, commands, widget |\n| `curator-page.ts` | HTML/CSS/JS generation for the curator UI with markdown rendering |\n| `curator-server.ts` | Ephemeral HTTP server with SSE streaming and state machine |\n| `summary-review.ts` | Summary prompt construction, model-based draft generation, and deterministic fallback summary |\n| `openai-search.ts` | OpenAI Responses API web search provider with Codex/API-key auth |\n| `brave.ts` | Brave Search API provider |\n| `parallel.ts` | Parallel search provider and extraction fallback |\n| `tavily.ts` | Tavily Search API provider |\n| `exa.ts` | Exa.ai search provider \u2014 direct API and MCP proxy |\n| `extract.ts` | URL/file path routing, HTTP extraction, fallback orchestration |\n| `gemini-search.ts` | Search routing across OpenAI, Brave, Parallel, Tavily, Exa, Perplexity, Gemini API, Gemini Web |\n| `gemini-url-context.ts` | Gemini URL Context + Web extraction fallbacks |\n| `gemini-web.ts` | Gemini Web client (cookie auth, StreamGenerate) |\n| `gemini-web-config.ts` | Gemini Web profile and browser-cookie opt-in config |\n| `gemini-api.ts` | Gemini REST API client (generateContent) |\n| `chrome-cookies.ts` | macOS/Linux Chromium-based cookie extraction (Keychain/secret-tool + SQLite) |\n| `youtube-extract.ts` | YouTube detection, three-tier extraction, frame extraction |\n| `video-extract.ts` | Local video detection, Files API upload, Gemini analysis |\n| `github-extract.ts` | GitHub URL parsing, clone cache, content generation |\n| `github-api.ts` | GitHub API fallback for large repos and commit SHAs |\n| `perplexity.ts` | Perplexity API client with rate limiting |\n| `pdf-extract.ts` | PDF text extraction, saves to markdown |\n| `rsc-extract.ts` | RSC flight data parser for Next.js pages |\n| `utils.ts` | Shared formatting and error helpers |\n| `storage.ts` | Session-aware result storage |\n| `activity.ts` | Activity tracking for the observability widget |\n| `skills/librarian/` | Bundled skill for library research |\n\n</details>\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "web-search",
+    "perplexity",
+    "fetch",
+    "scraping"
+  ],
+  "author": {
+    "name": "Nico Bailon"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/nicobailon/pi-web-access#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicobailon/pi-web-access.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "video": "https://github.com/nicobailon/pi-web-access/raw/refs/heads/main/pi-web-fetch-demo.mp4"
+  },
+  "time": {
+    "created": "2026-01-27T18:45:10.901Z",
+    "modified": "2026-06-25T07:41:38.895Z",
+    "0.4.2": "2026-01-27T18:45:11.122Z",
+    "0.4.3": "2026-01-28T06:53:26.096Z",
+    "0.4.4": "2026-02-02T00:39:54.916Z",
+    "0.4.5": "2026-02-02T00:42:47.609Z",
+    "0.5.0": "2026-02-02T02:01:46.641Z",
+    "0.5.1": "2026-02-02T17:19:39.577Z",
+    "0.7.0": "2026-02-03T19:53:45.224Z",
+    "0.7.1": "2026-02-03T20:16:52.814Z",
+    "0.7.2": "2026-02-03T21:02:25.635Z",
+    "0.7.3": "2026-02-06T06:48:32.035Z",
+    "0.10.0": "2026-02-18T14:28:44.154Z",
+    "0.10.1": "2026-02-18T16:23:15.304Z",
+    "0.10.2": "2026-02-18T16:27:13.266Z",
+    "0.10.3": "2026-03-12T05:27:58.888Z",
+    "0.10.4": "2026-03-27T23:01:07.847Z",
+    "0.10.5": "2026-04-04T01:28:47.912Z",
+    "0.10.6": "2026-04-04T02:14:59.997Z",
+    "0.10.7": "2026-05-02T21:33:07.794Z",
+    "0.12.0": "2026-06-24T07:03:55.908Z",
+    "0.13.0": "2026-06-25T07:41:38.785Z"
+  },
+  "versions_count": 19,
+  "downloads_last_week": 33797,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 802
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 421
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 189
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 791
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 619
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 625
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 1482
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 951
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 2456
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 3403
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 5040
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 3886
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 4259
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 12453
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 17164
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 15583
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 19922
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 31724
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 15896
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 26590
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 31997
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 7862
+    }
+  ]
+}

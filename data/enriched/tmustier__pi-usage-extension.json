@@ -1,0 +1,41 @@
+{
+  "name": "@tmustier/pi-usage-extension",
+  "latest_version": "0.3.2",
+  "description": "Usage statistics dashboard for Pi sessions.",
+  "readme": "# /usage - Usage Statistics Dashboard\n\nA Pi extension that displays aggregated usage statistics across all sessions.\n\n![Default table view of /usage](screenshot.png)\n\n## Compatibility\n\n- **Pi version:** 0.42.4+\n- **Last updated:** 2026-04-19 (0.3.1)\n\n## Installation\n\n### Pi package manager\n\n```bash\npi install npm:@tmustier/pi-usage-extension\n```\n\n```bash\npi install git:github.com/tmustier/pi-extensions\n```\n\nThen filter to just this extension in `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\n    {\n      \"source\": \"git:github.com/tmustier/pi-extensions\",\n      \"extensions\": [\"usage-extension/index.ts\"]\n    }\n  ]\n}\n```\n\n### Local clone\n\nAdd to your `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"extensions\": [\n    \"~/pi-extensions/usage-extension\"\n  ]\n}\n```\n\n## Usage\n\nIn Pi, run:\n```\n/usage\n```\n\n## Features\n\n### Views\n\n`/usage` has two view modes, toggled with `v`:\n\n- **Table** (default) \u2014 per-provider / per-model stats with cost and token breakdown (screenshot at the top of this page).\n- **Insights** \u2014 narrative characteristics of your cost for the active time period, e.g. *\"X% of your cost was at >150k context\"*. Insights are **independent characteristics**, not a breakdown, so they overlap and can sum to more than 100%.\n\n![Insights view of /usage](insights-screenshot.png)\n\n**Unit:** insights are always weighted by recorded API cost (USD). Periods with no recorded cost show an explicit empty state rather than silently switching to a different unit.\n\nThe insights currently shown:\n\n| Insight | Threshold |\n|---|---|\n| Parallel sessions | \u2265 4 sessions active within an exact \u00b12 min window |\n| Large context | `input + cacheRead + cacheWrite > 150k` |\n| Large uncached prompt | `input + cacheWrite > 100k` |\n| Long-running sessions | session lifetime \u2265 8 hours (global, not per-period slice) |\n| Top-session concentration | top 5 sessions by cost |\n\n### Time Periods\n\n| Period | Definition |\n|--------|------------|\n| **Today** | From midnight (00:00) today |\n| **This Week** | From Monday 00:00 of the current week |\n| **Last Week** | Previous week (Monday 00:00 \u2192 this Monday 00:00) |\n| **All Time** | All recorded sessions |\n\nUse `Tab` or `\u2190`/`\u2192` to switch between periods.\n\n### Timezone\n\nTime periods are calculated in the local timezone where Pi runs. If you want to override it, set the `TZ` environment variable (IANA timezone, e.g. `TZ=UTC` or `TZ=America/New_York`) before launching Pi.\n\n### Columns\n\n| Column | Description |\n|--------|-------------|\n| **Provider / Model** | Provider name, expandable to show models |\n| **Sessions** | Number of unique sessions |\n| **Msgs** | Number of assistant messages |\n| **Cost** | Total cost in USD (from API response) |\n| **Tokens** | Fresh tokens for the turn: input + output + cache write |\n| **\u2191In** | Fresh input tokens: input + cache write *(dimmed)* |\n| **\u2193Out** | Output tokens *(dimmed)* |\n| **Cache** | Cache read + write tokens *(dimmed; informational)* |\n\n> **As of 0.2.0:** `Tokens = Input + Output + CacheWrite` and `\u2191In = Input + CacheWrite`. `CacheRead` stays out of `Tokens` so repeated cache hits don't swamp the dashboard. The dashboard itself shows a one-line footer reminder.\n\nOn narrow terminals, `/usage` automatically switches to a compact table instead of overflowing the terminal. Hidden columns reappear as soon as you widen the terminal.\n\n### Navigation\n\n| Key | Action |\n|-----|--------|\n| `Tab` / `\u2190` `\u2192` | Switch time period |\n| `\u2191` `\u2193` | Select provider *(table view)* |\n| `Enter` / `Space` | Expand/collapse provider to show models *(table view)* |\n| `v` | Toggle between Table and Insights view |\n| `q` / `Esc` | Close |\n\n## Provider Notes\n\n### Cost Tracking\n\nCost data comes directly from the API response (`usage.cost.total`). Accuracy depends on the provider reporting costs.\n\n### Cache Tokens\n\nCache token support varies by provider:\n\n| Provider | Cache Read | Cache Write |\n|----------|------------|-------------|\n| Anthropic | \u2713 | \u2713 |\n| Google | \u2713 | \u2717 |\n| OpenAI Codex | \u2713 | \u2717 |\n\nThe \"Cache\" column combines both read and write tokens.\n\n`Tokens` and `\u2191In` include cache writes but intentionally exclude cache reads. That keeps totals aligned with fresh/billed prompt work without letting repeated cache hits swamp the dashboard.\n\n## Data Source\n\nStatistics are parsed recursively from session files in `~/.pi/agent/sessions/`, including nested subagent runs such as `run-0/` directories. Each session is a JSONL file containing message entries with usage data.\n\nAssistant messages duplicated across branched session files are deduplicated by timestamp + total tokens, matching the extension's previous behavior while still including recursive subagent sessions.\n\nRespects the `PI_CODING_AGENT_DIR` environment variable if set.\n\n## Changelog\n\nSee `CHANGELOG.md`.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "Thomas Mustier"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/tmustier/pi-extensions/tree/main/usage-extension",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tmustier/pi-extensions.git",
+    "directory": "usage-extension"
+  },
+  "pi": {
+    "extensions": [
+      "index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/tmustier/pi-extensions/main/usage-extension/screenshot.png"
+  },
+  "time": {
+    "created": "2026-01-25T01:07:58.863Z",
+    "modified": "2026-05-07T16:17:21.499Z",
+    "0.1.0": "2026-01-25T01:07:59.155Z",
+    "0.1.1": "2026-01-26T20:49:30.105Z",
+    "0.1.3": "2026-02-03T01:23:42.721Z",
+    "0.1.4": "2026-04-09T12:46:31.255Z",
+    "0.1.5": "2026-04-09T14:12:03.163Z",
+    "0.2.0": "2026-04-17T15:32:17.938Z",
+    "0.2.1": "2026-04-17T16:04:40.767Z",
+    "0.3.1": "2026-04-19T15:33:58.096Z",
+    "0.3.2": "2026-05-07T16:17:21.388Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": 434,
+  "download_trend": []
+}

@@ -1,0 +1,357 @@
+{
+  "name": "@grafana/sigil-pi",
+  "latest_version": "0.16.0",
+  "description": "Pi agent extension for Grafana Sigil AI telemetry",
+  "readme": "# @grafana/sigil-pi\n\n[Pi](https://github.com/badlogic/pi) agent extension that sends LLM generations to [Grafana AI Observability](https://grafana.com/docs/grafana-cloud/machine-learning/ai-observability/).\n\nBy default only metadata is sent (token counts, cost, model, tool names, durations). Set `SIGIL_CONTENT_CAPTURE_MODE` to `full`, `no_tool_content`, `metadata_only`, or `full_with_metadata_spans` to control what is sent. `default` is accepted as an alias for `metadata_only`. See [Content Capture Modes](../../docs/concepts/content-capture-modes.md) for the full reference.\n\n## 1. Install and launch\n\n```sh\nbrew install grafana/grafana/sigil\nsigil pi\n```\n\n`sigil pi` installs the `@grafana/sigil-pi` extension on first run, prompts for missing Grafana Cloud credentials, writes `~/.config/sigil/config.env`, and then launches pi.\n\n<details>\n<summary>Manual extension registration</summary>\n\n```sh\npi install npm:@grafana/sigil-pi\nsigil login\n```\n\nThe extension reads the same `~/.config/sigil/config.env` file whether you start pi with `sigil pi` or plain `pi`.\n\n</details>\n\n## 2. Credentials\n\nWhen `sigil pi` or `sigil login` prompts, copy values from `https://<your-grafana>.grafana.net/plugins/grafana-sigil-app`. Make sure AI Observability is enabled on your stack \u2014 an administrator opens **Observability \u2192 AI Observability** once and accepts the terms.\n\nYou need values from three Grafana Cloud pages:\n\n1. **AI Observability \u2192 Configuration**\n   - **API URL** \u2192 `SIGIL_ENDPOINT`\n   - **Instance ID** \u2192 `SIGIL_AUTH_TENANT_ID`\n\n2. **Administration \u2192 Users and access \u2192 Cloud access policies**\n   - Create a policy with scopes `sigil:write`, `metrics:write`, `traces:write`.\n   - Add a token. The `glc_\u2026` value is shown once \u2192 `SIGIL_AUTH_TOKEN`.\n\n3. **Grafana Cloud Portal \u2192 your stack \u2192 OpenTelemetry card**\n   - **OTLP endpoint URL** \u2192 `SIGIL_OTEL_EXPORTER_OTLP_ENDPOINT`\n\nRun `sigil login` later to update saved credentials.\n\n<details>\n<summary>Non-interactive config.env</summary>\n\nCreate or update `~/.config/sigil/config.env`:\n\n```dotenv\nSIGIL_ENDPOINT=https://sigil-prod-<region>.grafana.net\nSIGIL_AUTH_TENANT_ID=<instance-id>\nSIGIL_AUTH_TOKEN=glc_...\nSIGIL_OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp-gateway-prod-<region>.grafana.net/otlp\n```\n\n</details>\n\nWhen `SIGIL_AUTH_TENANT_ID` and `SIGIL_AUTH_TOKEN` are set, the extension uses them for Sigil and OTLP auth. If the OpenTelemetry card shows a different Instance ID, set `OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic <base64(otlp-id:glc_token)>`.\n\nTo include conversation text (with automatic secret redaction), add this to `~/.config/sigil/config.env`:\n\n```dotenv\nSIGIL_CONTENT_CAPTURE_MODE=full\n```\n\n## 3. Verify\n\nRun one pi turn, then open **AI Observability \u2192 Conversations** in Grafana Cloud. A new generation should appear within a few seconds.\n\nIf nothing shows up, set `SIGIL_DEBUG=true` in `~/.config/sigil/config.env`, run another turn, and check the debug log at `~/.local/state/sigil/logs/sigil.log` (honors `XDG_STATE_HOME`).\n\n## Redaction\n\nBefore any generation leaves the process, the SDK scrubs known token formats, PEM private keys, database URLs, `KEY=value` pairs, bearer tokens, and email addresses. Matches become `[REDACTED:<id>]`. User input messages are redacted by default; set `SIGIL_REDACT_INPUT_MESSAGES=false` to leave them unchanged.\n\n## Guards\n\nGuards block tool calls before they execute (e.g. refuse a `bash` invocation matching a deny rule). They're off by default:\n\n```sh\nSIGIL_GUARDS_ENABLED=true sigil pi\n```\n\nBy default, transport errors and timeouts let the tool through. Set `SIGIL_GUARDS_FAIL_OPEN=false` to block on errors instead. Raise or lower `SIGIL_GUARDS_TIMEOUT_MS` (default `1500`) to trade latency against tolerance for slow evaluators.\n\nThe same three variables are honored by the [Claude Code plugin](../claude-code/README.md); both plugins read them from `~/.config/sigil/config.env`.\n\n## All options\n\n`~/.config/sigil/config.env` is the only configuration file. Every option is set via env var.\n\n| Variable | Default | Description |\n|----------|---------|-------------|\n| `SIGIL_ENDPOINT` | \u2014 | Sigil URL (find it at `/plugins/grafana-sigil-app`) |\n| `SIGIL_AUTH_TENANT_ID` | \u2014 | Grafana Cloud instance ID. Combined with `SIGIL_AUTH_TOKEN` becomes Basic auth for Sigil and OTLP. |\n| `SIGIL_AUTH_TOKEN` | \u2014 | Cloud access policy token (`glc_\u2026`). |\n| `SIGIL_AGENT_NAME` | `pi` | Agent name reported to Sigil. |\n| `SIGIL_AGENT_VERSION` | \u2014 | Optional version string reported with the agent. |\n| `SIGIL_CONTENT_CAPTURE_MODE` | `metadata_only` | One of `full`, `no_tool_content`, `metadata_only`, or `full_with_metadata_spans`. `default` is accepted as an alias for `metadata_only`. |\n| `SIGIL_DEBUG` | `false` | Write lifecycle events to `~/.local/state/sigil/logs/sigil.log` (honors `XDG_STATE_HOME`). Never written to the terminal, to avoid corrupting pi's TUI. |\n| `SIGIL_REDACT_INPUT_MESSAGES` | `true` | Redact known secret patterns in user input messages before export. |\n| `SIGIL_OTEL_EXPORTER_OTLP_ENDPOINT` | \u2014 | OTLP HTTP endpoint. Falls back to `OTEL_EXPORTER_OTLP_ENDPOINT`. |\n| `SIGIL_OTEL_AUTH_TOKEN` | `SIGIL_AUTH_TOKEN` | Override the OTLP password. |\n| `SIGIL_GUARDS_ENABLED` | `false` | Evaluate `tool_call` requests against Sigil policy. |\n| `SIGIL_GUARDS_TIMEOUT_MS` | `1500` | Per-call timeout for guard requests, in milliseconds. |\n| `SIGIL_GUARDS_FAIL_OPEN` | `true` | Allow tools through when the guard call fails. Set `false` for strict mode. |\n\nFile format: one `KEY=value` per line, `#` line comments, optional `export ` prefix, optional matching single or double quotes around the value. Only the following keys are honoured \u2014 anything else (including stray `PATH=\u2026` lines) is ignored: any `SIGIL_*` key plus `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_EXPORTER_OTLP_INSECURE`, and `OTEL_SERVICE_NAME`.\n\nA non-empty OS env value always wins over the file; an empty or whitespace-only OS value is treated as unset and gets filled from `config.env`. Missing files are silent.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/grafana/sigil-sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/grafana/sigil-sdk.git",
+    "directory": "plugins/pi"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-04-29T16:31:30.220Z",
+    "modified": "2026-06-01T21:11:00.255Z",
+    "0.0.0": "2026-04-29T16:31:30.509Z",
+    "0.3.1": "2026-04-29T17:41:10.393Z",
+    "0.4.0": "2026-04-30T08:20:21.656Z",
+    "0.5.0": "2026-05-01T08:57:58.819Z",
+    "0.6.0": "2026-05-05T14:51:12.880Z",
+    "0.7.0": "2026-05-08T14:50:26.994Z",
+    "0.8.0": "2026-05-12T08:31:08.184Z",
+    "0.9.0": "2026-05-16T20:47:10.758Z",
+    "0.10.0": "2026-05-27T07:42:04.059Z",
+    "0.11.0": "2026-05-27T16:12:20.545Z",
+    "0.12.0": "2026-05-28T19:24:58.219Z",
+    "0.13.0": "2026-05-28T22:44:56.223Z",
+    "0.14.0": "2026-05-29T13:45:54.074Z",
+    "0.15.0": "2026-05-29T15:38:36.863Z",
+    "0.16.0": "2026-06-01T21:10:59.923Z"
+  },
+  "versions_count": 15,
+  "downloads_last_week": 86,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 557
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 297
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 202
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 1057
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 58
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 95
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 90
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 7
+    }
+  ]
+}

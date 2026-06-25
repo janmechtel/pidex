@@ -1,0 +1,388 @@
+{
+  "name": "@quintinshaw/pi-dynamic-workflows",
+  "latest_version": "2.8.0",
+  "description": "Claude-Code-style dynamic workflows for Pi \u2014 fan a task out across 100s of subagents with real model routing, token/cost accounting, resume, git-worktree isolation, an interactive /workflows TUI, and a real /deep-research.",
+  "readme": "# pi-dynamic-workflows\n\n[![npm](https://img.shields.io/npm/v/@quintinshaw/pi-dynamic-workflows?color=cb3837&logo=npm)](https://www.npmjs.com/package/@quintinshaw/pi-dynamic-workflows)\n[![license](https://img.shields.io/badge/license-MIT-blue)](#license)\n[![for Pi](https://img.shields.io/badge/for-Pi-7c3aed)](https://pi.dev)\n[![tests](https://img.shields.io/badge/tests-679%20passing-success)](#development)\n\n> **Claude Code\u2013style dynamic workflows for [Pi](https://pi.dev).**\n> Turn one prompt into a fleet of subagents that fan out in parallel, cross-check each other, and hand back a single synthesized answer.\n\n**[Website](https://quintinshaw.github.io/pi-dynamic-workflows/) \u00b7 [npm](https://www.npmjs.com/package/@quintinshaw/pi-dynamic-workflows) \u00b7 [Pi package](https://pi.dev/packages/@quintinshaw/pi-dynamic-workflows) \u00b7 [GitHub](https://github.com/QuintinShaw/pi-dynamic-workflows)**\n\n![pi-dynamic-workflows demo](https://raw.githubusercontent.com/QuintinShaw/pi-dynamic-workflows/main/docs/media/demo.gif)\n\nInstead of one model grinding a task step by step, Pi writes a small JavaScript **orchestration script** that spawns many subagents at once, keeps the intermediate work in script variables (not your chat context), and returns only the result. It's the \"code mode for subagents\" from Claude Code \u2014 on any model Pi can reach.\n\nBuilt for **codebase-wide audits, multi-perspective review, large refactors, and cross-checked research** \u2014 anything one context window can't hold.\n\n## Install\n\n```bash\npi install npm:@quintinshaw/pi-dynamic-workflows\n```\n\nThen `/reload` in Pi. You get the `workflow` tool plus the `/workflows`, `/deep-research`, and `/adversarial-review` commands.\n\n## Try it\n\nAsk in plain language:\n\n```text\nRun a workflow to audit every route under src/routes/ for missing auth checks.\n```\n\nPi writes the script and runs it in the background \u2014 your turn ends immediately and a live panel tracks progress while you keep working. Or just type **workflow** or **workflows** in any message to force one. To force one explicitly \u2014 even with the keyword trigger off \u2014 run `/workflows run <prompt>`. If that causes false triggers, set a custom trigger such as `pi-workflow` with `/workflows-trigger set pi-workflow` or by adding `{ \"keywordTriggerWord\": \"pi-workflow\" }` to `~/.pi/workflows/settings.json`. With that setting, only `pi-workflow` auto-arms workflows mode. If you only want to discuss workflows without triggering one, run `/workflows-trigger off`; preferences are saved for new sessions. Check the current state with `/workflows-trigger status`, and turn it back on with `/workflows-trigger on`.\n\n![Workflows mode in the input box](https://raw.githubusercontent.com/QuintinShaw/pi-dynamic-workflows/main/docs/media/workflows-mode.jpg)\n\nIf another Pi extension has already installed a custom editor component, pi-dynamic-workflows leaves it in place and keeps the submit-time workflow trigger active. In that compatibility mode, the animated keyword highlight and Backspace one-shot disarm affordance are skipped because the existing editor remains responsible for rendering and input handling; use `/workflows-trigger off` or `/workflows-trigger set <word>` when you need to discuss workflow/workflows without auto-triggering, including in future sessions. Editor composition is load-order dependent: whichever extension installs a visual editor last owns the editor surface, while pi-dynamic-workflows still keeps its submit-time hook registered.\n\n## What a workflow looks like\n\nPlain JavaScript. The first statement exports literal metadata; then you orchestrate:\n\n```js\nexport const meta = {\n  name: 'auth_audit',\n  description: 'Find routes missing auth checks and verify the findings',\n  phases: [{ title: 'Scan' }, { title: 'Review' }, { title: 'Verify' }],\n}\n\nphase('Scan')\nconst files = await agent('List every route file under src/routes/.', { tier: 'small' })\n\nphase('Review')\nconst findings = await parallel(\n  files.split('\\n').filter(Boolean).map((file) =>\n    () => agent(`Audit ${file} for missing auth checks.`, { tier: 'medium', isolation: 'worktree' }),\n  ),\n)\n\nphase('Verify')\nreturn await agent('Synthesize and double-check these findings:\\n' + findings.join('\\n\\n'), { tier: 'big' })\n```\n\n`agent()` spawns an isolated subagent, `parallel()` runs many at once, `phase()` groups them in the live view, and `tier` routes each one to the right model. That's the whole idea.\n\n## Highlights\n\n- **Fan-out orchestration** \u2014 `agent()`, `parallel()`, `pipeline()`, `phase()` in a sandboxed script. Up to 16 concurrent / 1000 total subagents; intermediate results stay in variables, not the chat.\n- **Real model routing** \u2014 `small` / `medium` / `big` tiers (or an exact `model`) per agent. It actually switches the subagent's model \u2014 cheap work on a light one, hard synthesis on a big one.\n- **Journaled resume** \u2014 an interrupted run replays finished agents from a journal (no re-run, no tokens) and runs only what's left or what you changed.\n- **Git worktree isolation** \u2014 `isolation: \"worktree\"` gives an agent its own branch, so parallel agents can edit the same files without clobbering each other.\n- **Real token & cost accounting** \u2014 read from each subagent's session, not estimated. Runs have no default token cap; `tokenBudget`, phase budgets, and `budget` let you add explicit gates when you want them.\n- **Background by default** \u2014 the turn ends right away, a live \"Workflows running\" panel tracks runs, and each result is delivered back so the conversation auto-continues when it finishes. The panel is compact by default; `/workflows-progress detailed` expands it inline to per-phase/per-agent rows with tokens, cost, and a live tok/s rate (so a stalled agent shows as 0 tok/s) \u2014 no need to open `/workflows`.\n- **Interactive `/workflows` TUI** \u2014 drill runs \u2192 phases \u2192 agents \u2192 detail; inspect per-agent failures and compact subagent history; pause, stop, restart, and save runs from the keyboard.\n- **Quality patterns built in** \u2014 `verify()`, `judgePanel()`, `loopUntilDry()`, and `completenessCheck()` for adversarial review, best-of-N, and exhaustive discovery.\n- **Ultracode** \u2014 `/ultracode` is a standing opt-in that auto-arms an exhaustive multi-agent workflow for every substantive message, the way Claude Code's ultracode does. `/effort high` is the lighter tier.\n- **Bundled `/deep-research` + `/adversarial-review`** \u2014 real web search, source cross-checking, and cited reports.\n- **Saved & nested workflows** \u2014 turn any run into a `/<name>` command, and compose saved workflows from inside other scripts.\n\n## How it maps to Claude Code dynamic workflows\n\nThe same model \u2014 on Pi, plus the production pieces a real run needs:\n\n| Claude Code dynamic workflows | pi-dynamic-workflows (on Pi) |\n| --- | --- |\n| Code-mode orchestration \u2014 the model writes a script that drives subagents | A JS `workflow` tool running `agent()` / `parallel()` / `pipeline()` / `phase()` in a vm sandbox |\n| Subagents with isolated context | Fresh in-memory Pi sessions; results held in script variables, not the chat |\n| Structured outputs | JSON-Schema `schema` \u2192 a validated object, with bounded repair if the model misses |\n| Background runs | Non-blocking by default, a live task panel, and auto-continue delivery |\n| Resume | **Journaled + replayable** \u2014 survives restarts and replays the unchanged prefix |\n| Model selection | **Per-agent / per-phase routing** across any provider Pi is authenticated for |\n| Ultracode (standing maximal-effort opt-in) | **`/ultracode`** (or `/effort ultra`) \u2014 auto-arms an exhaustive workflow for every substantive message |\n| \u2014 | **Git worktree isolation**, **real cost accounting**, **`/deep-research`**, and a **quality-pattern stdlib** |\n\n## Commands\n\n```text\n/workflows                  open the interactive navigator (plain list in print mode)\n/workflows status <id>      watch a run live; print its result when it finishes\n/workflows save <name>      save the latest run's script as a reusable /<name> command\n/workflows pause|resume|stop|rm <id>\n/workflows-trigger off|on|status\n                            persistently disable, restore, or inspect keyword triggering\n/workflows-trigger set <word>|reset\n                            customize or reset the keyword trigger word (default \"workflow\",\n                            also matches \"workflows\"; custom words match exactly, case-insensitive)\n/workflows run <prompt>     force a dynamic workflow from <prompt> on demand \u2014 the explicit\n                            twin of the keyword trigger. Works even when the keyword trigger\n                            is off (/workflows-trigger off); the run shows in the panel + /workflows.\n/workflows-progress compact|detailed|status\n                            switch the live panel between the compact one-liner and the detailed\n                            per-phase/per-agent view (with tokens, cost, and a live tok/s rate)\n/workflows-progress-max <N> cap agents shown per phase in detailed mode (1-1000, default 8)\n/workflows-models           map the small / medium / big tiers to real models\n/ultracode [off]            ultracode: auto-arm an exhaustive workflow for every substantive message\n/effort off|high|ultra      finer control over the standing opt-in (high = thorough, ultra = ultracode)\n\n/deep-research <question>   web-researched, source-cross-checked report\n/adversarial-review <task>  findings vetted by skeptical reviewers\n```\n\nIn the navigator: `\u2191/\u2193` select \u00b7 `enter`/`\u2192` open \u00b7 `esc`/`\u2190` back \u00b7 `p` pause \u00b7 `x` stop \u00b7 `r` restart \u00b7 `s` save \u00b7 `q` quit. Each agent shows the model it ran on; the detail view shows its prompt, result, error diagnostics, and compact message/tool history.\n\n## Storage\n\nWorkflow state is stored under `~/.pi/workflows` so projects do not accumulate extension-owned `.pi/workflows` directories. Global settings and model tiers live at `~/.pi/workflows/settings.json` and `~/.pi/workflows/model-tiers.json`; project-scoped run history, resume journals, locks, and saved workflow overrides live under `~/.pi/workflows/projects/<project>/`. Older project-local `.pi/workflows/runs` and `.pi/workflows/saved` data is still read as a fallback, but new writes go to the user-level workflow store.\n\nTo avoid accidental keyword triggers, configure a custom trigger word in `~/.pi/workflows/settings.json`:\n\n```json\n{\n  \"keywordTriggerWord\": \"pi-workflow\"\n}\n```\n\nThe default `\"workflow\"` preserves the legacy behavior and also matches `\"workflows\"`. Custom trigger words are literal, case-insensitive terms with no spaces and no leading slash; for example, `\"pi-workflow\"` does not match `\"workflow\"`, `\"workflows\"`, or `\"pi-workflows\"`.\n\n## Reference\n\nThe full guide \u2014 every global, agent option, `agentType` definitions, structured output, and determinism \u2014 lives on the **[website](https://quintinshaw.github.io/pi-dynamic-workflows/)**. The essentials:\n\n| Global | What it does |\n| --- | --- |\n| `agent(prompt, opts)` | Spawn an isolated subagent. Returns its final text, or a validated object with `opts.schema`; recoverable failures return `null` with diagnostics in `/workflows`. |\n| `parallel(thunks)` | Run `() => agent(...)` thunks concurrently; results in input order. |\n| `pipeline(items, ...stages)` | Fan items through sequential stages `(prev, original, index)`. |\n| `phase(title, { budget? })` | Group agents in the live view; optional per-phase token sub-budget. |\n| `verify` / `judgePanel` / `loopUntilDry` / `completenessCheck` | Built-in quality patterns. |\n| `workflow(name, args)` | Run a saved workflow inline (shares the global caps). |\n| `checkpoint(prompt, opts)` | A journaled, replayable human approval gate. |\n| `budget` | `{ total, spent(), remaining() }` real-token tracker. |\n\n| Agent option | Description |\n| --- | --- |\n| `tier` | `\"small\"` \\| `\"medium\"` \\| `\"big\"` \u2014 coarse model routing (configure via `/workflows-models`). |\n| `model` | Exact `provider/modelId` (always wins over `tier`). |\n| `agentType` | A named definition (`.pi/agents/<name>.md`) binding tools + model + role prompt. |\n| `isolation: \"worktree\"` | Run in a throwaway git worktree for conflict-free parallel edits. |\n| `schema` | JSON Schema \u2192 the subagent returns a validated object. |\n| `label` / `phase` / `timeoutMs` | Display label / phase override / optional per-agent hard timeout. Omit `timeoutMs` for no hard timeout. |\n| `retries` | Retry attempts after a recoverable failure (timeout, connection failure, empty output) for this agent. Overrides the run-level `agentRetries`. Default `0`. |\n\nBy default, workflows do not set a run-wide token budget or per-agent hard timeout. Use the `workflow` tool's `tokenBudget` / `agentTimeoutMs`, per-phase budgets, or per-agent `timeoutMs` only when you want an explicit cap. A global fallback timeout can also be set in `~/.pi/workflows/settings.json` as `{ \"defaultAgentTimeoutMs\": 600000 }`; set it to `null` or omit it for no default hard timeout.\n\nFor larger or flakier fan-outs, the `workflow` tool also accepts `concurrency` (max agents running at once, clamped to the runtime maximum of `16`) and `agentRetries` (retry attempts after a recoverable agent failure such as a timeout, connection failure, or empty output). Both can be defaulted in `~/.pi/workflows/settings.json` as `{ \"defaultConcurrency\": 4, \"defaultAgentRetries\": 2 }`; a per-run tool value overrides the default, and a per-agent `retries` overrides `agentRetries`. Retries default to `0` (off) unless configured or passed, and only recoverable failures retry \u2014 nonrecoverable errors still abort the run.\n\nThe live \"Workflows running\" panel is configured in the same `~/.pi/workflows/settings.json`: `\"progressPanelMode\"` is `\"compact\"` (default, one line per run) or `\"detailed\"` (per-phase/per-agent rows with tokens, cost, and a live tok/s rate), and `\"progressPanelMaxAgents\"` (default `8`, range `1`\u2013`1000`) caps how many agents each phase shows in detailed mode before a `\u2026 N earlier agents` line. Toggle them live with `/workflows-progress compact|detailed` and `/workflows-progress-max <N>` \u2014 changes take effect on the next render without a restart.\n\nWorkflows run in a Node `vm` sandbox; `Date.now()`, `Math.random()`, `new Date()`, and `require`/`import`/`fs`/network are unavailable, so runs stay reproducible \u2014 which is what makes resume reliable.\n\n## Development\n\n```bash\nnpm install\nnpm test     # biome + tsc + unit tests\n```\n\nEvery feature is also verified end-to-end against a real Pi subagent session before release.\n\n## Credits\n\nThe \"code mode for subagents\" idea comes from Michael Livs' original [pi-dynamic-workflows](https://github.com/Michaelliv/pi-dynamic-workflows) and Anthropic's [dynamic workflows in Claude Code](https://claude.com/blog/introducing-dynamic-workflows-in-claude-code). This project builds on it with real model routing, journaled resume, git-worktree isolation, cost accounting, an interactive TUI, and deep research.\n\n## License\n\nMIT \u2014 see [LICENSE](LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "workflow",
+    "workflows",
+    "dynamic-workflows",
+    "orchestration",
+    "subagents",
+    "multi-agent",
+    "agents",
+    "ai-agents",
+    "parallel",
+    "fan-out",
+    "claude-code",
+    "deep-research",
+    "code-review",
+    "llm"
+  ],
+  "author": {
+    "name": "QuintinShaw"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/QuintinShaw/pi-dynamic-workflows#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/QuintinShaw/pi-dynamic-workflows.git"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/workflow.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-30T19:08:07.084Z",
+    "modified": "2026-06-23T13:31:26.372Z",
+    "1.0.0": "2026-05-30T19:08:07.340Z",
+    "1.1.0": "2026-05-30T19:24:55.385Z",
+    "1.2.0": "2026-05-30T19:35:43.757Z",
+    "1.3.0": "2026-05-30T19:44:05.758Z",
+    "1.4.0": "2026-05-30T19:52:15.473Z",
+    "1.5.0": "2026-05-30T19:57:57.460Z",
+    "1.6.0": "2026-05-30T20:10:34.229Z",
+    "1.7.0": "2026-05-30T20:16:39.688Z",
+    "1.7.1": "2026-05-30T20:24:08.398Z",
+    "1.8.0": "2026-05-30T20:31:42.880Z",
+    "1.9.0": "2026-05-30T20:48:33.865Z",
+    "1.9.1": "2026-05-30T20:56:01.683Z",
+    "1.9.2": "2026-05-31T02:49:42.599Z",
+    "1.9.3": "2026-05-31T03:43:00.797Z",
+    "1.10.0": "2026-06-04T14:21:30.254Z",
+    "1.10.1": "2026-06-04T16:42:15.075Z",
+    "2.0.0": "2026-06-04T19:25:07.530Z",
+    "2.0.1": "2026-06-04T19:40:25.920Z",
+    "2.0.2": "2026-06-08T14:01:59.851Z",
+    "2.0.3": "2026-06-09T08:54:34.903Z",
+    "2.0.4": "2026-06-09T10:21:06.583Z",
+    "2.1.0": "2026-06-09T12:24:25.257Z",
+    "2.2.0": "2026-06-10T05:14:58.465Z",
+    "2.3.0": "2026-06-11T10:26:28.651Z",
+    "2.4.0": "2026-06-11T16:27:00.886Z",
+    "2.5.0": "2026-06-13T14:00:37.520Z",
+    "2.6.0": "2026-06-15T07:21:11.789Z",
+    "2.7.0": "2026-06-21T04:56:27.177Z",
+    "2.8.0": "2026-06-23T13:31:26.035Z"
+  },
+  "versions_count": 29,
+  "downloads_last_week": 7472,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 3458
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 4728
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 4414
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 7098
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 905
+    }
+  ]
+}

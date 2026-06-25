@@ -1,0 +1,358 @@
+{
+  "name": "@glemsom/pi-my-look",
+  "latest_version": "0.2.4",
+  "description": "Modern UI polish for pi \u2014 branded splash, tool icons, status pulse, custom working indicator",
+  "readme": "# pi-my-look\n\nVersion 0.2.2\n\nModern UI polish for the [pi coding agent](https://github.com/earendil-works/pi-coding-agent).\n\n![pi-my-look preview](pi-my-look-preview.png)\n\n## Features\n\n- **Pulsating Status Dot:** A single `\u25cf` that pulses through theme colors (muted \u2192 accent \u2192 warning \u2192 accent \u2192 muted \u2192 dim) while in-progress. On completion: `\u2713` (green) for success, `\u2717` (red) for error \u2014 accessible symbols that are unambiguous even without color vision.\n- **Tool Icons:** Every tool gets a deterministic emoji icon and theme color via the `TOOL_UI_CONFIG` lookup map, with `DEFAULT_TOOL_CONFIG` fallback (\u26a1, accent) for unknown tools. The map covers 42+ `ctx_*` tools, all built-in tools, and `lean-ctx` command entries.\n\n  | Icon | Tools | Rendering |\n  |------|-------|-----------|\n  | \ud83d\udd0d | `read` | Specialised \u2014 path + offset:limit range display |\n  | \u270f\ufe0f | `edit` | Specialised \u2014 inline diff stats (+N/-M) + coloured diff preview |\n  | \u276f | `bash` | Specialised \u2014 exit code + stderr differentiation |\n  | \ud83d\udcbe | `write` | Generic \u2014 dot + icon + path |\n  | \ud83d\udd0e | `grep`, `find`, `ctx_grep`, `ctx_find`, `ctx_search`, `ctx_semantic_search`, `search` | Generic |\n  | \ud83d\udcc2 | `ls`, `ctx_ls` | Generic |\n  | \ud83d\udcd6 | `ctx_read`, `ctx_git_read` | Generic |\n  | \u26a1 | All other `ctx_*` tools, MCP tools, custom extensions | Generic (fallback) |\n  | \ud83c\udf10 | `browser` | Generic |\n  | \ud83d\udcad | `think` | Generic |\n  | \ud83d\udd14 | `notify` | Generic |\n  | \u2753 | `ask` | Generic |\n  | \ud83d\udccb | `context`, `ctx_outline`, `ctx_summary` | Generic |\n  | \ud83e\udde0 | `ctx_knowledge` | Generic |\n  | \ud83c\udf33 | `ctx_tree` | Generic |\n  | \ud83d\udd17 | `ctx_graph` | Generic |\n  | \ud83d\udce6 | `ctx_compress`, `ctx_pack`, `ctx_transcript_compact` | Generic |\n  | \ud83d\udd0c | `ctx_provider`, `ctx_plugins` | Generic |\n  | \ud83d\uddfa\ufe0f | `ctx_overview` | Generic |\n  | \ud83d\udcbe | `ctx_session` | Generic |\n  | \ud83d\udce4 | `ctx_expand`, `ctx_share` | Generic |\n  | \ud83d\udca5 | `ctx_impact` | Generic |\n  | \ud83d\udcde | `ctx_callgraph`, `ctx_call` | Generic |\n  | \u23f1\ufe0f | `ctx_benchmark` | Generic |\n  | \ud83d\udd2c | `ctx_analyze` | Generic |\n  | \ud83e\udd16 | `ctx_agent` | Generic |\n  | \ud83e\udde9 | `ctx_compose` | Generic |\n  | \ud83c\udfaf | `ctx_intent` | Generic |\n  | \ud83d\udcda | `ctx_multi_read` | Generic |\n  | \ud83d\udcdd | `ctx_plan` | Generic |\n  | \ud83d\udce1 | `ctx_radar` | Generic |\n  | \ud83d\udd27 | `ctx_refactor` | Generic |\n  | \ud83d\udc41\ufe0f | `ctx_review` | Generic |\n  | \ud83d\udee0\ufe0f | `ctx_tools` | Generic |\n  | \u2705 | `ctx_verify` | Generic |\n\n  > **Specialised** = custom `pi.registerTool()` with unique rendering logic (path ranges, diff stats, exit codes). \\\n  > **Generic** = monkey-patched rendering: pulse dot + emoji icon + formatted args + keyboard hint + result summary.\n\n- **Semantic Path Highlighting:** File paths are rendered with dimmed directories and accented filenames to reduce visual noise.\n- **Smart Formatting:** Multi-line bash commands are automatically indented (using dynamic indent width that adapts to the prefix) for readability.\n- **Smart Path Truncation:** Long file paths are middle-truncated (preserving the filename) to fit within a consistent width, avoiding line wrapping.\n- **Inline Diff Stats:** The `edit` tool displays addition/removal counts (e.g., `+5 / -2`) directly on the collapsed call line, computed once in `execute` to avoid render loops.\n- **Collapsible Execution Results:** Output is hidden by default when collapsed, showing a keyboard hint to expand. When expanded, it previews content (e.g., file lines, bash output, or full colored diffs for edits).\n- **Bash Exit Codes & Stderr:** Completed bash commands display `exit 0` (muted) or `exit N` (error red) on the collapsed call line. When expanded, stderr output from failed commands renders in error color.\n- **Automatic Coverage:** Rendering is applied generically to ALL tools \u2014 `ctx_*` tools, MCP tools, and any custom extension tools \u2014 without per-tool configuration.\n\n## How it works\n\npi-my-look uses **monkey-patching** on `ToolExecutionComponent.prototype` to intercept the TUI's call and result rendering pipeline, keeping tool execution completely untouched.\n\n### Architecture\n\n```\nToolExecutionComponent.prototype\n\u251c\u2500\u2500 getCallRenderer()   \u2190 patched (#13)\n\u2502   \u251c\u2500\u2500 read / edit / bash  \u2192 delegate to original (uses pi.registerTool custom renderers)\n\u2502   \u2514\u2500\u2500 everything else     \u2192 genericCallRenderer(toolName)\n\u2502       \u251c\u2500\u2500 getStatusIndicator()     \u2192 \u25cf pulse / \u2713 success / \u2717 error\n\u2502       \u251c\u2500\u2500 getToolConfig()          \u2192 icon + color from TOOL_UI_CONFIG\n\u2502       \u251c\u2500\u2500 formatArguments()        \u2192 path highlighting, truncation\n\u2502       \u2514\u2500\u2500 keyHint()                \u2192 keyboard shortcut hint\n\u2514\u2500\u2500 getResultRenderer() \u2190 patched (#14)\n    \u251c\u2500\u2500 read / edit / bash  \u2192 delegate to original\n    \u2514\u2500\u2500 everything else     \u2192 genericResultRenderer(toolName)\n        \u251c\u2500\u2500 isPartial?       \u2192 \"toolName...\" (warning)\n        \u251c\u2500\u2500 summarizeResult() \u2192 diff stats (+N/-M), error preview, line count\n        \u251c\u2500\u2500 !expanded?       \u2192 empty (summary shown on call line)\n        \u2514\u2500\u2500 expanded         \u2192 up to 15-line content preview with truncation\n```\n\n### Tool UI Configuration\n\n`TOOL_UI_CONFIG` is an open lookup map \u2014 add any tool name with an icon/color pair and it automatically gets styled. Tools not in the map inherit `DEFAULT_TOOL_CONFIG` (\u26a1, accent). The map currently covers 42+ `ctx_*` tools and all built-in tools.\n\n### Separation of concerns\n\n- **Tool execution** \u2014 completely unchanged. Built-in tool `execute()` functions run as-is through `pi.registerTool()` (for read/edit/bash) or directly through built-in tool definitions.\n- **Tool rendering** \u2014 intercepted at the `ToolExecutionComponent` level. The monkey-patches decide which renderer to use based on the tool name, keeping specialised renderers for read/edit/bash and applying generic rendering to everything else.\n\n## Prerequisites\n\n- **pi** >= 0.79.0 \u2014 earlier versions may not export all types used by this extension (`ToolRenderContext`, tool details interfaces like `ReadToolDetails`, `BashToolDetails`, `EditToolDetails`).\n- **@earendil-works/pi-tui** \u2014 required peer dependency. The extension uses `Text`, `keyHint`, and theme functions exported by pi-tui.\n- **Modern terminal** with Unicode/emoji support \u2014 see [Compatibility](#compatibility) below.\n\n## Compatibility\n\nThis extension uses emoji icons and a single `\u25cf` dot for tool rendering. These characters require:\n\n- A **modern terminal emulator** with good Unicode support (e.g., kitty, iTerm2, Windows Terminal, GNOME Terminal, Alacritty).\n- An **emoji-aware font** or a **Nerd Font** that includes the required glyphs. If emoji appear as blank squares or boxes, try installing a Nerd Font ([nerdfonts.com](https://www.nerdfonts.com/)) and configuring your terminal to use it.\n\nThe extension degrades gracefully if the terminal lacks full Unicode support \u2014 tool names and file paths remain readable, but icons may not render as intended.\n\n## Install\n\n```bash\npi install npm:@glemsom/pi-my-look\n```\n\n## Customize\n\nEdit `TOOL_UI_CONFIG` in `packages/pi-my-look/extensions/pi-my-look.ts` to add or change tool icons and colors. The monkey-patch architecture means no per-tool registration is needed \u2014 just add an entry to the map.\n\n## Changelog\n\n- 0.2.2 (2026-06-18)\n  - Monkey-patch architecture: `ToolExecutionComponent.prototype` patching for `getCallRenderer()` and `getResultRenderer()`\n  - Generic rendering automatically covers ALL tools (ctx_*, MCP, custom extensions)\n  - `TOOL_UI_CONFIG` expanded to 42+ ctx_* entries from lean-ctx core and power profiles\n  - Removed redundant per-tool `pi.registerTool()` calls (write, grep, find, ls)\n  - Three tools remain special-cased: read (path + range), edit (diff stats), bash (exit codes)\n  - Bash exit code display on collapsed call lines (`exit 0` / `exit N`)\n  - Stderr differentiation: failed command output renders in error color when expanded\n  - Smart path middle-truncation for long paths (preserves filename)\n  - Accessible status symbols: `\u2713` (green success) and `\u2717` (red error) replace colored dots on completion\n\n- 0.2.1 (2026-06-17)\n  - Polymorphic tool UI configuration: `TOOL_UI_CONFIG` map as single source of truth for icons and colors\n  - `DEFAULT_TOOL_CONFIG` fallback ensures MCP and custom tools get polished UI automatically\n  - Generic result summarizer with automatic diff detection across all tools\n  - Tool config lookup via `getToolConfig()` with automatic fallback\n\n- 0.2.0 (2026-06-16)\n  - Major version bump: updated README with feature matrix, screenshot, prerequisites, compatibility notes\n\n- 0.1.17 (2026-06-16)\n  - Pulse dot cycles through theme colors (`muted`, `accent`, `warning`, `accent`, `muted`, `dim`) instead of swapping unicode glyphs. More consistent across terminals.\n\n- 0.1.16 (2026-06-15)\n  - Remove tool name text from render call lines \u2014 emoji icon alone identifies the tool\n\n- 0.1.15 (2026-06-15)\n  - Add icon rendering for all built-in tools (grep, find, ls) via a generic factory\n\n- 0.1.14 (2026-06-15)\n  - Compute edit diff stats in `execute` instead of `renderResult` to avoid render loops\n\n- 0.1.13 (2026-06-14) \u2014 reverted\n  - Powerline-style input frame with path and git status (reverted due to rendering issues)\n\n- 0.1.12 (2026-06-14)\n  - Add tool-specific unicode iconography (\ud83d\udd0d, \ud83d\udcbe, \u270f\ufe0f, \u276f)\n  - Implement semantic path highlighting (dimmed directories)\n\n- 0.1.11 (2026-06-14)\n  - Internal version bump\n\n- 0.1.10 (2026-06-14)\n  - Add pulsating dot animation (\u25cb \u25d4 \u25d0 \u25d5 \u25cf) for in-progress tool calls\n\n- 0.1.9 (2026-06-14)\n  - Remove startup splash and associated timers\n  - Simplify working indicator to pulsating dot on tool call lines\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "glemsom"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/glemsom/my-pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/glemsom/my-pi-extensions.git",
+    "directory": "packages/pi-my-look"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-14T07:44:42.306Z",
+    "modified": "2026-06-18T18:30:55.153Z",
+    "0.1.0": "2026-06-14T07:44:42.556Z",
+    "0.1.1": "2026-06-14T08:32:26.965Z",
+    "0.1.2": "2026-06-14T11:27:32.104Z",
+    "0.1.4": "2026-06-14T12:10:13.861Z",
+    "0.1.5": "2026-06-14T14:25:45.060Z",
+    "0.1.6": "2026-06-14T15:14:24.358Z",
+    "0.1.12": "2026-06-15T16:18:35.048Z",
+    "0.1.14": "2026-06-15T17:20:52.000Z",
+    "0.1.16": "2026-06-15T19:47:37.800Z",
+    "0.1.17": "2026-06-16T16:51:18.266Z",
+    "0.2.0": "2026-06-16T17:03:54.215Z",
+    "0.2.2": "2026-06-18T14:51:11.253Z",
+    "0.2.3": "2026-06-18T18:20:53.079Z",
+    "0.2.4": "2026-06-18T18:30:54.858Z"
+  },
+  "versions_count": 14,
+  "downloads_last_week": 555,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 1523
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 575
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 8
+    }
+  ]
+}

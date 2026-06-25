@@ -1,0 +1,73 @@
+{
+  "name": "pi-spark",
+  "latest_version": "0.15.0",
+  "description": "Pi package that polishes your daily experience.",
+  "readme": "![Cover](./assets/cover.png)\n\n# pi-spark\n\n[Pi](https://pi.dev/) package that polishes your daily experience.\n\n![Overview](./assets/screenshot-overview.png)\n\n## Install\n\nInstall from npm:\n\n```bash\npi install npm:pi-spark\n```\n\nInstall from git:\n\n```bash\npi install git:github.com/zlliang/pi-spark\n```\n\n## Features\n\n### Compact TUI: editor, footer, and fullscreen\n\npi-spark ships with custom editor, footer, and fullscreen rendering, replacing the default ones. The compact TUI gives you a calm, immersive experience without distraction.\n\n- The editor shows a working indicator inspired by [Amp](https://ampcode.com/) and the current model on the top border. If you use [presets](#presets), the active preset appears there too.\n- The footer shows session information, extension statuses, cost, and context usage on one line.\n- The fullscreen rendering clears the terminal screen and scrollback on session start and exit, and pins the editor and footer to the bottom.\n\n![Compact TUI](./assets/screenshot-tui.png)\n\n### Credits\n\npi-spark shows the active provider's credit balance or rate-limit usage in the status line, so you can keep an eye on what's left without leaving the terminal.\n\n- Supported providers: DeepSeek, Fireworks, Moonshot, OpenAI Codex, OpenRouter, and Vercel AI Gateway.\n- Most provider fetching follows [CodexBar](https://github.com/steipete/codexbar). Fireworks is the exception: its balance sits behind an internal gRPC API, reverse-engineered from the `firectl` binary (see [docs/fireworks.md](./docs/fireworks.md)).\n\n![Credits](./assets/screenshot-credits.png)\n\n### Presets\n\npi-spark lets you define named model presets in `spark.json` (see [Configuration](#configuration)), so you can switch between models and thinking levels without retyping provider details. The active preset is shown on the editor's top border.\n\n- Switch interactively with `/preset`, or jump straight to one with `/preset <name>`.\n- Start pi on a given preset with `pi --preset <name>`.\n- Cycle presets with `ctrl+super+p` (forward) and `ctrl+shift+super+p` (backward); `super` is `command` on macOS and needs a terminal that forwards it.\n\n![Presets](./assets/screenshot-presets.png)\n\n### Recap\n\npi-spark generates a short recap of the current session after it goes idle, or on demand, inspired by [Claude Code's session recap](https://code.claude.com/docs/en/interactive-mode#session-recap).\n\n- A recap is generated automatically once the session stays idle past `recap.idle` in `spark.json`.\n- Run `/recap` to generate one manually at any time.\n- The recap can use its own model, configured separately from your working model.\n\n![Recap](./assets/screenshot-recap.png)\n\n## Configuration\n\npi-spark reads config from `~/.pi/agent/spark.json` and from the current project's `.pi/spark.json`. Project config overrides matching global fields.\n\nFor example:\n\n```json\n{\n  \"editor\": {\n    \"spinner\": \"dots\"\n  },\n  \"footer\": false,\n  \"presets\": {\n    \"claude-opus\": {\n      \"provider\": \"anthropic\",\n      \"model\": \"claude-opus-4-8\",\n      \"thinkingLevel\": \"high\"\n    },\n    \"gpt\": {\n      \"provider\": \"openai-codex\",\n      \"model\": \"gpt-5.5\",\n      \"thinkingLevel\": \"medium\"\n    }\n  },\n  \"recap\": {\n    \"idle\": \"5m\",\n    \"provider\": \"openai-codex\",\n    \"model\": \"gpt-5.4-mini\",\n    \"thinkingLevel\": \"off\"\n  }\n}\n```\n\n### References\n\nAll fields are optional. Each top-level feature runs with the defaults below unless you [turn it off](#turn-off-the-features-you-dont-like).\n\n| Field | Value (or `false`) | Description |\n| --- | --- | --- |\n| `credits` | `{}` | Shows the active provider's credit balance or rate-limit usage in the status line. |\n| `editor` | `EditorConfig` | Shows a working indicator and the current model on the editor's top border. |\n| `footer` | `{}` | Shows session info, extension statuses, cost, and context usage on one line. |\n| `fullscreen` | `{}` | Clears the screen and scrollback on start and exit, and pins the editor and footer to the bottom. |\n| `presets` | `{ [name]: Preset }` | Defines named model presets, keyed by name. |\n| `recap` | `RecapConfig` | Generates a session recap when idle or on demand. |\n\n#### `EditorConfig`\n\nThe `spinner` field is optional and defaults to `tildes`.\n\n| Field | Value | Description |\n| --- | --- | --- |\n| `spinner` | `dots` | `\u280b, \u2819, \u2839, \u2838, \u283c, \u2834, \u2826, \u2827, \u2807, \u280f` |\n|  | `lights` | `\u25cb, \u25cf` |\n|  | `tildes` (default) | `\u223c, \u2248, \u224b, \u2248, \u223c` |\n|  | `pulse` | `\u00b7, \u2022, \u25cf, \u2022, \u00b7` |\n\n#### `Preset`\n\nEach preset must set all three fields.\n\n| Field | Value | Description |\n| --- | --- | --- |\n| `provider` | string | Provider ID, e.g., `anthropic`. |\n| `model` | string | Model ID, e.g., `claude-opus-4-8`. |\n| `thinkingLevel` | `ModelThinkingLevel` | Thinking level for the preset. |\n\n#### `RecapConfig`\n\nAll fields are optional, including `thinkingLevel`. If the recap model configuration is incomplete, pi-spark falls back to the session's main model.\n\n| Field | Value | Description |\n| --- | --- | --- |\n| `idle` | number (ms) or duration string | How long the session must stay idle before a recap is generated. Accepts a millisecond number or a [vercel/ms](https://github.com/vercel/ms) string (e.g., `\"5m\"`); minimum 5000 ms, defaults to 5 minutes. |\n| `provider` | string | Provider ID for the recap model. |\n| `model` | string | Model ID for the recap model. |\n| `thinkingLevel` | `ModelThinkingLevel` | Thinking level for the recap model. |\n\n#### `ModelThinkingLevel`\n\nValid values: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`.\n\n### Turn off the features you don't like\n\nAll features are enabled by default. Set a specific feature to `false` in `spark.json` to disable it.\n\nFor example, to disable the customized footer:\n\n```json\n{\n  \"footer\": false\n}\n```\n",
+  "keywords": [
+    "pi-coding-agent",
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/zlliang/pi-spark#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zlliang/pi-spark.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/zlliang/pi-spark/main/assets/cover.png"
+  },
+  "time": {
+    "created": "2026-06-02T14:14:36.110Z",
+    "modified": "2026-06-20T14:49:53.026Z",
+    "0.1.0": "2026-06-02T14:14:36.429Z",
+    "0.1.1": "2026-06-02T14:24:11.048Z",
+    "0.1.2": "2026-06-03T08:50:30.878Z",
+    "0.2.0": "2026-06-04T03:28:42.547Z",
+    "0.2.1": "2026-06-04T03:39:15.857Z",
+    "0.3.0": "2026-06-06T17:06:48.754Z",
+    "0.3.1": "2026-06-08T06:15:45.156Z",
+    "0.4.0": "2026-06-08T08:44:04.249Z",
+    "0.5.0": "2026-06-08T10:01:05.974Z",
+    "0.5.1": "2026-06-08T12:31:26.102Z",
+    "0.5.2": "2026-06-08T12:39:37.840Z",
+    "0.6.0": "2026-06-09T02:31:58.674Z",
+    "0.6.1": "2026-06-09T07:59:04.412Z",
+    "0.6.2": "2026-06-09T10:15:36.612Z",
+    "0.6.3": "2026-06-09T13:58:36.216Z",
+    "0.7.0": "2026-06-10T00:50:45.359Z",
+    "0.8.0": "2026-06-10T12:48:05.025Z",
+    "0.9.0": "2026-06-12T05:07:21.264Z",
+    "0.9.1": "2026-06-12T05:10:45.775Z",
+    "0.9.2": "2026-06-12T05:18:37.656Z",
+    "0.9.3": "2026-06-12T07:37:01.954Z",
+    "0.9.4": "2026-06-12T12:37:27.710Z",
+    "0.9.5": "2026-06-12T12:52:12.599Z",
+    "0.10.0": "2026-06-13T01:53:11.277Z",
+    "0.10.1": "2026-06-13T02:50:13.032Z",
+    "0.10.2": "2026-06-13T06:03:47.157Z",
+    "0.10.3": "2026-06-13T06:33:17.768Z",
+    "0.10.5": "2026-06-13T06:52:31.509Z",
+    "0.11.0": "2026-06-13T07:13:21.225Z",
+    "0.11.1": "2026-06-13T09:04:00.796Z",
+    "0.11.2": "2026-06-13T09:33:08.183Z",
+    "0.12.0": "2026-06-13T22:44:42.227Z",
+    "0.13.0": "2026-06-14T01:28:00.640Z",
+    "0.13.1": "2026-06-14T01:53:24.863Z",
+    "0.14.0": "2026-06-14T06:57:41.020Z",
+    "0.14.1": "2026-06-14T07:03:29.069Z",
+    "0.14.2": "2026-06-14T07:07:49.699Z",
+    "0.14.3": "2026-06-14T09:03:52.624Z",
+    "0.14.4": "2026-06-14T09:48:43.748Z",
+    "0.14.5": "2026-06-14T10:16:01.433Z",
+    "0.14.6": "2026-06-15T01:06:07.217Z",
+    "0.14.7": "2026-06-17T09:22:01.954Z",
+    "0.15.0": "2026-06-20T14:49:52.743Z"
+  },
+  "versions_count": 43,
+  "downloads_last_week": null,
+  "download_trend": []
+}

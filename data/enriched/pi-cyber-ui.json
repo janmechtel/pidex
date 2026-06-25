@@ -1,0 +1,53 @@
+{
+  "name": "pi-cyber-ui",
+  "latest_version": "0.1.31",
+  "description": "Standalone Pi UI package with a cyber-inspired theme, custom editor, footer, and lightweight working indicator.",
+  "readme": "# pi-cyber-ui\n\nA standalone Pi package that bundles a cyber-inspired editor, compact footer, lightweight working indicator, optional compact tool rendering, and a matching dark theme.\n\nThe visual direction was inspired by Tokyo Night, but this is a new project with its own palette, naming, and packaging structure.\n\nThe extension is split into small modules for easier maintenance:\n- `editor.ts` wires editor/session events\n- `cyber-editor.ts` owns the prompt shell, prompt marker, dynamic border, and optional session name label\n- `editor-state.ts` handles session state and token accounting\n- `working.ts` renders prompt progress and idle summaries\n- `footer.ts` renders cwd, git dirty state, model, thinking level, and context usage\n- `profile.ts` resolves `native`/`full`, registers `/cyber-profile`, and persists the global user profile\n- `tool-render.ts` re-registers built-in tools with compact cyber renderers while delegating execution to Pi built-ins; activated only in `full` profile\n- `read-compact.ts` preserves Pi read compact compatibility for skills and agent resource files in `full` profile\n- `tool-registry.ts` tracks tool lifecycle, durations, and per-turn tallies in `full` profile\n- `path-utils.ts` contains shared path shortening/styling helpers\n- `token-usage.ts` contains protocol-aware exact/estimated token helpers\n\n## Contents\n\n- `themes/cyber-ui-dark.json` \u2014 Pi theme\n- `extensions/pi-cyber-ui/index.ts` \u2014 extension entrypoint\n- `extensions/pi-cyber-ui/profile.ts` \u2014 profile resolution, `/cyber-profile`, and global persistence\n- `extensions/pi-cyber-ui/editor.ts` \u2014 editor/session event wiring\n- `extensions/pi-cyber-ui/editor-state.ts` \u2014 editor/session state\n- `extensions/pi-cyber-ui/cyber-editor.ts` \u2014 Cyber editor shell\n- `extensions/pi-cyber-ui/token-usage.ts` \u2014 token usage helpers\n- `extensions/pi-cyber-ui/footer.ts` \u2014 compact footer\n- `extensions/pi-cyber-ui/working.ts` \u2014 working line and idle summary widget\n- `extensions/pi-cyber-ui/tool-render.ts` \u2014 compact built-in tool renderer\n- `extensions/pi-cyber-ui/read-compact.ts` \u2014 Pi read compact compatibility layer\n- `extensions/pi-cyber-ui/tool-registry.ts` \u2014 tool timing/tally registry\n- `extensions/pi-cyber-ui/path-utils.ts` \u2014 path display helpers\n\n## Local development\n\n```bash\ncd ~/Developer/pi-cyber-ui\nnpm install\nnpm run typecheck\n```\n\n## Using with Pi\n\nInstall from the remote repository:\n\n```bash\npi install git:github.com/22GNUs/pi-cyber-ui.git\n```\n\nFor local development, you can also install from a local checkout path:\n\n```bash\npi install /path/to/pi-cyber-ui\n```\n\nThe package is structured to be publishable later via git or npm without changing the directory layout.\n\n### Profiles\n\n`pi-cyber-ui` defaults to the low-intrusion `native` profile:\n\n```bash\npi\n```\n\nSwitch profiles with the built-in command:\n\n```text\n/cyber-profile native\n/cyber-profile full\n/cyber-profile toggle\n/cyber-profile status\n```\n\nThe command persists the choice globally to `~/.pi/agent/pi-cyber-ui.json` and automatically reloads Pi so the new profile takes effect.\n\nYou can also use an environment variable as a temporary override:\n\n```bash\nPI_CYBER_UI_PROFILE=full pi\n```\n\nAvailable profiles:\n\n| Profile | Default | Tool overrides | Use case |\n|---|---:|---:|---|\n| `native` | \u2705 | none | Keeps Pi native tool definitions/renderers for maximum compatibility with Pi defaults and other extensions. Keeps theme, editor, footer, and working indicator. Tool colors come from theme tokens only. |\n| `full` | \u2014 | `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls` | Enables compact tool rows, Nerd Font tool icons, per-tool header colors, summaries, durations, and compact read affordances. May conflict with other extensions that register the same tool names. |\n\nEnable the full compact tool rendering explicitly:\n\n```text\n/cyber-profile full\n```\n\nUnknown persisted or environment profile values fall back to `native`. If `PI_CYBER_UI_PROFILE` is set by your shell, it overrides the persisted config on future launches.\n\nWhen it is published, install it with one of these forms:\n\n```bash\npi install npm:pi-cyber-ui\n# or\npi install git:github.com/22GNUs/pi-cyber-ui.git\n```\n\n## Architecture contract\n\nThis package is not a full tool implementation fork. Tool rendering is profile-gated progressive enhancement.\n\nIn the default `native` profile, `pi-cyber-ui` does not re-register any Pi built-in tools. This preserves Pi native tool definitions/renderers and avoids conflicts with other extensions. Tool-level coloring is limited to theme tokens such as `toolTitle`, `toolOutput`, `toolPendingBg`, `toolSuccessBg`, `toolErrorBg`, and diff colors.\n\nIn the explicit `full` profile, built-in tools are re-registered to control the UI, but execution and prompt metadata continue to come from Pi's native tool definitions.\n\n- Inherited from Pi native tools in `full`: `execute`, parameter schemas, descriptions, prompt snippets, and prompt guidelines.\n- Customized by this package in `full`: `renderCall`, `renderResult`, compact summaries, duration/spinner display, and cyber color semantics.\n- Consequence: Pi execution-layer improvements usually apply automatically; Pi native renderer improvements do not. Renderer-specific features must be reviewed and ported when Pi changes.\n- Compatibility rule: preserve known Pi compact read affordances where they affect semantics, especially `SKILL.md` as `[skill] name` and agent resource files (`AGENTS.md` / `CLAUDE.md`) as compact resource reads.\n- Maintenance rule: after upgrading `@earendil-works/pi-coding-agent`, review Pi's built-in renderers, especially `core/tools/read`, before publishing.\n\n## Commands\n\n- `/cyber-profile [native|full|toggle|status]` \u2014 show or switch the global `pi-cyber-ui` profile. Changes are persisted and followed by an automatic reload.\n- Pi's built-in `/name <name>` sets the session display name. When present, `pi-cyber-ui` shows it in the editor's top-right border as `\u27e6 name \u27e7`.\n\n## Notes\n\n- Package name: `pi-cyber-ui`\n- Theme name: `cyber-ui-dark`\n- Extension entrypoint: `extensions/pi-cyber-ui/index.ts`\n- Exact streaming usage is protocol-aware; Anthropic Messages API can surface cumulative in-flight usage, while other APIs fall back to estimates\n- Working indicator uses Pi's official `ctx.ui.setWorkingIndicator()` / `ctx.ui.setWorkingMessage()` APIs\n- Default profile is `native`, which does not re-register built-in tools\n- Use `/cyber-profile full` or `PI_CYBER_UI_PROFILE=full` to re-register built-in tools for compact rendering while preserving their original execution behavior and prompt metadata\n- Theme format follows the official Pi theme schema\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "themes": [
+      "./themes"
+    ],
+    "extensions": [
+      "./extensions/pi-cyber-ui/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-29T14:44:29.848Z",
+    "modified": "2026-06-23T08:34:27.449Z",
+    "0.1.0": "2026-03-29T14:44:30.067Z",
+    "0.1.1": "2026-04-11T08:01:48.268Z",
+    "0.1.2": "2026-04-15T03:34:29.432Z",
+    "0.1.3": "2026-05-08T02:00:56.306Z",
+    "0.1.4": "2026-05-08T02:32:51.814Z",
+    "0.1.5": "2026-05-08T02:45:16.249Z",
+    "0.1.6": "2026-05-08T03:03:06.660Z",
+    "0.1.7": "2026-05-16T08:59:29.423Z",
+    "0.1.8": "2026-05-16T10:19:06.976Z",
+    "0.1.9": "2026-05-16T10:46:42.071Z",
+    "0.1.12": "2026-05-17T04:09:07.191Z",
+    "0.1.14": "2026-05-17T04:26:49.975Z",
+    "0.1.15": "2026-05-17T08:19:22.749Z",
+    "0.1.16": "2026-05-17T08:49:57.928Z",
+    "0.1.17": "2026-05-17T09:48:46.758Z",
+    "0.1.19": "2026-05-17T13:06:15.006Z",
+    "0.1.20": "2026-05-17T14:38:22.062Z",
+    "0.1.21": "2026-05-17T14:47:07.708Z",
+    "0.1.22": "2026-05-27T13:37:55.164Z",
+    "0.1.23": "2026-05-27T14:38:34.191Z",
+    "0.1.27": "2026-06-16T09:48:42.935Z",
+    "0.1.28": "2026-06-19T07:06:02.087Z",
+    "0.1.29": "2026-06-19T07:33:59.466Z",
+    "0.1.30": "2026-06-20T10:24:00.488Z",
+    "0.1.31": "2026-06-23T08:34:27.332Z"
+  },
+  "versions_count": 25,
+  "downloads_last_week": null,
+  "download_trend": []
+}

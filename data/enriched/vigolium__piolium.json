@@ -1,0 +1,53 @@
+{
+  "name": "@vigolium/piolium",
+  "latest_version": "0.0.11",
+  "description": "Multi-phase security audits with specialist sub-agents, isolated context windows, capped concurrency, and resumable state \u2014 packaged as a Pi extension.",
+  "readme": "<p align=\"center\">\n  <a href=\"https://github.com/vigolium\"><img alt=\"Vigolium\" src=\"https://avatars.githubusercontent.com/u/266502139?s=200&v=4\" height=\"140\" /></a>\n  <br />\n  <strong>Vigolium - high-fidelity vulnerability scanner with native scan precision and agentic scan intelligence.</strong>\n  <br />\n  <p align=\"center\"><a href=\"https://www.vigolium.com\">www.vigolium.com</a> - <a href=\"https://docs.vigolium.com\">docs.vigolium.com</a></p>\n</p>\n\n![Piolium Audit](https://github.com/vigolium/docs/blob/main/images/audit/vigolium-audit-with-piolium.png?raw=true)\n\n# Piolium\n\nPiolium is [Vigolium](https://github.com/vigolium/vigolium)'s Pi-native repository security audit agent. It runs multi-phase source audits with specialist sub-agents, resumable state, controlled concurrency, PoC generation, and final reporting.\n\nPiolium is packaged as a Pi extension. Once installed, it registers `/piolium-*` slash commands inside Pi sessions and also provides a standalone `piolium` launcher when installed through the quick installer.\n\n> [!WARNING]\n> Full audit runs can take hours. Run Piolium only against repositories you trust or inside a sandboxed working directory.\n\n## Install\n\nPiolium is a Pi package, so install [Pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) first if you don't have it:\n\n```bash\nbun add -g @earendil-works/pi-coding-agent\n```\n\nRecommended \u2014 install Piolium into your Pi from npm:\n\n```bash\npi install npm:@vigolium/piolium\n```\n\nThis registers the `/piolium-*` slash commands in your Pi sessions. Run them with `pi -p \"/piolium-balanced --fresh\"` or inside an interactive `pi` session.\n\n### From source (development)\n\nFor development from this checkout, you need Pi (the `pi` CLI) and Bun \u2265 1.1.0 already on your PATH:\n\n```bash\nbun install\npi install ./   # in-place dev install; edits in this checkout apply immediately\n```\n\n## Quick Start\n\nRun an audit with a one-shot command:\n\n```bash\npi -p '/piolium-deep'\n```\n\nOr start an interactive `pi` session and type a command such as:\n\n```text\n/piolium-deep ../target-repo --fresh\n/piolium-status\n```\n\n## Commands\n\n| Command | Purpose |\n| --- | --- |\n| `/piolium-help` | Show commands, flags, and examples. |\n| `/piolium-status [path]` | Show audit progress. |\n| `/piolium-lite [path] [--fresh]` | Quick recon, secrets scan, and fast SAST. |\n| `/piolium-balanced [path] [--fresh]` | Default audit with PoCs and report. |\n| `/piolium-deep [path] [--fresh] [P1..P17]` | Full deep audit, optionally rerunning selected phases. |\n| `/piolium-confirm [path] [--fresh] [https://target]` | Confirm existing findings live or with tests. |\n| `/piolium-diff [path] [--since=<sha>]` | Scan changed files since an audited commit. |\n| `/piolium-revisit [path] [--fresh]` | Anti-anchored second pass over an audit. |\n| `/piolium-merge [path] --dir=<tree> --dir=<tree>` | Merge and dedupe result trees. |\n| `/piolium-export [path] [--format=json\\|md-dir]` | Export filtered findings with owner labels. |\n| `/piolium-learn [path] [--apply]` | Suggest or apply project-local candidate matchers. |\n| `/piolium-smoke [path] [prompt]` | Verify runner/provider wiring. |\n| `/piolium-longshot [path] [--fresh] [--limit=N]` | File-by-file vulnerability hunt. |\n\nMost commands accept an optional target directory as the first argument.\n\n## Providers\n\nPiolium runs on whatever provider your Pi session is configured for. It also bundles an `anthropic-vertex` provider for running Claude through Google Vertex AI, registered only when Vertex is configured \u2014 any `GOOGLE_CLOUD_*` / `ANTHROPIC_VERTEX_PROJECT_ID` env var enables it, or set `PIOLIUM_VERTEX=1` to force it on (`PIOLIUM_VERTEX=0` to hide it). See [HACKING.md](HACKING.md#claude-on-vertex) for details.\n\n## Deep mode phases\n\n`/piolium-deep` runs 17 phases (`P1`\u2013`P17`) in five stages. Pass phase ids to rerun only those (e.g. `/piolium-deep . P4 P10`):\n\n- **Recon & modeling** \u2014 `P1` intelligence & dependency risk, `P2` patch history & bypass review, `P3` architecture & threat model.\n- **Analysis** \u2014 `P4` static analysis & triage, `P5` authorization & access control, `P6` state machine & concurrency, `P7` spec/parser/framework-contract gaps, `P8` manual attack-surface probe, `P9` cross-service data flow.\n- **Adversarial validation** \u2014 `P10` adversarial review chamber, `P11` false-positive verification, `P12` variant search.\n- **PoC & reporting** \u2014 `P13` proof-of-concept construction, `P14` per-finding report drafting, `P15` final report assembly, `P16` finding verification.\n- **Cleanup** \u2014 `P17` removes transient workspaces and tool artifacts.\n\nSee [docs/phase-reference.md](docs/phase-reference.md) for per-phase behavior and outputs.\n\n## Output\n\nAll audit artifacts are written under a `piolium/` directory in the target repository:\n\n```text\npiolium/\n  audit-state.json          # resumable run state and per-phase status\n  attack-surface/           # durable knowledge base: recon, SAST, probes, threat model\n  findings-draft/           # candidate findings, named by the phase that produced them\n  findings/<id>-<slug>/      # final findings: draft.md, report.md, poc.*, evidence/\n  final-audit-report.md     # consolidated report across finalized findings\n  tmp/piolium/runs/<id>/     # per-agent transcripts (removed by cleanup phases)\n```\n\nNot every command writes every path \u2014 Lite skips the deep workspaces, while Deep adds the full `attack-surface/` corpus plus `variant-summary.md` and, when findings confirm, `confirmation-report.md`. For a finished audit, start with `final-audit-report.md`, then each `findings/<id>-<slug>/report.md`.\n\nUseful references:\n\n- [HACKING.md](HACKING.md) - technical setup, flags, retries, release, and development notes.\n- [docs/phase-reference.md](docs/phase-reference.md) - phase behavior and outputs.\n- [docs/output-structure.md](docs/output-structure.md) - output directory layout.\n\n## Security Note\n\nPi packages execute code locally. Extensions run TypeScript, skills can ask the model to run shell commands, and Piolium's audit agents use filesystem and shell tooling. Treat Piolium as trusted local tooling and sandbox untrusted targets.\n\n## License\n\nPiolium is made with \u2665 by [@j3ssie](https://github.com/j3ssie) and it is released under the MIT license.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "security",
+    "audit",
+    "subagents",
+    "piolium"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/vigolium/piolium",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vigolium/piolium.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/piolium/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ],
+    "themes": [
+      "./themes"
+    ]
+  },
+  "time": {
+    "created": "2026-05-17T12:12:49.246Z",
+    "modified": "2026-06-25T12:48:08.853Z",
+    "0.0.1": "2026-05-17T12:12:49.514Z",
+    "0.0.2": "2026-05-18T18:21:30.734Z",
+    "0.0.3": "2026-05-20T16:48:44.696Z",
+    "0.0.4": "2026-05-22T12:31:11.381Z",
+    "0.0.5": "2026-05-23T07:17:42.679Z",
+    "0.0.6": "2026-05-23T09:03:37.005Z",
+    "0.0.7": "2026-05-23T11:46:53.316Z",
+    "0.0.8": "2026-05-23T14:41:24.883Z",
+    "0.0.9": "2026-05-29T05:23:28.084Z",
+    "0.0.10": "2026-06-04T14:21:18.132Z",
+    "0.0.11": "2026-06-25T12:48:08.693Z"
+  },
+  "versions_count": 11,
+  "downloads_last_week": null,
+  "download_trend": []
+}

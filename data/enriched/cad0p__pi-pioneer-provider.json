@@ -1,0 +1,48 @@
+{
+  "name": "@cad0p/pi-pioneer-provider",
+  "latest_version": "0.2.4",
+  "description": "Pi coding agent provider for Pioneer AI API",
+  "readme": "# @cad0p/pi-pioneer-provider\n\nA [Pi](https://pi.dev) provider extension that connects to [Pioneer AI](https://pioneer.ai)'s OpenAI-compatible API.\n\n> Fork of [`jalyfeng/pi-pioneer-provider`](https://github.com/jalyfeng/pi-pioneer-provider) that opts out of\n> Pioneer's inference retention by sending `store: false` on every request (see [Privacy](#privacy)).\n\n## Installation\n\nInstall the package via Pi's package manager:\n\n```bash\npi install npm:@cad0p/pi-pioneer-provider\n```\n\nOr pin to a specific version:\n\n```bash\npi install npm:@cad0p/pi-pioneer-provider@0.2.0\n```\n\n## Authentication\n\nChoose one of the following methods:\n\n### 1. Interactive Login (Recommended)\n\nRun `/login` inside Pi, select **Pioneer AI**, and enter your API key when prompted. The key is stored securely by Pi's auth system.\n\n### 2. Environment Variable\n\nSet the `PIONEER_API_KEY` environment variable before starting Pi:\n\n```bash\nexport PIONEER_API_KEY=pio_sk_xxxxxxxxxxxxxxxx\npi\n```\n\n## Supported Models\n\nModels are discovered dynamically at startup from Pioneer's `/base-models` endpoint. Only chat-capable decoder models with inference support are exposed.\n\n**Plus the `pioneer/auto` router model** (added statically \u2014 not exposed via `/base-models`), which automatically routes tasks to the cheapest model meeting quality thresholds.\n\nThe following model capabilities are reported:\n\n- **Reasoning**: Enabled for all discovered concrete models\n- **Router thinking**: Disabled for `pioneer/auto`. Pioneer's `/v1/messages` router can select upstreams that reject Anthropic extended-thinking payloads, so the provider clamps Pi thinking off for the router while leaving concrete Pioneer models reasoning-capable.\n- **GLM/ZAI thinking**: Pioneer GLM models discovered as `zai-org/*` use the ZAI-style `thinking` request field through Pioneer's OpenAI-compatible chat-completions endpoint.\n- **Context window**: Fetched from Pioneer API. For the router model, derived dynamically as the **maximum context window among all discoverable models** (currently 1M tokens)\n- **Max tokens**: Set to `min(context_window / 4, 131072)` for all models\n\n> **Note**: The router model's limits are computed at startup from the live `/base-models` catalog. Since the router can route to any candidate model, its effective limits equal the maximum of the pool.\n\n## Configuration\n\nThe provider uses `https://api.pioneer.ai/v1` as the default base URL. You can override it via the `PIONEER_BASE_URL` environment variable:\n\n```bash\nexport PIONEER_BASE_URL=https://your-custom-endpoint.com/v1\n```\n\n## Prompt Caching\n\nPioneer honors prompt caching on `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, and native generate endpoints. This provider routes Pioneer Claude models and the `pioneer/auto` router through Pioneer's Anthropic-compatible `/v1/messages` endpoint because its usage accounting exposes cache reads and writes cleanly (`cache_read_input_tokens` / `cache_creation_input_tokens`). OpenAI/GPT-family models, including `gpt-5.5`, use Pioneer's OpenAI Responses endpoint so GPT reasoning traces and native GPT prompt caching are preserved.\n\n- **Claude/Anthropic models**: Sent through `/v1/messages` with Anthropic `cache_control` markers\n- **OpenAI/GPT models** (GPT-4, GPT-5 families): Sent through `/v1/responses` for native GPT reasoning traces and automatic prompt caching\n- **`pioneer/auto`**: Sent through `/v1/messages` so router choices, including GPT routes, get the cleaner cache accounting\n\nBy default, this provider **does** mark Pi tool definitions cacheable on the Claude/Anthropic path. Pi's tool schema can be tens of thousands of tokens, so opt out if you want to avoid a potentially large cache write on the first request. To disable tool-definition caching, start Pi with:\n\n```bash\nPIONEER_CACHE_TOOLS=0 pi\n```\n\nSet it back to `1`, `true`, `yes`, `on`, or unset to keep tool definitions cacheable by default.\n\n> **Router caveat**: `pioneer/auto` remains available, but Pioneer's router can be less reliable than selecting a concrete model on very long, mixed agent conversations (for example sessions with large context, prior tool calls/results, and prior responses from multiple model APIs). The provider disables Pi extended-thinking for `pioneer/auto` because router-selected upstreams can reject Anthropic thinking payloads; use concrete models such as `pioneer/gpt-5.5` or specific Claude models when you need explicit thinking blocks/tokens. Concrete models preserve their native transport: GPT models use `/v1/responses`, while Claude models use `/v1/messages`.\n\nSee [Pioneer's prompt caching guide](https://docs.pioneer.ai/api-reference/prompt-caching) for details.\n\n## Usage\n\nAfter installation and authentication, select a Pioneer model via `/model` or `Ctrl+L` inside Pi.\n\nExample prompt:\n\n```\nWrite a TypeScript function that fetches JSON from an API and retries on failure.\n```\n\n## Privacy\n\nBy default, Pioneer persists every inference \u2014 input, output, and metadata \u2014 to drive\nevaluation, use-case clustering, and adapter training. This fork sets `compat.supportsStore: true`\non each model so Pi emits `store: false` on every request, disabling that retention.\n\nIf you *want* retention enabled, use the upstream package instead.\n\n## Requirements\n\n- Pi coding agent (`@earendil-works/pi-coding-agent`)\n- Pioneer AI API key (starts with `pio_sk_`)\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-provider",
+    "pioneer-ai"
+  ],
+  "author": {
+    "name": "cad0p"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/cad0p/pi-pioneer-provider#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cad0p/pi-pioneer-provider.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-31T19:48:33.509Z",
+    "modified": "2026-06-22T01:31:29.601Z",
+    "0.1.0": "2026-05-31T19:48:33.830Z",
+    "0.1.0-20260531.0": "2026-05-31T20:13:17.613Z",
+    "0.1.0-20260531.1": "2026-05-31T22:58:46.599Z",
+    "0.1.1": "2026-05-31T23:05:27.631Z",
+    "0.1.1-20260611.0": "2026-06-11T16:18:29.093Z",
+    "0.2.0": "2026-06-11T16:43:23.012Z",
+    "0.2.0-20260612.0": "2026-06-12T11:48:26.618Z",
+    "0.2.0-20260612.1": "2026-06-12T12:23:13.671Z",
+    "0.2.1": "2026-06-12T12:29:16.006Z",
+    "0.2.1-20260612.0": "2026-06-12T13:13:35.583Z",
+    "0.2.2": "2026-06-12T13:17:53.542Z",
+    "0.2.2-20260613.0": "2026-06-13T02:05:18.714Z",
+    "0.2.3": "2026-06-13T03:13:54.713Z",
+    "0.2.3-20260613.0": "2026-06-13T22:43:48.575Z",
+    "0.2.3-20260622.0": "2026-06-22T00:55:54.995Z",
+    "0.2.4": "2026-06-22T01:31:29.322Z"
+  },
+  "versions_count": 16,
+  "downloads_last_week": 346,
+  "download_trend": []
+}

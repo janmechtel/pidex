@@ -1,0 +1,50 @@
+{
+  "name": "pi-packages-manager",
+  "latest_version": "1.4.0",
+  "description": "Claude-style Pi packages manager: browse, search, install, update, and remove Pi packages from inside Pi.",
+  "readme": "# pi-packages-manager\n\nA Pi packages manager extension. Browse, search, install, update, and remove\nPi packages without leaving Pi. Inspired by the Claude Code package UX.\n\n[English](README.md) \u00b7 [\u7b80\u4f53\u4e2d\u6587](docs/README.zh-CN.md) \u00b7 [Pi Discussion](https://github.com/earendil-works/pi/discussions/5322) \u00b7 [npm](https://www.npmjs.com/package/pi-packages-manager)\n\n![status](https://img.shields.io/badge/status-1.4.0-blue)\n![license](https://img.shields.io/badge/license-MIT-green)\n\n## Features\n\n- \ud83d\udce6 Claude-style overlay panel with `Tab` to switch between Installed,\n  Browse, Updates, and Settings\n- \ud83c\udf10 Multi-language UI (English, \u7b80\u4f53\u4e2d\u6587, \u7e41\u9ad4\u4e2d\u6587, \u65e5\u672c\u8a9e, \ud55c\uad6d\uc5b4) with an\n  in-panel language switcher that takes effect immediately\n- \ud83d\udd0d Fast catalog with disk cache and fuzzy ranking; supports filters like\n  `type:skill`, `source:npm`, `scope:project`, `installed`, `updates`\n- \u2b07\ufe0f Install / remove / update flows with scope selection (Global vs Project),\n  safety confirmation and reload prompt\n- \u2b06\ufe0f Update all with skip detection for pinned, git and local sources\n- \ud83d\udee1\ufe0f Detail page surfacing extensions, skills, prompts, themes, source type\n  and trust warnings\n- \ud83d\udd12 **Pre-install security audit**: every install runs a two-layer static\n  analysis (metadata + source-code keyword scan) with 4-tier risk\n  classification. High/critical packages require explicit \"Install anyway\"\n  confirmation.\n- \ud83e\udd16 **Natural language tools**: 4 LLM-callable tools (`packages_search`,\n  `packages_detail`, `packages_audit`, `packages_install`) \u2014 ask Pi to\n  find, audit, or install packages in plain English.\n- \ud83d\udd0d **Audit in detail page**: one-click \"Run security audit\" button on\n  every package detail page, with results embedded inline.\n- \ud83c\udff7 **Filter chips**: press `1-5` to filter by type \u2014 All, extension, skill,\n  prompt, theme.\n- \u26a1 **Quick shortcuts**: press `i` install, `r` remove, `u` update, `a` audit,\n  `?` help \u2014 all without leaving the panel.\n- \ud83d\udccb **Inline detail view**: `Enter` shows package detail inside the panel\n  with version, author, resources, and security audit. Press `\u2190` to go back.\n- \ud83e\udded Subcommands for power users: `list`, `search`, `install`, `remove`,\n  `update`, `info`, `settings`, `refresh`, `panel`, `legacy`\n\n## Install\n\n### From npm\n\n```bash\npi install npm:pi-packages-manager\n```\n\n### From GitHub\n\n```bash\npi install git:github.com/RexYoung000/pi-packages-manager\n```\n\n### From a local checkout\n\n```bash\ngit clone https://github.com/RexYoung000/pi-packages-manager.git\npi install /path/to/pi-packages-manager\n```\n\nAfter install, reload Pi:\n\n```text\n/reload\n```\n\n## Security audit\n\nEvery `install` (and `update`) runs a two-layer static audit before the\nfinal confirmation:\n\n1. **Metadata** via `npm view`: dependency count, peer count, file count,\n   unpacked size, npm `flags.insecure`, last-published date, declared\n   resource types.\n2. **Source code keyword scan** via `npm pack` + `tar` + grep against 15\n   known-dangerous patterns (`rm -rf`, `rimraf`, `fs.unlink`, `eval`,\n   `Function()`, `execSync`, `spawn`, `child_process`, `process.env`,\n   `chmod`, ...). Files larger than 1.5 MB are skipped to keep audits\n   snappy; `node_modules`, `test/`, `coverage/` are ignored.\n\nFindings are aggregated into a 4-tier risk:\n\n| Badge | Meaning | UX |\n| --- | --- | --- |\n| \ud83d\udfe2 safe | No findings in deep scan | Plain confirm with summary |\n| \ud83d\udfe2 low / \ud83d\udfe1 medium | Only low/medium findings, or 3+ medium | Plain confirm with summary |\n| \ud83d\udfe0 high | Any `high` finding, or high finding inside an extension | Two-step select \u2014 must pick \"Install anyway\" |\n| \ud83d\udd34 critical | Any `critical` finding | Two-step select \u2014 must pick \"Install anyway\" |\n\nThe audit is fail-safe: if `npm view` or `npm pack` fails (network,\ntimeout, etc.), the install is **not** blocked, but the failure is shown\nin the confirm dialog so the user can decide.\n\nYou can also trigger an audit from the **detail page** \u2014 click \"\ud83d\udd0d Run security\naudit\" to scan any package on demand.\n\nCredits: the audit module is adapted from\n[pi-marketplace](https://github.com/507/pi-marketplace).\n\n## Natural language tools\n\nThis extension registers 4 tools that the LLM can call directly. Try saying:\n\n> \"Find me a Pi package for MCP\"\n\n> \"Show me details of pi-tinyfish-tools\"\n\n> \"Audit the package pi-mcp-adapter before installing\"\n\n> \"Install pi-autoname\"\n\n| Tool | What it does |\n| --- | --- |\n| `packages_search` | Search packages by keyword, filter by type |\n| `packages_detail` | Full package info: version, author, resources, links |\n| `packages_audit` | Security audit: metadata + source code scan |\n| `packages_install` | Audit \u2192 confirm \u2192 install |\n\nThese tools coexist with the `/packages-list` command \u2014 use whichever feels\nmore natural.\n\n## Usage\n\nOpen the overlay panel:\n\n```text\n/packages-list\n```\n\n| Key | Action |\n| --- | --- |\n| `Tab` / `\u21e7Tab` | Switch tabs |\n| `\u2191` / `\u2193` | Navigate |\n| `Enter` | Open package detail (inline) |\n| `/` | Focus search bar |\n| `1-5` | Filter by type |\n| `i` | Install selected |\n| `r` | Remove selected |\n| `u` | Update selected |\n| `a` | Audit selected |\n| `?` | Help overlay |\n| `Esc` / `q` | Close panel |\n\n### Subcommands\n\n```text\n/packages-list list                       # installed packages\n/packages-list search [query]             # browse community\n/packages-list install <source>           # install a package\n/packages-list remove <source>            # remove a package\n/packages-list update [source]            # update one or all\n/packages-list info <source>              # detail page\n/packages-list settings                   # legacy settings view\n/packages-list refresh                    # clear catalog cache\n/packages-list panel                      # explicit overlay\n/packages-list legacy                     # classic select menu\n```\n\n### Switch language\n\nOpen the panel, press `Tab` to focus the **Settings** tab, choose a language\nand press `Enter`. The change is applied immediately and persisted to:\n\n```text\n~/.pi/agent/extensions/pi-packages-manager/data/preferences.json\n```\n\nFor project-level overrides, create:\n\n```text\n<cwd>/.pi/pi-packages-manager.json\n```\n\nwith content:\n\n```json\n{\n  \"locale\": \"zh-CN\"\n}\n```\n\nSupported locales: `en`, `zh-CN`, `zh-TW`, `ja`, `ko`.\n\n## Development\n\nRun the extension directly from source:\n\n```bash\npi -e ./src/index.ts\n```\n\nRun tests:\n\n```bash\nnpm test\n```\n\n## Roadmap\n\nSee [docs/ROADMAP.md](docs/ROADMAP.md).\n\nNext up: \u6269\u5c55\u6d4b\u8bd5\u8986\u76d6\uff08search/locale/api \u6a21\u5757\uff09\u3002\u8be6\u89c1 [docs/ROADMAP.md](docs/ROADMAP.md)\u3002\n\n## License\n\nMIT \u00a9 RexYoung000\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "packages-manager",
+    "package-manager",
+    "plugin-manager",
+    "extension",
+    "tui",
+    "overlay"
+  ],
+  "author": {
+    "name": "RexYoung000"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/RexYoung000/pi-packages-manager#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RexYoung000/pi-packages-manager.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/RexYoung000/pi-packages-manager/main/preview.png"
+  },
+  "time": {
+    "created": "2026-06-02T13:32:53.857Z",
+    "modified": "2026-06-15T10:15:58.457Z",
+    "1.0.0": "2026-06-02T13:32:54.096Z",
+    "1.0.1": "2026-06-02T13:52:50.516Z",
+    "1.0.2": "2026-06-03T06:04:31.391Z",
+    "1.0.3": "2026-06-03T10:49:13.089Z",
+    "1.1.0": "2026-06-03T14:04:47.114Z",
+    "1.1.1": "2026-06-04T02:02:43.920Z",
+    "1.2.0": "2026-06-04T03:24:21.291Z",
+    "1.2.1": "2026-06-04T03:44:10.607Z",
+    "1.3.0": "2026-06-07T08:06:02.912Z",
+    "1.3.1": "2026-06-09T04:53:50.268Z",
+    "1.3.2": "2026-06-10T06:57:21.138Z",
+    "1.4.0": "2026-06-15T10:15:58.347Z"
+  },
+  "versions_count": 12,
+  "downloads_last_week": 99,
+  "download_trend": []
+}

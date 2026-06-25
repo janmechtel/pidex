@@ -1,0 +1,68 @@
+{
+  "name": "pi-loadout",
+  "latest_version": "0.0.35",
+  "description": "Interactive tool and skill loadouts for Pi sessions.",
+  "readme": "# pi-loadout\n\nInteractive tool and skill loadouts for [Pi](https://pi.dev) sessions.\n\n`pi-loadout` adds a `/loadout` command for choosing which tools and skills are active in the current Pi session, grouped by source extension/package. Toggles apply live as you change them, the session branch is updated on close, and you can save the current selection as a global default for future sessions.\n\n## Install\n\n```bash\npi install npm:pi-loadout\n```\n\n## Usage\n\n```text\n/loadout          # open interactive picker\n/loadout full     # enable every available tool and skill\n/loadout minimal  # enable only built-in tools and skills\n/loadout default  # apply saved global default loadout\n/loadout save <name>    # save current loadout as a user preset\n/loadout use <name>     # apply a built-in, default, or user preset\n/loadout list           # list built-in and user presets\n/loadout delete <name>  # delete a user preset\n/loadout status   # print current active tools and skills\n/loadout reset    # alias for /loadout full\n/loadout help     # show subcommand list\n```\n\n### Picker controls\n\nThe hint bar is contextual to the active pane, and the selected row's description spells out the actions available on it. Press `?` for the full shortcut overlay:\n\n- Just start typing \u2014 filters tools/skills live by their name **or** their extension/source name (standard text editing, including word delete with Option/Alt+Delete)\n- `?` \u2014 toggle the shortcut overlay\n- `Tab` \u2014 switch between Tools, Skills, and Presets panes\n- `Space` \u2014 toggle the selected group/tool/skill, or apply the selected preset (applies immediately)\n- `Enter` \u2014 collapse/expand the selected group, or apply the selected preset\n- `Ctrl+P` \u2014 save current selection as a user preset using the search field as the preset name\n- `Ctrl+D` \u2014 delete the selected user preset in the Presets pane\n- `Ctrl+S` \u2014 save current selection as the global default (`~/.pi/agent/loadout.json`)\n- `\u2191` / `\u2193` \u2014 navigate\n- `Esc` \u2014 clear the search filter if one is active, otherwise close the picker (live changes are kept and persisted to the session branch)\n\n## Why use `/loadout`?\n\nPi enables every installed tool and skill by default. As your package list grows, that becomes harder to manage. `/loadout` gives you grounded control over what each session can do:\n\n- **Hide skills you don't want auto-suggested, keep them callable manually.** Disabled skills are removed from the model's `<available_skills>` system prompt block, but `/skill:name` invocation still works. Useful when a skill is helpful occasionally but distracting in normal turns.\n- **Disable tools you don't want the model to reach for in this session** without uninstalling the package that provides them. Saved selection persists in the current session branch and is restored when you resume.\n- **Run Pi on smaller or cheaper models** by trimming the tool definitions and skill block down to what the task actually needs.\n- **Debug extensions** by toggling individual tools or whole packages on and off without an install/reinstall cycle.\n- **Start from presets.** `/loadout full` enables everything; `/loadout minimal` enables only built-in tools and skills; `/loadout default` reapplies your saved global default.\n- **Save reusable presets.** `/loadout save <name>` stores the current selection in `~/.pi/agent/loadout-profiles.json`; the interactive Presets pane can list, apply, save, and delete them too.\n- **Set a sensible default once.** `Ctrl+S` in the picker writes the current selection to `~/.pi/agent/loadout.json`, which seeds new sessions until you override it per-branch.\n\n## How it works\n\n- **Live apply.** Each toggle in the picker calls Pi's active-tool API immediately. There is no separate \"save\" step inside the picker for the session; changes are in effect as you make them.\n- **Branch-persisted on close.** When the picker closes (Esc, or selecting a confirmation), the current selection is appended to the session branch as a custom entry (`pi-loadout:selection`). Resuming or branching the session restores it.\n- **Presets.** `full` selects all tools and skills. `minimal` selects only entries whose source is Pi built-in. `default` applies the saved global default from `~/.pi/agent/loadout.json`. User presets are full snapshots saved under `~/.pi/agent/loadout-profiles.json`.\n- **Interactive Presets pane.** Press `Tab` to reach Presets. `Space`/`Enter` applies the selected preset. Type a name and press `Ctrl+P` to save the current selection. Select a user preset and press `Ctrl+D` to delete it.\n- **Global default (`Ctrl+S`).** Writes the current selection to `~/.pi/agent/loadout.json`. New sessions without their own branch entry read this file.\n- **Skill filtering.** The skill list shown to the model is filtered in `before_agent_start` by replacing the `<available_skills>` block. Explicit `/skill:name` invocations are unaffected.\n- **Session log entries.** Loadout changes are logged as visible session messages (`pi-loadout:loadout changed`) for resume/export readability. These log entries are filtered out of context, compaction, and tree summarization, so they don't pollute model input.\n- **Status bar.** While installed, the footer shows `N/total tools \u00b7 N/total skills` for the current session.\n\n### Group rows\n\n- `\u25cf enabled` \u2014 every item in the group is enabled\n- `\u25d0 partial` \u2014 some items in the group are enabled\n- `\u25cb disabled` \u2014 no items in the group are enabled\n\nToggling a group toggles every item in that group. Toggling an item affects only that item.\n\n## Caveats\n\n- **Prompt-cache miss on change.** Changing tool definitions or available skills invalidates provider prompt caches. The next response after a loadout change is typically slower and more expensive. If you toggle frequently within a session, expect repeated cache misses.\n- **Mid-session changes are silent to the model.** Loadout log entries are filtered out of the model's context. If a tool disappears mid-session the model may still attempt to call it on the next turn before adapting.\n- **Preset snapshots are explicit.** User presets store exact tool and skill names. If extensions are later removed, missing entries are ignored when applying the preset.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "tools",
+    "skills",
+    "loadout"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/tianrendong/pi-loadout#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tianrendong/pi-loadout.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-16T18:24:11.520Z",
+    "modified": "2026-06-02T00:55:37.226Z",
+    "0.0.1": "2026-05-16T18:24:11.803Z",
+    "0.0.2": "2026-05-16T18:29:39.115Z",
+    "0.0.3": "2026-05-16T18:30:38.077Z",
+    "0.0.4": "2026-05-16T18:33:54.576Z",
+    "0.0.5": "2026-05-16T18:34:31.081Z",
+    "0.0.6": "2026-05-16T18:40:06.496Z",
+    "0.0.7": "2026-05-16T18:42:49.753Z",
+    "0.0.8": "2026-05-16T18:43:26.963Z",
+    "0.0.9": "2026-05-16T18:47:14.850Z",
+    "0.0.10": "2026-05-16T18:58:35.747Z",
+    "0.0.11": "2026-05-16T19:01:13.518Z",
+    "0.0.12": "2026-05-16T19:10:05.366Z",
+    "0.0.13": "2026-05-16T19:13:21.309Z",
+    "0.0.14": "2026-05-17T01:48:24.982Z",
+    "0.0.15": "2026-05-17T02:03:55.890Z",
+    "0.0.16": "2026-05-17T02:33:59.451Z",
+    "0.0.17": "2026-05-17T02:42:12.277Z",
+    "0.0.18": "2026-05-17T02:45:53.865Z",
+    "0.0.19": "2026-05-17T02:57:54.527Z",
+    "0.0.20": "2026-05-17T13:40:14.481Z",
+    "0.0.21": "2026-05-17T15:42:22.829Z",
+    "0.0.22": "2026-05-17T15:58:13.709Z",
+    "0.0.23": "2026-05-17T22:47:24.318Z",
+    "0.0.24": "2026-05-18T00:37:24.434Z",
+    "0.0.25": "2026-05-18T00:39:51.808Z",
+    "0.0.26": "2026-05-18T00:49:45.565Z",
+    "0.0.27": "2026-05-18T03:26:16.248Z",
+    "0.0.28": "2026-05-18T11:00:42.489Z",
+    "0.0.29": "2026-05-18T11:05:34.464Z",
+    "0.0.30": "2026-05-31T18:09:14.429Z",
+    "0.0.31": "2026-05-31T18:22:56.609Z",
+    "0.0.32": "2026-05-31T18:46:09.237Z",
+    "0.0.33": "2026-05-31T20:35:57.103Z",
+    "0.0.34": "2026-06-01T23:37:16.342Z",
+    "0.0.35": "2026-06-02T00:55:37.113Z"
+  },
+  "versions_count": 35,
+  "downloads_last_week": 91,
+  "download_trend": []
+}

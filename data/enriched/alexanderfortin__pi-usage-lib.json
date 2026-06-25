@@ -1,0 +1,41 @@
+{
+  "name": "@alexanderfortin/pi-usage-lib",
+  "latest_version": "0.2.3",
+  "description": "Shared library for Pi usage monitoring extensions",
+  "readme": "# pi-usage-lib\n\nShared library for building [Pi coding agent](https://pi.dev/) usage-monitoring extensions.\n\nIt absorbs all the boilerplate that most `*-usage` extension needs \u2014 Pi event registration, provider matching, API fetching with sandbox-aware auth, response caching, error handling, and themed footer rendering \u2014 so that each extension reduces to a single config object with two callbacks.\n\n## What's Included\n\n| Module | Exports | Purpose |\n|---|---|---|\n| `pi-usage-lib` | `createUsageExtension()`, `UsageCache`, `UsageError`, `buildAuthHeaders()`, `safeFetch()`, `safeParseJson()` | Factory + building blocks |\n| `pi-usage-lib/datetime` | `formatInstantFromEpochMs()`, `formatTimeRemainingFromEpochMs()` | Temporal date/time helpers |\n\n## Install\n\n```bash\nbun add @alexanderfortin/pi-usage-lib\n```\n\n## Quick Start\n\n```ts\nimport { createUsageExtension, buildAuthHeaders, safeFetch, safeParseJson } from \"@alexanderfortin/pi-usage-lib\"\n\nexport default createUsageExtension({\n  providerPrefix: \"myprovider\",\n  statusKey: \"myprovider-usage\",\n  label: \"MyProvider\",\n\n  async fetchUsage(modelRegistry) {\n    const headers = await buildAuthHeaders(modelRegistry, \"myprovider\")\n    const response = await safeFetch(\"https://api.myprovider.com/usage\", { headers })\n    const data = await safeParseJson(response)\n    return { balance: data.balance }\n  },\n\n  renderStatus(data, theme) {\n    return theme.fg(\"muted\", \"MyProvider:\") + theme.fg(\"accent\", `$${data.balance.toFixed(2)}`)\n  },\n})\n```\n\nThat's it \u2014 one file, no other source files needed. The factory registers all Pi events, manages caching, handles errors, and shows a themed footer automatically.\n\n## API Reference\n\n### `createUsageExtension<TData>(config)`\n\nCreates a Pi extension function from a configuration object.\n\n```ts\ninterface UsageExtensionConfig<TData> {\n  providerPrefix: string      // e.g. \"zai\", \"deepseek\"\n  statusKey: string           // e.g. \"zai-usage\"\n  label: string               // e.g. \"MyProvider\"\n  cooldownMs?: number         // cache TTL (default: 30_000)\n  fetchUsage: FetchUsageFn<TData>\n  renderStatus: RenderStatusFn<TData>\n  renderError?: RenderErrorFn // optional, defaults to themed <err:code> display\n}\n```\n\nThe returned function is a valid Pi extension \u2014 pass it as the default export or register it via `pi.extensions`.\n\n### `buildAuthHeaders(modelRegistry, providerName, extra?)`\n\nBuilds authenticated fetch headers using a **3-way sandbox-aware** strategy:\n\n1. **Real key** \u2192 sends `Authorization: Bearer <key>`\n2. **`\"proxy-managed\"` sentinel** \u2192 skips auth header (Docker Sandbox proxy handles it)\n3. **No key** \u2192 skips auth header (API returns 401 \u2192 shown as `<err:http401>`)\n\nAlways sets `Accept-Encoding: identity` to work around Pi v0.75.0's undici gzip decompression issue.\n\n### `safeFetch(url, init?)`\n\nWraps `fetch()` with structured error handling:\n\n- Network errors (DNS, timeout, proxy) \u2192 throws `UsageError` with code `\"fetch\"`\n- HTTP errors (4xx, 5xx) \u2192 throws `UsageError` with code `\"http{status}\"`\n\n### `safeParseJson<T>(response)`\n\nParses `response.json()` with error handling:\n\n- Empty or malformed body \u2192 throws `UsageError` with code `\"badjson\"`\n\n### `UsageError`\n\n```ts\nclass UsageError extends Error {\n  readonly name = \"UsageError\"\n  readonly code: string  // e.g. \"fetch\", \"http401\", \"badjson\", custom codes\n}\n```\n\nUsed by `safeFetch`, `safeParseJson`, and the default error renderer. Extensions can throw `UsageError` from their `fetchUsage` with custom codes \u2014 the default `renderError` will display them as `<err:code>` in the footer.\n\n### `UsageCache<TData>`\n\nThe generic cache class used internally by `createUsageExtension`. Available for advanced use cases where you need direct control over the cache lifecycle.\n\n## Color Thresholds (Configurable)\n\nThe library highlights usage values with color when they approach or exceed limits:\n\n- **Percentage-based** (e.g. Z.ai usage): **warning** above 80%, **critical** at 90%+\n- **Credit-based** (e.g. DeepSeek balance): **warning** below $5, **critical** at $1 or less\n\n### Overriding thresholds via settings file\n\nYou can override any or all of the default thresholds by creating a JSON file at `~/.pi/agent/usage-lib.json`:\n\n```json\n{\n  \"thresholds\": {\n    \"percentage\": { \"warning\": 70, \"critical\": 85 },\n    \"credit\": { \"warning\": 5, \"critical\": 2 }\n  }\n}\n```\n\nAll keys are optional \u2014 only the ones you specify are overridden; the rest keep their defaults. Unknown keys and non-numeric values are silently ignored. The file is read once per session and cached.\n\n### Overriding thresholds programmatically\n\nThe `colorForPercentage()` and `colorForCredit()` helpers accept an optional `thresholds` parameter:\n\n```ts\nimport { colorForPercentage, type ColorThresholds } from \"@alexanderfortin/pi-usage-lib\"\n\nconst custom: ColorThresholds = {\n  percentage: { warning: 60, critical: 75 },\n  credit: { warning: 5, critical: 1 },\n}\n\n// In your renderStatus callback:\nconst color = colorForPercentage(data.percentage, theme, custom)\n```\n\nWhen no `thresholds` argument is passed, the functions fall back to the values loaded from the settings file (or the built-in defaults).\n\n### Color threshold API\n\n| Export | Description |\n|---|---|\n| `ColorThresholds` | Type describing the threshold structure |\n| `DEFAULT_COLOR_THRESHOLDS` | Built-in default thresholds |\n| `loadColorThresholds()` | Load & cache thresholds from the settings file |\n| `mergeThresholds(defaults, overrides)` | Merge partial overrides into defaults |\n| `getSettingsFilePath()` | Resolve the path to `~/.pi/agent/usage-lib.json` |\n\n### Error Display (Default Behavior)\n\nBy default, errors are shown in the footer using the following pattern:\n\n```\nMyProvider:<err:http401>\nMyProvider:<err:fetch>\nMyProvider:<err:badjson>\n```\n\nNo `console.error` is called \u2014 the footer is the error channel. To customize, provide a `renderError` callback. Return `undefined` to clear the footer instead.\n\n### Date/Time Utilities (`pi-usage-lib/datetime`)\n\n```ts\nimport { formatInstantFromEpochMs, formatTimeRemainingFromEpochMs } from \"@alexanderfortin/pi-usage-lib/datetime\"\n\nformatInstantFromEpochMs(1705318245000)    // \"Mon, 15 Jan 2024, 14:30:45 GMT\"\nformatTimeRemainingFromEpochMs(Date.now() + 3665000)  // \"1h 1m 5s\"\n```\n\n## License\n\nSee [LICENSE](./LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "usage-monitoring",
+    "api-quota"
+  ],
+  "author": {
+    "name": "Alexander Fortin"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/shaftoe/pi-usage-lib#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shaftoe/pi-usage-lib.git"
+  },
+  "pi": {},
+  "time": {
+    "created": "2026-05-29T17:39:46.751Z",
+    "modified": "2026-06-25T05:06:25.293Z",
+    "0.0.1": "2026-05-29T17:39:47.145Z",
+    "0.0.2": "2026-06-01T15:41:43.423Z",
+    "0.0.3": "2026-06-05T10:47:18.738Z",
+    "0.0.4": "2026-06-14T15:19:52.132Z",
+    "0.0.5": "2026-06-15T12:26:42.607Z",
+    "0.0.6": "2026-06-17T09:46:39.605Z",
+    "0.0.7": "2026-06-17T11:48:17.292Z",
+    "0.1.0": "2026-06-17T16:51:55.732Z",
+    "0.2.0": "2026-06-18T07:44:44.887Z",
+    "0.2.1": "2026-06-21T18:07:25.876Z",
+    "0.2.2": "2026-06-23T06:16:43.491Z",
+    "0.2.3": "2026-06-25T05:06:24.988Z"
+  },
+  "versions_count": 12,
+  "downloads_last_week": 806,
+  "download_trend": []
+}

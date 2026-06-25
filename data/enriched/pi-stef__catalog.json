@@ -1,0 +1,50 @@
+{
+  "name": "@pi-stef/catalog",
+  "latest_version": "0.6.5",
+  "description": "Pi extension for managing skill/package catalogs.",
+  "readme": "# @pi-stef/catalog\n\nDeclarative package manager for the [pi](https://pi.dev) coding agent. Manage your skills and extensions from a single `cat.yaml` file, sync across machines via GitHub Gist.\n\n## Installation\n\n```bash\npi install npm:@pi-stef/catalog\n```\n\n## Quick Start\n\n```bash\n# 1. Authenticate with GitHub (requires gh CLI)\n/ct login\n\n# 2. Initialize catalog from installed packages (or import from a gist)\n/ct init\n#   or: /ct init --from-gist=<gist-id>\n\n# 3. Sync \u2014 install missing, remove orphaned, push changes to gist\n/ct sync\n```\n\nAfter `ct login`, your GitHub token is cached for future sync operations.\n\n## Hot-Reload\n\nCommands that install, update, or remove packages (`add`, `update`, `remove`, `disable`, `sync`, `pull`) automatically reload extensions after a successful operation. This means new or updated tools are available immediately without restarting pi.\n\nIf the reload fails or is not available (e.g., when invoked via an LLM tool), you'll see a message asking you to restart pi for changes to take effect.\n\n## Command Reference\n\nAll commands are invoked as `/ct <subcommand>` inside pi, or via the shorthand `/ct-<subcommand>`.\n\n| Subcommand | Alias | Description | Flags |\n|---|---|---|---|\n| `sync` | \u2014 | Full sync cycle: pull \u2192 reconcile \u2192 execute \u2192 push | `--dry-run`, `--force`, `--no-push`, `--profile=<name>` |\n| `init` | \u2014 | Initialize catalog from installed packages or a gist | `--from-gist=<id>` |\n| `add` | `a` | Add a package to the catalog and install it | `--type=<t>`, `-s <t>`, `--scope=@pi-stef` |\n| `remove` | `rm` | Remove a package from the catalog | `--yes`, `--scope=@pi-stef` |\n| `toggle` | \u2014 | Toggle a package's enabled state (enabled \u2194 disabled) | \u2014 |\n| `enable` | \u2014 | Enable a disabled package | \u2014 |\n| `disable` | \u2014 | Disable a package and uninstall it | \u2014 |\n| `update` | `up` | Update packages to latest versions | `--all` |\n| `push` | \u2014 | Push local catalog + lock to GitHub Gist | `--dry-run`, `--profile=<name>` |\n| `pull` | \u2014 | Pull remote catalog from gist and reconcile | `--dry-run`, `--profile=<name>` |\n| `login` | \u2014 | Authenticate with GitHub via `gh` CLI | \u2014 |\n| `status` | \u2014 | Show catalog status with package listing | \u2014 |\n| `diff` | \u2014 | Show diff between local and remote catalog | \u2014 |\n| `verify` | \u2014 | Verify catalog integrity | \u2014 |\n| `profiles` | \u2014 | List all profiles with active indicator | \u2014 |\n| `profile` | \u2014 | Show or switch active profile | \u2014 |\n| `reset` | \u2014 | Uninstall all @pi-stef packages and delete config | `--yes` |\n\n### Adding Packages\n\n```bash\n# Add from a git source (name auto-derived)\n/ct add git:github.com/user/repo#packages/my-skill\n\n# Add an npm package\n/ct add npm:lodash\n\n# Add all @pi-stef packages at once\n/ct add --scope=@pi-stef\n```\n\n### Removing Packages\n\n```bash\n/ct remove my-skill\n/ct remove --scope=@pi-stef\n```\n\n### Enabling and Disabling\n\n```bash\n/ct enable my-skill      # Enable a disabled package\n/ct disable my-skill     # Disable a package (uninstalls it)\n/ct toggle my-skill      # Toggle enabled \u2194 disabled\n```\n\n## `cat.yaml` Format\n\nThe catalog is stored in `cat.yaml`. Example:\n\n```yaml\nmeta:\n  pi_version: \"0.70.0\"\n  activeProfile: default\n\npackages:\n  pair:\n    source: \"git:github.com/sfiorini/pi-stef#packages/pair\"\n    type: skill\n  team:\n    source: \"git:github.com/sfiorini/pi-stef#packages/team\"\n    type: skill\n  atlassian:\n    source: \"git:github.com/sfiorini/pi-stef#packages/atlassian\"\n    type: skill\n    enabled: false\n```\n\n### Package Fields\n\n| Field | Required | Description |\n|---|---|---|\n| `source` | \u2713 | Package source URL (`npm:\u2026` or `git:\u2026`) |\n| `type` | \u2014 | `skill` or `pi-native` |\n| `profile` | \u2014 | Profile name this package belongs to |\n| `enabled` | \u2014 | `true` (default) or `false` |\n| `companions` | \u2014 | Array of companion source strings to auto-install |\n\n### Companions\n\nA package can declare required companion packages in its own `package.json`:\n\n```json\n{\n  \"pi\": {\n    \"companions\": [\"git:github.com/obra/superpowers\"]\n  }\n}\n```\n\nWhen `ct add` installs such a package, it also installs each companion that\nisn't already installed. Companions resolve transitively (a companion may\ndeclare its own companions) up to a depth of 3, with de-duplication so each\nsource installs at most once.\n\n### Examples\n\n**NPM source:**\n```yaml\npackages:\n  lodash:\n    source: \"npm:lodash\"\n```\n\n**Git source:**\n```yaml\npackages:\n  my-extension:\n    source: \"git:github.com/user/repo#packages/my-extension\"\n    type: pi-native\n```\n\n## Setup Detection\n\nPackages can include a `.pi-setup.json` file declaring requirements (environment variables, config files, CLI tools). After install or update, the catalog checks these requirements and warns if anything is missing.\n\n```json\n{\n  \"env\": [\"API_TOKEN\"],\n  \"files\": [\"config.json\"],\n  \"cli\": [\"docker\"]\n}\n```\n\n## Profiles\n\nProfiles let you maintain different package sets for different machines or contexts (e.g., work vs. personal).\n\n```yaml\nmeta:\n  pi_version: \"0.70.0\"\n  activeProfile: work\n\npackages:\n  pair:\n    source: \"git:github.com/sfiorini/pi-stef#packages/pair\"\n\nprofiles:\n  work:\n    packages:\n      atlassian:\n        source: \"git:github.com/sfiorini/pi-stef#packages/atlassian\"\n  personal:\n    packages:\n      figma:\n        source: \"git:github.com/sfiorini/pi-stef#packages/figma\"\n```\n\n**Profile commands:**\n- `/ct profiles` \u2014 list all profiles (shows active with a marker)\n- `/ct profile <name>` \u2014 switch active profile\n- `--profile=<name>` flag on `sync`, `push`, `pull` \u2014 operate on a specific profile\n\nThe `default` profile always exists and uses the base `packages` section. Profile packages override base packages with the same key.\n\n## Configuration\n\n### File Locations\n\n| File | Path | Purpose |\n|---|---|---|\n| Catalog | `~/.pi/sf/catalog/cat.yaml` | Declarative package manifest |\n| Lock file | `~/.pi/sf/catalog/catalog.lock.json` | Installed versions and hashes |\n| Gist cache | `~/.pi/sf/catalog/` | Cached gist ID for sync |\n\n### GitHub Gist Setup\n\nSync uses GitHub Gists for cloud storage. Prerequisites:\n\n1. Install the [GitHub CLI (`gh`)](https://cli.github.com/)\n2. Authenticate: `gh auth login`\n3. Run `/ct login` inside pi to verify and cache your token\n\nOn first `ct push` or `ct sync`, a secret gist is created automatically.\n\n## Development\n\n```bash\npnpm install          # Install dependencies\npnpm -F @pi-stef/catalog test    # Run tests\npnpm -F @pi-stef/catalog typecheck  # Type check\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "catalog"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://sfiorini.github.io/pi-stef/packages/catalog.html",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sfiorini/pi-stef.git",
+    "directory": "packages/catalog"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-11T23:37:47.110Z",
+    "modified": "2026-06-20T22:58:27.917Z",
+    "0.2.2": "2026-06-11T23:37:47.472Z",
+    "0.3.0": "2026-06-12T00:04:15.915Z",
+    "0.3.1": "2026-06-12T01:04:23.855Z",
+    "0.3.2": "2026-06-12T01:23:50.469Z",
+    "0.3.3": "2026-06-12T01:38:40.285Z",
+    "0.3.4": "2026-06-12T02:12:22.524Z",
+    "0.3.5": "2026-06-12T02:26:15.844Z",
+    "0.4.0": "2026-06-12T19:52:16.107Z",
+    "0.5.0": "2026-06-14T21:38:39.933Z",
+    "0.5.1": "2026-06-15T21:24:33.287Z",
+    "0.5.2": "2026-06-17T03:34:29.437Z",
+    "0.5.3": "2026-06-18T03:26:06.399Z",
+    "0.5.4": "2026-06-18T23:33:34.327Z",
+    "0.6.0": "2026-06-20T21:08:50.169Z",
+    "0.6.1": "2026-06-20T21:31:41.248Z",
+    "0.6.2": "2026-06-20T21:51:04.710Z",
+    "0.6.3": "2026-06-20T21:59:35.352Z",
+    "0.6.4": "2026-06-20T22:28:10.306Z",
+    "0.6.5": "2026-06-20T22:58:27.760Z"
+  },
+  "versions_count": 19,
+  "downloads_last_week": null,
+  "download_trend": []
+}

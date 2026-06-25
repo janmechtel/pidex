@@ -1,0 +1,57 @@
+{
+  "name": "decorated-pi",
+  "latest_version": "0.7.3",
+  "description": "decorated-pi is a practical enhancement pack for pi coding agent \u2014 token-efficient workflow, cache-friendly design, and smarter tools.",
+  "readme": "# decorated-pi\n\n`decorated-pi` is a practical enhancement pack for [Pi](https://github.com/earendil-works/pi) \u2014 token-efficient workflow, cache-friendly design, and smarter tools.\n\n## Install\n\n```bash\npi install npm:decorated-pi\npi install git:github.com/lcwecker/decorated-pi\npi install /path/to/decorated-pi\n```\n\n## Features\n\n### 1. Token Efficiency\n\nMultiple layers of token savings that compound across every session. \n\n**RTK** \u2014 integrates [RTK](https://github.com/rtk-ai/rtk) to compress bash output into structured summaries, so the LLM never sees raw noise. **Just install the CLI, zero config**.\n\n**Codegraph** \u2014 integrates [codegraph](https://github.com/colbymchenry/codegraph) to offer a code map of your project, so the LLM can navigate symbols and call graphs without chaining `ls` \u2192 `grep` \u2192 `read`. **You should manage the code source index yourself, see [codegraph doc](https://github.com/colbymchenry/codegraph/blob/main/README.md)**.\n\n**Auxiliary Models** \u2014 offloads heavy-but-dumb tasks to cheaper models so your primary model only pays for the hard work:\n\n- **Image Read Fallback** \u2014 detects image type via magic bytes, calls a configured vision-capable model, and injects the analysis text, so your main model never touches image tokens\n- **Compact Model** \u2014 handles context compaction with a smaller model instead of burning main-model capacity\n\n> Configured via `/dp-model`.\n\n**Cache\u2011friendly Design** \u2014 stable system prompt prefix:\n\n- tool definitions, guidelines, and skills are sorted alphabetically so the system prompt is identical across sessions\n- volatile elements like `Current date: \u2026` are stripped before prompt assembly\n- MCP tool schemas are persisted to a local cache, so the tool list stays stable regardless of network conditions or server availability\n\n**Pi Native Prompt Slimming**\n\n- move the default Pi documentation block out of the system prompt and into a builtin `pi-docs` skill, so the docs reference loads on demand instead of sitting in every turn's prompt\n- unregister the native `write` tool, since `bash` can handle it\n\n**Large Result Externalization**\n\n- a `tool_result` hook that catches ANY tool output (bash, read, MCP, etc.) exceeding 30 KB and saves the full content to `/tmp/decorated-pi-results/<tool>-<callId>.txt`. Pi's native truncation still keeps a chunk of the original content in the prompt; this replaces it entirely with a one\u2011line pointer (`[Output too long, saved to /tmp/\u2026]`) so the LLM knows where the result is and reads it on demand \u2014 strictly fewer tokens per turn\n\n### 2. Smarter Tools\n\nDrop\u2011in replacements for Pi's built\u2011in tools, with better UX and fewer wasted turns.\n\n#### Patch Tool\n\n| Capability | Pi native `edit` | `patch` |\n| ------ | :---: | :---: |\n| **Anchor\u2011based search** | \u274c extending `oldText` for uniqueness | \u2705 `anchor` bounds scope for precise matching |\n| **Fuzzy whitespace match** | \u274c only reports \"not found\" | \u2705 auto\u2011corrects tab\u2194space / trailing whitespace mismatches |\n| **Edit fault diagnostics** | \u274c only reports \"not found\" | \u2705 pinpoint faults for LLM comprehension |\n| **Stale\u2011read protection** | \u274c Blind to external changes | \u2705 `read` captures mtime, `patch` rejects stale targets |\n\n#### Smarter `@` File Search\n\n`decorated-pi` replaces pi's built-in `@` autocomplete with a high-speed file finder backed by **[`@ff-labs/fff-node`](https://github.com/dmtrKovalenko/fff)**\u2014 a Rust SIMD fuzzy file search engine with in-memory index, frecency ranking, and git status awareness. Pi's native provider shells out to `fd` on every keystroke.\n\n| Aspect | Pi native `@` | `decorated-pi` (FFF) |\n| ------ | :---: | :---: |\n| **Speed** | \u274c walks filesystem via `fd` subprocess on every keystroke | \u2705 in\u2011memory index built once per session, ~0.1 ms / query |\n| **Ranking** | \u274c 4\u2011bucket case\u2011sensitive score (exact/starts/contains/path) | \u2705 fuzzy match + frecency + git status (boots from git log) |\n| **Noise** | \u274c shows every file in the project, including `.git`, `node_modules`, `dist` | \u2705 filters `git\u2011ignored` files; substring filter on path keeps short queries relevant |\n\n###### Benchmark of `@`\n\n```\n\u250c\u2500 smart-at benchmark\n\u251c\u2500 generated 500,000 files in 3.9 s\n\u251c\u2500 FFF scan complete in 664 ms\n\u2502  RSS after FFF index: 408 MB  (+330 MB over baseline)\n\u251c\u2500 accuracy (14 queries)\n\u2502                  top\u20111   top\u20113   top\u20115   false\u2011pos\n\u2502  smart-at         93%     93%     93%    0\n\u2502  native (fd)      86%     93%     93%    0\n\u2514\u2500 corpus cleaned\n\nname                                            hz      mean\n\u00b7 smart-at                                      8.10    123 ms\n\u00b7 native @  (fd subprocess)                     3.12    320 ms\n\nSummary: smart-at is 2.59x faster than native @  (fd subprocess)\n```\n\n#### LSP support\n\nCovers what codegraph can't: real-time compiler and lint errors.\n\n- **`lsp_diagnostics`** \u2014 file diagnostics with severity filtering\n\nSupported languages: c/cpp, go, java, lua, json, python, ruby, rust, svelte, typescript\n\n### 3. MCP Ecosystem\n\nZero-config MCP client with built-in servers:\n\n| Server | Tool Prefix | Source |\n| --- | --- | --- |\n| Context7 | `context7_*` | `https://mcp.context7.com/mcp` |\n| Exa | `exa_*` | `https://mcp.exa.ai/mcp` |\n| codegraph | `codegraph_*` | bundled binary |\n\n**Custom servers** in `.pi/agent/mcp.json` (project) or `~/.pi/agent/mcp.json` (global). Project overrides global. Tool prompts and schemas are cached locally so MCP tools are available immediately on startup.\n\n```json\n{\n  \"mcpServers\": {\n    \"my-server\": {\n      \"url\": \"https://my-mcp.example.com/mcp\",\n      \"enabled\": true\n    },\n    \"my-sse\": {\n      \"url\": \"https://my-mcp.example.com/sse\",\n      \"enabled\": false\n    },\n    \"my-stdio\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"my-mcp-server\"],\n      \"env\": { \"DEBUG\": \"1\" }\n    }\n  }\n}\n```\n\nUse `/mcp` to view connection status and toggle servers.\n\n### 4. Secret Redaction\n\nThree-layer detection: high-confidence known-format patterns (AWS, GitHub, OpenAI, etc.), config-key regex matching, and adjusted Shannon entropy heuristics for unknown secret-like values.\n\nExample redaction on a `read` / `bash` output:\n\n```json\n{\n  \"aws_access_key_id\": \"AKI**************PLE\",\n  \"github_token\": \"ghp***************def\",\n  \"database_password\": \"Sup#######t99\",\n  \"api_key\": \"sk_**************f5a\",\n  \"random_secret\": \"a1b??????5f5\"\n}\n```\n\n> `*` = known pattern, `#` = config key regex, `?` = entropy heuristic.\n\n### 5. Other\n\n- `/usage` \u2014 token stats with cache\u2011hit rate, per\u2011model breakdown (Session / Today / This Week / This Month / All Time)\n- `/retry` \u2014 continue after interruption\n- Progressive context \u2014 supports subdirectory `AGENTS.md` / `CLAUDE.md` discovery and injection\n- **WakaTime** \u2014 coding activity tracking via [WakaTime](https://wakatime.com)\n\n## Configuration\n\nRuntime settings in `~/.pi/agent/decorated-pi.json`. run `/dp-settings` to configure it.\n\n```json\n{\n  \"modules\": {\n    \"tools\": {\n      \"patchOverrideEdit\": true,\n      \"ask\": true,\n      \"lsp\": true,\n      \"mcp\": true\n    },\n    \"hooks\": {\n      \"secretRedaction\": true,\n      \"rtk\": true,\n      \"wakatime\": true\n    },\n    \"commands\": {\n      \"atOverride\": true,\n      \"retry\": true,\n      \"usage\": true\n    }\n  },\n  \"dependencies\": {\n    \"rtk\": {\n      \"path\": \"/custom/bin/rtk\",\n      \"dontBother\": false\n    },\n    \"wakatime-cli\": {\n      \"dontBother\": true\n    }\n  }\n}\n```\n\n- `modules` can be toggled on/off to enable/disable features. All are enabled by default.\n- `dependencies[binaryName].path` overrides the lookup location for a binary (file or directory). `dependencies[binaryName].dontBother` silences missing-dependency notifications for that binary. Both are optional\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "rtk",
+    "mcp",
+    "security",
+    "lsp",
+    "lsp-client",
+    "secret-redaction",
+    "codegraph",
+    "fff",
+    "fuzzy-search"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/lcwecker/decorated-pi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lcwecker/decorated-pi.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-16T02:37:50.942Z",
+    "modified": "2026-06-23T07:53:45.801Z",
+    "0.1.0": "2026-05-16T02:37:51.107Z",
+    "0.2.0": "2026-05-16T04:55:00.772Z",
+    "0.2.1": "2026-05-16T11:35:17.176Z",
+    "0.2.2": "2026-05-16T17:02:34.247Z",
+    "0.3.0": "2026-05-19T15:14:11.136Z",
+    "0.4.0": "2026-05-25T10:13:07.089Z",
+    "0.4.1": "2026-05-27T04:06:56.157Z",
+    "0.5.0": "2026-05-30T10:24:03.323Z",
+    "0.5.1": "2026-05-30T15:38:28.495Z",
+    "0.5.2": "2026-06-01T02:08:49.941Z",
+    "0.5.3": "2026-06-02T08:43:08.388Z",
+    "0.5.4": "2026-06-03T06:15:49.611Z",
+    "0.5.5": "2026-06-04T06:55:28.439Z",
+    "0.6.0": "2026-06-12T07:55:32.198Z",
+    "0.7.0": "2026-06-13T03:46:47.828Z",
+    "0.7.1": "2026-06-14T12:14:01.328Z",
+    "0.7.2": "2026-06-15T07:01:50.131Z",
+    "0.7.3": "2026-06-23T07:53:45.705Z"
+  },
+  "versions_count": 18,
+  "downloads_last_week": 261,
+  "download_trend": []
+}
