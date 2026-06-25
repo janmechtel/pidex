@@ -1,0 +1,345 @@
+{
+  "name": "pi-verify",
+  "latest_version": "0.1.1",
+  "description": "Pi extension that runs configurable, staged code verification checks.",
+  "readme": "# pi-verify\n\nPi extension that adds one configurable verification tool for staged code checks. It replaces the Claude Code `verify` and `check-di` skills with an npm-installable Pi extension.\n\n## Install\n\n```bash\npi install npm:pi-verify\n```\n\nFor project-local installation:\n\n```bash\npi install -l npm:pi-verify\n```\n\nDuring local development in this repository:\n\n```bash\nnpm install\nnpm run build\npi -e /absolute/path/to/pi-verify\n```\n\n## Tool\n\n- `verify_code` \u2014 detects the project/profile and runs configured conditional stages.\n\n`verify_code` accepts optional `paths`. If omitted, it uses git changed/untracked files. Use `mode: \"all\"` for full project verification. To run a single configured stage, pass `stage`, for example `\"go.di\"`.\n\n## Built-in profiles\n\n### Go (`go.mod`)\n\n1. `go test ./... -count=1`\n2. `go build ./...`\n3. `go vet ./...`\n\n### Python (`pyproject.toml`)\n\n1. `uv run pytest`\n2. `uv build` when `[project]` or `[build-system]` exists\n3. `uv run ruff check .`\n4. `uv run mypy .` when `[tool.mypy]` exists\n\n### Frontend (`package.json`)\n\nUses Bun, pnpm, Yarn, or npm based on the lockfile:\n\n1. package-manager `run test` when `scripts.test` exists\n2. package-manager `run build` when `scripts.build` exists\n3. package-manager `run lint` when `scripts.lint` exists\n\n### Java Maven (`pom.xml`)\n\n1. `mvn test`\n2. `mvn checkstyle:check` when checkstyle is configured\n\n## Configuration\n\nPlace config in either:\n\n- `.pi-verify.json`\n- `.pi/verify.json`\n\nUser profiles merge with built-ins by `id`. A stage with the same `id` overrides built-in fields; a new stage is appended. Set top-level `replaceDefaults: true` to disable built-ins.\n\nEach stage may define `files` and `condition`; the tool picks matching stages automatically and executes them sequentially.\n\nSee `examples/.pi-verify.json`.\n\n## Config shape\n\n```json\n{\n  \"version\": 1,\n  \"defaults\": {\n    \"stopOnFailure\": true,\n    \"timeoutMs\": 120000,\n    \"outputMaxLines\": 400,\n    \"outputMaxBytes\": 16384\n  },\n  \"profiles\": [\n    {\n      \"id\": \"go\",\n      \"label\": \"Go\",\n      \"markers\": [\"go.mod\"],\n      \"files\": [\"**/*.go\", \"go.mod\", \"go.sum\"],\n      \"stages\": [\n        {\n          \"id\": \"test\",\n          \"label\": \"Go tests\",\n          \"command\": \"go\",\n          \"args\": [\"test\", \"./...\", \"-count=1\"],\n          \"timeoutMs\": 600000\n        },\n        {\n          \"id\": \"build\",\n          \"label\": \"Go build\",\n          \"command\": \"go\",\n          \"args\": [\"build\", \"./...\"],\n          \"timeoutMs\": 600000\n        },\n        {\n          \"id\": \"lint\",\n          \"label\": \"go vet\",\n          \"command\": \"go\",\n          \"args\": [\"vet\", \"./...\"],\n          \"timeoutMs\": 300000\n        }\n      ]\n    }\n  ]\n}\n```\n\nA stage can use either `command` + `args` or `run`:\n\n```json\n{ \"id\": \"lint\", \"run\": \"pnpm eslint .\" }\n```\n\nSupported stage conditions:\n\n```json\n{\n  \"condition\": {\n    \"exists\": [\"pyproject.toml\"],\n    \"contains\": { \"path\": \"pyproject.toml\", \"regex\": \"^\\\\s*\\\\[tool\\\\.mypy\\\\]\", \"flags\": \"m\" },\n    \"command\": { \"command\": \"test\", \"args\": [\"-f\", \"some-file\"] }\n  }\n}\n```\n\nAlso supported: `all`, `any`, and `not` nested conditions.\n\n## Publishing\n\n```bash\nnpm version patch\nnpm publish\n```\n\nThe package manifest contains:\n\n```json\n{\n  \"keywords\": [\"pi-package\"],\n  \"pi\": { \"extensions\": [\"./dist/index.js\"] }\n}\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "verify",
+    "code-checks",
+    "testing"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-05-11T18:57:32.780Z",
+    "modified": "2026-05-15T12:08:21.143Z",
+    "0.1.0": "2026-05-11T18:57:32.912Z",
+    "0.1.1": "2026-05-15T12:08:21.030Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 6,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 123
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 158
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 3
+    }
+  ]
+}

@@ -1,0 +1,353 @@
+{
+  "name": "pi-working-vibe",
+  "latest_version": "0.1.2",
+  "description": "Custom Working\u2026 message + tool-aware spinner for pi. Vibe files with [default] and [tool:<name>] sections; ships with mafia, hacker, pirate, zen.",
+  "readme": "# pi-working-vibe\n\n> Custom **Working\u2026** message and tool-aware spinner for [pi](https://pi.dev).\n\n![pi-working-vibe demo](./assets/demo.png)\n\nReplace pi's default `\u280b Working\u2026` with themed flavor text that rotates while\nthe agent is thinking, and automatically switches when the model calls a\ntool. Ships with four ready-to-use vibes: **mafia**, **hacker**, **pirate**,\n**zen**.\n\n```\n\u280b The Don is stirring...                        (default thinking)\n\u2819 The boys are kicking down doors...            (when calling bash)\n\u2839 The ledger is being scanned...                (when calling read)\n\u2838 The contract is being amended...              (when calling edit)\n```\n\n## Install\n\n```bash\n# From npm (recommended)\npi install npm:pi-working-vibe\n\n# From GitHub (always latest main)\npi install git:github.com/Davidcreador/pi-working-vibe\n\n# Project-local (writes to .pi/settings.json instead of global)\npi install -l npm:pi-working-vibe\n\n# Try without installing (single-run, ephemeral)\npi -e npm:pi-working-vibe\n```\n\nThat's it. Default vibe (`mafia`) activates immediately on the next session.\n\nUpdate later with `pi update npm:pi-working-vibe`. Remove with `pi remove npm:pi-working-vibe`.\n\n## What it does\n\n- **Rotating message**: picks random lines from `vibes/<name>.txt` every ~3.5s\n  while pi is in a turn.\n- **Tool-aware**: switches to a tool-specific pool the instant the model\n  invokes `bash`, `read`, `edit`, `grep`, `find`, `ls`, `write`, `web_search`,\n  `web_fetch`, `todo`, or any custom tool you've authored a section for.\n- **Customizable spinner**: swap the `\u280b\u2819\u2839\u2838` glyphs for one of six presets\n  (`dots`, `line`, `pulse`, `braille`, `arrow`) or fully custom frames, with\n  a themeable color.\n- **Safe**: atomic settings writes, path-traversal guards, mtime-cached file\n  IO, file-size caps, graceful degradation when a vibe pool is missing.\n\n## Vibe file format\n\nVibes are plain text. One message per line. `#` for comments. Optional\n`[section]` headers split lines into named pools:\n\n```\n# mafia.txt\nThe Don is stirring...\nShadows tally the books...\n\n[tool:bash]\nThe boys are kicking down doors...\nA package is being delivered...\n\n[tool:read]\nThe ledger is being scanned...\n\n[tool:edit]\nThe contract is being amended...\n```\n\nPools fall back to `[default]` when the active tool doesn't have its own\nsection. A file with no headers becomes one big `default` pool (backward\ncompatible with any flat vibe file).\n\n## Customize your own vibe\n\nDrop a `.txt` file into `~/.pi/agent/vibes/` and switch to it:\n\n```bash\n# in pi\n/vibe list                  # shows installed vibes (bundled + user)\n/vibe vibe:hacker           # switch\n/vibe info                  # current settings + line counts\n/vibe pools                 # sections in the active vibe\n/vibe preview               # show a sample line\n```\n\nUser files in `~/.pi/agent/vibes/` override bundled files of the same name,\nso you can fork `mafia.txt` without losing the package update.\n\n## `/vibe` command reference\n\n| Form | Effect |\n|---|---|\n| `/vibe` | Toggle master switch |\n| `/vibe info` | Show active settings + line counts |\n| `/vibe list` | List installed vibes (user + bundled) |\n| `/vibe pools` | List sections in the active vibe |\n| `/vibe on` \\| `/vibe off` | Enable / disable |\n| `/vibe reload` | Re-read settings + vibe file from disk |\n| `/vibe preview` | Pick a sample line from the active pool |\n| `/vibe vibe:<name>` | Switch active vibe |\n| `/vibe indicator:<preset>` | `default` \\| `dots` \\| `line` \\| `pulse` \\| `braille` \\| `arrow` \\| `custom` |\n| `/vibe color:<token>` | Theme color for spinner (e.g. `accent`, `primary`, `dim`) |\n| `/vibe rotate:<ms>` | Message rotation interval (`0` = no rotation) |\n| `/vibe interval:<ms>` | Spinner frame interval |\n\n## Settings reference\n\nAll keys live at the top level of `settings.json`. Project file\n`<cwd>/.pi/settings.json` overrides global `~/.pi/agent/settings.json`.\n\n| Key | Type | Default | Effect |\n|---|---|---|---|\n| `workingVibe` | boolean | `true` | Master switch |\n| `workingVibeName` | string | `\"mafia\"` | Vibe file name (no `.txt`) |\n| `workingVibeRotateMs` | number | `3500` | Rotation interval; `0` = static. Floor 750ms |\n| `workingIndicator` | enum | `\"default\"` | Spinner preset |\n| `workingIndicatorColor` | string | `\"accent\"` | Theme color token |\n| `workingIndicatorFrames` | string[] | `[]` | Custom frames (when `workingIndicator: \"custom\"`) |\n| `workingIndicatorIntervalMs` | number | `90` | Spinner frame interval. Floor 40ms |\n\nLegacy: a string value `workingVibe: \"<name>\"` from earlier ad-hoc usage is\nauto-migrated to `{workingVibe: true, workingVibeName: \"<name>\"}` on first\nload.\n\n## Lifecycle (how it hooks into pi)\n\n```\nsession_start         \u2192 load settings, install indicator, build picker\nagent_start           \u2192 reset state, set message, start rotation timer\ntool_call             \u2192 activePool=tool:<name>, refresh message\ntool_execution_end    \u2192 if no more active tools, back to default\nmessage_start (asst.) \u2192 snap to a fresh line as model resumes talking\nagent_end             \u2192 stop rotation, reset state\nsession_shutdown      \u2192 tear down timer + null out ctx ref\n```\n\nBuilt on the [extension API](https://github.com/badlogic/pi-mono/blob/main/docs/extensions.md)\npatterns: `setWorkingMessage`, `setWorkingIndicator`, and the `tool_call` /\n`tool_execution_end` event pair.\n\n## Authoring tips\n\n- Pi only renders the working line during the streaming/tool phase. Compaction\n  and retry loaders keep their own built-in styling \u2014 this is a pi constraint.\n- Custom frames are rendered verbatim; colors come from pi's theme.\n- Parallel tool calls: the most-recently-started tool wins. When that tool\n  ends, the pool falls back to the next most-recent surviving tool, or to\n  default if there are none.\n- Edit a `.txt` file while pi is running \u2014 `mtime` caching auto-invalidates\n  on the next read, or run `/vibe reload`.\n\n## Bundled vibes\n\n| File | Theme |\n|---|---|\n| `mafia.txt` | 1930s mob / made-men / consigliere |\n| `hacker.txt` | 90s cyberpunk / phreakers / ICE |\n| `pirate.txt` | High seas / treasure / plunder |\n| `zen.txt` | Calm / contemplative / minimalist |\n\nEach ships with ~110\u2013140 lines across 11 sections (default + 10 tool pools).\n\n## Contributing\n\nPRs welcome \u2014 especially new vibe themes. Each vibe should cover the standard\ntool taxonomy (`bash`, `read`, `edit`, `write`, `grep`, `find`, `ls`,\n`web_search`, `web_fetch`, `todo`) plus a meaty `[default]` pool.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "coding-agent",
+    "working-message",
+    "spinner",
+    "vibe",
+    "tui"
+  ],
+  "author": {
+    "name": "davecodes"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Davidcreador/pi-working-vibe#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Davidcreador/pi-working-vibe.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/Davidcreador/pi-working-vibe/main/assets/demo.png"
+  },
+  "time": {
+    "created": "2026-05-14T03:19:59.267Z",
+    "modified": "2026-05-14T03:23:43.990Z",
+    "0.1.1": "2026-05-14T03:19:59.593Z",
+    "0.1.2": "2026-05-14T03:23:43.874Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 8,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 236
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

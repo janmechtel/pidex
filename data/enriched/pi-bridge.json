@@ -1,0 +1,46 @@
+{
+  "name": "pi-bridge",
+  "latest_version": "0.3.1",
+  "description": "Transparent filesystem bridge that makes pi run natively on a remote machine over SSH",
+  "readme": "# pi-bridge\n\nTransparent filesystem bridge that makes [pi](https://github.com/badlogic/pi-mono) run natively on a remote machine \u2014 no internet required on the remote, no tools to install beyond Node.js.\n\nPi runs on your local machine (needs internet for auth and Claude API). Your project lives on a remote Linux machine. `pi-bridge` intercepts all of pi's filesystem calls and redirects them over SSH to a tiny HTTP server running on the remote. Pi thinks it's running locally \u2014 it finds `AGENTS.md`, skills, context files, and git state natively, without knowing they're remote.\n\n## Prerequisites\n\n- Node.js \u2265 18 on the **local** machine\n- Node.js on the **remote** machine\n- SSH access to the remote machine with key-based auth (no password prompt)\n- `pi` installed locally\n\n## Installation\n\n```bash\nnpm install -g pi-bridge\n```\n\n## Usage\n\nUse `pii` exactly like `pi`, adding `--ssh` to point at your remote project:\n\n```bash\n# Absolute path\npii --ssh user@host:/root/projects/my-app\n\n# With SSH alias (configured in ~/.ssh/config)\npii --ssh myserver:/root/projects/my-app\n\n# Tilde path (expanded by remote shell)\npii --ssh user@host:~/projects/my-app\n```\n\nEverything works natively \u2014 pi discovers `AGENTS.md`, skills, and context files on the remote without any extra flags or extensions.\n\n## Updating\n\n```bash\nnpm update -g pi-bridge\n```\n\n## How It Works\n\n```\nLocal machine                          Remote (Linux)\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\npii (bin/pii.js)\n  \u2514\u2500 node --require preload.js pi\n       \u251c\u2500 upload server bundle via SSH\n       \u251c\u2500 start HTTP server on remote\n       \u2502    \u2192 prints PORT:TOKEN:PID to stdout\n       \u251c\u2500 SSH port forward localhost:PORT\n       \u251c\u2500 create fake local dir:\n       \u2502    /tmp/pi-bridge/root/projects/my-app\n       \u251c\u2500 process.chdir(fakeLocalCwd)\n       \u251c\u2500 strip --ssh from process.argv\n       \u251c\u2500 patch fs.*  (sync + promises)     remote/index.js\n       \u2514\u2500 patch child_process.*               listens on 127.0.0.1:PORT\n                                              validates token\npi loads \u2014 unaware of bridge               restricts to remoteCwd\n  fs.readFileSync(...)  \u2500\u2500GET\u2500\u2500\u2192           reads real remote files\n  fs.readdirSync(...)   \u2500\u2500GET\u2500\u2500\u2192           \u2190 returns data\n  spawn('git', ...)     \u2500\u2500SSH\u2500\u2500\u2192           runs on remote\n  \u2192 finds AGENTS.md \u2713\n  \u2192 finds skills \u2713\n  \u2192 git branch in footer \u2713\n```\n\n\n## What Gets Patched\n\n| API | Covered |\n|---|---|\n| `fs` sync \u2014 read, write, stat, readdir, mkdir, rm, copy, rename, realpath, access, watch | \u2713 |\n| `fs.promises` \u2014 all async equivalents | \u2713 |\n| `fs/promises` module (ES module static imports) | \u2713 |\n| `child_process.spawn` / `spawnSync` \u2014 runs in remote cwd via SSH | \u2713 |\n| `fs.watch` / `fs.watchFile` \u2014 polls remote via HTTP (git branch updates) | \u2713 |\n\n`node`, `pi`, and `pii` spawns are always kept local \u2014 they need internet access and must never be redirected over SSH.\n\n## Security\n\n| Layer | Protection |\n|---|---|\n| Loopback only | HTTP server binds `127.0.0.1` \u2014 not reachable from the network |\n| SSH tunnel | All HTTP traffic encrypted end-to-end |\n| Random token | 32-byte random token required on every request |\n| Path restriction | Server rejects paths outside `remoteCwd` (403) |\n| Token in stdout | Token never appears in `ps aux` args |\n\n## Development\n\n```bash\ngit clone https://github.com/zeflq/pi-bridge\ncd pi-bridge\nnpm install\n```\n\nTest against a real remote without installing pi:\n\n```bash\nSSH_TARGET=user@host:/root/projects/my-app npm run dev\n```\n\nRun tests:\n\n```bash\nnpm test\n```\n\n## Troubleshooting\n\n**`Command failed: ssh \u2026 syntax error near unexpected token`**\nYour SSH alias requires `BatchMode=yes`. Add to `~/.ssh/config`:\n```\nHost myserver\n  BatchMode yes\n```\n\n**Files show as empty / ENOENT**\nThe fake local directory (`/tmp/pi-bridge/\u2026`) is intentionally empty \u2014 all reads go to the remote. If you see ENOENT, the bridge may not have started correctly. Check that Node.js is available on the remote (`node --version`).\n\n**Branch name not updating**\nThe footer polls `.git` every second. Switching branches from outside a pi session is reflected within ~1s. If the branch is stuck, restart `pii`.\n\n**Windows: `pii` can't find `pi`**\nEnsure the OpenSSH client is enabled (Windows 10+: Settings \u2192 Apps \u2192 Optional Features \u2192 OpenSSH Client) and `pi` is installed globally (`npm install -g pi`).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "ssh",
+    "bridge",
+    "remote",
+    "filesystem"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/zeflq/pi-bridge#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zeflq/pi-bridge.git"
+  },
+  "pi": {},
+  "time": {
+    "created": "2026-05-03T15:26:54.111Z",
+    "modified": "2026-05-11T20:04:35.356Z",
+    "0.1.1": "2026-05-03T15:26:54.261Z",
+    "0.1.2": "2026-05-04T00:14:20.964Z",
+    "0.1.3": "2026-05-04T00:18:46.616Z",
+    "0.1.4": "2026-05-04T00:21:03.099Z",
+    "0.1.5": "2026-05-04T00:22:57.098Z",
+    "0.1.8": "2026-05-04T00:28:17.818Z",
+    "0.1.9": "2026-05-04T00:33:54.303Z",
+    "0.2.0": "2026-05-04T00:36:02.880Z",
+    "0.2.2": "2026-05-04T00:47:16.586Z",
+    "0.2.4": "2026-05-04T00:53:06.924Z",
+    "0.2.6": "2026-05-04T11:26:10.839Z",
+    "0.2.7": "2026-05-07T00:33:35.511Z",
+    "0.2.8": "2026-05-07T20:40:28.264Z",
+    "0.2.9": "2026-05-07T20:57:36.496Z",
+    "0.3.0": "2026-05-07T21:21:22.127Z",
+    "0.3.1": "2026-05-11T20:04:35.236Z"
+  },
+  "versions_count": 16,
+  "downloads_last_week": null,
+  "download_trend": []
+}

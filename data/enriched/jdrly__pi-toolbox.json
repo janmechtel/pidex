@@ -1,0 +1,40 @@
+{
+  "name": "@jdrly/pi-toolbox",
+  "latest_version": "0.1.0",
+  "description": "Deferred tool loading for Pi: keep heavy tool schemas out of context until prompts need them.",
+  "readme": "# Pi Toolbox\n\nDeferred tool loading for Pi.\n\nKeep heavyweight tool schemas out of normal model context, then enable them only when the user prompt needs them.\n\n## Why\n\nPi sends active tool schemas with model requests. Big tool groups like Web, MCP, notes, databases, issue trackers, or docs search can add unnecessary context and cost to every turn.\n\nToolbox keeps ordinary turns lean and activates heavy tool groups only for prompts that need them.\n\n## What it does\n\n- Keeps one tiny always-on fallback tool: `enable_toolbox`\n- Removes configured heavy tool groups from normal turns\n- Detects user intent in Pi's `input` event before the model request starts\n- Enables matching tools for that same prompt\n- Lets the model use those tools in the same turn\n- Restores lean tools after the agent run\n- Avoids hidden/fake follow-up messages\n\n## How it works\n\nPi lifecycle used by Toolbox:\n\n```text\nuser input\n  \u2193\ninput event\n  \u2193\nbefore_agent_start\n  \u2193\nmodel request\n  \u2193\ntool calls\n  \u2193\nagent_end\n```\n\nToolbox flow:\n\n1. `session_start` / `session_switch` strips heavy tools and records lean baseline.\n2. `input` inspects raw user prompt.\n3. If prompt matches a domain, Toolbox enables that domain's tools immediately.\n4. `before_agent_start` sees the current prompt was enabled and does not strip those tools.\n5. Model request includes only normal tools + matching heavy tools.\n6. Model can call those heavy tools in the same turn.\n7. `agent_end` restores lean baseline and clears status.\n\nThis means prompts like:\n\n```text\nUpdate note:Y3NuISlJ with latest changes\n```\n\ncan activate Inkdrop tools before the LLM starts, so the same turn can call `inkdrop_read` / `inkdrop_save`.\n\nPrompts like:\n\n```text\nSearch web for latest AI news and summarize the second result\n```\n\ncan activate Web tools before the LLM starts, so the same turn can call `websearch` / `webfetch`.\n\nPrompts that mention both can activate both:\n\n```text\nCreate an Inkdrop note from the latest AI news on the web\n```\n\n## Same-turn automation vs fallback\n\nToolbox has two activation paths.\n\n### 1. Automatic input intent\n\nBest path. The extension detects intent before the model request, enables tools, and the model uses them immediately.\n\nNo extra user prompt. No fake follow-up. No `enable_toolbox` call.\n\n### 2. Manual fallback tool\n\nIf intent detection misses something, the model can call:\n\n```ts\nenable_toolbox({ domain: \"web\" })\n```\n\nThe tool returns:\n\n```text\ntoolbox_enabled\n```\n\nIt also remembers the requested domain for the next user prompt. So if the next prompt is only:\n\n```text\ncontinue\n```\n\nToolbox still enables the remembered domain before the model starts.\n\nThis fallback exists because `pi.setActiveTools()` changes the active tools for later model calls, not the already-running model request.\n\n## Install\n\n### Recommended: Pi package install\n\n```sh\npi install npm:@jdrly/pi-toolbox\n```\n\nGit install also works:\n\n```sh\npi install https://github.com/jdrly/pi-toolbox\n```\n\nThen reload Pi:\n\n```text\n/reload\n```\n\nPi reads `package.json` from npm or git and loads:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./extensions/toolbox.ts\"]\n  }\n}\n```\n\n### Manual install\n\nClone repo somewhere stable:\n\n```sh\ngit clone https://github.com/jdrly/pi-toolbox.git ~/.pi/extensions/pi-toolbox\n```\n\nAdd package to Pi settings:\n\n```json\n{\n  \"packages\": [\n    \"../extensions/pi-toolbox\"\n  ]\n}\n```\n\nOr load extension directly:\n\n```sh\npi -e ~/.pi/extensions/pi-toolbox/extensions/toolbox.ts\n```\n\nReload Pi:\n\n```text\n/reload\n```\n\n## Wire your own tools\n\nEdit `extensions/toolbox.ts`.\n\n### 1. Define tool groups\n\nDefault example:\n\n```ts\nconst WEB_TOOLS = [\"webfetch\", \"websearch\"];\nconst INKDROP_TOOLS = [\n  \"inkdrop_titles\",\n  \"inkdrop_search\",\n  \"inkdrop_read\",\n  \"inkdrop_save\",\n];\n```\n\nAdd your own groups:\n\n```ts\nconst GITHUB_TOOLS = [\"gh_issue_search\", \"gh_pr_read\", \"gh_issue_update\"];\nconst DOCS_TOOLS = [\"docs_search\", \"docs_read\"];\n```\n\n### 2. Extend domain type\n\n```ts\ntype Domain = \"web\" | \"inkdrop\" | \"both\";\n```\n\nExample:\n\n```ts\ntype Domain = \"web\" | \"inkdrop\" | \"github\" | \"docs\" | \"both\";\n```\n\n### 3. Include groups in heavyTools\n\n```ts\nfunction heavyTools(): string[] {\n  return [...WEB_TOOLS, ...INKDROP_TOOLS];\n}\n```\n\nExample:\n\n```ts\nfunction heavyTools(): string[] {\n  return [...WEB_TOOLS, ...INKDROP_TOOLS, ...GITHUB_TOOLS, ...DOCS_TOOLS];\n}\n```\n\n### 4. Map domains to tool groups\n\n```ts\nfunction domainTools(domain: Domain): string[] {\n  if (domain === \"web\") return WEB_TOOLS;\n  if (domain === \"inkdrop\") return INKDROP_TOOLS;\n  return heavyTools();\n}\n```\n\nExample:\n\n```ts\nfunction domainTools(domain: Domain): string[] {\n  if (domain === \"web\") return WEB_TOOLS;\n  if (domain === \"inkdrop\") return INKDROP_TOOLS;\n  if (domain === \"github\") return GITHUB_TOOLS;\n  if (domain === \"docs\") return DOCS_TOOLS;\n  return heavyTools();\n}\n```\n\n### 5. Detect intent from prompts\n\n```ts\nfunction detectDomain(text: string): Domain | undefined {\n  const wantsInkdrop = /\\b(inkdrop|note:[a-z0-9_-]+|book:[a-z0-9_-]+)\\b/i.test(text);\n  const wantsWeb = /\\b(web|search web|latest|https?:\\/\\/)\\b/i.test(text);\n\n  if (wantsInkdrop && wantsWeb) return \"both\";\n  if (wantsInkdrop) return \"inkdrop\";\n  if (wantsWeb) return \"web\";\n  return undefined;\n}\n```\n\nExample GitHub detector:\n\n```ts\nconst wantsGitHub = /\\b(github|issue #?\\d+|pr #?\\d+|pull request)\\b/i.test(text);\nif (wantsGitHub) return \"github\";\n```\n\nExample docs detector:\n\n```ts\nconst wantsDocs = /\\b(docs|documentation|api reference|sdk)\\b/i.test(text);\nif (wantsDocs) return \"docs\";\n```\n\nKeep regexes conservative. False positives activate more tools than needed.\n\n## Prompt guidance\n\nToolbox registers `enable_toolbox` with guidance telling the model:\n\n- auto-detection handles most Web/Inkdrop prompts\n- call `enable_toolbox` only if needed tools are missing\n- after calling it, output only `toolbox_enabled`\n- next user prompt will have requested tools active\n\nWhen adding domains, update `description`, `promptSnippet`, and `promptGuidelines` so the model knows when to use the fallback.\n\n## Status indicator\n\nWhen Toolbox enables a domain, it sets Pi status:\n\n```text\n\ud83e\uddf0web\n\ud83e\uddf0inkdrop\n```\n\nStatus clears after `agent_end` restores lean tools.\n\n## Notes\n\n- Tool names must match registered Pi tool names.\n- Missing tools are ignored.\n- Normal coding/local-file prompts stay lean.\n- Same-turn automation depends on `input` intent detection, not on the fallback tool.\n- Fallback `enable_toolbox` cannot make new tools available inside the already-running model request.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "extension",
+    "tools",
+    "deferred-tools",
+    "toolbox",
+    "context",
+    "tokens"
+  ],
+  "author": {
+    "name": "Jan Drly"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/jdrly/pi-toolbox#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jdrly/pi-toolbox.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/toolbox.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-02T22:32:58.031Z",
+    "0.1.0": "2026-05-02T22:32:58.285Z",
+    "modified": "2026-05-02T22:32:58.483Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

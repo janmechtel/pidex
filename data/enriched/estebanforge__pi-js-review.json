@@ -1,0 +1,44 @@
+{
+  "name": "@estebanforge/pi-js-review",
+  "latest_version": "1.0.0",
+  "description": "JavaScript code-review tool for Pi. Grades your git diffs against a focused JS flaws rubric (5 sections, 18 entries: equality/coercion, async, mutation/scope, globals/prototypes, security). Each entry has a bad/good pair; the LLM proposes a corrected snip",
+  "readme": "# @estebanforge/pi-js-review\n\nJavaScript code review against a focused **JS flaws rubric**. Registers a `js_review` tool that reads git diffs, filters to `.js`/`.mjs`/`.cjs`, and attaches the rubric (18 entries across 5 sections, each a one-line rationale plus a bad\u2192good pair). The rubric targets semantic and security flaws **Biome / ESLint do not reliably catch**. Every rule is grounded in a confirmed online source \u2014 see [Sources](#sources).\n\nSibling to [`@estebanforge/pi-go-review`](https://github.com/EstebanForge/pi-go-review), [`pi-php-review`](https://github.com/EstebanForge/pi-php-review), and [`pi-rust-review`](https://github.com/EstebanForge/pi-rust-review). Pair with `biome check` (or `eslint`) for compiler-grade lint coverage; this tool focuses on mistakes static analyzers may not flag.\n\n## Install\n\n```\npi install npm:@estebanforge/pi-js-review\n```\n\n## Usage\n\nAsk Pi: **\"review my JS changes.\"**\n\nThe tool runs `git` in one of five modes:\n\n| Mode | Description | Needs `ref` |\n| --- | --- | --- |\n| `working` | Unstaged changes | No |\n| `staged` | Staged (cached) changes | No |\n| `all` | All changes vs HEAD | No |\n| `commit` | A specific commit | Yes (SHA) |\n| `range` | A commit range | Yes (e.g. `main..HEAD`) |\n\nNarrow scope with `path` (a file or directory).\n\n## What it does\n\n1. Reads the git diff filtered to `*.js` / `*.mjs` / `*.cjs`.\n2. Attaches the JS flaws rubric (18 entries, 5 sections).\n3. The LLM reviews the diff and returns findings that **propose a corrected snippet**:\n\n| Severity | Meaning |\n| --- | --- |\n| Bug / Critical | Must fix |\n| Suggestion | Should consider |\n| Nit | Minor improvement |\n| Good pattern | Well done |\n\nEach finding cites the entry number (e.g. **#10**), the file + code fragment, and a corrected snippet. Ends with a **Verdict**: Approve / Request Changes / Needs Discussion.\n\n## Rubric sections\n\n| Section | Entries |\n| --- | --- |\n| 1. Equality & Coercion | #1 - #2 |\n| 2. Async | #3 - #5 |\n| 3. Mutation & Scope | #6 - #7 |\n| 4. Globals & Prototypes | #8 - #9 |\n| 5. Security | #10 - #18 |\n\nSecurity-weighted: 9 of 18 entries are injection / access-control / crypto flaws \u2014 `#10` eval, `#11` innerHTML XSS, `#12` ReDoS, `#13` hardcoded secrets, `#14` open redirect/SSRF, `#16` command injection, `#17` insecure randomness, `#18` path traversal, plus `#9` prototype pollution. `#15` covers event-loop (availability). The rest are the async and coercion bugs that cause real outages.\n\n## Sources\n\nThe rubric's rules were validated against confirmed online sources during research. The sources live here in the README (not embedded in the rubric) to keep the per-call prompt lean.\n\n| # | Entry | Source |\n| --- | --- | --- |\n| 1 | Loose equality `==` | MDN \u2014 [Equality comparisons and sameness](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Equality_comparisons_and_sameness) |\n| 2 | Falsy conditional trap | MDN \u2014 [Falsy](https://developer.mozilla.org/en-US/docs/Glossary/Falsy) |\n| 3 | Missing `await` | [eslint-plugin-promise `no-floating-promises`](https://github.com/eslint-community/eslint-plugin-promise/issues/151) |\n| 4 | Unhandled rejection | nodebestpractices \u2014 [Catch unhandled promise rejections](https://github.com/goldbergyoni/nodebestpractices/blob/master/sections/errorhandling/catchunhandledpromiserejection.md) |\n| 5 | `forEach` with async | MDN \u2014 [Array.prototype.forEach](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/forEach) |\n| 6 | Mutating arguments | clean-code-javascript \u2014 [Avoid Side Effects](https://github.com/ryanmcdermott/clean-code-javascript) |\n| 7 | Detached `this` | MDN \u2014 [this](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/this) |\n| 8 | Extending natives | [Why extending built-in objects is not a good idea](https://github.com/yangshun/top-javascript-interview-questions) |\n| 9 | Prototype pollution | OWASP \u2014 [Prototype Pollution Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Prototype_Pollution_Prevention_Cheat_Sheet.html) |\n| 10 | `eval` | MDN \u2014 [eval()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval) |\n| 11 | `innerHTML` XSS | OWASP \u2014 [DOM based XSS Prevention](https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html) |\n| 12 | ReDoS | OWASP \u2014 [Regular expression Denial of Service](https://owasp.org/www-community/attacks/Regular_expression_Denial_of_Service_-_ReDoS) |\n| 13 | Hardcoded secrets | OWASP \u2014 [Secrets Management](https://github.com/OWASP/CheatSheetSeries/blob/master/cheatsheets/Secrets_Management_Cheat_Sheet.md) |\n| 14 | Open redirect / SSRF | OWASP \u2014 [Unvalidated Redirects and Forwards](https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html) |\n| 15 | Event-loop blocking | Node.js \u2014 [Don't Block the Event Loop](https://nodejs.org/learn/asynchronous-work/dont-block-the-event-loop) |\n| 16 | Command injection | OWASP \u2014 [OS Command Injection Defense](https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html) |\n| 17 | Insecure randomness | MDN \u2014 [Math.random()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random) / [Crypto.randomUUID()](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/randomUUID) |\n| 18 | Path traversal | OWASP \u2014 [Path Traversal](https://owasp.org/www-community/attacks/Path_Traversal) |\n\nPrimary authorities: [MDN Web Docs](https://developer.mozilla.org/), [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/), [nodebestpractices](https://github.com/goldbergyoni/nodebestpractices), [clean-code-javascript](https://github.com/ryanmcdermott/clean-code-javascript) (MIT).\n\nNote: Azat Mardan's *100 JavaScript and TypeScript Mistakes and How to Avoid Them* (Manning) exists but is paywalled (MEAP), with no free checklist; this rubric is therefore a **curated hybrid** rather than book-primary, like the PHP extension.\n\n## TUI rendering\n\nCustom rendering for both the tool call and its result: mode, file count, insertions/deletions, and truncation status at a glance.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "javascript",
+    "js",
+    "code-review",
+    "code-reviewer",
+    "anti-patterns",
+    "code-smells",
+    "rubric",
+    "security",
+    "git-diff",
+    "biome"
+  ],
+  "author": {
+    "name": "EstebanForge",
+    "email": "esteban@attitude.cl",
+    "url": "https://actitud.xyz"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/EstebanForge/pi-js-review#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EstebanForge/pi-js-review.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-24T16:20:58.710Z",
+    "1.0.0": "2026-06-24T16:20:58.987Z",
+    "modified": "2026-06-24T16:20:59.217Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

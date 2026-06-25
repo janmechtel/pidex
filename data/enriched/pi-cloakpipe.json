@@ -1,0 +1,33 @@
+{
+  "name": "pi-cloakpipe",
+  "latest_version": "0.1.0",
+  "description": "Pi package that masks sensitive prompt data with CloakPipe and rehydrates assistant responses before local use.",
+  "readme": "# pi-cloakpipe\n\nPi package that uses CloakPipe as a privacy layer for prompt text, provider payloads, tool output, and assistant tool calls.\n\n## Other CloakPipe plugins\n\nIf you use a different coding tool, similar CloakPipe integrations are also available for:\n\n- [Claude Code (`claude-cloakpipe`)](https://github.com/borgius/claude-cloakpipe)\n- [Hermes (`hermes-cloakpipe`)](https://github.com/borgius/hermes-cloakpipe)\n- [OpenCode (`opencode-cloakpipe`)](https://github.com/borgius/opencode-cloakpipe)\n\n## What it does\n\n`pi-cloakpipe` registers a Pi extension that:\n\n- pseudonymizes user input before Pi expands skills or persists the user message;\n- pseudonymizes cloned conversation context before each model call;\n- pseudonymizes the final provider payload as a defense-in-depth pass;\n- pseudonymizes textual tool output before it enters later model context;\n- rehydrates finalized assistant text and tool-call arguments;\n- rehydrates tool input before local tools execute.\n\nThis design is provider-generic because it uses Pi extension events instead of a provider-specific proxy.\n\n## Requirements\n\n- Pi (`@earendil-works/pi-coding-agent`)\n- Node.js compatible with Pi\n- A running CloakPipe direct API, usually at `http://127.0.0.1:3100/v1`\n\n## Local setup\n\nCopy the example environment file and edit values if needed:\n\n```bash\ncp .env.example .env\n```\n\nRequired setting:\n\n- `CLOAKPIPE_BASE_URL` \u2014 CloakPipe direct privacy API, default `http://127.0.0.1:3100/v1`.\n\nCommon toggles:\n\n- `PI_CLOAKPIPE_STRICT` \u2014 fail closed when CloakPipe is unavailable. Default: `1`.\n- `PI_CLOAKPIPE_TRANSFORM_TOOL_DEFINITIONS` \u2014 pseudonymize tool descriptions and schemas in provider payloads. Default: `0`.\n- `PI_CLOAKPIPE_TRANSFORM_THINKING` \u2014 transform thinking blocks. Default: `0`.\n- `PI_CLOAKPIPE_AUDIT` \u2014 write safe operational audit events. Default: `1`.\n\nThe `.env` file is gitignored. Keep real local values there only.\n\n## Install in Pi\n\nPi supports two standard install styles for extensions and packages:\n\n- package-managed installs via `pi install`, which write to `~/.pi/agent/settings.json` by default;\n- auto-discovered extensions under `~/.pi/agent/extensions/`.\n\n`pi-cloakpipe` supports both.\n\n### Standard package install\n\nThis is the normal Pi package flow. For a local path, Pi stores the path in settings and loads the package in place. It does not copy the directory.\n\n```bash\npi install /Users/admin/dev/pi-cloakpipe\n```\n\nThat updates the user settings file at `~/.pi/agent/settings.json`.\n\nFor a project-local install, use Pi's local scope flag instead of editing `.pi/settings.json` by hand:\n\n```bash\npi install -l /Users/admin/dev/pi-cloakpipe\n```\n\n### Standard extension directory install\n\nPi also auto-discovers extensions from `~/.pi/agent/extensions/`. In the current Pi runtime, subdirectories in that folder can be package-style directories with `package.json` and `pi.extensions`, so this project works there too.\n\nThis repo now includes a helper that links the project into the standard extension directory:\n\n```bash\nnpm run install:pi\n```\n\nThat creates a link at `~/.pi/agent/extensions/pi-cloakpipe`.\n\nTo remove it later:\n\n```bash\nnpm run uninstall:pi\n```\n\nIf you use a custom Pi agent directory, set `PI_CODING_AGENT_DIR` first. The install and uninstall scripts respect that override.\n\nAfter installing into the standard extension directory, restart Pi or run `/reload`.\n\n### One-run test\n\nTo try the extension without installing it, use Pi's temporary extension flag:\n\n```bash\npi -e /Users/admin/dev/pi-cloakpipe/src/index.ts\n```\n\n## Commands\n\nInside Pi, run:\n\n```text\n/cloakpipe-status\n```\n\nThis reports whether CloakPipe is reachable and whether the extension is running in strict mode. It does not print secrets.\n\n## Development\n\nInstall dependencies:\n\n```bash\nnpm install\n```\n\nRun type checks:\n\n```bash\nnpm run check\n```\n\nRun tests:\n\n```bash\nnpm test\n```\n\n## Publishing\n\nThis repo now includes a release command that:\n\n- checks for a clean git working tree by default;\n- runs the build check and test suite;\n- bumps the package version;\n- creates the release commit and tag via `npm version`;\n- publishes the package to npm.\n\nCommon release commands:\n\n```bash\nnpm run release:patch\nnpm run release:minor\nnpm run release:major\n```\n\nYou can also pass any `npm version` target directly, including an explicit version:\n\n```bash\nnpm run release -- patch\nnpm run release -- 1.2.3\n```\n\nHelpful flags:\n\n- `--dry-run` \u2014 print the release steps without changing anything.\n- `--allow-dirty` \u2014 skip the clean working tree guard.\n- `--tag <dist-tag>` \u2014 publish to a specific npm dist-tag such as `next`.\n\nAfter a successful publish, push the generated release commit and tag:\n\n```bash\ngit push --follow-tags\n```\n\n## Smoke test\n\n1. Start CloakPipe.\n2. Launch Pi with this extension.\n3. Send a prompt that contains a synthetic sensitive value.\n4. Confirm the provider payload contains placeholders, not the raw value.\n5. Confirm assistant text and tool-call arguments are rehydrated before local use.\n6. Point `CLOAKPIPE_BASE_URL` to an unused loopback port and confirm strict mode blocks the prompt.\n\n## Limitations\n\n- Images, binary payloads, URLs, encrypted content, IDs, and signatures are preserved by default.\n- Thinking blocks are preserved by default because some providers sign or replay them.\n- Pi does not expose an in-stream response transform hook. Placeholders may appear while streaming, then `message_end` rehydrates the finalized assistant message.\n- If live token-by-token rehydration is required, add a provider-specific gateway or custom `streamSimple` provider wrapper later.\n",
+  "keywords": [
+    "pi-package",
+    "privacy",
+    "cloakpipe"
+  ],
+  "author": {
+    "name": "borgius"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/borgius/pi-cloakpipe#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/borgius/pi-cloakpipe.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-01T00:31:01.061Z",
+    "0.1.0": "2026-06-01T00:31:01.432Z",
+    "modified": "2026-06-01T00:31:01.683Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

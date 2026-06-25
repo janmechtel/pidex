@@ -1,0 +1,36 @@
+{
+  "name": "pi-context-loader",
+  "latest_version": "0.1.0",
+  "description": "Config-driven context injection for Pi agents. Loads files at session start and injects them as system prompt or message.",
+  "readme": "# pi-context-loader\n\nConfig-driven context injection for [Pi](https://pi.dev) agents. Loads files at session start and injects them as system prompt or message \u2014 the Pi equivalent of a `sessionStart` hook.\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:pi-context-loader\n```\n\nFrom git:\n\n```bash\npi install git+https://github.com/juanje/pi-context-loader.git\n```\n\nOr load directly without installing:\n\n```bash\npi -e /path/to/pi-context-loader/extensions/context-loader.ts\n```\n\n## Quick start\n\nCreate `.pi/context-loader.json` in your project:\n\n```json\n{\n  \"files\": [\n    \"context/user-profile.md\",\n    \"context/current-state.md\"\n  ]\n}\n```\n\nStart Pi \u2014 the listed files are read at session start and injected into the agent's context (system prompt by default, or as a message with `\"inject\": \"message\"`).\n\n## How it works\n\nThe extension hooks into two Pi events:\n\n1. **`session_start`** \u2014 loads the config, reads all listed files and optional latest log, caches the combined context\n2. **`before_agent_start`** \u2014 injects the cached context via the configured mode\n\n### Injection modes\n\nThe `inject` field controls how context reaches the agent:\n\n| Mode | Behavior | Survives compaction | LLM weight |\n|------|----------|-------------------|------------|\n| `\"systemPrompt\"` (default) | Appended to system prompt | Yes \u2014 always present | High \u2014 treated as instructions |\n| `\"message\"` | Injected as a conversation message | No \u2014 may be summarized | Normal \u2014 treated as context |\n\n**When to use each:**\n- **`systemPrompt`** \u2014 for identity, rules, or context that must be present on every turn (e.g., user profile, agent guidelines)\n- **`message`** \u2014 for operational state that's useful at the start but shouldn't permanently occupy the context budget (e.g., active incidents, current sprint items)\n\n## Config format\n\nConfig file: `.pi/context-loader.json`\n\n```typescript\ninterface ContextLoaderConfig {\n  files?: string[];        // paths relative to project root\n  latestLog?: {\n    index: string;         // path to an index file (e.g. \"logs/index.md\")\n    dir: string;           // directory containing log files (e.g. \"logs\")\n    marker: string;        // marker to match in index lines (e.g. \"active\")\n  };\n  separator?: string;      // join string (default: \"\\n\\n---\\n\\n\")\n  inject?: \"systemPrompt\" | \"message\";  // injection mode (default: \"systemPrompt\")\n}\n```\n\n### `files`\n\nArray of file paths relative to the project root. Each file is read and its content is included in the context. Missing files are silently skipped.\n\n### `latestLog`\n\nOptional dynamic log finder. Scans the `index` file for lines matching `marker` (case-insensitive), extracts the last `YYYY-MM-DD` date found, and loads `{dir}/{date}.md`.\n\nUseful for agents with session logs where you want to inject the most recent active log automatically.\n\n### `separator`\n\nString used to join all loaded content. Defaults to `\"\\n\\n---\\n\\n\"` (markdown horizontal rule).\n\n### `inject`\n\nHow context is delivered to the agent. Either `\"systemPrompt\"` (default) or `\"message\"`. See [Injection modes](#injection-modes) for details.\n\n## Examples\n\n### Memory agent ([Agentic Buddy](https://github.com/juanje/agentic-buddy)-style)\n\n```json\n{\n  \"files\": [\n    \"agent_brain/identity/USER.md\"\n  ],\n  \"latestLog\": {\n    \"index\": \"logs/index.md\",\n    \"dir\": \"logs\",\n    \"marker\": \"active\"\n  }\n}\n```\n\n### Diagnostic agent (active incidents as message)\n\n```json\n{\n  \"files\": [\"kb/active/index.md\"],\n  \"inject\": \"message\"\n}\n```\n\n### Diagnostic agent (reference context in system prompt)\n\n```json\n{\n  \"files\": [\n    \"context/team-roster.md\",\n    \"context/known-issues-summary.md\"\n  ]\n}\n```\n\n### Minimal\n\n```json\n{\n  \"files\": [\"CONTEXT.md\"]\n}\n```\n\n## Static context\n\nThis extension handles **dynamic** context \u2014 files that change between sessions. For static context, Pi has built-in support:\n\n- **`.pi/SYSTEM.md`** \u2014 replaces the default system prompt (agent identity)\n- **`AGENTS.md` / `CLAUDE.md`** \u2014 hierarchical context files loaded automatically\n\nUse `pi-context-loader` for content that needs to be assembled from multiple files or includes dynamic elements like \"latest active log.\"\n\n## Development\n\n```bash\ngit clone https://github.com/juanje/pi-context-loader.git\ncd pi-context-loader\nnpm install\nnpm run check    # typecheck + lint + test\n```\n\n## License\n\nMIT \u2014 see [LICENSE](LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "context",
+    "context-loader",
+    "system-prompt"
+  ],
+  "author": {
+    "name": "Juanje Ojeda"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/juanje/pi-context-loader#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juanje/pi-context-loader.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-20T17:33:28.183Z",
+    "0.1.0": "2026-06-20T17:33:28.507Z",
+    "modified": "2026-06-20T17:33:28.703Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

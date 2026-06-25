@@ -1,0 +1,37 @@
+{
+  "name": "pi-pledit",
+  "latest_version": "1.0.1",
+  "description": "Plan mode and Accept-Edits mode for Pi, inspired by Claude Code.",
+  "readme": "# pi-pledit\n\nPermission modes for **[Pi](https://github.com/badlogic/pi-mono)** \u2014 inspired by Claude Code's plan/execute workflow.\n\nCycle between **Plan**, **Accept Edits**, and **Default** modes to control how aggressively the agent modifies your codebase.\n\n---\n\n## \u2728 Features\n\n- **\u2225\u2225 Plan Mode** \u2014 Read-only. The model analyzes your code and produces a structured implementation plan saved to `.pi/plans/`.\n- **\u23f5\u23f5 Accept Edits** \u2014 Auto-approves file edits and safe filesystem commands. Fast execution without interruption.\n- **Default** \u2014 Prompts before every file edit or shell command. Full manual control.\n- **Persistent** \u2014 Mode survives session resume, reload, and restarts.\n- **Approval workflow** \u2014 After a plan completes, a dialog lets you choose: auto-execute, manual review, or keep planning.\n\n---\n\n## \ud83d\udce6 Installation\n\n### As a Pi Package (recommended)\n\n```bash\npi install npm:pi-pledit\n```\n\nOr via GitHub:\n\n```bash\npi install git:github.com/jaroslawjanas/pi-pledit\n```\n\nOr add to your Pi `settings.json`:\n\n```json\n{\n  \"packages\": [\"npm:pi-pledit\"]\n}\n```\n\n### Manual (single file)\n\nCopy `index.ts` to `~/.pi/agent/extensions/plan-edits-mode.ts`.\n\n### Project-local\n\nCopy `index.ts` to `.pi/extensions/plan-edits-mode.ts` in your project.\n\n---\n\n## \ud83d\ude80 Usage\n\nPress your configured shortcut to cycle modes:\n\n| Current | Press shortcut \u2192 | Next |\n|---------|------------------|------|\n| Default | \u2192 | Accept Edits |\n| Accept Edits | \u2192 | Plan |\n| Plan | \u2192 | Default |\n\nDefault shortcut: **`F6`**\n\nThe current mode appears in the status bar:\n- **(blank)** \u2014 Default mode\n- **`\u2225\u2225 plan mode`** \u2014 Plan mode\n- **`\u23f5\u23f5 accept edits`** \u2014 Accept edits mode\n\n### After a plan completes\n\nWhen you finish a plan, a dialog appears:\n\n```\nThe plan is ready to execute. Would you like to proceed?\n\n  1. Auto-accept edits\n  2. Manually approve edits\n  3. Provide further feedback\n```\n\n| Choice | Result |\n|--------|--------|\n| **Auto-accept edits** | Switches to Accept Edits mode and executes the plan |\n| **Manually approve edits** | Switches to Default mode and asks before each change |\n| **Provide further feedback** | Stays in Plan mode; type your feedback and continue |\n\n---\n\n## \u2699\ufe0f Configuration\n\n### Custom Shortcut\n\nCreate `.pi/pledit.json` in your project (or `~/.pi/agent/pledit.json` globally):\n\n```json\n{ \"shortcut\": \"shift+tab\" }\n```\n\nPrecedence: project config > global config > default (`F6`).\n\nAfter editing, run `/reload` in Pi to apply.\n\n### Rebinding Pi's Thinking Level Cycle\n\nIf you set your pleedit shortcut to `shift+tab`, Pi's built-in thinking-level cycle (`app.thinking.cycle`) will be displaced. Move it to another key in `~/.pi/agent/keybindings.json`:\n\n```json\n{\n  \"app.thinking.cycle\": [\"alt+e\"]\n}\n```\n\n### Customizing Bash Command Safety\n\nYou can override which bash commands are allowed in each mode via `.pi/pledit.json`:\n\n```json\n{\n  \"shortcut\": \"f6\",\n  \"readonlyBash\": [\n    \"git status\", \"git log\", \"ls \", \"find \", \"grep \", \"cat \", \"echo \", \"pwd \"\n  ],\n  \"safeBash\": [\n    \"mkdir \", \"touch \", \"mv \", \"cp \", \"npm run \", \"cargo test\"\n  ],\n  \"unsafePatterns\": [\n    \"rm -rf\", \"sudo\", \"docker system prune\"\n  ]\n}\n```\n\n| Key | Purpose |\n|-----|---------|\n| `readonlyBash` | Commands **allowed in all modes** without prompting (Plan, Default, Accept Edits). |\n| `safeBash` | Commands **auto-approved only in Accept Edits mode**. Prompted in Default mode. Blocked in Plan mode. |\n| `unsafePatterns` | Substrings that **block or prompt everywhere** \u2014 overrides both lists above. |\n\n**Important:** These lists **replace** the built-in defaults entirely, they do not extend them. If you provide `safeBash: [\"cargo test\"]`, you must also include `mkdir`, `touch`, etc. if you want them.\n\nDefault `unsafePatterns`: `rm -rf`, `sudo`, `chmod 777`, `docker system prune`.\n\n---\n\n## \ud83d\udee1\ufe0f Modes in Detail\n\n### Plan Mode (`\u2225\u2225 plan mode`)\n\n- **Blocked:** `write`, `edit`\n- **Allowed bash (read-only):** `git status`, `git diff`, `git log`, `git branch`, `git stash list`, `git show`, `ls`, `find`, `grep`, `rg`, `cat`, `head`, `tail`, `echo`, `pwd`, `which`, `wc`\n- **Blocked bash:** everything else (`mkdir`, `touch`, `mv`, `npm run`, etc.)\n- **Allowed tools:** `read`, `glob`, `grep`, `find`, `ls` \u2014 all read-only tools\n- The model is instructed to produce a structured plan as its final response\n- Plans are saved to `.pi/plans/plan-YYYY-MM-DDTHH-mm-ss.md` with YAML frontmatter\n\n### Accept Edits Mode (`\u23f5\u23f5 accept edits`)\n\n- **Auto-approved:** `write`, `edit`\n- **Auto-approved bash (safe):** `mkdir`, `touch`, `mv`, `cp`, `rm`, `rmdir`, `sed`, `npm test`, `npm run *`, `yarn *`, `pnpm *`\n- **Also auto-approved:** all read-only bash commands listed above\n- **Prompted:** anything not in the safe or read-only lists, or matching an `unsafePatterns` substring (e.g. `sudo`, `rm -rf`)\n\n### Default Mode\n\n- **Prompted:** Every `write`, `edit`, and non-readonly `bash` call\n- **Allowed silently:** Read-only bash commands (same list as Plan mode)\n- Full manual control over destructive changes\n\n---\n\n## \ud83d\udcdd Plan Files\n\nWhen a plan completes, the model's last text response is saved to:\n\n```\n.pi/plans/plan-2026-05-03T21-45-00.md\n```\n\nWith YAML frontmatter:\n\n```markdown\n---\ncreated: \"2026-05-03T21:45:00.000Z\"\nmode: \"plan\"\nsession: \"/path/to/session.jsonl\"\n---\n\n# Plan\n\n[Model-generated structured plan...]\n```\n\nThese files are ephemeral working notes \u2014 useful for review, not committed.\n\n---\n\n## \ud83d\udcc4 License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "pi-package",
+    "plan-mode",
+    "accept-edits",
+    "claude-code"
+  ],
+  "author": {
+    "name": "jaroslawjanas"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/jaroslawjanas/pi-pledit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jaroslawjanas/pi-pledit.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-04T00:16:42.005Z",
+    "modified": "2026-05-04T00:19:22.268Z",
+    "1.0.0": "2026-05-04T00:16:42.160Z",
+    "1.0.1": "2026-05-04T00:19:22.132Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 16,
+  "download_trend": []
+}

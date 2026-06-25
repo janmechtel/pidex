@@ -1,0 +1,39 @@
+{
+  "name": "pi-hindsight-stats",
+  "latest_version": "0.1.0",
+  "description": "Hindsight memory analytics CLI \u2014 tags, entities, and bank statistics for Pi agent sessions",
+  "readme": "# pi-hindsight-stats\n\n[![npm version](https://img.shields.io/npm/v/pi-hindsight-stats?style=flat-square)](https://www.npmjs.com/package/pi-hindsight-stats)\n[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)\n[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)\n\n**Hindsight memory analytics for Pi agent sessions** \u2014 fetches tags, entities, entity-graph hotspots, and mental models from [Hindsight](https://github.com/buihongduc132/hindsight-pi-local) banks and renders a compact project-insight cover.\n\nInjected into Pi agent context on session start (async, non-blocking) or queried on-demand via CLI and slash commands.\n\n## Features\n\n- **Tag analytics** \u2014 top tags with level-grouping and ranking\n- **Entity tracking** \u2014 most-mentioned named entities with mention counts\n- **Graph visualization** \u2014 hotspot chains from entity relationship graph\n- **Mental models** \u2014 active mental model summaries\n- **TTL-based disk cache** \u2014 avoids redundant API calls with configurable TTL\n- **Token-budgeted rendering** \u2014 respects configurable max token budget for context injection\n- **Non-blocking injection** \u2014 async fire-and-forget on `session_start`, never blocks Pi workflow\n- **Configurable steps** \u2014 enable/disable individual stat sections independently\n\n## Example Output\n\n```text\n[Top Tags]\n- repo:vendor-omo (182)\n- topic:auth (91)\n\n[Top Entities]\n- Stripe (31)\n- AuthService (28)\n\n[Hotspots]\n- AuthService \u2194 Stripe \u2194 SessionToken\n\n[Top Mental Models]\n- active-project-goals\n- coding-constraints\n```\n\n## Installation\n\n### For Humans\n\n```bash\nnpm install pi-hindsight-stats\n```\n\n### For AI Agents\n\nAdd to your Pi `settings.json` packages array:\n\n```json\n{\n  \"packages\": [\n    \"pi-hindsight-stats\"\n  ]\n}\n```\n\n### For pi git-sourced\n\nAdd the git URL to your Pi `settings.json` packages array:\n\n```json\n{\n  \"packages\": [\n    \"https://github.com/buihongduc132/pi-hindsight-stats\"\n  ]\n}\n```\n\nOr local path for development:\n\n```json\n{\n  \"packages\": [\n    \"/path/to/pi-hindsight-stats\"\n  ]\n}\n```\n\n## Prerequisites\n\n- A running [Hindsight](https://github.com/buihongduc132/hindsight-pi-local) server\n- Pi CLI agent (`@mariozechner/pi-coding-agent`)\n\n## Configuration\n\nCreate `~/.hindsight/stats-config.json`:\n\n```json\n{\n  \"enabled\": true,\n  \"baseUrl\": \"http://localhost:8888\",\n  \"bankId\": \"my-bank\",\n  \"injectOnSessionStart\": true,\n  \"cache\": {\n    \"dir\": \"~/.hindsight/cache/stats\",\n    \"ttlSeconds\": 600\n  },\n  \"steps\": {\n    \"topTags\": { \"enabled\": true, \"limit\": 5, \"maxTokens\": 120, \"level\": 2 },\n    \"topEntities\": { \"enabled\": true, \"limit\": 5, \"maxTokens\": 120 },\n    \"hotspots\": { \"enabled\": true, \"limit\": 5, \"maxTokens\": 160, \"level\": 2 },\n    \"topMentalModels\": { \"enabled\": true, \"limit\": 5, \"maxTokens\": 120 }\n  },\n  \"render\": {\n    \"totalMaxTokens\": 420,\n    \"compact\": true\n  }\n}\n```\n\n### Config precedence\n\n```\nenv vars (HINDSIGHT_BASE_URL, HINDSIGHT_API_KEY, HINDSIGHT_BANK_ID)\n  > ~/.hindsight/stats-config.json\n  > defaults\n```\n\n### Step options\n\n| Step | Config key | Description |\n|------|-----------|-------------|\n| Top Tags | `topTags` | Most frequent tags across all facts |\n| Top Entities | `topEntities` | Most mentioned named entities |\n| Hotspots | `hotspots` | Highly connected entity clusters from the entity graph |\n| Top Mental Models | `topMentalModels` | Active mental model summaries |\n\nEach step supports: `enabled`, `limit`, `maxTokens`, and optional `level` (graph traversal depth).\n\n## Usage\n\n### Pi Extension (automatic)\n\nWhen installed as a Pi package, the extension auto-registers hooks and commands:\n\n- **Session start** \u2014 if `injectOnSessionStart` is `true`, fetches and injects a stats cover into context (non-blocking)\n- **`hindsight-stats:cover`** \u2014 show stats cover on demand via Pi slash command\n- **`hindsight-stats:cache-clear`** \u2014 clear the stats cache via Pi slash command\n\n### CLI\n\n```bash\n# Full cover report\nnpx hindsight-stats cover\n\n# Individual sections\nnpx hindsight-stats top-tags --limit 10\nnpx hindsight-stats top-entities --limit 10\nnpx hindsight-stats hotspots --limit 5\nnpx hindsight-stats top-mental-models --limit 5\n\n# Cache management\nnpx hindsight-stats cache-clear\n\n# Diagnostics\nnpx hindsight-stats doctor\n```\n\n## Architecture\n\n```\nsrc/\n\u251c\u2500\u2500 index.ts    # Pi extension \u2014 session_start hook, async injection\n\u251c\u2500\u2500 client.ts   # Hindsight REST API client (tags, entities, mental models)\n\u251c\u2500\u2500 config.ts   # Config resolution with file/env/defaults\n\u251c\u2500\u2500 cache.ts    # TTL-based disk cache\n\u2514\u2500\u2500 steps.ts    # Individual stat extraction + rendering\ncli/\n\u2514\u2500\u2500 index.ts    # Standalone CLI entry point\ntests/          # Vitest test suite\n```\n\n## Development\n\n```bash\nnpm install\nnpm run typecheck\nnpm test\n```\n\n## License\n\nMIT \u00a9 2025 [buihongduc132](https://github.com/buihongduc132)\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "hindsight",
+    "stats",
+    "analytics",
+    "tags",
+    "entities",
+    "pi-extension",
+    "pi-coding-agent"
+  ],
+  "author": {
+    "name": "buihongduc132"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/buihongduc132/pi-hindsight-stats#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/buihongduc132/pi-hindsight-stats.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-19T07:07:45.136Z",
+    "0.1.0": "2026-05-19T07:07:45.377Z",
+    "modified": "2026-05-19T07:07:45.594Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 5,
+  "download_trend": []
+}

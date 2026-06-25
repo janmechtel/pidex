@@ -1,0 +1,352 @@
+{
+  "name": "@gregjohnso/pi-monitor",
+  "latest_version": "0.1.0",
+  "description": "Background shell command runner for the pi coding agent. Each stdout line becomes a live TUI event and enters the LLM's next turn as context.",
+  "readme": "# Monitor Extension\n\nSpawn a background shell command from inside [pi][pi]. Each stdout line\nbecomes an event you see live in the TUI and that the LLM sees on your next\nturn. Silence costs zero tokens.\n\npi's default stance is \"no background bash \u2014 use tmux\" (README.md line 460).\nThis extension fills that gap on purpose: `--no-monitor` flag to disable\nat startup, session-scoped lifetime, firehose auto-stop, max-concurrent\ncap.\n\n**Monitor surfaces events. It does not drive turns.** Autonomous\nturn-driving on every event belongs in a future `/loop` extension. See\n[Event delivery model](#event-delivery-model).\n\n## Install\n\n```bash\n# from npm\npi install npm:@gregjohnso/pi-monitor\n\n# or directly from git\npi install git:github.com/gregjohnso/pi-monitor\n```\n\nThen `/reload` inside pi, or start a new session.\n\nTo develop locally, symlink this repo into your extensions directory:\n\n```bash\nln -s /absolute/path/to/pi-monitor/extensions/monitor ~/.pi/agent/extensions/monitor\n```\n\n## Tools exposed to the LLM\n\n| Tool                  | Purpose                                                          |\n| --------------------- | ---------------------------------------------------------------- |\n| `monitor`             | Start a background command; stdout lines become events           |\n| `monitor_stop`        | Kill a running monitor by id                                     |\n| `monitor_list`        | Enumerate running monitors with status + activity                |\n| `monitor_read_stderr` | Pull the stderr tail for a monitor on demand (no wake)           |\n\n### `monitor` parameters\n\n| Param         | Type    | Default | Meaning                                                                |\n| ------------- | ------- | ------- | ---------------------------------------------------------------------- |\n| `description` | string  | \u2014       | Short label shown with every notification (max 80 chars)               |\n| `command`     | string  | \u2014       | Shell command whose **stdout** lines become events                     |\n| `timeout_ms`  | integer | 300 000 | Auto-kill after N ms. Max 3 600 000 (1 hr). Ignored when `persistent`. |\n| `persistent`  | boolean | false   | If true, runs until session end. Stop with `monitor_stop`.             |\n\n## Event semantics\n\n- **Each stdout line is one event.**\n- **200 ms coalesce window**: lines arriving close together are grouped into\n  a single event so multi-line output from one source stays together.\n- **Stderr is never streamed.** It is piped to\n  `~/.pi/agent/monitor/<id>.stderr` and exposed via `monitor_read_stderr`.\n- **Per-event truncation at 400 chars** with a `\u2026(truncated)` suffix.\n- **Firehose auto-stop**: a monitor emitting more than 50 lines/sec over 10s\n  is automatically stopped with an explanatory final event so the model can\n  retry with a better filter.\n- **Session-scoped lifetime**: children die when pi exits.\n\n## Event delivery model\n\nEvents are delivered with **`deliverAs: \"followUp\", triggerTurn: false`**.\nThey render inline in the transcript (and enter the LLM's context) via the\nagent-loop's followUp drain when the current turn ends. A transient toast\nalso fires immediately via `ctx.ui.notify`, so events are visible live\nduring mid-stream tool execution.\n\nA status widget shows `\"N monitor\" / \"N monitors\"` while any are running.\n\nNote: pi's agent-loop (`agent-loop.js:127`) drains the followUp queue\nunconditionally and starts a fresh LLM call on what lands there. For a\nnoisy monitor this can cascade into extra turns. If that becomes a\nproblem, suppress emission when the transcript already ends with a\n`monitor-event`. Autonomous per-event turn-driving is scoped out to a\nfuture `/loop` extension.\n\n## Three rules\n\n1. **Always add `grep --line-buffered` (or `stdbuf -oL`) in pipes.** Without\n   it, pipe buffering silently delays events by minutes.\n2. **Append `|| true` after network calls in poll loops** so one transient\n   failure does not kill the monitor.\n3. **Be selective with stdout.** Monitors exceeding 50 lines/sec over 10s\n   are auto-stopped \u2014 filter aggressively before piping into the stream.\n\n## Example monitors\n\n```text\n# Stream filter: tail logs, surface only errors\ntail -f /var/log/app.log | grep --line-buffered -E \"ERROR|FATAL\"\n\n# Poll-and-if: watch a PR for new comments, robust to transient failures\nwhile true; do\n  gh api \"repos/owner/repo/pulls/123/comments\" --jq '.[-1].body' || true\n  sleep 30\ndone\n\n# Dev server: catch build errors as they appear\nnpm run dev 2>&1 | grep --line-buffered -E \"error|Failed\"\n```\n\n## User commands\n\n| Command                   | Effect                                                     |\n| ------------------------- | ---------------------------------------------------------- |\n| `/monitors`               | List running monitors with status + age                    |\n| `/monitor-stop <id\\|all>` | SIGTERM a monitor (SIGKILL fallback after 2s), or stop all |\n| `/monitor-tail <id> [n]`  | Dump last N stderr lines to the TUI (default 200)          |\n| `/monitor-clean`          | Alias for `/monitor-stop all`                              |\n\n## Flags\n\n| Flag           | Effect                                                   |\n| -------------- | -------------------------------------------------------- |\n| `--no-monitor` | Disable the extension (tools/commands not registered).  |\n\n## Interop\n\n- **Plan-mode**: while plan-mode is active, a `tool_call` hook blocks the\n  `monitor` start tool. `monitor_list` / `monitor_stop` /\n  `monitor_read_stderr` remain available.\n- **Permissions**: no per-spawn confirm. The LLM is trusted the same way\n  as for `bash`. Safety rails are structural: session-scoped processes,\n  `MAX_CONCURRENT = 8`, firehose auto-stop at 50 lines/s over 10s, and\n  `--no-monitor` to disable the whole extension for a session.\n\n## Settings (module constants in `index.ts`)\n\n```\nBATCH_WINDOW_MS          = 200        // coalesce window\nPER_EVENT_MAX_CHARS      = 400        // per-event truncation cap\nDEFAULT_TIMEOUT_MS       = 300_000    // 5 min\nMAX_TIMEOUT_MS           = 3_600_000  // 1 hr\nMAX_CONCURRENT           = 8\nRATE_LIMIT_LINES_PER_SEC = 50\nRATE_LIMIT_WINDOW_SEC    = 10\nSTDERR_DIR               = ~/.pi/agent/monitor\n```\n\n## Running the unit tests\n\n```bash\ncd ~/.pi/agent/extensions/monitor\nnpx tsx --test utils.test.ts\n```\n\n## vs. `bash` and tmux\n\n`bash` has no background mode. For fire-and-forget tasks where you only\nwant one \"done\" notification, use `bash` in a tmux pane. For live event\nstreaming the LLM can react to on your next turn, use `monitor`.\n\n## Known limitations\n\n- Children do not survive pi restart \u2014 by design.\n- Does not inherit pi's bash allow/deny settings. Disable the whole\n  extension for a session with `--no-monitor` if needed.\n- Windows untested; uses `process.env.SHELL || \"/bin/sh\"`.\n- Noisy monitors can trigger cascading short LLM turns via pi's followUp\n  drain; autonomous turn-driving is scoped to a future `/loop` extension.\n\n---\n\nInspired by the background-monitor tool in [Claude Code][cc-monitor].\n\n[pi]: https://github.com/badlogic/pi-mono\n[cc-monitor]: https://claudefa.st/blog/guide/mechanics/monitor\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-mono",
+    "monitor",
+    "background",
+    "tail",
+    "watch",
+    "agent",
+    "llm"
+  ],
+  "author": {
+    "name": "Gregory Johnson"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/gregjohnso/pi-monitor#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gregjohnso/pi-monitor.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/monitor"
+    ]
+  },
+  "time": {
+    "created": "2026-04-24T19:07:44.023Z",
+    "0.1.0": "2026-04-24T19:07:44.358Z",
+    "modified": "2026-04-24T19:07:44.513Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 5,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 64
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

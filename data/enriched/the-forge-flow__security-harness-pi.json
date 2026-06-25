@@ -1,0 +1,352 @@
+{
+  "name": "@the-forge-flow/security-harness-pi",
+  "latest_version": "0.1.2",
+  "description": "Security harness for the PI coding agent \u2014 forbids dangerous commands and gates sensitive ones behind user approval",
+  "readme": "<div align=\"center\">\n  <img src=\"https://raw.githubusercontent.com/MonsieurBarti/The-Forge-Flow-CC/refs/heads/main/assets/forge-banner.png\" alt=\"The Forge Flow - Security Harness Extension\" width=\"100%\">\n\n  <h1>@the-forge-flow/security-harness-pi</h1>\n\n  <p>\n    <strong>Permission-gate for the PI coding agent \u2014 forbids dangerous commands and asks approval for sensitive ones</strong>\n  </p>\n\n  <p>\n    <a href=\"https://github.com/MonsieurBarti/security-harness-pi/actions/workflows/ci.yml\">\n      <img src=\"https://img.shields.io/github/actions/workflow/status/MonsieurBarti/security-harness-pi/ci.yml?label=CI&style=flat-square\" alt=\"CI Status\">\n    </a>\n    <a href=\"https://www.npmjs.com/package/@the-forge-flow/security-harness-pi\">\n      <img src=\"https://img.shields.io/npm/v/@the-forge-flow/security-harness-pi?style=flat-square\" alt=\"npm version\">\n    </a>\n    <a href=\"LICENSE\">\n      <img src=\"https://img.shields.io/github/license/MonsieurBarti/security-harness-pi?style=flat-square\" alt=\"License\">\n    </a>\n  </p>\n</div>\n\n---\n\n## What it does\n\nPI extension that intercepts every tool call from the [pi coding agent](https://github.com/mariozechner/pi-coding-agent) and classifies it against a policy: hard-forbid the obviously dangerous, ask-first on the sensitive, allow everything else. Commands are parsed into an AST and every simple-command inside pipes, `$(...)`, `eval`, and `bash -c` is classified independently. Parse errors fail closed.\n\n## Features\n\n- **Hard-forbid** \u2014 `sudo`, `rm -rf /`, `curl | sh`, reverse shells, system-path writes, credential reads \u2014 blocked with no prompt\n- **Ask-first** \u2014 `git push` to the default branch, force-push, `git merge`, package installs across ecosystems (npm/yarn/pnpm/bun/cargo/brew/go/gem/composer/poetry/uv/deno), `rm -rf <any>`, writes/reads of `.env` / secrets / CI files, dynamic interpreter calls (`python -c`, `node -e`), any command piped into a shell\n- **Allow** \u2014 anything not matched by a rule\n- **AST-based parsing** \u2014 pipes, subshells, `eval`, `bash -c` classified independently; argv0 must be a literal (no `$RM -rf /`)\n- **Two-tier config** \u2014 global can tighten *and* relax, project can only tighten; an agent with project write access cannot weaken global rules\n- **329 tests** including a dedicated adversarial bypass suite\n\n## Requirements\n\n- Node.js >= 22.5.0\n- PI (`pi` CLI) installed\n\n## Installation\n\n```bash\n# Global (all projects)\npi install npm:@the-forge-flow/security-harness-pi\n\n# Project-local\npi install -l npm:@the-forge-flow/security-harness-pi\n\n# From GitHub (tracks main)\npi install git:github.com/MonsieurBarti/security-harness-pi\n\n# Pin a version\npi install npm:@the-forge-flow/security-harness-pi@0.1.1\n```\n\nThen reload PI with `/reload` (or restart it).\n\n## Commands\n\n- `/security-status` \u2014 active rules, config sources, recent decisions\n- `/security-reload` \u2014 reload config without restarting PI\n\n## Configuration\n\nConfiguration files (both optional):\n\n- **Global** (can tighten and relax): `~/.pi/agent/security-harness.json`\n- **Project** (tighten only): `<project>/.pi/security-harness.json`\n\n### Minimal config (use all defaults)\n\n```json\n{ \"enabled\": true }\n```\n\n### Tighten a project\n\n```json\n{\n  \"forbid\": [\n    \"Bash(./scripts/deploy-prod.sh)\",\n    \"Write(.env.production)\"\n  ],\n  \"ask\": [\n    \"Bash(docker system prune:*)\"\n  ]\n}\n```\n\n### Opt out of a baked-in rule (global only)\n\n```json\n{\n  \"disable\": [\"default:forbid.eval\"],\n  \"mode\": \"enforce\"\n}\n```\n\nProject-level `disable`, `enabled`, and `mode` are ignored with a warning \u2014 an agent with project write access cannot relax global settings.\n\nSee [`docs/rules.md`](docs/rules.md) for the full pattern grammar and handler catalogue.\n\n## Pattern grammar (quick reference)\n\n```\n[!]<Tool>(<inner>)[@<handler>[(<args>)]][|<piped-into>]\n```\n\n| Pattern | Matches |\n|---|---|\n| `Bash(rm:*)` | `rm` with any args |\n| `Bash(rm -rf:*)` | `rm` with first arg `-rf` |\n| `Bash(git push)` | exact `git push` (no args) |\n| `Bash(npm install:+)` | `npm install` with a package name |\n| `Bash(curl:*)\\|sh` | `curl` piped into `sh` |\n| `Bash(git push)@default-branch` | push targeting the repo's default branch |\n| `Write(.env*)` | writes matching a glob |\n| `Read(~/.ssh/id_*)` | reads of a home-rooted glob |\n| `!Bash(rm:-i*)` | negation (exclude interactive `rm`) |\n\n## Modes\n\n- **`enforce`** (default) \u2014 block per policy\n- **`warn`** \u2014 never block; log what would have been blocked (for dry runs / rule development)\n\n## Limitations\n\nStatic analysis can't cover everything. What this does NOT protect against:\n\n- **Variable expansion** \u2014 `RM=/bin/rm; $RM -rf /` \u2014 mitigated by forbidding any simple-command whose argv0 is not a literal\n- **Dynamic interpreter contents** \u2014 `python -c \"...\"` \u2014 routed to ask-first, human inspects\n- **Race conditions** \u2014 agent writes a script then executes it \u2014 only the `bash ./script.sh` call is visible\n- **Side-channels** \u2014 agent reads a file and embeds content in response \u2014 not a command, can't intercept\n\nSee [`docs/threat-model.md`](docs/threat-model.md) for the full list and the recommended layering strategy.\n\n## Development\n\n```bash\nbun install\nbun run test        # vitest\nbun run lint        # biome check\nbun run typecheck   # tsc --noEmit\nbun run build       # tsc \u2192 dist/\n```\n\n## Contributing\n\n1. Fork the repository\n2. Create your feature branch (`git checkout -b feature/amazing`)\n3. Commit with conventional commits (`git commit -m \"feat: add something\"`)\n4. Push to the branch (`git push origin feature/amazing`)\n5. Open a Pull Request\n\n## License\n\nMIT \u00a9 2026 MonsieurBarti\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "security",
+    "permissions",
+    "sandbox",
+    "tff",
+    "the-forge-flow"
+  ],
+  "author": "The Forge Flow",
+  "license": "MIT",
+  "homepage": "https://github.com/MonsieurBarti/security-harness-pi#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MonsieurBarti/security-harness-pi.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-04-14T19:03:53.562Z",
+    "modified": "2026-05-14T21:44:36.424Z",
+    "0.1.0": "2026-04-14T19:03:53.931Z",
+    "0.1.1": "2026-04-14T19:13:26.390Z",
+    "0.1.2": "2026-05-14T21:44:36.304Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 22,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 205
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 34
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 161
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 3
+    }
+  ]
+}

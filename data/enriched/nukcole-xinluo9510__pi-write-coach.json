@@ -1,0 +1,37 @@
+{
+  "name": "@nukcole-xinluo9510/pi-write-coach",
+  "latest_version": "0.1.0",
+  "description": "Pi extension \u2014 coach the model to build large files incrementally, prevent truncated broken files",
+  "readme": "# \ud83c\udfcb\ufe0f pi-write-coach\n\n**A coach for large files \u2014 game plan before, whistle after.**\n\nWhen a model tries to write a large file in one shot, the output can hit\n`max_tokens` mid-stream and land a **truncated, broken file** on disk.\n`pi-write-coach` prevents this by teaching the model to build large files\nincrementally: skeleton first, then small edits \u2014 each step too small to\ntruncate into garbage.\n\n<p align=\"center\">\n  <img src=\"https://raw.githubusercontent.com/luoxin9510/pi-packages/main/packages/pi-write-coach/assets/coach-viz.png\" alt=\"pi-write-coach \u2014 game plan before, whistle after\" width=\"840\">\n</p>\n\n```bash\npi install npm:@nukcole-xinluo9510/pi-write-coach\n```\n\n---\n\n## The problem\n\n```\nmodel wants to write 800-line file\n  \u2192 emits 15,000+ output tokens in one shot\n  \u2192 hits max_tokens limit mid-stream\n  \u2192 auth.ts lands on disk: broken, half-written\n  \u2192 you need to ask it to rewrite anyway\n```\n\n## The solution\n\n```\nSTEER injects the game plan:\n  \u2192 write a skeleton first (imports, signatures, // TODO markers)\n  \u2192 then edit each section one at a time\n\nGUARD blows the whistle if a write is still too big:\n  \u2192 blocks single writes/edits over 200 lines / 8000 chars\n  \u2192 tells the model exactly how to fix it\n  \u2192 releases path after 2 blocks to prevent retry loops\n```\n\n---\n\n## Two honest layers\n\n### STEER \u2014 `before_agent_start`\n\nInjects a large-file policy into the system prompt **before** the model\ngenerates anything. This is the part that actually saves output tokens \u2014\nit changes model behaviour ahead of generation.\n\n### GUARD \u2014 `tool_call` (write + edit)\n\nBlocks oversized single writes and edits. Its job is **file safety**: a\ngiant single write can be truncated mid-stream and land a broken file.\nThe guard forces the work into small, untruncatable pieces.\n\n> **Honest note:** `tool_call` fires *after* the model already emitted\n> the call as output tokens \u2014 the GUARD does **not** recover those tokens.\n> It protects the file on disk. Token savings come from STEER only.\n\n---\n\n## What it guards\n\n| Operation | What is measured | When blocked |\n|-----------|-----------------|--------------|\n| `write` | `content` length | > 200 lines OR > 8000 chars |\n| `edit` | sum of all `edits[].newText` | > 200 lines OR > 8000 chars |\n\nThe \"3-line skeleton + 1 giant edit\" bypass is caught: the guard sums\nthe total replacement output of the call, not per-edit.\n\n**Never blocked:** `package-lock.json`, `*.min.js`, `*.lock`,\n`*.generated.*`, `dist/**` (add custom paths by extending `ALLOWLIST`\nin `core.ts`).\n\n## Loop-breaker\n\nAfter a path is blocked `RELEASE_AFTER_BLOCKS` times (default: 2), it\nis permanently released for the session. A model that genuinely must\nwrite a large file is never trapped in an infinite retry loop.\n\n## Guarded models\n\nOnly applies to big-context models where chunking matters most:\n`claude` and `deepseek` (substring match on `provider/id`). Other models\n(gpt, gemini, local) are never affected.\n\n## Install\n\n```bash\npi install npm:@nukcole-xinluo9510/pi-write-coach\n```\n\n## Requirements\n\n- pi 0.79+\n\n## Testing\n\n```bash\ncd packages/pi-write-coach\nnpm test   # 49 unit tests, no pi runtime needed\n```\n\nCovers: `countLines`, `isGuardedModelKey`, `isAllowlistedPath`,\n`measureEdits`, `createSizeGuard` state machine (block \u2192 loop-breaker \u2192\nrelease \u2192 permanent pass), `guidance` message content.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "write",
+    "skeleton",
+    "incremental",
+    "coach",
+    "file-safety"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/luoxin9510/pi-packages#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luoxin9510/pi-packages.git",
+    "directory": "packages/pi-write-coach"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "image": "https://raw.githubusercontent.com/luoxin9510/pi-packages/main/packages/pi-write-coach/assets/coach-viz.png"
+  },
+  "time": {
+    "created": "2026-06-18T08:45:08.155Z",
+    "0.1.0": "2026-06-18T08:45:09.515Z",
+    "modified": "2026-06-18T08:45:10.669Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

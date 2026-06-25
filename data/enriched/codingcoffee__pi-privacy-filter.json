@@ -1,0 +1,44 @@
+{
+  "name": "@codingcoffee/pi-privacy-filter",
+  "latest_version": "0.1.0",
+  "description": "pi extension that redacts PII/secrets before sending to the LLM and restores them in responses",
+  "readme": "# pi-privacy-filter\n\nA [pi](https://pi.dev) extension that runs every prompt through a local privacy classifier (`openai/privacy-filter` via `@huggingface/transformers`) **before** it is sent to the LLM, and transparently **restores** the original values in the LLM's response.\n\n```\nuser input \u2500\u2500\u25ba [redact] \u2500\u2500\u25ba LLM\n                  \u2502\n                  \u2514\u2500\u2500 placeholder\u2192original mapping (in memory)\n\nLLM response \u2500\u2500\u25ba [unredact via mapping] \u2500\u2500\u25ba you see the real values\n```\n\nExample:\n\n- you type:    `My AWS account number is 22922829292`\n- LLM sees:    `My AWS account number is [ACCOUNT_NUMBER_1]`\n- you see:     `... My AWS account number is 22922829292 ...` (assistant's reply, restored)\n\nThe mapping lives in memory for the session only \u2014 nothing is written to disk by this extension. Your original message is still stored in the session file (since that's where pi keeps it); only the bytes leaving for the model are redacted.\n\n## How it works\n\n- Hooks the `context` event to mutate the deep-cloned messages pi is about to send to the model. User messages and tool results have their text run through the classifier; matched spans are replaced with stable placeholders like `[ACCOUNT_NUMBER_1]`.\n- Hooks the `message_end` event to swap any placeholders back to their original values in the assistant's finalized message before pi displays / persists it.\n- Identical values reuse the same placeholder for the whole session.\n\n## Install\n\n```bash\ncd pi-privacy-filter\nnpm install   # or: bun install\n```\n\nThen wire it into pi using any one of:\n\n### Quick test\n```bash\npi -e ./index.ts\n```\n\n### Project-local\n```bash\nmkdir -p .pi/extensions\nln -s \"$PWD\" .pi/extensions/pi-privacy-filter\n```\n\n### Global\n```bash\nmkdir -p ~/.pi/agent/extensions\nln -s \"$PWD\" ~/.pi/agent/extensions/pi-privacy-filter\n```\n\n### Or via pi settings (`~/.pi/settings.json`)\n```json\n{\n  \"extensions\": [\"/absolute/path/to/pi-privacy-filter\"]\n}\n```\n\n## Commands\n\n- `/privacy-mapping` \u2014 dump the current placeholder\u2192value mapping (handy for debugging).\n\n## Files\n\n- `index.ts` \u2014 the extension\n- `sample.ts` \u2014 original standalone POC (`bun run sample.ts`)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "llm-tools",
+    "pi-coding-agent",
+    "privacy",
+    "filter",
+    "privacy-filter",
+    "redact",
+    "secrets",
+    "llm",
+    "agent"
+  ],
+  "author": {
+    "name": "Ameya Shenoy",
+    "url": "https://codingcoffee.dev"
+  },
+  "license": "MIT",
+  "homepage": "https://pi-privacy-filter.codingcoffee.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codingcoffee/pi-privacy-filter.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://pi-privacy-filter.codingcoffee.dev/og.png"
+  },
+  "time": {
+    "created": "2026-05-10T08:06:46.099Z",
+    "0.1.0": "2026-05-10T08:06:46.346Z",
+    "modified": "2026-05-10T08:06:46.533Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 4,
+  "download_trend": []
+}

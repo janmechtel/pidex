@@ -1,0 +1,30 @@
+{
+  "name": "@dougbots/avenor-pi",
+  "latest_version": "0.1.0",
+  "description": "Pi extension that registers avenor agent runs as tools in your Pi session. When you need a sub-agent to handle a well-defined task \u2014 write code, run tests, search a codebase \u2014 avenor operates in the background while you keep your session focused.",
+  "readme": "# @dougbots/avenor-pi\n\nPi extension that registers avenor agent runs as tools in your Pi session. When you need a sub-agent to handle a well-defined task \u2014 write code, run tests, search a codebase \u2014 avenor operates in the background while you keep your session focused.\n\n## Prerequisites\n\nYou need the `avenor` binary available. It is installed to `~/.botfiles/bin/avenor` by default.\n\n```bash\n# Check it's on PATH\nwhich avenor\n\n# Or set explicitly\nexport AVENOR_BIN=~/.botfiles/bin/avenor\n```\n\n## Installation\n\n### From npm (once published)\n\n```bash\npi install npm:@dougbots/avenor-pi\n```\n\nThis writes to your global settings (`~/.pi/agent/settings.json`). Use `-l` for project-local installation (`.pi/settings.json`).\n\n### From a git repo\n\n```bash\npi install git:github.com/sdougbrown/avenor@v0.1.0\n```\n\nPi will clone the repo and load the extension from `packages/pi`.\n\n### Local development\n\n**Quick test** \u2014 run pi with the extension directly:\n\n```bash\ncd packages/pi\npi -e ./src/index.ts\n```\n\n**Symlink for auto-discovery** \u2014 link into your global extensions directory:\n\n```bash\nmkdir -p ~/.pi/agent/extensions/avenor\nln -sf $(pwd)/packages/pi/src/index.ts ~/.pi/agent/extensions/avenor/index.ts\n```\n\nPi auto-discovers `~/.pi/agent/extensions/*/index.ts`. Changes are hot-reloadable with `/reload`.\n\n**Local path in settings** \u2014 add the built dist directly:\n\n```bash\n# Build first\ncd packages/pi && bun run build\n\n# Add to settings\npi install /path/to/avenor/packages/pi\n```\n\n### Manual settings.json\n\nIf you prefer to edit settings directly:\n\n```json\n// ~/.pi/agent/settings.json\n{\n  \"packages\": [\"npm:@dougbots/avenor-pi\"]\n}\n```\n\nOr for a local path:\n\n```json\n{\n  \"packages\": [\"/path/to/avenor/packages/pi\"]\n}\n```\n\n## Package Structure\n\n```\npackages/pi/\n\u251c\u2500\u2500 package.json\n\u251c\u2500\u2500 tsdown.config.ts\n\u251c\u2500\u2500 src/\n\u2502   \u251c\u2500\u2500 index.ts          # main extension (tools, commands, hooks, rendering)\n\u2502   \u251c\u2500\u2500 types.ts          # shared types, status emoji mapping\n\u2502   \u2514\u2500\u2500 watch.ts          # EventFeedOverlay TUI component\n\u2514\u2500\u2500 dist/\n    \u2514\u2500\u2500 index.js          # built output (loaded by pi)\n```\n\nThe `pi` key in `package.json` declares the extension entry point:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./dist/index.js\"]\n  }\n}\n```\n\n## Features\n\n### Tools\n\nSix tools for the LLM to dispatch and manage sub-agents:\n\n| Tool | Description |\n|---|---|\n| `avenor_spawn` | Dispatch an agent run (blocking or fire-and-forget) |\n| `avenor_status` | Get status of a run or all runs |\n| `avenor_answer_permission` | Answer a pending permission request |\n| `avenor_follow_up` | Resume a completed run with a follow-up message |\n| `avenor_events` | Read events from a run |\n| `avenor_shutdown` | Shut down the avenor supervisor |\n\n### Pi-specific features\n\nBeyond the tools, the extension integrates with Pi's TUI and event system:\n\n- **Status widget** \u2014 persistent widget showing all active runs with status, phase, and permission state\n- **Footer status** \u2014 active runs shown in the Pi footer bar\n- **Live progress** \u2014 blocking `avenor_spawn` calls stream progress updates via `onUpdate`\n- **Context enrichment** \u2014 active sub-agents are automatically surfaced in the system prompt via `before_agent_start`\n- **Custom rendering** \u2014 tool calls and results are rendered with status emojis and color-coded output\n- **Commands** \u2014 interactive commands for run management:\n  - `/avenor-status` \u2014 show status of all runs\n  - `/avenor-watch <run_id>` \u2014 open a live event feed overlay\n  - `/avenor-cancel <run_id>` \u2014 cancel a running sub-agent\n\n## Typical workflows\n\n**Blocking (default):**\n```\n1. avenor_spawn            \u2192  tool call shows live progress, blocks until done\n2. tool call returns       \u2192  structured result with status + session_id\n3. avenor_events           \u2192  inspect detailed output\n4. avenor_follow_up        \u2192  optionally iterate\n5. avenor_shutdown         \u2192  clean up when finished\n```\n\n**Parallel / fire-and-forget (`wait=false`):**\n```\n1. avenor_spawn \u00d7 N        \u2192  each returns run_id immediately\n2. (status widget updates) \u2192  persistent widget shows all active runs\n3. /avenor-watch <id>      \u2192  open live event feed for a specific run\n4. avenor_events           \u2192  inspect output when done\n```\n\n## Dependencies\n\n- **Peer:** `@earendil-works/pi-coding-agent` (Pi runtime, provided by pi)\n- **Peer:** `@earendil-works/pi-tui` (TUI components, provided by pi)\n- **Dependency:** `@dougbots/avenor-core` (supervisor, client, tool primitives)\n- **Binary:** `avenor` must be available on `PATH` or at `AVENOR_BIN`\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/sdougbrown/avenor#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sdougbrown/avenor.git",
+    "directory": "packages/pi"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-06-20T03:36:00.917Z",
+    "0.1.0": "2026-06-20T03:36:01.236Z",
+    "modified": "2026-06-20T03:36:01.522Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 173,
+  "download_trend": []
+}

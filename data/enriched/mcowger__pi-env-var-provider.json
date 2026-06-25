@@ -1,0 +1,37 @@
+{
+  "name": "@mcowger/pi-env-var-provider",
+  "latest_version": "1.0.0",
+  "description": "Pi extension: register a custom OpenAI-compatible provider from environment variables. Configure baseUrl, apiKey, and models via env vars without editing models.json.",
+  "readme": "# pi-env-var-provider\n\nA [pi](https://github.com/badlogic/pi-mono) extension that registers a custom OpenAI-compatible provider from environment variables. Configure `baseUrl`, `apiKey`, and model settings without editing `models.json` \u2014 perfect for proxies, API gateways, and local models.\n\n---\n\n## Quick Start\n\n```bash\n# Set required environment variables\nexport PI_BASE_URL=https://proxy.example.com/v1\nexport PI_API_KEY=sk-your-api-key\n\n# Optional: customize provider/model names\nexport PI_PROVIDER_NAME=my-proxy\nexport PI_MODEL_ID=gpt-4o\n\n# Load and run with pi\npi -e npm:@mcowger/pi-env-var-provider\n\n# Then select the model\n/model my-proxy/gpt-4o\n```\n\n---\n\n## Two Modes of Operation\n\n### Mode 1: New Provider (Default)\n\nRegister a completely new provider with custom models:\n\n```bash\nexport PI_BASE_URL=https://api.example.com/v1\nexport PI_API_KEY=sk-...\nexport PI_PROVIDER_NAME=custom-ai      # Provider identifier\nexport PI_MODEL_ID=llama-70b           # Model ID\nexport PI_MODEL_NAME=\"Llama 3 70B\"     # Display name\npi -e npm:@mcowger/pi-env-var-provider\n```\n\n### Mode 2: Override Existing Provider\n\nChange the baseUrl for a built-in provider (keeps all models):\n\n```bash\nexport PI_BASE_URL=https://my-gateway.openai.azure.com\nexport PI_API_KEY=...\nexport PI_OVERRIDE_PROVIDER=openai     # Override built-in \"openai\" provider\npi -e npm:@mcowger/pi-env-var-provider\n```\n\nAll `openai/*` models now use your custom baseUrl.\n\n---\n\n## Environment Variables\n\n| Variable | Required | Default | Description |\n|----------|----------|---------|-------------|\n| `PI_BASE_URL` | **Yes** | \u2014 | API base URL (e.g., `https://api.openai.com/v1`) |\n| `PI_API_KEY` | Mode 1 only | \u2014 | API key or access token |\n| `PI_OVERRIDE_PROVIDER` | No | \u2014 | Existing provider to override instead of creating new |\n| `PI_PROVIDER_NAME` | No | `env-provider` | New provider identifier |\n| `PI_MODEL_ID` | No | `default` | Model ID |\n| `PI_MODEL_NAME` | No | matches `PI_MODEL_ID` | Display name |\n| `PI_MODEL_REASONING` | No | `false` | Supports reasoning/thinking |\n| `PI_MODEL_INPUT` | No | `text,image` | Input types (`text`, `image`, or both) |\n| `PI_CONTEXT_WINDOW` | No | `128000` | Context window size in tokens |\n| `PI_MAX_TOKENS` | No | `16384` | Max output tokens |\n| `PI_COST_INPUT` | No | `0` | Input cost per 1M tokens |\n| `PI_COST_OUTPUT` | No | `0` | Output cost per 1M tokens |\n| `PI_COMPAT_OVERRIDES` | No | \u2014 | OpenAI compat overrides as JSON |\n\n---\n\n## Common Use Cases\n\n### Azure OpenAI\n\n```bash\nexport PI_BASE_URL=https://my-resource.openai.azure.com/openai/deployments/my-deployment\nexport PI_API_KEY=...\nexport PI_OVERRIDE_PROVIDER=openai\nexport PI_MODEL_ID=gpt-4o\nexport PI_COMPAT_OVERRIDES='{\"supportsReasoningEffort\":false}'\npi -e npm:@mcowger/pi-env-var-provider\n```\n\n### Local Ollama\n\n```bash\nexport PI_BASE_URL=http://localhost:11434/v1\nexport PI_API_KEY=ollama  # or any non-empty string\nexport PI_PROVIDER_NAME=ollama-local\nexport PI_MODEL_ID=llama3.1\nexport PI_CONTEXT_WINDOW=8192\npi -e npm:@mcowger/pi-env-var-provider\n\n# Then: /model ollama-local/llama3.1\n```\n\n### OpenRouter Proxy\n\n```bash\nexport PI_BASE_URL=https://openrouter.ai/api/v1\nexport PI_API_KEY=sk-or-...\nexport PI_OVERRIDE_PROVIDER=openai\nexport PI_MODEL_ID=claude-sonnet-4\npi -e npm:@mcowger/pi-env-var-provider\n```\n\n### Perplexity API\n\n```bash\nexport PI_BASE_URL=https://api.perplexity.ai\nexport PI_API_KEY=pplx-...\nexport PI_PROVIDER_NAME=perplexity\nexport PI_MODEL_ID=sonar-pro\nexport PI_MAX_TOKENS=8192\npi -e npm:@mcowger/pi-env-var-provider\n```\n\n---\n\n## GitHub Action Usage\n\nUse with `shaftoe/pi-coding-agent-action` for CI/CD workflows:\n\n```yaml\n- name: Run Pi agent with custom provider\n  uses: shaftoe/pi-coding-agent-action@v2\n  with:\n    github_token: ${{ secrets.GITHUB_TOKEN }}\n    provider: env-provider        # or PI_OVERRIDE_PROVIDER value\n    model: default                # or PI_MODEL_ID value\n    token: ${{ secrets.API_KEY }} # or inline in PI_API_KEY\n    extensions: npm:@mcowger/pi-env-var-provider\n  env:\n    PI_BASE_URL: ${{ secrets.CUSTOM_API_URL }}\n    PI_API_KEY: ${{ secrets.API_KEY }}\n    PI_PROVIDER_NAME: my-gateway\n    PI_MODEL_ID: gpt-4o\n```\n\n### GitHub Action with Provider Override\n\n```yaml\n- name: Run Pi with Azure OpenAI\n  uses: shaftoe/pi-coding-agent-action@v2\n  with:\n    github_token: ${{ secrets.GITHUB_TOKEN }}\n    provider: openai\n    model: gpt-4o\n    token: ${{ secrets.AZURE_OPENAI_KEY }}\n    extensions: npm:@mcowger/pi-env-var-provider\n  env:\n    PI_BASE_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT }}\n    PI_API_KEY: ${{ secrets.AZURE_OPENAI_KEY }}\n    PI_OVERRIDE_PROVIDER: openai\n```\n\n---\n\n## Advanced: Compat Overrides\n\nFor providers with OpenAPI compatibility quirks, use `PI_COMPAT_OVERRIDES`:\n\n```bash\nexport PI_COMPAT_OVERRIDES='{\n  \"supportsDeveloperRole\": false,\n  \"supportsReasoningEffort\": false,\n  \"maxTokensField\": \"max_tokens\",\n  \"requiresToolResultName\": true\n}'\n```\n\nAvailable options:\n- `supportsDeveloperRole` \u2014 Use \"system\" instead of \"developer\" role\n- `supportsReasoningEffort` \u2014 Provider supports reasoning_effort parameter\n- `maxTokensField` \u2014 Use \"max_tokens\" instead of \"max_completion_tokens\"\n- `requiresToolResultName` \u2014 Tool results must include name field\n- `supportsUsageInStreaming` \u2014 Include usage in streaming responses\n- `thinkingFormat` \u2014 Format for thinking blocks (\"openai\", \"zai\", \"qwen\")\n\n---\n\n## Installation\n\n### Global (all projects)\n```bash\npi install npm:@mcowger/pi-env-var-provider\n```\n\n### Project-local\n```bash\npi install -l npm:@mcowger/pi-env-var-provider\n```\n\n### Temporary (one-time)\n```bash\npi -e npm:@mcowger/pi-env-var-provider\n```\n\n### From Git (latest)\n```bash\npi install git:github.com:mcowger/pi-env-var-provider\n```\n\n---\n\n## Requirements\n\n- [pi](https://github.com/badlogic/pi-mono) (any recent version)\n- `@mariozechner/pi-coding-agent` (bundled with pi)\n\n---\n\n## Uninstalling\n\n```bash\npi remove npm:@mcowger/pi-env-var-provider\n```\n\n---\n\n## License\n\nMIT \u00a9 mcowger\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "openai",
+    "proxy",
+    "custom-provider",
+    "environment-variables",
+    "pi-coding-agent"
+  ],
+  "author": {
+    "name": "mcowger"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/mcowger/pi-env-var-provider#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcowger/pi-env-var-provider.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-19T00:49:54.161Z",
+    "1.0.0": "2026-04-19T00:49:54.422Z",
+    "modified": "2026-04-19T00:49:54.637Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 6,
+  "download_trend": []
+}

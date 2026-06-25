@@ -1,0 +1,368 @@
+{
+  "name": "pi-agent-memory",
+  "latest_version": "0.3.4",
+  "description": "Persistent memory for pi-agents, powered by claude-mem (55k+ stars). Cross-session, cross-engine memory with hybrid search.",
+  "readme": "# pi-agent-memory\n\n<p align=\"center\">\n  <img src=\"https://raw.githubusercontent.com/ArtemisAI/pi-mem/main/pi-agent/banner.png\" alt=\"Pi-agent-memory banner\" width=\"600\">\n</p>\n\n<p align=\"center\">\n  <a href=\"https://github.com/thedotmack/claude-mem\">\n    <img src=\"https://img.shields.io/github/stars/thedotmack/claude-mem?style=social&label=claude-mem\" alt=\"GitHub Stars\">\n  </a>\n  <a href=\"https://github.com/thedotmack/claude-mem/network/members\">\n    <img src=\"https://img.shields.io/github/forks/thedotmack/claude-mem?style=social\" alt=\"GitHub Forks\">\n  </a>\n  <a href=\"https://www.npmjs.com/package/pi-agent-memory\">\n    <img src=\"https://img.shields.io/npm/v/pi-agent-memory.svg\" alt=\"npm version\">\n  </a>\n  <a href=\"https://github.com/thedotmack/claude-mem/blob/main/LICENSE\">\n    <img src=\"https://img.shields.io/badge/License-AGPL%203.0-blue.svg\" alt=\"License\">\n  </a>\n</p>\n\n> **Fork & adaptation of [claude-mem](https://github.com/thedotmack/claude-mem)** (55k+ stars, 4.4k+ forks) \u2014 the most popular persistent memory system for AI coding agents \u2014 now available as a native pi-mono extension.\n\nGives pi-coding-agent and any pi-mono-based runtime cross-session, cross-engine memory by connecting to claude-mem's battle-tested worker service. Same compressed memory, same hybrid search (FTS5 + Chroma vector embeddings), same cross-engine sharing \u2014 built for pi-agents.\n\n## Why pi-agent-memory?\n\n- **Backed by claude-mem** \u2014 the #1 memory system for AI coding agents, trusted by 55k+ developers\n- **Cross-engine memory** \u2014 your pi-agent shares memory with Claude Code, Cursor, Codex, and OpenClaw sessions\n- **Hybrid search** \u2014 FTS5 full-text + Chroma vector embeddings for precise memory recall\n- **Zero config** \u2014 installs with one command, auto-connects to the claude-mem worker\n- **Battle-tested** \u2014 built on the same worker API powering thousands of daily sessions\n\n## Installation\n\nRequires the claude-mem worker running on `localhost:37777`. Install claude-mem first via `npx claude-mem install` or run the worker from source.\n\n### From npm (recommended)\n\n```bash\npi install npm:pi-agent-memory\n```\n\n### From git\n\n```bash\npi install git:github.com/thedotmack/claude-mem\n```\n\n### Manual\n\n```bash\ncp extensions/pi-mem.ts ~/.pi/agent/extensions/pi-mem.ts\n```\n\n### Verify\n\n```bash\n# Start pi \u2014 the extension auto-loads\npi\n\n# Check connectivity\n/memory-status\n```\n\n## What It Does\n\n- **Captures observations** \u2014 every tool call your pi-agent makes is recorded to claude-mem's database\n- **Injects context** \u2014 relevant past observations are automatically injected into the LLM context each turn\n- **Memory search** \u2014 a `memory_recall` tool is registered for the LLM to explicitly search past work\n- **Cross-engine sharing** \u2014 pi-agent observations live alongside Claude Code, Cursor, Codex, and OpenClaw memories in the same database\n\n## Architecture\n\n```text\nPi-Agent (pi-coding-agent / OpenClaw / custom)\n    \u2502\n    \u251c\u2500\u2500 pi-mem extension (this package)\n    \u2502   \u251c\u2500\u2500 session_start      \u2500\u2500\u2192  (local state init only)\n    \u2502   \u251c\u2500\u2500 before_agent_start \u2500\u2500\u2192  POST /api/sessions/init (with prompt)\n    \u2502   \u251c\u2500\u2500 context            \u2500\u2500\u2192  GET  /api/context/inject\n    \u2502   \u251c\u2500\u2500 tool_result        \u2500\u2500\u2192  POST /api/sessions/observations\n    \u2502   \u251c\u2500\u2500 agent_end          \u2500\u2500\u2192  POST /api/sessions/summarize\n    \u2502   \u2502                           POST /api/sessions/complete\n    \u2502   \u251c\u2500\u2500 session_compact    \u2500\u2500\u2192  (preserve session state)\n    \u2502   \u2514\u2500\u2500 session_shutdown   \u2500\u2500\u2192  (cleanup)\n    \u2502\n    \u2514\u2500\u2500 memory_recall tool     \u2500\u2500\u2192  GET  /api/search\n                                         \u2502\n                                         \u25bc\n                            claude-mem worker (port 37777)\n                            SQLite + FTS5 + Chroma\n                            Shared across all engines\n```\n\n## Event Mapping\n\n| Pi-Mono Event | Worker API | Purpose |\n|---|---|---|\n| `session_start` | \u2014 (local state only) | Derive project name, generate session ID |\n| `before_agent_start` | `POST /api/sessions/init` | Capture user prompt for privacy filtering |\n| `context` | `GET /api/context/inject` | Inject past observations into LLM context |\n| `tool_result` | `POST /api/sessions/observations` | Record what tools did (fire-and-forget) |\n| `agent_end` | `POST /api/sessions/summarize` + `complete` | AI-compress the session |\n| `session_compact` | \u2014 | Preserve session ID across context compaction |\n| `session_shutdown` | \u2014 | Clean up local state |\n\nDerived from the OpenClaw plugin (`claude-mem/openclaw/src/index.ts`), which is a proven integration of claude-mem into a pi-mono-based runtime.\n\n## Configuration\n\n| Variable | Default | Description |\n|---|---|---|\n| `CLAUDE_MEM_PORT` | `37777` | Worker service port |\n| `CLAUDE_MEM_HOST` | `127.0.0.1` | Worker service host |\n| `PI_MEM_PROJECT` | (derived from cwd) | Project name for scoping observations |\n| `PI_MEM_DISABLED` | \u2014 | Set to `1` to disable the extension |\n\n## Cross-Engine Memory\n\nAll engines write to the same `~/.claude-mem/claude-mem.db`, tagged by `platform_source`:\n\n| Engine | Platform Source |\n|---|---|\n| Claude Code | `claude` |\n| OpenClaw | `openclaw` |\n| Pi-Agent | `pi-agent` |\n| Cursor | `cursor` |\n| Codex | `codex` |\n\nContext injection returns observations from all engines for the same project by default. Pass `platformSource` to filter by engine.\n\n## Related Packages\n\nOther independent claude-mem adapters published to npm:\n\n- [`@ephemushroom/opencode-claude-mem`](https://www.npmjs.com/package/@ephemushroom/opencode-claude-mem) \u2014 OpenCode adapter (MIT)\n- [`opencode-cmem`](https://www.npmjs.com/package/opencode-cmem) \u2014 OpenCode adapter (MIT)\n\nOther pi memory extensions (standalone, not claude-mem based):\n\n- [`@samfp/pi-memory`](https://www.npmjs.com/package/@samfp/pi-memory) \u2014 Learns corrections/preferences from sessions\n- [`@zhafron/pi-memory`](https://www.npmjs.com/package/@zhafron/pi-memory) \u2014 Memory management + identity\n- [`@db0-ai/pi`](https://www.npmjs.com/package/@db0-ai/pi) \u2014 Auto fact extraction, local SQLite\n\n## Development\n\n```bash\n# Edit the extension\nvim extensions/pi-mem.ts\n\n# Test locally\npi -e ./extensions/pi-mem.ts\n\n# Or install from local path\npi install ./pi-agent\n```\n\n## Credits\n\nThis package is a fork and adaptation of [**claude-mem**](https://github.com/thedotmack/claude-mem) by [@thedotmack](https://github.com/thedotmack) \u2014 the leading persistent memory system for AI coding agents. All core memory infrastructure (worker service, SQLite + FTS5 database, Chroma vector embeddings, AI-powered compression) is provided by claude-mem.\n\n## License\n\nAGPL-3.0 \u2014 same as [claude-mem](https://github.com/thedotmack/claude-mem/blob/main/LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-skill",
+    "claude-mem",
+    "pi-agent",
+    "pi-coding-agent",
+    "memory",
+    "persistent-memory",
+    "cross-session",
+    "cross-engine"
+  ],
+  "author": {
+    "name": "ArtemisAI"
+  },
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/ArtemisAI/pi-mem/tree/main/pi-agent#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArtemisAI/pi-mem.git",
+    "directory": "pi-agent"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "image": "https://raw.githubusercontent.com/ArtemisAI/pi-mem/main/pi-agent/banner.png"
+  },
+  "time": {
+    "created": "2026-04-14T02:20:46.940Z",
+    "modified": "2026-04-16T17:32:53.137Z",
+    "0.1.0": "2026-04-14T02:20:47.291Z",
+    "0.1.1": "2026-04-14T02:34:01.957Z",
+    "0.2.0": "2026-04-14T17:47:33.409Z",
+    "0.2.1": "2026-04-14T17:58:07.953Z",
+    "0.2.2": "2026-04-14T17:59:09.032Z",
+    "0.2.3": "2026-04-14T18:02:10.566Z",
+    "0.3.0": "2026-04-14T18:16:03.899Z",
+    "0.3.1": "2026-04-14T18:25:54.452Z",
+    "0.3.2": "2026-04-14T22:56:02.942Z",
+    "0.3.3": "2026-04-14T23:09:33.801Z",
+    "0.3.4": "2026-04-16T17:32:53.044Z"
+  },
+  "versions_count": 11,
+  "downloads_last_week": null,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 1002
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 313
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 101
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 70
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 107
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 84
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 47
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 33
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 27
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 42
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 36
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 19
+    }
+  ]
+}

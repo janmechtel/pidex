@@ -1,0 +1,347 @@
+{
+  "name": "@brngp/pi-voice",
+  "latest_version": "0.1.0",
+  "description": "Hold-Space voice dictation extension for Pi using ffmpeg and Whisper.",
+  "readme": "# Pi Voice\n\nA Pi package that adds `/voice`: hold-Space microphone dictation for Pi. It records audio with `ffmpeg`, transcribes with local `whisper-cli` by default, and inserts the transcript into the prompt editor for review.\n\n\n## Project documentation\n\n- [Installation](docs/INSTALLATION.md)\n- [Usage](docs/USAGE.md)\n- [Configuration](docs/CONFIGURATION.md)\n- [Privacy](docs/PRIVACY.md)\n- [Troubleshooting](docs/TROUBLESHOOTING.md)\n- [Publishing](docs/PUBLISHING.md)\n- [Contributing](CONTRIBUTING.md)\n- [Security](SECURITY.md)\n- [Changelog](CHANGELOG.md)\n\n## Install\n\nFrom a local checkout:\n\n```sh\npi install /Users/bruno/Developer/pi-voice\n```\n\nFrom GitHub after publishing/tagging:\n\n```sh\npi install git:github.com/brunogama/pi-voice@v0.1.0\n```\n\nFrom npm after publishing:\n\n```sh\npi install npm:@brngp/pi-voice\n```\n\nRestart Pi or run `/reload`, then:\n\n```text\n/voice doctor\n/voice\n```\n\n---\n\n# Pi `/voice` Extension\n\nGlobal Pi extension for recording microphone audio in interactive Pi TUI sessions, transcribing it, and inserting the transcript into the active prompt editor for review.\n\n## Usage\n\n- `/voice` or `/voice toggle` \u2014 toggle persistent hold-Space voice mode; enabling it clears the prompt.\n- Hold `Space` \u2014 start recording; keep holding to continue recording.\n- Release `Space` \u2014 after a short key-repeat pause, stop, transcribe, and insert the transcript. Voice mode stays enabled for the next dictation.\n- `/voice start` \u2014 start recording immediately without hold-Space mode.\n- `/voice stop` \u2014 stop the active recording, transcribe it, and insert the transcript.\n- `/voice off` \u2014 exit hold-Space voice mode and discard active audio if needed.\n- `/voice cancel` \u2014 discard an active recording or abort an active transcription. No transcript is inserted; voice mode remains ready unless you type `/voice` or `/voice off`.\n- `/voice status` \u2014 show whether voice is idle, recording, or transcribing.\n- `/voice doctor` \u2014 check `ffmpeg` and the selected transcription backend.\n- `/voice devices` \u2014 on macOS, list `ffmpeg`/`avfoundation` audio devices.\n- `/voice help` \u2014 show command and privacy help inside Pi.\n\nRecording starts only while Pi is idle in interactive TUI mode. `/voice` clears the current editor text before entering hold-Space mode. Voice mode stays enabled after each release/transcription and is disabled only when you type `/voice` again (or `/voice off`). While voice mode is active, Pi shows an animated spectrum widget below the editor; during recording it is driven by ffmpeg RMS audio levels when available. Because terminals do not expose true key-up events, release is detected by the pause in repeated Space keypresses; tune this with `PI_VOICE_SPACE_RELEASE_MS` if needed. The transcript is inserted into the prompt editor only. The extension never calls `sendUserMessage` and never submits the prompt for you.\n\n## Privacy model\n\nThe default backend is local-only:\n\n```sh\nexport PI_VOICE_BACKEND=whisper-cli\n```\n\nCloud transcription is used only when you explicitly opt in:\n\n```sh\nexport PI_VOICE_BACKEND=openai-compatible\n```\n\nHaving `OPENAI_API_KEY` in your environment is not enough to select cloud transcription. If the local backend is selected, `/voice doctor` reports that `OPENAI_API_KEY` is ignored.\n\nWhen cloud transcription is explicitly enabled, stopping a recording uploads the temporary WAV to `PI_VOICE_ENDPOINT` and the UI/doctor output shows the endpoint host. Endpoint safety rules reject URL credentials, reject non-HTTPS remote endpoints, and allow plain HTTP only for exact loopback hosts (`localhost`, `127.0.0.1`, `::1`). API keys and Authorization headers are never displayed.\n\nTemporary `pi-voice-*` WAV directories are deleted on successful stop, cancel, transcription error, max-duration timeout, reload/shutdown, and agent start. Timeout/agent-start cleanup discards audio only; it does not transcribe or upload in the background.\n\n## Setup\n\nRuntime dependencies are user-managed. This extension does not install packages, download models, or mutate other extensions.\n\n### Capture dependency\n\nInstall `ffmpeg` yourself if needed:\n\n```sh\nbrew install ffmpeg\n```\n\nCommon capture variables:\n\n```sh\nexport PI_VOICE_FFMPEG=ffmpeg\nexport PI_VOICE_FFMPEG_FORMAT=avfoundation   # macOS default\nexport PI_VOICE_FFMPEG_INPUT=:0              # macOS default audio device index\nexport PI_VOICE_MAX_SECONDS=120\nexport PI_VOICE_SPACE_RELEASE_MS=850  # hold-Space release detection grace\n```\n\nRun `/voice devices` on macOS to inspect `avfoundation` device indexes, then set `PI_VOICE_FFMPEG_INPUT` as needed.\n\n### Local `whisper-cli` backend\n\nInstall whisper.cpp yourself and provide a model file:\n\n```sh\nbrew install whisper-cpp\nmkdir -p ~/.pi/models\n# Put a ggml model at ~/.pi/models/ggml-base.en.bin, or set PI_VOICE_WHISPER_MODEL.\nexport PI_VOICE_BACKEND=whisper-cli\nexport PI_VOICE_WHISPER_BIN=whisper-cli\nexport PI_VOICE_WHISPER_MODEL=~/.pi/models/ggml-base.en.bin\n```\n\nThe extension checks `whisper-cli --help` at runtime and requires compatible text-output and output-prefix flags (`--output-txt`/`-otxt`, `--output-file`/`-of`). It uses `--no-timestamps`/`-nt` when available, otherwise it strips common timestamp prefixes after transcription and warns in `/voice doctor`.\n\n### OpenAI-compatible backend\n\nExplicitly opt in to cloud transcription and provide a key for non-loopback endpoints:\n\n```sh\nexport PI_VOICE_BACKEND=openai-compatible\nexport OPENAI_API_KEY=...\nexport PI_VOICE_ENDPOINT=https://api.openai.com/v1/audio/transcriptions\nexport PI_VOICE_MODEL=whisper-1\n```\n\nOptional:\n\n```sh\nexport PI_VOICE_LANGUAGE=en\nexport PI_VOICE_TIMEOUT_MS=120000\n```\n\nLoopback HTTP endpoints are allowed for local OpenAI-compatible servers:\n\n```sh\nexport PI_VOICE_BACKEND=openai-compatible\nexport PI_VOICE_ENDPOINT=http://localhost:10301/v1/audio/transcriptions\n```\n\n## Editor insertion\n\nDefault mode uses Pi's paste handling:\n\n```sh\nexport PI_VOICE_INSERT_MODE=paste\n```\n\nAppend mode reads and writes the editor text:\n\n```sh\nexport PI_VOICE_INSERT_MODE=append\n```\n\nTrailing space is enabled by default so you can keep typing naturally:\n\n```sh\nexport PI_VOICE_TRAILING_SPACE=1\n```\n\nSet `PI_VOICE_TRAILING_SPACE=0` to disable it.\n\n## Troubleshooting\n\n- **`ffmpeg` missing**: install/configure `ffmpeg`, or set `PI_VOICE_FFMPEG` to its path. Run `/voice doctor`.\n- **macOS microphone permission**: grant Terminal/iTerm/Ghostty microphone access in System Settings, then retry.\n- **wrong input device**: run `/voice devices` on macOS and set `PI_VOICE_FFMPEG_INPUT` (for example, `:0`, `:1`).\n- **recording too small**: speak before stopping, verify mic permission/device selection, and check `PI_VOICE_MIN_BYTES`.\n- **missing local model**: set `PI_VOICE_WHISPER_MODEL` to an existing whisper.cpp GGML model file.\n- **unsupported `whisper-cli` flags**: update whisper.cpp or set `PI_VOICE_WHISPER_BIN` to a compatible binary.\n- **endpoint rejected**: use HTTPS for remote endpoints; use HTTP only for exact loopback hosts; do not put credentials in the URL.\n- **cloud key missing**: set `PI_VOICE_API_KEY` or `OPENAI_API_KEY` when using a non-loopback OpenAI-compatible endpoint.\n\nRun `/voice doctor` after changing configuration.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "voice",
+    "whisper",
+    "speech-to-text",
+    "dictation"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/brunogama/pi-voice#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brunogama/pi-voice.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/voice.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-18T23:08:52.271Z",
+    "0.1.0": "2026-06-18T23:08:52.648Z",
+    "modified": "2026-06-18T23:08:52.850Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 92,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 91
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

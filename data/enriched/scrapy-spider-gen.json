@@ -1,0 +1,30 @@
+{
+  "name": "scrapy-spider-gen",
+  "latest_version": "0.2.18",
+  "description": "Pi extension \u2014 g\u00e9n\u00e8re des spiders Scrapy depuis des pages HTML",
+  "readme": "# scrapy-spider-gen\n\nA [Pi](https://github.com/badlogic/pi-mono) extension that generates Scrapy spiders from web pages. Downloads HTML, strips the noise, and feeds the cleaned DOM to the LLM for automatic selector extraction and spider generation.\n\n## The problem\n\nA typical e-commerce page weighs **500KB\u20132MB** of raw HTML. Most of it is noise for an LLM trying to identify CSS/XPath selectors on product content:\n\n- `<style>` / `<link>` blocks\n- `<script>` tags (analytics, tracking, hydration)\n- Dozens of `data-*` attributes\n- Inline SVG icons\n- HTML comments\n\n## How it works\n\n```\nRaw HTML (2MB)\n      \u2502\n      \u25bc\n[scrapy-spider-gen extension]\n  \u251c\u2500\u2500 Strip <script>, <style>, <svg>, <noscript>, <iframe>, \u2026\n  \u251c\u2500\u2500 Filter parasitic attributes (style, onclick, data-tracking\u2026)\n  \u251c\u2500\u2500 Keep only structural DOM\n  \u2514\u2500\u2500 Optionally extract product zone only (main, article\u2026)\n      \u2502\n      \u25bc\nCleaned HTML (20\u201350KB)\n      \u2502\n      \u25bc\n[LLM via Pi]  \u2190  spider template + item fields\n      \u2502\n      \u25bc\nCompleted Scrapy spider\n```\n\n## Install\n\n```bash\npi install npm:scrapy-spider-gen\n```\n\nOr from source:\n\n```bash\ngit clone <this-repo>\ncd pi-vapalape\nnpm install\npi install ./\n\n```\n\n> **Looking for omp.sh (oh-my-pi) support?** See [`scrapy-spider-gen-omp`](./scrapy-spider-gen-omp/) \u2014 a sibling package that targets the `@oh-my-pi/pi-coding-agent` runtime.\n\n## Usage\n\n### Command: `/spider-create`\n\n```\n/spider-create url=<url_or_path> [template=<path>] [level=light|normal|aggressive] [prompt=<text_or_path>]\n```\n\n| Parameter | Description | Default |\n|-----------|-------------|---------|\n| `url` | HTTPS URL or local file path to the HTML page | *required* |\n| `template` | Path to a Scrapy spider template file | \u2014 |\n| `level` | Cleaning intensity | `normal` |\n| `prompt` | Custom prompt (replaces the default). Inline text or path to a prompt file | \u2014 |\n\n**Examples:**\n\n```\n/spider-create url=https://shop.example.com/product/42\n/spider-create url=https://shop.example.com/product/42 template=./spider.py level=aggressive\n/spider-create url=./pages/product.html level=light\n/spider-create url=https://shop.example.com/product/42 prompt=./my_instructions.txt\n```\n\n### Command: `/spider-help`\n\nShows extension usage, available commands, clean levels, and custom prompt variables.\n\n### Custom prompt variables\n\nWhen using `prompt=<file>`, the following variables are resolved in the prompt content:\n\n| Variable | Value |\n|----------|-------|\n| `{source}` | URL or file path of the HTML page |\n| `{level}` | Cleaning level |\n| `{templateClause}` | `, template=\"<path>\"` or empty string |\n\n### Tool: `spider_clean`\n\nLLM-callable tool that fetches, cleans, and returns structural HTML for Scrapy selector analysis. The LLM can also call it directly when generating or completing a spider.\n\n## Clean levels\n\n| Level | What it does |\n|-------|-------------|\n| **light** | Removes `<script>`, `<style>`, `<svg>`, `<noscript>`, `<iframe>`, `<canvas>`, `<video>`, `<audio>`, `<link>`, `<meta>`, `<template>` |\n| **normal** | *light* + filters parasitic attributes (`style`, `onclick`, `data-tracking`\u2026), keeps only structural attributes (`id`, `class`, `href`, `src`, `alt`, `data-product-*`, Schema.org\u2026) |\n| **aggressive** | *normal* + extracts only the product zone using heuristics (Schema.org markers, `.product-detail`, `main`, `article`, `[role='main']`\u2026) |\n\n## Safety\n\nCleaned HTML is capped at **400KB** to stay within LLM context limits. If the output exceeds this threshold, it is truncated with a warning.\n\n## Architecture\n\n```\nsrc/\n\u251c\u2500\u2500 index.ts          \u2014 Entry point: /spider-create command + spider_clean tool\n\u251c\u2500\u2500 arg-parser.ts     \u2014 Parses /spider-create command arguments\n\u251c\u2500\u2500 fetcher.ts        \u2014 Downloads HTML from URL or reads local file\n\u251c\u2500\u2500 html-cleaner.ts   \u2014 Cleans HTML: removes noise, filters attributes, extracts product zone\n\u2514\u2500\u2500 *.test.ts         \u2014 Co-located tests (vitest)\n```\n\n## Development\n\n```bash\nnpm install\nnpm test            # vitest run\nnpm run check       # biome lint + format\nnpm run format      # auto-fix formatting\nnpm run build       # tsc\nnpm run ci          # check + build + test\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "scrapy",
+    "spider",
+    "html-cleaning"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-16T21:14:28.865Z",
+    "0.2.18": "2026-06-16T21:14:29.159Z",
+    "modified": "2026-06-16T21:14:29.364Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 17,
+  "download_trend": []
+}

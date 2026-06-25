@@ -1,0 +1,26 @@
+{
+  "name": "@petechu/pi-package-usage",
+  "latest_version": "0.1.0",
+  "description": "Passively collected usage statistics for installed Pi packages",
+  "readme": "# Package Usage\n\n> **\u26a0\ufe0f Beta**: This extension is in active development and has not been battle-tested. It needs real-world usage over time to validate that the tracking is accurate and the stale/unused classifications produce useful signals. Feedback and bug reports are welcome.\n\nPassively collects usage statistics for installed Pi packages \u2014 see which tools, skills, and commands earn their place in your workflow. Trigger `/package-usage` to view an interactive HTML report, or `/package-usage reset` to clear all counters.\n\n> **Privacy**: All data is stored locally in `~/.pi/agent/package-usage/usage-stats-v1.json`. No usage data is ever transmitted \u2014 no telemetry, no analytics service, no network requests. The extension only counts the _fact_ that a resource was used; it does not store prompts, arguments, results, session identifiers, or absolute paths.\n\n## Install\n\n```bash\npi install npm:@petechu/pi-package-usage\n/reload\n```\n\n## Usage\n\n| Command                      | Description                                                       |\n| ---------------------------- | ----------------------------------------------------------------- |\n| `/package-usage`             | Generate and open an HTML usage report                            |\n| `/package-usage reset`       | Clear all usage counters (with confirmation)                      |\n| `/package-usage reset --yes` | Clear all usage counters (skip confirmation, for non-UI sessions) |\n\nThe report groups resources by package, with sortable columns, search, type/status filters, and stale threshold controls. It also surfaces no-longer-installed resources so you can review historical usage from packages you've since removed.\n\n## What is tracked\n\n| Resource     | How it's tracked                                                                                                                                       |\n| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |\n| **Tools**    | `tool_execution_end` event \u2014 logged when a tool from an installed package completes execution                                                          |\n| **Commands** | `input` event (detects `/commandName` patterns) + a patch on `AgentSession.prototype._tryExecuteExtensionCommand` for extension-registered commands    |\n| **Skills**   | `input` event (detects skill names in conversation), plus `tool_result` for `read` invocations on skill files \u2014 deduplicated within a 10-second window |\n\nOnly resources originating from third-party installed Pi packages (`origin === \"package\"`) are tracked. Built-in tools, local extensions, and local skills are excluded.\n\n## Design & workflow\n\nThe extension has three layers: **tracking**, **storage**, and **reporting**.\n\n### Tracking\n\nOn startup, the extension subscribes to Pi events to detect when package resources are used:\n\n- **Tools** \u2014 `tool_execution_end` fires each time a tool completes; if the tool belongs to an installed package, its usage is recorded.\n- **Commands** \u2014 two mechanisms cover both `/command` text typed by the user and commands dispatched internally by Pi's extension runner.\n- **Skills** \u2014 detected from conversation input and file reads, with a 10-second deduplication window to avoid double-counting when a skill is triggered and its file is simultaneously read.\n\nAll trackers resolve the origin of each resource against Pi's registry, filtering out anything that isn't from a third-party package.\n\n### Storage\n\nUsage records are kept in memory as a simple array of `{ packageSource, resourceType, resourceName, count, firstUsed, lastUsed }` objects. A debounced flush (default 2 seconds) writes the in-memory state to `~/.pi/agent/package-usage/usage-stats-v1.json`. On session shutdown the store flushes immediately to ensure nothing is lost.\n\n### Reporting\n\nWhen `/package-usage` is invoked, the extension:\n\n1. Discovers all currently installed package resources via Pi's package manager.\n2. Merges the live install list with stored usage records \u2014 resources that are no longer installed are separated into a \"historical\" section.\n3. Classifies each resource as **used** (recent usage), **stale** (last used outside the configured threshold), or **unused** (zero usage count).\n4. Embeds the full dataset into a self-contained HTML report and opens it in the browser.\n\nThe HTML report is fully interactive \u2014 you can search, filter by type or status, sort by usage, adjust the stale threshold, toggle dark mode, and collapse/expand packages.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/PeteChu/pi-extensions",
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-22T15:08:41.221Z",
+    "0.1.0": "2026-05-22T15:08:41.678Z",
+    "modified": "2026-05-22T15:08:41.861Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

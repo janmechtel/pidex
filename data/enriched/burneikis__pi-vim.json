@@ -1,0 +1,38 @@
+{
+  "name": "@burneikis/pi-vim",
+  "latest_version": "1.6.0",
+  "description": "Vim motions extension for pi \u2013 normal, insert, visual, and replace modes with operators, motions, text objects, registers, search, and repeat",
+  "readme": "# pi-vim\n\nVim motions extension for [pi-coding-agent](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent). Replaces the default input editor with a vim-modal editor supporting normal, insert, visual, and replace modes.\n\n## Install\n\n```bash\npi install npm:@burneikis/pi-vim\n```\n\n### With Fuzzy File Picker\n\nInstall [pi-fzfp](https://github.com/burneikis/pi-fzfp) as a separate pi package alongside pi-vim:\n\n```bash\npi install npm:@burneikis/pi-fzfp\n```\n\nThat's it. When both are installed, pi-vim detects pi-fzfp at startup and integrates its fuzzy autocomplete automatically. pi-fzfp will not install its own editor \u2014 pi-vim handles the editor and wraps its autocomplete provider with fzfp's fuzzy matching.\n\n> **Requires** [`fd`](https://github.com/sharkdp/fd) and [`fzf`](https://github.com/junegunn/fzf) on your `PATH`.\n\n## Features\n\n### Vim Motions\n- Normal, Insert, Visual, and Replace modes\n- Mode-aware cursor shape updates (Insert = bar cursor, non-Insert = block cursor)\n- Motions (`h`, `j`, `k`, `l`, `w`, `b`, `e`, `0`, `$`, `gg`, `G`, etc.)\n- Operators (`d`, `c`, `y`, `p`, etc.)\n- Text objects (`iw`, `aw`, `i\"`, `a(`, etc.)\n- Search (`/`, `?`, `n`, `N`)\n- Registers and yank/paste\n- Dot repeat\n\n### Fuzzy File Picker (optional, via pi-fzfp)\n- Replaces `@file` autocomplete with weighted dual-key fuzzy matching\n- Basename matches scored 2\u00d7 higher than path matches\n- Suffix alignment bonus for extension-aware matching (`@acts` \u2192 `abct.ts` over `abct.scss`)\n- Path prefix pre-filtering when query contains `/`\n- Test file penalty as a tiebreaker\n\n## Integration Protocol\n\npi-vim and pi-fzfp coordinate via `pi.events` so they work regardless of which extension loads first. Other custom editors can use the same protocol to integrate pi-fzfp.\n\n### As an editor extension that wants pi-fzfp integration\n\nRegister listeners during your extension factory (before `session_start`), so they are in place regardless of load order:\n\n```typescript\nimport type { ExtensionAPI } from \"@mariozechner/pi-coding-agent\";\nimport type { AutocompleteProvider } from \"@mariozechner/pi-tui\";\n\nexport default function (pi: ExtensionAPI) {\n  let wrapAutocomplete: ((provider: AutocompleteProvider) => AutocompleteProvider) | undefined;\n\n  // Tell pi-fzfp not to set its own editor component.\n  pi.events.on(\"pi-fzfp:check-editor\", (ack: () => void) => { ack(); });\n\n  // Receive the provider (pi-fzfp emits this from both its factory and\n  // session_start to cover both load orderings).\n  pi.events.on(\"pi-fzfp:provider\", (fn: (provider: AutocompleteProvider) => AutocompleteProvider) => {\n    wrapAutocomplete = fn;\n  });\n\n  pi.on(\"session_start\", (_event, ctx) => {\n    ctx.ui.setEditorComponent((tui, theme, keybindings) =>\n      new MyEditor(tui, theme, keybindings, wrapAutocomplete)\n    );\n  });\n}\n```\n\nThen apply `wrapAutocomplete` inside your editor's `setAutocompleteProvider`:\n\n```typescript\noverride setAutocompleteProvider(provider: AutocompleteProvider): void {\n  super.setAutocompleteProvider(this.wrapAutocomplete ? this.wrapAutocomplete(provider) : provider);\n}\n```\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "burneikis"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/burneikis/pi-vim#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/burneikis/pi-vim.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-26T10:19:16.117Z",
+    "modified": "2026-06-18T20:38:08.524Z",
+    "1.0.0": "2026-03-26T10:19:16.365Z",
+    "1.0.1": "2026-03-26T10:30:31.843Z",
+    "1.1.0": "2026-03-28T22:34:38.689Z",
+    "1.2.0": "2026-03-28T23:36:14.167Z",
+    "1.3.0": "2026-03-28T23:43:46.110Z",
+    "1.4.0": "2026-03-31T08:08:47.515Z",
+    "1.5.0": "2026-06-18T20:32:21.757Z",
+    "1.6.0": "2026-06-18T20:38:08.313Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,350 @@
+{
+  "name": "pi-vox",
+  "latest_version": "0.1.0",
+  "description": "Lightweight voice dictation for Pi: /voice-toggle records locally and transcribes with ElevenLabs.",
+  "readme": "# pi-vox\n\nVoice input for [pi coding agent](https://github.com/earendil-works/pi-coding-agent).\n\nIt records your microphone, sends the audio to ElevenLabs speech-to-text, and puts the transcript into the current pi input box.\n\nElevenLabs is the only speech provider right now. Their free tier is generous enough for normal testing and light use.\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:pi-vox\n```\n\nOr from GitHub:\n\n```bash\npi install https://github.com/denismrvoljak/pi-vox\n```\n\n## Setup\n\n### 1. Add your ElevenLabs API key\n\nCreate an API key in ElevenLabs, then set it before starting pi:\n\n```bash\nexport ELEVENLABS_API_KEY=\"your-key-here\"\n```\n\nYou can also put it in a `.env` file in the directory where you launch pi:\n\n```bash\nELEVENLABS_API_KEY=your-key-here\n```\n\n`pi-vox` redacts this key from status messages and common error output.\n\n### 2. Install a recorder\n\n`pi-vox` needs a local command-line recorder. On macOS, install one of these:\n\n```bash\nbrew install sox\n```\n\nor:\n\n```bash\nbrew install ffmpeg\n```\n\nIf you install `sox`, `pi-vox` can use `rec` or `sox`. If you install `ffmpeg`, it can use `ffmpeg`.\n\n### 3. Reload pi\n\nInside pi:\n\n```text\n/reload\n```\n\nThen check that everything is connected:\n\n```text\n/voice-status\n```\n\nYou should see something like:\n\n```text\nVoice input: version=..., provider=elevenlabs, key=configured, autoSubmit=off, cleanup=on, audio=rec/sox/ffmpeg\n```\n\n## How to use it\n\nStart recording:\n\n```text\n/voice-toggle\n```\n\nSpeak your prompt.\n\nStop recording and insert the transcript:\n\n```text\n/voice-toggle\n```\n\nCancel the recording:\n\n```text\n/voice-cancel\n```\n\nThat's the main workflow.\n\n## Commands\n\n### `/voice-toggle`\n\nStarts recording when idle. Stops recording when active, transcribes, and inserts the text into the editor.\n\n### `/voice-cancel`\n\nStops the current recording and deletes the temporary audio file.\n\n### `/voice-status`\n\nShows whether the API key is configured, which recorder is available, and a few current settings.\n\n### `/voice-glossary`\n\nAdds custom cleanup rules for words speech-to-text gets wrong.\n\n```text\n/voice-glossary list\n/voice-glossary add pi-vox pyvox \"bye vox\"\n/voice-glossary add pi-coding-agent pycodingagent \"bye coding agent\"\n/voice-glossary clear\n```\n\nSettings are saved here:\n\n```text\n~/.pi/pi-vox/config.json\n```\n\nYou can use another config file with:\n\n```bash\nexport PI_VOX_CONFIG=/path/to/config.json\n```\n\n## Transcript cleanup\n\nSpeech-to-text often gets project names wrong, so `pi-vox` cleans up common mistakes before inserting the text.\n\nExamples:\n\n- `py-coding agent` \u2192 `pi-coding-agent`\n- `pie coding agent` \u2192 `pi-coding-agent`\n- `bye coding agent` \u2192 `pi-coding-agent`\n- `pyvox` \u2192 `pi-vox`\n- `pytutor` \u2192 `pi-tutor`\n- `pyoverwatch` \u2192 `pi-overwatch`\n\nYou can add your own glossary entries in config:\n\n```json\n{\n  \"transcriptGlossary\": [\n    { \"canonical\": \"my-product\", \"aliases\": [\"my product\", \"mai product\"] }\n  ]\n}\n```\n\nOr use the command:\n\n```text\n/voice-glossary add my-product \"my product\" \"mai product\"\n```\n\nTo turn cleanup off:\n\n```json\n{\n  \"transcriptCleanup\": false\n}\n```\n\n## Why it uses commands instead of hold-space\n\nSome terminals handle key press/release events differently. Holding space can be unreliable, and it can interfere with normal typing.\n\nSo the default is simple and safe:\n\n```text\n/voice-toggle\n```\n\nThere is internal support for shortcuts and hold-to-talk, but the command workflow is the supported default.\n\n## Config defaults\n\n```js\n{\n  provider: 'elevenlabs',\n  holdKey: 'space',\n  holdToTalk: false,\n  holdThresholdMs: 350,\n  fallbackToggleShortcut: 'ctrl+v',\n  cancelShortcut: 'escape',\n  autoSubmit: false,\n  appendMode: 'append',\n  recorder: 'auto',\n  transcriptCleanup: true,\n  transcriptGlossary: undefined,\n  transcriptReplacements: undefined\n}\n```\n\n## Privacy notes\n\nWhen you stop recording, `pi-vox` sends that audio to ElevenLabs for transcription.\n\nIt does not keep a recording history. Temporary audio files are cleaned up after transcribe or cancel.\n\nStill, don't dictate secrets into any networked voice tool.\n\n## Development\n\n```bash\npnpm install\npnpm test\npnpm check\npnpm pack:smoke\n```\n\nLocal install while developing:\n\n```bash\npi install /absolute/path/to/pi-vox\n```\n\nInside pi:\n\n```text\n/reload\n/voice-status\n/voice-toggle\n```\n\n## Known limitations\n\n- ElevenLabs is the only provider right now\n- command-based toggle is the supported path\n- hold-space is disabled by default\n- no streaming partial transcripts yet\n- no text-to-speech, wake word, or daemon\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "voice",
+    "dictation",
+    "elevenlabs",
+    "speech-to-text"
+  ],
+  "author": {
+    "name": "Denis Mrvoljak"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/denismrvoljak/pi-vox",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/denismrvoljak/pi-vox.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-11T21:13:55.426Z",
+    "0.1.0": "2026-06-11T21:13:55.712Z",
+    "modified": "2026-06-11T21:13:55.896Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 146
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 27
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "name": "pi-lcm",
+  "latest_version": "0.1.3",
+  "description": "Lossless Context Management for Pi \u2014 DAG-based summarization with full history recovery",
+  "readme": "<p align=\"center\">\n  <h1 align=\"center\">pi-lcm</h1>\n  <p align=\"center\"><strong>Lossless context management for Pi. Never lose a message again.</strong></p>\n</p>\n\n<p align=\"center\">\n  <!-- BADGES:START -->\n  <a href=\"https://opensource.org/licenses/MIT\"><img src=\"https://img.shields.io/badge/License-MIT-yellow.svg\" alt=\"License: MIT\"></a>\n  <a href=\"https://www.npmjs.com/package/pi-lcm\"><img src=\"https://img.shields.io/npm/v/pi-lcm.svg\" alt=\"npm version\"></a>\n  <img src=\"https://img.shields.io/badge/TypeScript-5.x-blue.svg\" alt=\"TypeScript\">\n  <img src=\"https://img.shields.io/badge/Pi-0.58+-purple.svg\" alt=\"Pi 0.58+\">\n  <img src=\"https://img.shields.io/badge/PRs-welcome-brightgreen.svg\" alt=\"PRs Welcome\">\n  <!-- BADGES:END -->\n</p>\n\n<p align=\"center\">\n  <a href=\"#install\">Install</a> \u00b7\n  <a href=\"#quick-start\">Quick Start</a> \u00b7\n  <a href=\"#how-it-works\">How It Works</a> \u00b7\n  <a href=\"#features\">Features</a> \u00b7\n  <a href=\"#configuration\">Configuration</a> \u00b7\n  <a href=\"#contributing\">Contributing</a>\n</p>\n\n---\n\nPi's default compaction throws away old messages when the context window fills up. A single flat summary replaces everything, and the original messages are gone forever.\n\npi-lcm fixes this. Every message is stored permanently in SQLite. When compaction triggers, messages are summarized into a hierarchical DAG (directed acyclic graph) instead of a flat blob. The agent can search and drill back into any compressed node to recover the original detail.\n\n## Install\n\n```bash\n# From npm\npi install npm:pi-lcm\n\n# From source (development)\ngit clone https://github.com/codexstar69/pi-lcm.git\ncd pi-lcm\nbun install\npi -e ./index.ts\n```\n\n## Quick Start\n\nInstall the extension and start Pi. That's it. pi-lcm works automatically:\n\n1. Every message is persisted to SQLite as it happens\n2. When Pi triggers compaction, pi-lcm creates hierarchical DAG summaries instead of flat text\n3. The agent gets three tools to recover detail from compressed history\n\nNo configuration needed. Default settings work well for most sessions.\n\n## How It Works\n\n```\nPi Session\n\u2502\n\u251c\u2500\u2500 message_end \u2500\u2500\u25ba SQLite (every message stored permanently)\n\u2502\n\u251c\u2500\u2500 session_before_compact \u2500\u2500\u25ba CompactionEngine\n\u2502   \u251c\u2500\u2500 Leaf pass: raw messages \u2192 D0 summaries (parallel, 4 workers)\n\u2502   \u251c\u2500\u2500 Condensed pass: D0 \u2192 D1 \u2192 D2+ (cascading until stable)\n\u2502   \u2514\u2500\u2500 Assembly: DAG summaries \u2192 token-budgeted output for Pi\n\u2502\n\u251c\u2500\u2500 before_agent_start \u2500\u2500\u25ba Static system prompt preamble (cache-safe)\n\u2502\n\u2514\u2500\u2500 registerTool \u2500\u2500\u25ba lcm_grep, lcm_describe, lcm_expand\n```\n\n**The DAG grows logarithmically.** With a condensation threshold of 6, you need 7 compaction cycles to get a D1 summary, 43 to get D2, 259 to get D3. A conversation can run for thousands of turns and the DAG stays compact.\n\n**Prompt caching is preserved.** The system prompt preamble is a static const string, identical every turn. Dynamic stats go in the compaction summary message (which only changes on compaction). Zero extra cache misses.\n\n## Features\n\n### Message Persistence\n- Every `AgentMessage` stored in SQLite with FTS5 full-text search\n- Idempotent inserts via `dedup_hash` (safe for session resume)\n- Atomic sequence numbers via `INSERT...SELECT` (no race conditions)\n- Per-project database (cross-session history within the same project)\n\n### DAG Compaction\n- Two-phase: leaf pass (messages \u2192 D0) then condensed pass (D0 \u2192 D1 \u2192 D2+)\n- Parallel leaf summarization (configurable concurrency, default 4)\n- Bounded cascade loop (max 10 passes per cycle)\n- Consumed summaries filtered via `NOT EXISTS` (no re-condensation)\n- Failed chunks stay uncompacted for retry next cycle (no data loss)\n- Per-conversation mutex prevents duplicate summaries\n\n### Agent Tools\n\n| Tool | Purpose |\n|------|---------|\n| `lcm_grep` | Search all history by text (FTS5) or regex. Returns snippets with context. Time-range filtering. |\n| `lcm_describe` | Overview of the summary DAG, recent/earliest activity, or detail on a specific summary ID. |\n| `lcm_expand` | Drill into any compressed summary to recover original messages. Hard 8K token cap. Cycle-safe. |\n\n### Security\n- XML-fenced content in summarization prompts (prompt injection mitigation)\n- FTS5 query sanitization (no syntax injection)\n- Regex execution with 50K char cap per message (ReDoS mitigation)\n- DB directory permissions: 0o700 dir, 0o600 file\n- Path validation on `LCM_DB_DIR` (no traversal)\n\n### Settings TUI\n- `/lcm-settings` opens an interactive overlay panel\n- Toggle, adjust, and edit all settings with keyboard navigation\n- Global or project-scoped settings (`.pi/settings.json`)\n- Changes apply instantly, no restart needed\n\n## Configuration\n\nOpen the settings panel with `/lcm-settings`, or edit `~/.pi/agent/settings.json` directly:\n\n```json\n{\n  \"lcm\": {\n    \"enabled\": true,\n    \"leafChunkTokens\": 4000,\n    \"condensationThreshold\": 6,\n    \"maxDepth\": 5,\n    \"maxSummaryTokens\": 8000,\n    \"minMessagesForCompaction\": 10,\n    \"leafPassConcurrency\": 4,\n    \"debugMode\": false\n  }\n}\n```\n\n| Setting | Default | Description |\n|---------|---------|-------------|\n| `enabled` | `true` | Enable/disable the extension |\n| `leafChunkTokens` | `4000` | Token budget per leaf summary chunk |\n| `condensationThreshold` | `6` | Number of summaries at one depth before condensing up |\n| `maxDepth` | `5` | Maximum DAG depth levels |\n| `maxSummaryTokens` | `8000` | Token budget for the assembled compaction output |\n| `minMessagesForCompaction` | `10` | Skip DAG compaction if fewer messages (falls back to Pi default) |\n| `leafPassConcurrency` | `4` | Parallel workers for leaf summarization |\n| `debugMode` | `false` | Verbose logging and notifications |\n\nEnvironment variables also work: `LCM_ENABLED`, `LCM_LEAF_CHUNK_TOKENS`, `LCM_DEBUG`, etc.\n\nProject-level settings (`.pi/settings.json`) override global settings.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/lcm stats` | Show message count, summary count, DAG depth, DB size |\n| `/lcm tree` | Visualize the summary DAG |\n| `/lcm compact` | Trigger manual compaction |\n| `/lcm settings` | Open the settings panel |\n| `/lcm-settings` | Open the settings panel (standalone) |\n\n## Compaction Models\n\npi-lcm uses a cheap fast model for summarization, not your session model. It tries in order:\n\n1. `cerebras/zai-glm-4.7` (fast, free)\n2. `anthropic/claude-haiku-4-5` (reliable fallback)\n3. Session model (last resort)\n\nConfigure custom models in settings.json under `compactionModels`.\n\n## Development\n\n```bash\ngit clone https://github.com/codexstar69/pi-lcm.git\ncd pi-lcm\nbun install\nbun run test          # 46 tests\npi -e ./index.ts      # Load in Pi for testing\n```\n\n## Contributing\n\nSee [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.\n\n## Security\n\nSee [SECURITY.md](SECURITY.md) for reporting vulnerabilities.\n\n## License\n\nMIT. See [LICENSE](LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "context-management",
+    "llm",
+    "summarization",
+    "conversation-memory",
+    "dag",
+    "sqlite",
+    "fts5",
+    "compaction",
+    "lossless",
+    "ai-agent",
+    "coding-assistant",
+    "developer-tools"
+  ],
+  "author": {
+    "name": "codexstar69",
+    "email": "engazedigital@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/codexstar69/pi-lcm#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codexstar69/pi-lcm.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-16T18:42:38.527Z",
+    "modified": "2026-04-02T23:59:29.251Z",
+    "0.1.0": "2026-03-16T18:42:38.802Z",
+    "0.1.1": "2026-03-16T18:46:17.787Z",
+    "0.1.2": "2026-03-16T18:53:59.626Z",
+    "0.1.3": "2026-04-02T23:59:29.121Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": null,
+  "download_trend": []
+}

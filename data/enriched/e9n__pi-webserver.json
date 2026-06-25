@@ -1,0 +1,347 @@
+{
+  "name": "@e9n/pi-webserver",
+  "latest_version": "0.2.0",
+  "description": "Shared HTTP server for pi \u2014 authenticated web host with extension mount points",
+  "readme": "# @e9n/pi-webserver\n\nShared HTTP server for [pi](https://github.com/mariozechner/pi-coding-agent) \u2014 one port, shared auth, and an event-bus mount system that other extensions plug into.\n\n## Features\n\n- **Single shared port** \u2014 all extensions serve from one HTTP server (default `4100`)\n- **Basic auth** \u2014 protects page routes with HTTP Basic authentication\n- **API bearer token auth** \u2014 separate full-access and read-only tokens for `/api/*` routes\n- **Cookie session auth** \u2014 browser-friendly login page for API-token-only setups\n- **Prefix routing** \u2014 longest-prefix match; prefix is stripped before calling the handler\n- **Event bus mounting** \u2014 extensions mount via `pi.events.emit(\"web:mount\", ...)` without importing\n- **Built-in dashboard** \u2014 `/` lists all registered mounts with links\n- **Autostart** \u2014 optionally start on session init via settings\n\n## Setup / Settings\n\nAdd to `~/.pi/agent/settings.json` (project overrides in `<project>/.pi/settings.json`):\n\n```json\n{\n  \"pi-webserver\": {\n    \"autostart\": true,\n    \"port\": 4100,\n    \"auth\": \"mypassword\",\n    \"apiToken\": \"my-secret-token\",\n    \"apiReadToken\": \"my-read-token\"\n  }\n}\n```\n\n| Key | Type | Default | Description |\n|-----|------|---------|-------------|\n| `autostart` | boolean | `false` | Start the server automatically on session start |\n| `port` | number | `4100` | HTTP port |\n| `auth` | string \\| null | `null` | Basic auth \u2014 `\"password\"` or `\"user:password\"` |\n| `apiToken` | string \\| null | `null` | Bearer token for full API access (all methods) |\n| `apiReadToken` | string \\| null | `null` | Bearer token for read-only API access (GET/HEAD) |\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/web` | Start on port 4100, or stop if already running |\n| `/web <port>` | Start on a specific port |\n| `/web stop` | Stop the server |\n| `/web status` | Show URL, auth status, and all mounts |\n| `/web port [number]` | Show or change the current port |\n| `/web auth <password>` | Enable Basic auth (username: `pi`) |\n| `/web auth <user:pass>` | Enable Basic auth with custom username |\n| `/web auth off` | Disable Basic auth |\n| `/web api <token>` | Set bearer token for full API access |\n| `/web api read <token>` | Set read-only bearer token (GET/HEAD only) |\n| `/web api off` | Disable API token auth |\n| `/web api` | Show API token status and mounted API routes |\n\n## Web UI\n\n| Route | Description |\n|-------|-------------|\n| `/` | Dashboard listing all registered mounts |\n| `/_api/mounts` | JSON: all mounts (Basic auth) |\n| `/_api/mounts/dashboard` | JSON: non-API mounts (for nav shells) |\n| `/_auth/login` | Browser login page (when only API tokens are set) |\n| `/_auth/logout` | Clear session cookie |\n| `/api/*` | API routes \u2014 Bearer token auth (or open if no token set) |\n\n## For extension authors\n\nMount a page route via the event bus (no import needed):\n\n```typescript\nexport default function (pi: ExtensionAPI) {\n  pi.events.on(\"web:ready\", () => {\n    pi.events.emit(\"web:mount\", {\n      name: \"my-ext\",\n      label: \"My Extension\",\n      description: \"Does cool things\",\n      prefix: \"/my-ext\",\n      handler: (req, res, subPath) => {\n        res.writeHead(200, { \"Content-Type\": \"text/html\" });\n        res.end(\"<h1>Hello</h1>\");\n      },\n    });\n  });\n}\n```\n\nMount an API route under `/api/*`:\n\n```typescript\npi.events.emit(\"web:mount-api\", {\n  name: \"my-ext-api\",\n  label: \"My Extension API\",\n  prefix: \"/my-ext\",           // mounts at /api/my-ext\n  handler: (req, res, subPath) => { ... },\n});\n```\n\n### Events\n\n| Event | Direction | Payload |\n|-------|-----------|---------|\n| `web:ready` | \u2190 emitted by webserver on session start | `{}` |\n| `web:mount` | \u2192 webserver listens | `MountConfig` |\n| `web:unmount` | \u2192 webserver listens | `{ name: string }` |\n| `web:mount-api` | \u2192 webserver listens | `MountConfig` |\n| `web:unmount-api` | \u2192 webserver listens | `{ name: string }` |\n\n## Install\n\n```bash\npi install npm:@e9n/pi-webserver\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "Espen Nilsen",
+    "email": "hi@e9n.dev"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/espennilsen/pi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/espennilsen/pi.git",
+    "directory": "extensions/pi-webserver"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-17T09:12:12.434Z",
+    "modified": "2026-04-26T19:52:25.113Z",
+    "0.1.0": "2026-02-17T09:12:12.644Z",
+    "0.2.0": "2026-04-26T19:52:25.022Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 18,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 29
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 56
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 148
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 51
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 43
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 22
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 17
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

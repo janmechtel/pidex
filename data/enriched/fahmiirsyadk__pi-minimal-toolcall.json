@@ -1,0 +1,40 @@
+{
+  "name": "@fahmiirsyadk/pi-minimal-toolcall",
+  "latest_version": "0.2.1",
+  "description": "Minimalist & less noisy tool-call rendering for pi",
+  "readme": "<div align=\"center\">\r\n\r\n# pi-minimal-toolcall\r\n\r\nMinimalist & less noisy tool-call rendering for [Pi](https://github.com/earendil-works/pi-coding-agent).\r\n\r\n</div>\r\n\r\n<div align=\"center\">\r\n\r\nhttps://github.com/user-attachments/assets/605cb58b-cbd3-4dfa-9a0d-41f46472038c\r\n\r\n</div>\r\n\r\n<table>\r\n<tr>\r\n<td align=\"center\" width=\"50%\">\r\n\r\n![ss_1](ss_1.png)\r\n\r\n</td>\r\n<td align=\"center\" width=\"50%\">\r\n\r\n![ss_2](ss_2.png)\r\n\r\n</td>\r\n</tr>\r\n</table>\r\n<div align=\"center\">\r\n  <i>another extensions you might want to try</i><br/>\r\n  <a href=\"https://github.com/fahmiirsyadk/pi-record-term.git\">pi-record-term</a>\r\n  <span>|</span>\r\n  <a href=\"https://github.com/fahmiirsyadk/pi-minimal-diff.git\">pi-minimal-diff</a>\r\n</div>\r\n\r\n## Visual\r\n```\r\nShell 1 command (grep -rn \"friendlyLabel\\|nounFor\" ./tests ./src --include=\"*.test.ts\" 2>/dev/null | head -10) ctrl+o to expand\r\nWrite 1 file (README.md) +148 -129 ctrl+o to expand\r\nShell 1 command & Read 1 file ctrl+o to expand\r\n\u280b Read file\r\n```\r\n\r\n## Installation\r\n\r\nPi package manager:\r\n\r\n```bash\r\npi install npm:@fahmiirsyadk/pi-minimal-toolcall\r\n```\r\n\r\nGit Repository:\r\n\r\n```\r\npi install git:github.com/fahmiirsyadk/pi-minimal-toolcall\r\n```\r\n\r\nLocal clone (for development or pinning to a fork):\r\n\r\n```bash\r\ngit clone https://github.com/fahmiirsyadk/pi-minimal-toolcall.git ~/pi-minimal-toolcall\r\n```\r\n\r\nThen add to your `~/.pi/agent/settings.json`:\r\n\r\n```json\r\n{\r\n  \"extensions\": [\r\n    \"~/pi-minimal-toolcall/index.ts\"\r\n  ]\r\n}\r\n```\r\n\r\n## Quick start for customizing\r\n\r\nEdit `~/.pi/agent/extensions/pi-minimal-toolcall/config.json` (or `$PI_CODING_AGENT_DIR/extensions/pi-minimal-toolcall/config.json`):\r\n\r\n```json\r\n{\r\n  \"toolsExpandedByDefault\": true,\r\n  \"hiddenThinkingLabel\": \"\",\r\n  \"registerToolOverrides\": { \"bash\": false },\r\n  \"groupingMode\": \"proximity\",\r\n  \"showArgOnSummary\": \"always\"\r\n}\r\n```\r\n\r\nThen `/reload` to apply.\r\n\r\nThree starter presets ship in [`config/presets/`](./config/presets) \u2014 copy the one you want to your config file:\r\n\r\n- [`calm.json`](./config/presets/calm.json) \u2014 the defaults (one row per group, collapsed tools, `thinking` label).\r\n- [`verbose.json`](./config/presets/verbose.json) \u2014 expanded previews, larger body cap, args on multi-tool rows.\r\n- [`minimal.json`](./config/presets/minimal.json) \u2014 bare frames, no args, no diff, no `\u2717`, empty thinking label.\r\n\r\n## What you get (Configuration Option)\r\n\r\n| Behavior | Default | How to change |\r\n| --- | --- | --- |\r\n| Tool rows | collapsed | `toolsExpandedByDefault: true` |\r\n| Thinking | hidden behind `thinking` label | `hiddenThinkingLabel: \"...\"` |\r\n| Grouping mode | `proximity` (any tool call joins until text/thinking) | `groupingMode: \"consecutive\" \\| \"none\"` |\r\n| Latest arg on summary | single-tool groups only | `showArgOnSummary: \"always\" \\| \"never\"` |\r\n| Aggregated `+N -M` | on | `showDiffSuffix: false` |\r\n| Per-tool `\u2717` | on | `showErrorMark: false` |\r\n| Write expand | full content, syntax-highlighted | `writeExpandMode: \"summary\" \\| \"both\"` |\r\n| Expanded body cap | 200 lines | `expandedBodyMaxLines: <n>` |\r\n| Spinner | `\u280b\u2819\u2839\u2838\u283c\u2834\u2826\u2827\u2807\u280f` @ 80ms | `spinnerFrames: [\"a\",\"b\"]`, `spinnerIntervalMs: <n>` |\r\n| Per-tool ownership | all 7 built-ins | `registerToolOverrides: { \"read\": false, ... }` |\r\n| Batch tools (`read_files`, `edit_files`, `grep_files`, `find_files`) | on | `batchToolsEnabled: false` |\r\n| Debug log | off | `debug: true` (writes to `<agent-dir>/.../debug/debug.log`) |\r\n\r\n## How grouping works\r\n\r\nA **group** is a run of tool calls with no text or thinking between them, regardless of tool name. Frozen when a text or thinking block appears (`message_update` with `text_start` / `thinking_start`), or when a new agent loop starts (`agent_start` \u2014 separates prompts).\r\n\r\n```\r\nread, read, read                  \u2192 Read 3 files\r\nread, read, bash, read            \u2192 one row (proximity)\r\ntext or thinking\r\nbash, bash                        \u2192 Shell 2 commands (new group)\r\n```\r\n\r\n`groupingMode: \"consecutive\"` restores the old \"different tool name = new group\" behavior. `\"none\"` makes every call its own row.\r\n\r\n## Batch tools\r\n\r\nThe package registers four batch tools the model can call instead of repeating built-ins:\r\n\r\n| Tool | Input |\r\n| --- | --- |\r\n| `read_files` | `{ paths, offset?, limit? }` |\r\n| `edit_files` | `{ edits: [{ path, oldText, newText }] }` |\r\n| `grep_files` | `{ queries: [{ pattern, path? }] }` |\r\n| `find_files` | `{ queries: [{ pattern, path? }] }` |\r\n\r\nEach renders as one row; `ctrl+o` expands to per-item `\u2713`/`\u2717` status plus aggregated output. Partial failures surface per item.\r\n\r\n## Reload\r\n\r\n`/reload` re-reads `config.json` and re-registers. Tool ownership, the per-tool grouping session, and the debug-log path all take effect on the next `session_start`.\r\n\r\n## Compatibility\r\n\r\n- Pi `0.79.0+`. Peer dependencies: `@earendil-works/pi-coding-agent`, `pi-ai`, `pi-tui`, `typebox` (all `*` range \u2014 pi bundles these).\r\n- This package only changes tool-call rendering. We touch two pieces of global UI state on `session_start` (and only these two \u2014 we don't touch the working indicator, the prompt box, or anything else outside our scope):\r\n  - `ctx.ui.setToolsExpanded(config.toolsExpandedByDefault)` \u2014 the resting state of tool output (collapsed vs expanded). `ctrl+o` toggles it during a session.\r\n  - `ctx.ui.setHiddenThinkingLabel(config.hiddenThinkingLabel)` \u2014 the label on the thinking block.\r\n- Tools registered by other extensions render with their own renderer and break proximity groups.\r\n\r\n## Development\r\n\r\n```bash\r\nnpm install\r\nnpm run check        # typecheck + test\r\nnpm run pack:dry     # preview the published tarball\r\n```\r\n\r\nUses `tsc` for typecheck and `tsx --test` for tests. No bundler, no\r\nformatter, no linter \u2014 keep the dep tree small.\r\n\r\n## License\r\n\r\nMIT\r\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "tui",
+    "minimal",
+    "tool-call",
+    "compact",
+    "configurable"
+  ],
+  "author": {
+    "name": "fahmiirsyadk"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/fahmiirsyadk/pi-minimal-toolcall#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fahmiirsyadk/pi-minimal-toolcall.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "video": "https://raw.githubusercontent.com/fahmiirsyadk/pi-minimal-toolcall/refs/heads/main/demo.mp4",
+    "image": "https://raw.githubusercontent.com/fahmiirsyadk/pi-minimal-toolcall/refs/heads/main/ss_1.png"
+  },
+  "time": {
+    "created": "2026-06-20T19:10:21.495Z",
+    "0.2.1": "2026-06-20T19:10:21.907Z",
+    "modified": "2026-06-20T19:10:22.119Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 105,
+  "download_trend": []
+}

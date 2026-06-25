@@ -1,0 +1,40 @@
+{
+  "name": "@s1m0n38/pi-voice",
+  "latest_version": "2.0.1",
+  "description": "HTTP server for Kokoro TTS \u2014 text-to-speech via ONNX inference.",
+  "readme": "# pi-voice\n\nGive your Pi agent a voice.\n\npi-voice is a text-to-speech package for the [Pi coding agent](https://github.com/mariozechner/pi). It runs a local HTTP server powered by [Kokoro ONNX](https://github.com/hexgrad/kokoro) and exposes a `/voice` settings UI, a `tts` tool, and automatic speech on agent responses.\n\n**How it works:** The server loads a single Kokoro ONNX model into memory and exposes a REST API for synthesis. The pi extension talks to this server over HTTP \u2014 it never loads the model directly. This separation keeps the agent lightweight while the server handles the heavy ONNX inference.\n\n## Installation\n\n```bash\npi install npm:@s1m0n38/pi-voice\n```\n\nThe `pi-voice` CLI is available after install. Start the server and download the default model:\n\n```bash\npi-voice server                      # start on 127.0.0.1:8181\npi-voice download q4                 # download + activate the q4 model (~291 MB)\n```\n\n## Usage\n\n### `/voice` command\n\nOpen the interactive settings UI inside Pi:\n\n<!-- TODO: add screenshot of /voice TUI -->\n\n| Setting | Controls | Keys |\n|---------|----------|------|\n| TTS | Enable/disable speech | \u2190 \u2192 |\n| Voice | Speaker voice (with language/gender hints) | \u2190 \u2192 |\n| Speed | Speech rate (0.5\u00d7\u20133.0\u00d7) | \u2190 \u2192 |\n\nNavigate with \u2191 \u2193, press **Enter** to play a sample, **r** to reset defaults, **Esc** to close.\n\nSettings persist in `~/.pi/voice/config.json` across sessions.\n\n### `tts` tool\n\nThe agent can speak at any time using the `tts` tool:\n\n```\n> Use the tts tool to say \"Build complete, all tests passing\"\n```\n\n### Auto-TTS\n\nEnable automatic speech after every agent response by editing `~/.pi/voice/config.json`:\n\n```json\n{\n  \"enabled\": true,\n  \"voice\": \"af_heart\",\n  \"speed\": 1.0,\n  \"events\": {\n    \"agent_end\": {\n      \"prompt\": \"Summarize in one short sentence for text-to-speech.\",\n      \"model\": { \"provider\": \"anthropic\", \"id\": \"claude-haiku-4-5\" }\n    },\n    \"turn_end\": {\n      \"prompt\": \"Summarize briefly.\"\n    },\n    \"custom_event\": {\n      \"text\": \"Custom event triggered.\"\n    }\n  }\n}\n```\n\nEach event key enables auto-TTS for that event. The value is one of:\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `prompt` | `string` | LLM system prompt for summarizing the event message. The event's last message is provided as context. |\n| `text` | `string` | Fixed text to speak directly \u2014 no LLM call. Mutually exclusive with `prompt`. |\n| `model` | `{ provider, id }` | Optional. Model to use for summarization. If omitted, inherits the active session model. |\n\nBuilt-in pi events (`agent_end`, `turn_end`, `message_end`) use the message data from the event. Any other key is treated as a custom event on the shared `pi.events` bus.\n\n## CLI Reference\n\n```bash\npi-voice server                              # start server (default: 127.0.0.1:8181)\npi-voice server --host 0.0.0.0 --port 9090   # custom host/port\npi-voice download q4                         # download + activate model dtype\npi-voice delete q4                           # delete cached model files\npi-voice status                              # show server status and active model\npi-voice voices                              # list available voices\n```\n\n### Model dtypes\n\n| Dtype | Size | Quality | Notes |\n|-------|------|---------|-------|\n| `q4` | ~291 MB | Good | 4-bit matmul \u2014 recommended default |\n| `q4f16` | ~147 MB | Good | 4-bit matmul + fp16 weights \u2014 smaller, good trade-off |\n| `q8` | ~88 MB | Great | 8-bit quantized \u2014 best quality/size ratio |\n| `fp16` | ~156 MB | Excellent | Half-precision floats |\n| `fp32` | ~310 MB | Best | Full-precision floats \u2014 largest, highest quality |\n\nOnly one model is loaded at a time. Downloading or activating a new model automatically unloads the previous one.\n\nModel files are cached at `~/.pi/voice/cache/` and persist across `npm install` cycles. To reclaim disk space, use `pi-voice delete <dtype>`.\n\n## API\n\nThe server exposes HTTP endpoints at `http://127.0.0.1:8181`:\n\n| Method | Path | Description |\n|--------|------|-------------|\n| GET | `/health` | Server status, active dtype, model loaded |\n| GET | `/voices` | Available voice names |\n| GET | `/models` | All dtypes with download status |\n| POST | `/models/download` | Download + activate a dtype |\n| POST | `/models/delete` | Delete cached model files |\n| POST | `/models/activate` | Load a downloaded model |\n| POST | `/models/unload` | Unload model, free memory |\n| POST | `/tts` | Synthesize text \u2192 WAV audio |\n| POST | `/shutdown` | Graceful shutdown |\n\n## Events\n\npi-voice emits events on the pi event bus (`pi.events`) so other extensions can integrate with TTS activity.\n\n| Event | Payload | When |\n|-------|---------|------|\n| `voice:config` | `{ enabled, voice, speed }` | Any setting change via `/voice` |\n| `voice:speak_start` | `{ text, voice, speed, source }` | Synthesis requested |\n| `voice:speak_end` | `{ text, source, error? }` | Playback done or failed |\n\n`source` is `\"tool\"` (LLM invoked tts), `\"auto\"` (auto-TTS handler), or `\"sample\"` (/voice preview).\n\n```typescript\n// React to config changes\npi.events.on(\"voice:config\", ({ enabled, voice, speed }) => {\n  // update status bar, toggle features, etc.\n});\n\n// Track speech activity\npi.events.on(\"voice:speak_start\", ({ text, source }) => {\n  if (source === \"auto\") console.log(`[TTS] ${text}`);\n});\n\npi.events.on(\"voice:speak_end\", ({ error }) => {\n  if (error) console.warn(`TTS failed: ${error}`);\n});\n```\n\n## License\n\nMIT\n\n---\n\nBootstrapped from [pi-package-template](https://github.com/S1M0N38/pi-package-template).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "tts",
+    "kokoro",
+    "speech-synthesis"
+  ],
+  "author": {
+    "name": "S1M0N38"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/S1M0N38/pi-voice#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/S1M0N38/pi-voice.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-05T01:14:02.686Z",
+    "modified": "2026-05-07T14:57:55.254Z",
+    "1.0.1": "2026-05-05T01:14:02.935Z",
+    "1.1.0": "2026-05-05T12:26:09.547Z",
+    "1.2.0": "2026-05-05T22:44:03.029Z",
+    "2.0.0": "2026-05-06T10:37:20.434Z",
+    "2.0.1": "2026-05-07T14:57:54.941Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 28,
+  "download_trend": []
+}

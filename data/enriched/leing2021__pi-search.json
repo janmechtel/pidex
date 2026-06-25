@@ -1,0 +1,50 @@
+{
+  "name": "@leing2021/pi-search",
+  "latest_version": "0.6.3",
+  "description": "Minimal Secure Evidence Gateway for Pi Coding Agent \u2014 search, web_search, web_fetch, research_search. Intent-based provider routing, quota fallback, dual-LLM research, 4-layer abuse prevention.",
+  "readme": "# pi-search\n\n[\u7b80\u4f53\u4e2d\u6587](README_CN.md)\n\nA minimal, secure evidence gateway for [Pi Coding Agent](https://github.com/badlogic/pi-mono).\n\n`pi-search` gives agents four focused tools:\n\n- `search` \u2014 search the local repo with ripgrep\n- `web_search` \u2014 find web sources through routed providers\n- `web_fetch` \u2014 fetch and clean one web page safely\n- `research_search` \u2014 collect web evidence, with optional LLM verification\n\nIt is designed to be simple, auditable, and safe by default.\n\n## Install\n\n```bash\npi install npm:@leing2021/pi-search\n# Restart pi or run /reload\n```\n\nThe package exposes its Pi extension through `package.json`:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"extensions/pi-search.ts\"]\n  }\n}\n```\n\n## Quick use\n\n```ts\nsearch({ query: \"registerTool\" })\n\nweb_search({ query: \"React 19 features\" })\n\nweb_fetch({ url: \"https://react.dev/blog\" })\n\nresearch_search({ query: \"SSRF protection in Node.js\" })\n```\n\n## Tools\n\n| Tool | Purpose | Default behavior |\n|---|---|---|\n| `search` | Local repo search | Uses `ripgrep`; blocks unsafe paths by default |\n| `web_search` | Web source discovery | Routes through SearXNG / Brave / Tavily / DuckDuckGo |\n| `web_fetch` | Safe page fetch | HTTPS, SSRF checks, redirect checks, HTML cleanup |\n| `research_search` | Evidence collection | LLM verification is off unless explicitly enabled |\n\n## Configuration\n\nAll configuration is optional. Use only what you need.\n\n```bash\n# Web search providers\nexport BRAVE_SEARCH_API_KEY=\"brave_xxx\"\nexport TAVILY_API_KEY=\"tvly_xxx\"\nexport FIRECRAWL_API_KEY=\"fc_xxx\"\n\n# Optional private SearXNG provider\nexport PI_SEARCH_SEARXNG_URL=\"http://<private-searxng-host>:8888\"\nexport PI_SEARCH_ALLOW_PRIVATE_SEARXNG=\"always\"\n\n# Optional provider override\nexport PI_SEARCH_WEB_PROVIDER=\"auto\" # auto | brave | tavily | duckduckgo\n\n# Optional research LLM verification\nexport PI_SEARCH_LLM_ENABLED=\"always\" # never | ask | always\nexport PI_SEARCH_LLM_PROVIDER=\"openai\" # openai | anthropic | local-openai\nexport PI_SEARCH_LLM_MODEL=\"gpt-4o-mini\"\nexport PI_SEARCH_LLM_BASE_URL=\"https://api.openai.com/v1\"\nexport PI_SEARCH_LLM_API_KEY_ENV=\"OPENAI_API_KEY\"\nexport OPENAI_API_KEY=\"<OPENAI_API_KEY>\"\n\n# Optional local search boundary override\nexport PI_SEARCH_ALLOW_OUTSIDE_CWD=\"always\"\n```\n\n## Provider routing\n\n`pi-search` uses intent-based routing instead of broad fan-out.\n\n| Task | Primary path | Fallback |\n|---|---|---|\n| General web search | SearXNG if explicitly enabled, otherwise Brave | Tavily \u2192 DuckDuckGo |\n| Page fetch | Local safe fetch | Firecrawl when configured / requested |\n| Basic research | Search + safe fetch | Provider fallback |\n| Deep research | Tavily-oriented evidence | Search + fetch fallback |\n\nPrivate SearXNG is allowed only when both variables are set:\n\n```bash\nexport PI_SEARCH_SEARXNG_URL=\"http://<private-searxng-host>:8888\"\nexport PI_SEARCH_ALLOW_PRIVATE_SEARXNG=\"always\"\n```\n\n## Safety model\n\n`pi-search` is a process-level safety layer. It is not a Docker, VM, or OS sandbox.\n\nIt focuses on practical defaults:\n\n- child commands use `execFile`, not shell strings\n- child processes get a minimal environment\n- local search stays inside `cwd` unless explicitly allowed\n- sensitive paths like `.env`, `.ssh`, and private keys are blocked\n- web fetches validate URL, DNS, IP range, redirects, content type, size, and timeout\n- fetched web content is marked as untrusted\n- API key values are never shown in tool output\n- optional research LLM only receives clipped evidence, not chat history\n\nThe implementation lives in `src/security.ts` and is covered by the test suite.\n\n## AI agent setup prompt\n\nCopy this into a new AI agent when you want it to install and configure `pi-search`:\n\n```text\nInstall and configure pi-search for Pi Coding Agent.\n\nInstallation:\npi install npm:@leing2021/pi-search\nThen restart pi or run /reload.\n\nAvailable tools:\n- search({ query, path? })\n- web_search({ query, provider?, count? })\n- web_fetch({ url })\n- research_search({ query, mode?, maxSources? })\n\nUse these environment variables when needed:\n\nWEB_SEARCH:\nBRAVE_SEARCH_API_KEY=\"brave_xxx\"\nTAVILY_API_KEY=\"tvly_xxx\"\nFIRECRAWL_API_KEY=\"fc_xxx\"\nPI_SEARCH_WEB_PROVIDER=\"auto\"\n\nPRIVATE_SEARCH:\nPI_SEARCH_SEARXNG_URL=\"http://<private-searxng-host>:8888\"\nPI_SEARCH_ALLOW_PRIVATE_SEARXNG=\"always\"\n\nRESEARCH_LLM:\nPI_SEARCH_LLM_ENABLED=\"always\"\nPI_SEARCH_LLM_PROVIDER=\"openai\"\nPI_SEARCH_LLM_MODEL=\"gpt-4o-mini\"\nPI_SEARCH_LLM_BASE_URL=\"https://api.openai.com/v1\"\nPI_SEARCH_LLM_API_KEY_ENV=\"OPENAI_API_KEY\"\nOPENAI_API_KEY=\"<OPENAI_API_KEY>\"\n\nLOCAL_SEARCH:\nPI_SEARCH_ALLOW_OUTSIDE_CWD=\"always\"\n```\n\nResearch LLM notes:\n\n- The prompt uses OpenAI as the default example.\n- `PI_SEARCH_LLM_API_KEY_ENV` is the name of the environment variable that stores the API key. It is not the API key itself.\n- For a local model, use an OpenAI-compatible API such as Ollama, LM Studio, or vLLM:\n\n```bash\nPI_SEARCH_LLM_PROVIDER=\"local-openai\"\nPI_SEARCH_LLM_MODEL=\"<local-model-name>\"\nPI_SEARCH_LLM_BASE_URL=\"http://<local-llm-host>:11434/v1\"\nPI_SEARCH_LLM_API_KEY_ENV=\"LOCAL_LLM_API_KEY\"\nLOCAL_LLM_API_KEY=\"<LOCAL_LLM_API_KEY_OR_DUMMY>\"\n```\n\nOther OpenAI-compatible provider examples:\n\n```bash\n# OpenRouter\nPI_SEARCH_LLM_PROVIDER=\"openai\"\nPI_SEARCH_LLM_MODEL=\"openai/gpt-4o-mini\"\nPI_SEARCH_LLM_BASE_URL=\"https://openrouter.ai/api/v1\"\nPI_SEARCH_LLM_API_KEY_ENV=\"OPENROUTER_API_KEY\"\nOPENROUTER_API_KEY=\"<OPENROUTER_API_KEY>\"\n\n# DeepSeek\nPI_SEARCH_LLM_PROVIDER=\"openai\"\nPI_SEARCH_LLM_MODEL=\"deepseek-chat\"\nPI_SEARCH_LLM_BASE_URL=\"https://api.deepseek.com/v1\"\nPI_SEARCH_LLM_API_KEY_ENV=\"DEEPSEEK_API_KEY\"\nDEEPSEEK_API_KEY=\"<DEEPSEEK_API_KEY>\"\n```\n\n## Project structure\n\n```text\n.\n\u251c\u2500\u2500 extensions/        # Pi extension entry\n\u251c\u2500\u2500 src/               # security, providers, research, text helpers\n\u251c\u2500\u2500 tests/             # node:test suite\n\u251c\u2500\u2500 package.json       # package metadata and Pi extension manifest\n\u251c\u2500\u2500 README.md          # English README\n\u2514\u2500\u2500 README_CN.md       # Chinese README\n```\n\n## Test\n\n```bash\nnpm test\n```\n\n## What pi-search is not\n\n- not a browser agent\n- not a crawler\n- not a multi-agent orchestrator\n- not an OS-level sandbox\n- not a general research framework\n\nIt is intentionally small: search, fetch, evidence, safety.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "search",
+    "web-search",
+    "brave",
+    "tavily",
+    "searxng",
+    "evidence-gateway",
+    "security",
+    "ripgrep",
+    "web-search",
+    "duckduckgo",
+    "semantic-search",
+    "pi-search"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/leing2021/pi-search#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leing2021/pi-search.git"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/pi-search.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-06T05:57:29.901Z",
+    "modified": "2026-05-07T13:49:15.162Z",
+    "0.3.1": "2026-05-06T05:57:30.185Z",
+    "0.4.1": "2026-05-06T11:53:52.168Z",
+    "0.4.2": "2026-05-06T12:11:42.566Z",
+    "0.4.3": "2026-05-06T12:33:30.226Z",
+    "0.6.0": "2026-05-07T09:49:11.673Z",
+    "0.6.1": "2026-05-07T10:13:04.169Z",
+    "0.6.2": "2026-05-07T11:43:17.662Z",
+    "0.6.3": "2026-05-07T13:49:15.032Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 25,
+  "download_trend": []
+}

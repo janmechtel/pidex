@@ -1,0 +1,350 @@
+{
+  "name": "@banon-labs/pi-inline-format",
+  "latest_version": "0.1.5",
+  "description": "Strict Pi extension project with a Rust core subproject and a TypeScript extension wrapper.",
+  "readme": "# pi-inline-format\n\n[![check](https://github.com/Banon-Labs/pi-inline-format/actions/workflows/check.yml/badge.svg)](https://github.com/Banon-Labs/pi-inline-format/actions/workflows/check.yml)\n\nStrict Pi extension project scaffold with:\n\n- a TypeScript Pi extension entrypoint in `extensions/`\n- a Rust core subproject in `rust/`\n\n## Goals\n\n- Follow Pi package and extension conventions\n- Keep the Pi-facing wrapper small and type-safe\n- Keep parsing/rendering logic in a stricter Rust core\n- Enforce strict checks separately for TypeScript and Rust\n\n## Layout\n\n```text\npi-inline-format/\n\u251c\u2500\u2500 extensions/        # Pi extension entrypoint(s)\n\u251c\u2500\u2500 rust/              # Rust core subproject\n\u251c\u2500\u2500 .ralphi/           # Ralph loop config/runtime files\n\u251c\u2500\u2500 eslint.config.mjs\n\u251c\u2500\u2500 package.json\n\u2514\u2500\u2500 tsconfig.json\n```\n\n## TypeScript commands\n\n```bash\nnpm run typecheck\nnpm run lint\nnpm run format\n```\n\n## Rust commands\n\n```bash\nnpm run rust:fmt\nnpm run rust:check\nnpm run rust:lint\nnpm run rust:test\n```\n\n## Combined check\n\n```bash\nnpm run check\n```\n\n## CI contract\n\nThe GitHub Actions `check` workflow is the repository-level guardrail for the package-backed setup.\n\nIt currently runs four layers:\n\n1. `npm run verify:host-source-upgrade-path`\n   - explicitly rehearses the reversible local-path to pinned-git migration flow,\n   - proves the pinned host source still loads,\n   - proves deterministic compare still works after the source switch,\n   - restores `.pi/settings.json` automatically,\n   - in CI, runs after the workflow materializes the legacy `../pi-inline-format-extensions` sibling checkout expected by the rehearsal.\n2. `npm run check:pinned-host-runtime`\n   - covers the headless deterministic regression path for the pinned host source.\n3. `npm run check:ansi-capture-proof`\n   - runs the tmux-based ANSI capture proof harness,\n   - consumes the new `replay.ansi` and `observer.capture` artifacts,\n   - verifies that color-sensitive proof survives the ANSI-preserving `tmux capture-pane -e` bridge for python, javascript, typescript, and bash.\n4. `npm run check:core`\n   - covers linting, formatting, TypeScript checks, and all Rust checks/tests.\n\nUse this split to interpret failures:\n\n- upgrade-path rehearsal failures usually indicate package-source or migration regressions,\n- `check:pinned-host-runtime` failures usually indicate package-backed host/runtime regressions before TUI/tmux proof is involved,\n- `check:ansi-capture-proof` failures usually indicate the ANSI-preserving proof bridge or color-sensitive transcript evidence regressed,\n- `check:core` failures usually indicate repo-local diagnostics or Rust/tooling issues rather than package-source wiring.\n\n## Rust transcript analysis contract\n\nThe Rust CLI reads raw transcript text from stdin and prints JSON shaped like:\n\n```json\n{\n  \"regions\": [\n    {\n      \"id\": \"outer-0\",\n      \"role\": \"outer\",\n      \"language\": \"bash\",\n      \"start_byte\": 0,\n      \"end_byte\": 18\n    },\n    {\n      \"id\": \"embedded-0\",\n      \"role\": \"embedded\",\n      \"language\": \"python\",\n      \"start_byte\": 18,\n      \"end_byte\": 30\n    },\n    {\n      \"id\": \"outer-1\",\n      \"role\": \"outer\",\n      \"language\": \"bash\",\n      \"start_byte\": 30,\n      \"end_byte\": 44\n    }\n  ],\n  \"render_blocks\": [\n    {\n      \"id\": \"outer-0\",\n      \"role\": \"outer\",\n      \"language\": \"bash\",\n      \"content\": \"$ python - <<'PY'\\n\"\n    },\n    {\n      \"id\": \"embedded-0\",\n      \"role\": \"embedded\",\n      \"language\": \"python\",\n      \"content\": \"print('hi')\\n\"\n    },\n    {\n      \"id\": \"outer-1\",\n      \"role\": \"outer\",\n      \"language\": \"bash\",\n      \"content\": \"PY\\n$ echo done\\n\"\n    }\n  ]\n}\n```\n\nContract notes:\n\n- `regions` is ordered and generic so later iterations can add more nested-language patterns.\n- `render_blocks` is the render-ready companion to `regions`; each block keeps a renderer's language choice separate from the original byte offsets.\n- `role` distinguishes outer transcript content from embedded code content.\n- `language` identifies the rendering language for each region or block.\n- `start_byte` and `end_byte` preserve original transcript boundaries for later extraction/rendering work.\n- The Rust core now drives detection through a generic `NESTED_REGION_PATTERNS` table, so future nested-language additions can plug in new pattern descriptors without changing the JSON contract shape.\n- For `python - <<'PY' ... PY`, the embedded Python region excludes the heredoc opener and terminator so wrapper content stays in outer bash regions while `render_blocks` expose a distinct Python block for display.\n- The first embedded-language detection case is `python - <<'PY' ... PY` inside a bash transcript.\n- The same `PY` heredoc split also supports plain bash file-writing flows such as `cat > /tmp/delete.me.py <<'PY' ... PY`, which is the canonical normal-flow validation prompt for this repo.\n\n## TypeScript wrapper integration\n\nThe Pi extension keeps TypeScript Pi-facing and delegates transcript analysis to `extensions/rust-cli.ts`.\nThat helper:\n\n- prefers a fresh Rust CLI binary from `rust/target/...` when one is newer than the Rust sources,\n- falls back to `cargo run --manifest-path rust/Cargo.toml --quiet --bin pi-inline-format-core` when no fresh binary is available,\n- sends the raw transcript to stdin,\n- validates the JSON response shape before returning it to the Pi-facing layer,\n- includes the invoked command in thrown errors so integration failures are easier to debug.\n\n## Deterministic compare helpers\n\nDeterministic compare for live tmux A/B checks is owned by the package-backed host runtime loaded from `.pi/settings.json`, not by repo-local provider files.\n\nCurrent deterministic provider surface:\n\n- Provider: `inline-deterministic`\n- Scenario models:\n  - `canonical-heredoc-compare` \u2014 Python\n  - `javascript-heredoc-compare` \u2014 JavaScript\n  - `typescript-heredoc-compare` \u2014 TypeScript\n  - `bash-heredoc-compare` \u2014 shell/bash\n- Default prompt/model pair:\n  - prompt: `Use bash to run python from a heredoc with python3. Use PY as the heredoc delimiter exactly. Keep the transcript inline and normal.`\n  - model: `inline-deterministic/canonical-heredoc-compare`\n- Commands:\n  - `/inline-format-use-deterministic-model [scenario]` \u2014 switches the current session to the package-backed deterministic compare model for `python`, `javascript`, `typescript`, or `bash`.\n  - `/inline-format-run-deterministic-compare [scenario]` \u2014 switches to the requested deterministic scenario and submits its matching prompt with no real LLM call.\n  - `/inline-format-deterministic-status` \u2014 shows the provider, available scenarios/models, default prompt, and helper commands.\n\nVerification in this repo:\n\n- `npm run check:pinned-host-runtime`\n  - makes sure the pinned public package still serves the shipped Python, JavaScript, TypeScript, and bash proof paths.\n- `npm run verify:multilanguage-local-package-proof`\n  - temporarily switches `.pi/settings.json` to the local root package source `../../pi-inline-format-extensions`,\n  - checks the Python/JavaScript/TypeScript/bash scenarios,\n  - and switches back to the pinned git source automatically.\n- `npm run smoke:javascript-highlight-compare`\n  - opens a tmux session with the same JavaScript heredoc on both sides,\n  - left pane = the current pinned package,\n  - right pane = your local checkout,\n  - keeps the normal bash tool row,\n  - keeps the same source text,\n  - and shows whether the local version changes highlighting only.\n- `npm run smoke:typescript-highlight-compare`\n  - does the same side-by-side check for the TypeScript heredoc scenario.\n\nExtra inspection commands exposed by the pinned host package:\n\n- `/inline-format-intel-status` \u2014 shows which language backends are available.\n- `/inline-format-inspect-sample <scenario>` \u2014 inspects a built-in sample heredoc.\n- `/inline-format-explain-symbol <scenario> <symbol>` \u2014 explains a symbol in a sample heredoc.\n- `/inline-format-find-definition <scenario> <symbol>` \u2014 finds where a symbol comes from in a sample heredoc.\n- `/inline-format-highlight-symbol <scenario> <symbol>` \u2014 shows matching symbol ranges in a sample heredoc.\n- `/inline-format-semantic-tokens <scenario>` \u2014 shows the raw token data for JS/TS.\n- `/inline-format-diagnostics-sample <scenario>` \u2014 shows diagnostics for a sample heredoc.\n\nPi-facing entrypoints exposed from `extensions/index.ts`:\n\n- `/inline-format-status` \u2014 reports that the project-local diagnostics wrapper is wired to the Rust CLI.\n- `/inline-format-analyze` \u2014 analyzes either the provided transcript argument or a built-in heredoc sample.\n- `/inline-format-render` \u2014 renders the transcript as distinct language-aware markdown code fences derived from Rust `render_blocks`.\n- `analyze_inline_transcript` \u2014 Pi tool that returns the full Rust JSON contract for a raw transcript.\n- `render_inline_transcript` \u2014 Pi tool that returns markdown-ready output plus structured `render_blocks` for downstream rendering.\n- package-backed host runtime seams \u2014 loaded from `.pi/settings.json`, currently owning the built-in `bash` override, deterministic compare helpers, and summary suppression behavior for the normal Pi user flow.\n\n## Heredoc language support\n\nBash heredocs can hold almost any text. This table is about what **this package** knows how to recognize and highlight today.\n\n### What kind of highlighting do you get?\n\n- **Basic highlighting** = the package detects the heredoc and Pi colors it like normal code.\n- **Smarter highlighting** = the package keeps the same source text and layout, but adds stronger emphasis to important symbols in the normal bash tool row.\n- **Inspection backend** = the package has a language-aware backend that can inspect the extracted snippet, even if the final tool row still uses basic highlighting.\n\n### Canonical package-backed capability tables\n\nThe package-backed capability tables now live in the host/package repo:\n\n- [Shipped today](https://github.com/Banon-Labs/pi-inline-format-extensions#shipped-today)\n- [Researched next candidates](https://github.com/Banon-Labs/pi-inline-format-extensions#researched-next-candidates)\n\nUse `pi-inline-format-extensions` as the source of truth for:\n\n- which heredoc languages are currently shipped,\n- which languages have real or partial inspection backends,\n- and which next-language candidates were researched but are not wired yet.\n\nThis repo keeps the Rust-core and repo-local diagnostics documentation, while the package-backed capability matrix is maintained in `Banon-Labs/pi-inline-format-extensions`.\n\nThis repo still exposes `extensions/index.ts` through `package.json` because the repo-local Rust diagnostics remain a valid direct local entrypoint.\n\nFor normal package-backed development, project-scoped `.pi/settings.json` now loads both:\n\n- host package source: `git:github.com/Banon-Labs/pi-inline-format-extensions@v0.1.5`\n- local diagnostics extension: `../extensions/index.ts`\n\nThis split keeps reusable runtime behavior in the pinned git-backed host package while preserving repo-local Rust CLI diagnostics inside `pi-inline-format`.\n\nThe intended stable release-time source is the pinned git ref above, resolved through the root-level Pi package surface in `Banon-Labs/pi-inline-format-extensions`.\n\nFor unpublished host changes under active development, the preferred local package source is now the repo root:\n\n- `../../pi-inline-format-extensions`\n\nThat root-level local path matches the same package surface used by future pinned git installs. The older `../../pi-inline-format-extensions/packages/host` path remains relevant only as a historical migration source validated by `npm run verify:host-source-upgrade-path`.\n\n## Quick install in another project\n\nIf you are a normal user and just want the feature, install **only the published npm package**:\n\n- [`npm:@banon-labs/pi-inline-format-extensions@0.1.5`](https://www.npmjs.com/package/@banon-labs/pi-inline-format-extensions)\n\nIf you need an exact repository build instead of the published package, the pinned git source remains available as an advanced fallback.\n\nIf that package is **not** in `.pi/settings.json`, this feature will not load.\n\nYou do **not** need:\n\n- `../extensions/index.ts`\n- `pi-tmux`\n- `pi-semaphore`\n- any other local Pi package from this workspace\n\nCreate `.pi/settings.json` with just the published npm package source:\n\n```json\n{\n  \"packages\": [\n    {\n      \"source\": \"npm:@banon-labs/pi-inline-format-extensions@0.1.5\",\n      \"skills\": [],\n      \"prompts\": [],\n      \"themes\": []\n    }\n  ]\n}\n```\n\nThen, in that project:\n\n```bash\npi list\npi\n```\n\nInside Pi, these are good quick checks:\n\n- `/inline-format-host-status`\n- `/inline-format-run-deterministic-compare javascript`\n\nThat should show:\n\n- the package under `Project packages` in `pi list`,\n- host status text from the installed package,\n- and the normal inline JavaScript heredoc row with `hello from js 42`.\n\n> This install path was validated in a clean temp project with no repo-local diagnostics extension loaded. The repo-local development flow below still uses a pinned git ref because current consumer-regression scripts are anchored to an exact host commit.\n\n## ANSI example: Python before and after install\n\nThis is the same Python heredoc prompt in two states:\n\n- **Before**: deterministic provider only, no package-installed bash override.\n- **After**: pinned package installed in `.pi/settings.json`.\n\nThe source text stays the same. The difference is that the installed package gives the Python body real syntax colors instead of one plain tool-colored block.\n\n**Before**\n\n```text\n\\x1b[1m\\x1b[38;2;208;144;96mdef main() -> None:\\x1b[0m\n\\x1b[1m\\x1b[38;2;208;144;96m    print(\"hello from /tmp/delete.me.py\")\\x1b[0m\n```\n\n**After**\n\n```text\n\\x1b[38;2;86;156;214mdef\\x1b[39m \\x1b[38;2;220;220;170mmain\\x1b[39m() -> \\x1b[38;2;181;206;168mNone\\x1b[39m:\n\\x1b[38;2;78;201;176mprint\\x1b[39m(\\x1b[38;2;206;145;120m\"hello from /tmp/delete.me.py\"\\x1b[39m)\n```\n\nThese examples came from a clean install proof run captured in tmux.\n\n## Consumer install/update/migration flow\n\nFor normal users, prefer the npm package source above. The remaining pinned-git instructions in this repo are for repo-local development, release rehearsal, and exact-commit rollback.\n\n## Repo-local development flow\n\nThe section below is **for this repo only**.\n\nIf you are developing inside `pi-inline-format`, keep the pinned package **and** the local diagnostics extension:\n\n```json\n{\n  \"packages\": [\n    {\n      \"source\": \"git:github.com/Banon-Labs/pi-inline-format-extensions@v0.1.5\",\n      \"skills\": [],\n      \"prompts\": [],\n      \"themes\": []\n    }\n  ],\n  \"extensions\": [\"../extensions/index.ts\"]\n}\n```\n\n### What stays local vs package-backed\n\n- Keep the host/runtime package source pinned in `.pi/settings.json`.\n- Keep `../extensions/index.ts` loaded locally for repo-local Rust CLI diagnostics.\n- Do **not** move the local diagnostics commands into the package source; the package owns runtime seams, while this repo keeps diagnostics.\n\n1. Land and publish the host-side changes in `pi-inline-format-extensions` first.\n2. Replace the `packages[0].source` value in `.pi/settings.json` with the new pinned git ref.\n3. Keep `extensions[0]` set to `../extensions/index.ts`.\n4. Run `pi list` and confirm the new pinned source appears under `Project packages`.\n5. Run `npm run check`.\n6. If the host change expanded language support or deterministic proof behavior, rerun the relevant proof flow before calling the repin complete.\n\n## ANSI-preserving tmux proof helper\n\nFor color-sensitive proof that should survive beyond a live pane, use:\n\n```bash\nnpm run smoke:ansi-capture-proof\n```\n\nDefault behavior:\n\n- launches a deterministic target Pi pane in this repo,\n- runs `/inline-format-run-deterministic-compare typescript`,\n- launches an observer Pi pane,\n- extracts ANSI-rich proof lines into a replay pane, then captures that replay pane with ANSI-preserving `tmux capture-pane -e`,\n- validates that the observer capture artifact still contains ANSI-highlighted TypeScript output,\n- writes artifacts under `/tmp/pi-inline-smoke-ansi-capture-*/`.\n\nUseful flags:\n\n- `--scenario python|javascript|typescript|bash`\n- `--keep-open` to leave the dedicated smoke session running for inspection\n\nThis helper is for proofing the capture bridge itself. It complements, rather than replaces, the existing deterministic grid smoke and raw `PI_TUI_WRITE_LOG` artifacts. The automated harness entrypoint is `npm run check:ansi-capture-proof`.\n\n### Pre-release local-root validation flow\n\nBefore publishing a new host ref, validate against the local root package surface:\n\n1. point `packages[0].source` at `../../pi-inline-format-extensions`,\n2. keep `../extensions/index.ts` unchanged,\n3. run `npm run verify:multilanguage-local-package-proof`,\n4. restore the pinned git source after validation.\n\nThis flow is specifically for unpublished host work. Stable consumer installs should continue to use pinned git refs, not an unpinned sibling checkout.\n\n### Migrating from the old local sibling path\n\nOlder local development used:\n\n- `../../pi-inline-format-extensions/packages/host`\n\nThe verified migration path is:\n\n1. start from the old local-path package source above,\n2. switch `packages[0].source` to the pinned git source,\n3. keep `../extensions/index.ts` unchanged,\n4. verify with `npm run verify:host-source-upgrade-path`,\n5. finish with `npm run check`.\n\n`npm run verify:host-source-upgrade-path` rehearses the exact transition locally by temporarily switching `.pi/settings.json` from the old local-path source to the pinned git source, running `pi list` plus headless deterministic compare verification at each step, and restoring the original settings file automatically even on failure.\n\n### Rollback note\n\nIf a future update fails, restore `.pi/settings.json` to the last known-good package source and rerun:\n\n- `pi list`\n- `npm run check`\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "rust",
+    "typescript"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/Banon-Labs/pi-inline-format#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Banon-Labs/pi-inline-format.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-01T03:26:19.065Z",
+    "modified": "2026-04-01T23:36:10.834Z",
+    "0.1.0": "2026-04-01T03:26:19.332Z",
+    "0.1.1": "2026-04-01T08:14:56.880Z",
+    "0.1.2": "2026-04-01T20:47:01.099Z",
+    "0.1.3": "2026-04-01T21:20:53.358Z",
+    "0.1.4": "2026-04-01T22:01:05.753Z",
+    "0.1.5": "2026-04-01T23:36:10.405Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 17,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 664
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 33
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 25
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 29
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 23
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 49
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 26
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "name": "@pi-lab/permissions",
+  "latest_version": "1.0.1",
+  "description": "Permission system extension for pi coding agent",
+  "readme": "# @pi-lab/permissions [![NPM Version](https://img.shields.io/npm/v/@pi-lab/permissions)](https://www.npmjs.com/package/@pi-lab/permissions)\n\nA permission system extension for [pi coding agent](https://github.com/earendil-works/pi). Intercepts tool calls and enforces allow / deny / ask rules defined in a JSON config file.\n\n## Install\n\n```bash\npi install npm:@pi-lab/permissions\n```\n\n## Configuration\n\nRules are configured in pi settings and merged into a single list:\n\n- `~/.pi/agent/settings.json` \u2014 global\n- `.pi/settings.json` \u2014 project\n\nExample `settings.json`:\n\n```json\n{\n  \"permissions\": {\n    \"rules\": [\n      {\n        \"message\": \"Block rm -rf\",\n        \"priority\": 10,\n        \"match\": { \"tool\": \"bash\", \"params\": { \"command\": \"rm\\\\s+-rf\" } },\n        \"action\": \"deny\"\n      },\n      {\n        \"match\": { \"tool\": \"bash\", \"params\": { \"command\": \"sudo\" } },\n        \"action\": \"ask\"\n      },\n      {\n        \"message\": \"Only allow reading files inside the project\",\n        \"priority\": 10,\n        \"match\": { \"tool\": \"read\", \"paths\": [\"~/projects/my-app/**\"] },\n        \"action\": \"allow\"\n      },\n      {\n        \"message\": \"read is restricted to allowed paths only\",\n        \"match\": { \"tool\": \"read\" },\n        \"action\": \"deny\"\n      }\n    ]\n  }\n}\n```\n\n### Rule fields\n\n| Field             | Type     | Required | Description                                                                                                                                                                                             |\n| ----------------- | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |\n| `match.tool`      | string   | \u2713        | Tool name, or `\"*\"` to match all tools                                                                                                                                                                  |\n| `match.params`    | object   | \u2014        | Param name \u2192 regex pattern. All conditions must match.                                                                                                                                                  |\n| `match.paths`     | string[] | \u2014        | Path patterns the tool's path argument must fall within. Supports glob (`**`, `*`) and plain directory prefixes. Supports `~` expansion. Pairs with a higher-priority `allow` rule to form a whitelist. |\n| `match.pathParam` | string   | \u2014        | Which input key holds the path. Defaults to `\"path\"`.                                                                                                                                                   |\n| `action`          | string   | \u2713        | `allow`, `deny`, or `ask`                                                                                                                                                                               |\n| `priority`        | number   | \u2014        | Defaults to `0`. Higher values are evaluated first.                                                                                                                                                     |\n| `message`         | string   | \u2014        | Reason returned to the LLM when a call is blocked.                                                                                                                                                      |\n\n### Matching order\n\n1. Rules sorted by `priority` descending\n2. Same priority: `deny` > `ask` > `allow`\n\nNo match defaults to `allow`.\n\n### ask mode\n\nA dialog prompts the user with four options:\n\n- **Allow** \u2014 allow this call once\n- **Allow always** \u2014 allow identical calls for the rest of the session (not persisted)\n- **Deny** \u2014 deny this call once\n- **Deny always** \u2014 deny identical calls for the rest of the session (not persisted)\n\n## Events\n\nThe extension broadcasts observational events on `pi.events`. Listeners cannot change permission decisions, cache behavior, or blocked responses.\n\n### Event names\n\n- `permissions:deny` \u2014 emitted whenever a tool call is blocked\n- `permissions:ask` \u2014 emitted immediately before a real user prompt is shown\n- `permissions:user_select` \u2014 emitted after the prompt resolves\n\n### Payloads\n\nAll payloads include the matched rule serialized with configured patterns only. Raw tool input is never broadcast.\n\n```ts\ntype SerializedPermissionRule = {\n  action: \"allow\" | \"deny\" | \"ask\";\n  message?: string;\n  priority?: number;\n  match: {\n    tool: string;\n    params?: Record<string, string>;\n    paths?: string[];\n    pathParam?: string;\n  };\n};\n\ntype PermissionsDenyEvent = {\n  toolCallId: string;\n  toolName: string;\n  reason: string;\n  source: \"rule\" | \"cache\" | \"user\" | \"no_ui\";\n  rule: SerializedPermissionRule;\n};\n\ntype PermissionsAskEvent = {\n  toolCallId: string;\n  toolName: string;\n  rule: SerializedPermissionRule;\n  options: [\"Allow\", \"Allow always\", \"Deny\", \"Deny always\"];\n};\n\ntype PermissionsUserSelectEvent = {\n  toolCallId: string;\n  toolName: string;\n  selection: \"Allow\" | \"Allow always\" | \"Deny\" | \"Deny always\" | null;\n  decision: \"allow\" | \"deny\";\n  cached: boolean;\n  rule: SerializedPermissionRule;\n};\n```\n\n### Privacy guarantee\n\nEvent payloads never include `event.input` or derived raw argument values such as shell commands, file paths, or file contents. The `params` and `paths` fields contain only the configured rule patterns.\n\n### Example listener\n\n```ts\npi.events.on(\"permissions:deny\", (event) => {\n  console.log(event);\n});\n```\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "anthod0"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/anthod0/pi-lab/tree/main/packages/permissions",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anthod0/pi-lab.git",
+    "directory": "packages/permissions"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.mjs"
+    ]
+  },
+  "time": {
+    "created": "2026-04-20T05:57:34.943Z",
+    "modified": "2026-06-22T06:46:46.747Z",
+    "0.1.0": "2026-04-20T05:57:35.195Z",
+    "0.1.1": "2026-04-20T06:06:17.854Z",
+    "0.1.2": "2026-04-20T06:15:45.945Z",
+    "0.1.3": "2026-04-21T06:24:18.468Z",
+    "0.1.4": "2026-05-01T15:10:08.973Z",
+    "0.1.5": "2026-05-02T05:09:27.005Z",
+    "1.0.0": "2026-05-08T05:49:16.923Z",
+    "1.0.1": "2026-06-22T06:46:46.613Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 194,
+  "download_trend": []
+}

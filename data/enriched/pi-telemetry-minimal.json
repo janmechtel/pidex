@@ -1,0 +1,42 @@
+{
+  "name": "pi-telemetry-minimal",
+  "latest_version": "0.3.0",
+  "description": "Minimal token usage telemetry for Pi",
+  "readme": "# pi-telemetry-minimal\n\nPassive Pi token telemetry: one finalized assistant turn in, one usage record out.\n\nWrites local JSONL by default. The prescribed way to consume the stream is [`pi-telemetry-web`](https://github.com/drsh4dow/pi-telemetry-web), a self-hosted SQLite dashboard that receives this package's webhook payload. You can still POST the same record to any compatible org webhook.\n\nIt never records prompts, responses, tool output, command text, file contents, or code snippets.\n\nSubagents are counted when their Pi runtime loads this extension. `pi-delegate` children inherit this extension through `PI_CHILD_EXTENSION_PATHS`, so development runs like `pi --no-extensions -e .` still capture delegated child turns when used with a compatible `pi-delegate` version. `ask_questions` itself does not call an LLM.\n\n## Install\n\n```bash\npi install npm:pi-telemetry-minimal\n```\n\n## Records\n\nEach event is `schemaVersion: 1`, `type: \"turn_usage\"`.\n\nCaptured:\n\n- timestamp, turn index, assistant stop reason\n- session id/file, cwd/cwd name\n- model api/provider/name\n- input/output/cache tokens and provider-reported cost\n- labels: team/project/developer\n- git metadata: root, origin, branch, commit, user name/email\n\nDefault local sink:\n\n```text\n~/.pi/telemetry-minimal/events.jsonl\n```\n\nWebhook sink, when configured:\n\n- `POST` one JSON record per turn\n- body is the same object as local JSONL\n- any 2xx is success\n- optional `Authorization: Bearer <token>`\n- 2000ms timeout by default\n- best effort only: no retries, no queue, abort-aware\n- failures are silent, including non-2xx responses and timeouts\n\n## Consume with pi-telemetry-web\n\nRun [`pi-telemetry-web`](https://github.com/drsh4dow/pi-telemetry-web), create the first admin user, then copy the generated webhook URL and bearer token from its Settings page into `~/.pi/telemetry-minimal.json`:\n\n```json\n{\n \"sinks\": {\n  \"local\": { \"path\": \"~/.pi/telemetry-minimal/events.jsonl\" },\n  \"webhook\": {\n   \"url\": \"https://telemetry.example.com/api/telemetry/events\",\n   \"token\": \"pi-telemetry-web-ingest-token\",\n   \"timeoutMs\": 2000\n  }\n }\n}\n```\n\nExisting local history can be imported in the dashboard by uploading:\n\n```text\n~/.pi/telemetry-minimal/events.jsonl\n```\n\nKeep the local sink enabled unless you intentionally want webhook-only telemetry.\n\n## Configure\n\nFull config example:\n\n```json\n{\n \"enabled\": true,\n \"labels\": {\n  \"team\": \"platform\",\n  \"project\": \"pi\",\n  \"developer\": \"dev@example.com\"\n },\n \"sinks\": {\n  \"local\": { \"path\": \"~/.pi/telemetry-minimal/events.jsonl\" },\n  \"webhook\": {\n   \"url\": \"https://telemetry.example.com/api/telemetry/events\",\n   \"token\": \"pi-telemetry-web-ingest-token\",\n   \"timeoutMs\": 2000\n  }\n },\n \"git\": { \"enabled\": true, \"timeoutMs\": 750 },\n \"warnOnError\": true\n}\n```\n\nOr env vars:\n\n```bash\nPI_TELEMETRY_ENABLED=true\nPI_TELEMETRY_LOG_PATH=~/.pi/telemetry-minimal/events.jsonl\nPI_TELEMETRY_TEAM=platform\nPI_TELEMETRY_PROJECT=pi\nPI_TELEMETRY_DEVELOPER=dev@example.com\nPI_TELEMETRY_GIT=true\nPI_TELEMETRY_GIT_TIMEOUT_MS=750\nPI_TELEMETRY_WARN_ON_ERROR=true\nPI_TELEMETRY_WEBHOOK_URL=https://telemetry.example.com/api/telemetry/events\nPI_TELEMETRY_WEBHOOK_TOKEN=pi-telemetry-web-ingest-token\nPI_TELEMETRY_WEBHOOK_TIMEOUT_MS=2000\n```\n\nEnv wins over config. Boolean envs accept `true/false`, `1/0`, `yes/no`, `on/off`.\n\n## Privacy + failure model\n\nWebhook payloads mirror local records. If webhook is enabled, paths and git identity are sent to that backend.\n\nDisable git metadata:\n\n```json\n{ \"git\": { \"enabled\": false } }\n```\n\nor:\n\n```bash\nPI_TELEMETRY_GIT=false\n```\n\nWebhook delivery failures are always silent. Other failures degrade silently except for one warning when `warnOnError` is enabled.\n\nRecords include the assistant `stopReason` (`stop`, `length`, `toolUse`, `error`, or `aborted`) so downstream consumers can separate successful, truncated, tool-using, failed, and aborted turns without receiving error text.\n\n## Development\n\n```bash\nbun install\nbun test\nbun run typecheck\nbun run check\nbun pm pack --dry-run\nPI_OFFLINE=1 bunx --bun pi --no-extensions -e . --list-models >/tmp/pi-telemetry-minimal-pi-load.out\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "telemetry",
+    "token-usage",
+    "minimal",
+    "extension"
+  ],
+  "author": {
+    "name": "drsh4dow",
+    "email": "daniel.morettiv@gmail.com",
+    "url": "https://github.com/drsh4dow"
+  },
+  "license": null,
+  "homepage": "https://github.com/drsh4dow/pi-telemetry-minimal#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/drsh4dow/pi-telemetry-minimal.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/telemetry-minimal.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-27T19:44:07.626Z",
+    "modified": "2026-04-28T13:45:07.210Z",
+    "0.1.0": "2026-04-27T19:44:07.768Z",
+    "0.2.0": "2026-04-27T20:15:20.274Z",
+    "0.2.2": "2026-04-28T02:41:41.040Z",
+    "0.2.3": "2026-04-28T12:34:16.649Z",
+    "0.3.0": "2026-04-28T13:45:07.120Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": null,
+  "download_trend": []
+}

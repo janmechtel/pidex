@@ -1,0 +1,37 @@
+{
+  "name": "@marks/pi-subagent",
+  "latest_version": "0.1.1",
+  "description": "Minimal Pi extension: one subagent tool that spawns role-shaped child pi processes. Roles defined as markdown in ~/.pi/agent/agents/.",
+  "readme": "# pi-subagent\n\nMinimal Pi extension: one `subagent` tool that spawns role-shaped child `pi` processes. Roles are markdown files. The parent LLM decides how many subagents to fan out \u2014 the host (Pi) handles parallel tool calls.\n\nBuilt to keep parent context lean on local-LLM setups where the main session has a tight token budget (e.g. Qwen at ~100k) and slower planning work belongs on a different model (e.g. Gemma).\n\n## What it does\n\n`subagent({ agent, task })` runs `pi --mode json -p --no-session` in a child process with:\n\n- The role markdown's body appended as the child's system prompt (`--append-system-prompt`).\n- The role's `model:` and `thinking:` frontmatter (per-role model is the whole point).\n- No session history. No extensions unless the role asks for them.\n\nOnly the child's final assistant text is returned to the parent. Everything the child thought, called, and read stays in the child's process.\n\n## Install\n\nFrom npm (recommended):\n\n```bash\npi install @marks/pi-subagent\nmkdir -p ~/.pi/agent/agents\ncp node_modules/@marks/pi-subagent/agents/*.md ~/.pi/agent/agents/\n```\n\nThe package ships the role markdowns in `agents/` inside `node_modules/@marks/pi-subagent/`. Copy or symlink them into `~/.pi/agent/agents/` so Pi can find them \u2014 that location is where roles are resolved from.\n\nFrom a local checkout (for development):\n\n```bash\nnpm install\npi install $(pwd)\ncp agents/*.md ~/.pi/agent/agents/\n```\n\nConfirm: `pi list` shows `pi-subagent`. Inside a fresh `pi` session, the `subagent` tool is available.\n\n## Bundled roles\n\n| Role | Model | Use for |\n|---|---|---|\n| `scout` | `qwen-coder:latest` | Fast file/symbol reconnaissance \u2014 dense bullets, no prose |\n| `architect` | `gemma4-think:latest` | Implementation plans before coding |\n| `researcher` | `gemma4-think:latest` | Investigations, structured briefs |\n| `code-reviewer` | `qwen-coder:latest` | Prioritized issue lists on a diff or file |\n| `sme` | `qwen-coder:latest` | Focused Q&A from supplied context |\n\nEach lives as a markdown file in `~/.pi/agent/agents/`. Edit the frontmatter (`model`, `thinking`) to swap models per role. Drop your own `<role>.md` into the same folder to add a new role \u2014 no rebuild needed.\n\nProject-scoped overrides go in `<repo>/.pi/agents/<role>.md` and win over the user-level file.\n\n## Settings (optional)\n\nIn `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"pi-subagent\": {\n    \"model\": \"qwen-coder:latest\",\n    \"extensions\": [\"~/.pi/agent/extensions/ollama.ts\"]\n  }\n}\n```\n\n- `model` \u2014 fallback when a role markdown omits `model:`.\n- `extensions` \u2014 paths passed through to each child as `--extension`. Useful for provider extensions (e.g. ollama) that children need in order to use a model.\n\n## Parallel use\n\nTell the parent to call `subagent` more than once in a turn. Pi will run them in parallel:\n\n> Use `scout` to map `src/` and `code-reviewer` to read `README.md` in parallel.\n\nTwo child `pi` processes run side by side; both replies land back before the parent continues.\n\n## Layout\n\n```\nsrc/\n  index.ts      # registerTool wiring\n  agents.ts     # discover + load markdown roles\n  spawn.ts      # child pi process + JSON-mode parse\n  settings.ts   # ~/.pi/agent/settings.json[\"pi-subagent\"]\nagents/         # bundled role markdowns\n```\n\nNo build step \u2014 Pi runs the TypeScript directly via `pi.extensions` in `package.json`.\n",
+  "keywords": [
+    "pi",
+    "subagent",
+    "pi-package",
+    "agent",
+    "llm"
+  ],
+  "author": {
+    "name": "Mark Hougaard",
+    "email": "mark@hougaard.email"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/markhougaard/pi-subagent#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/markhougaard/pi-subagent.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-14T08:49:33.892Z",
+    "modified": "2026-05-14T09:47:45.166Z",
+    "0.1.0": "2026-05-14T08:49:34.162Z",
+    "0.1.1": "2026-05-14T09:47:44.851Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 15,
+  "download_trend": []
+}

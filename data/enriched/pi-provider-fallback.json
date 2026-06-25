@@ -1,0 +1,41 @@
+{
+  "name": "pi-provider-fallback",
+  "latest_version": "1.0.4",
+  "description": "Cross-provider model fallback for pi, with an interactive TUI config",
+  "readme": "# pi-provider-fallback\n\nA simple cross-provider model fallback extension for [pi](https://github.com/earendil-works/pi-coding-agent), with an interactive TUI config.\n\nWhen the active model hits a terminal **transient**, **quota**, or **model-unavailable** error, the extension swaps to the next configured fallback model (trying the **same provider first**, then other providers) and re-issues the failed prompt. If fallback switches to a model with a smaller context window, the extension triggers pi compaction first when the current context would be too large. The swap is sticky for the session; the original model is restored on shutdown or at `/reload`.\n\nAt a glance:\n\n- This is a **pi extension**. It adds the `/fallback-config` and `/fallback-status` commands.\n- Options **draw from your available providers** (those in `pi --list-models`).\n- **Providers are enabled for fallback per your preference**: opt each one in or out.\n- **Up to two models per provider** can be set as your **1st** and **2nd** fallback preference.\n\n## Install\n\n```bash\n# via npm\npi install npm:pi-provider-fallback\n\n# via git\npi install git:github.com/37/pi-provider-fallback\n```\n\nThis adds the extension to `~/.pi/agent/settings.json` (use `-l` to write project-local `.pi/settings.json` instead).\n\nAlternatively you can install from local, or remote using specific versions pinned to a tag or commit:\n\n```bash\n# specific git version\npi install git:github.com/37/pi-provider-fallback@v1.0.3\n\n# Local / dev\npi -e ./provider-fallback.ts   # run once from a clone, no settings change\n```\n\n## Usage\n\nConfigure interactively in pi:\n\n```\n/fallback-config      # interactive TUI to set fallback models per provider\n/fallback-status      # view current config\n```\n\n### Configuration / setup with TUI\n\nNo JSON editing required. The TUI only shows providers and models present in your registry (`pi --list-models`).\n\n![fallback-config provider list](assets/fallback-config.png)\n\nA `\u2713` marks a provider enabled for fallback, `\u2717` disabled. Press `Enter` on a provider to pick up to two fallback models and assign them priority `1` / `2`.\n\nNote: `/fallback-config` automatically saves changes on every action. No `ctrl+s` required.\n\n## How fallback works\n\nOn an eligible error for `providerA/modelX`:\n1. Try `providerA`'s other configured fallbacks (priority 1, then 2).\n2. If exhausted, try other enabled providers' fallbacks.\n3. If nothing is available: `[fallback] no fallback available`.\n\nThe pointer is forward-only per session (never retries an already-failed fallback). If the target fallback has a smaller context window and the current context is too large, compaction runs before the retry.\n\n![fallback process in action](assets/fallback-in-action.png)\n\nThe screenshot shows a rate-limit error falling back first within Anthropic, then across providers after the second rate-limit. Request IDs are redacted.\n\n## Error classification\n\n| Bucket | Triggers fallback | Examples |\n|--------|-------------------|----------|\n| transient | yes | overloaded, rate-limit, 429/5xx, network/timeout |\n| quota | yes | usage limit, billing, insufficient quota |\n| unavailable | yes | 404 not_found, \"model is not available\", invalid model |\n| ignore | no | context overflow, user abort |\n\n## Config\n\nStored at `~/.pi/agent/extensions/provider-fallback.json` (override with `PI_PROVIDER_FALLBACK_CONFIG`). Managed by the TUI; see `provider-fallback.example.json` for the shape.\n\n## Testing fallback\n\nSet your default model to `anthropic/claude-fable-5` and send a prompt. As of **2026-06-21** this is a convenient deterministic test: Anthropic has disabled the model, so it **always 404s** and reliably triggers fallback. This may change in future; if the model is re-enabled or removed, pick any other unavailable model id.\n\nYou should see:\n\n```\n[fallback] anthropic/claude-fable-5 failed (unavailable) \u2192 anthropic/claude-opus-4-8\n```\n\n> Note: the `\u2192 anthropic/claude-opus-4-8` target appears only if `claude-opus-4-8` is configured as an `anthropic` fallback model. With a different anthropic fallback (or none, falling through to another provider) the target reflects whatever you configured.\n\nSelf-check the classifier: `npx tsx provider-fallback.ts --selfcheck`\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "model-fallback",
+    "provider-fallback",
+    "auto-retry"
+  ],
+  "author": {
+    "name": "k"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/37/pi-provider-fallback#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/37/pi-provider-fallback.git"
+  },
+  "pi": {
+    "extensions": [
+      "./provider-fallback.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/37/pi-provider-fallback/master/assets/fallback-config.png"
+  },
+  "time": {
+    "created": "2026-06-21T10:28:40.193Z",
+    "modified": "2026-06-22T05:24:26.393Z",
+    "1.0.0": "2026-06-21T10:28:40.421Z",
+    "1.0.1": "2026-06-21T10:42:38.259Z",
+    "1.0.2": "2026-06-21T10:53:22.696Z",
+    "1.0.3": "2026-06-21T11:08:53.859Z",
+    "1.0.4": "2026-06-22T05:24:26.261Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 729,
+  "download_trend": []
+}

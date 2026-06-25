@@ -1,0 +1,356 @@
+{
+  "name": "@tryinget/pi-evalset-lab",
+  "latest_version": "0.2.0",
+  "description": "pi extension for fixed-task-set eval runs and prompt/system comparisons",
+  "readme": "---\nsummary: \"Overview and quickstart for @tryinget/pi-evalset-lab.\"\nread_when:\n  - \"Starting work in this package workspace.\"\n  - \"Using /evalset run or /evalset compare.\"\nsystem4d:\n  container: \"Monorepo package for a pi fixed-task-set evaluation extension.\"\n  compass: \"Keep prompt/system comparisons small, reproducible, and easy to inspect.\"\n  engine: \"Define dataset -> run or compare variants -> export JSON/HTML report -> review deltas.\"\n  fog: \"Model/provider nondeterminism can make brittle checks noisy.\"\n---\n\n# @tryinget/pi-evalset-lab\n\nMonorepo package for fixed-task-set eval workflows in Pi (`/evalset run|compare`) with reproducible JSON reports and static HTML export.\n\n- Workspace path: `packages/pi-evalset-lab`\n- Release component key: `pi-evalset-lab`\n- Former legacy standalone source: `~/programming/pi-extensions/pi-evalset-lab`\n- Canonical package status: canonicalized here; the legacy repo was archived to `~/programming/pi-extensions/pi-evalset-lab-final-archive.tar.gz` and removed after validation.\n- Session-history migration: no legacy Pi session-history directory existed for the old path, so relocation was recorded as `skip-no-history`.\n\nPrimary category fit: **Model & Prompt Management**, **Review & Quality Loops**, **UX & Observability**, **Safety & Governance**.\n\n## Runtime dependencies and packaged files\n\nThis package expects Pi host runtime APIs and declares them as `peerDependencies`:\n\n- `@mariozechner/pi-coding-agent`\n- `@mariozechner/pi-ai`\n\nThe npm package uses a `files` whitelist so required runtime artifacts are explicitly included:\n\n- `extensions/evalset.ts`\n- `prompts/`\n- `examples/` (sample datasets + sample report UI)\n- `scripts/export-evalset-report-html.mjs`\n\n## Quickstart\n\nInstall package dependencies for local validation:\n\n```bash\ncd packages/pi-evalset-lab\nnpm install\nnpm run check\n```\n\nInstall into Pi from the package directory containing `package.json`:\n\n```bash\npi install /absolute/path/to/pi-extensions/packages/pi-evalset-lab\n# then in Pi: /reload\n```\n\nFor ad hoc source testing from this package directory:\n\n```bash\npi -e ./extensions/evalset.ts\n```\n\n## evalset command\n\n```bash\n/evalset help\n/evalset init [dataset-path] [--force]\n/evalset run <dataset.json> [--system-file <path>] [--system-text <text>] [--variant <name>] [--max-cases <n>] [--temperature <n>] [--out <report.json>]\n/evalset compare <dataset.json> <baseline-system.txt> <candidate-system.txt> [--baseline-name <name>] [--candidate-name <name>] [--max-cases <n>] [--temperature <n>] [--out <report.json>]\n```\n\n`/evalset` is a Pi slash command, not a shell executable.\n\nInteractive mode:\n\n```bash\npi -e ./extensions/evalset.ts\n# then inside Pi:\n/evalset compare examples/fixed-task-set.json examples/system-baseline.txt examples/system-candidate.txt\n```\n\nNon-interactive mode:\n\n```bash\npi -e ./extensions/evalset.ts -p \"/evalset compare examples/fixed-task-set.json examples/system-baseline.txt examples/system-candidate.txt\"\n# or, if installed/enabled:\npi -p \"/evalset compare examples/fixed-task-set.json examples/system-baseline.txt examples/system-candidate.txt\"\n```\n\nInteractive sessions use Pi UI hooks (`ctx.ui`) for status/notify updates. Non-interactive `-p` mode skips those UI calls when `ctx.hasUI === false`.\n\n## Included datasets and sample output\n\n- `examples/fixed-task-set.json` \u2014 tiny smoke set (3 cases)\n- `examples/fixed-task-set-v2.json` \u2014 larger first pass set\n- `examples/fixed-task-set-v3.json` \u2014 less brittle checks (recommended)\n- `examples/evalset-compare-sample-embedded.html` \u2014 self-contained report UI with embedded compare JSON\n- `examples/evalset-compare-sample.png` \u2014 screenshot preview of that HTML report\n- `examples/system-baseline.txt` and `examples/system-candidate.txt` \u2014 compare inputs\n\nPreview:\n\n![Evalset compare sample screenshot](examples/evalset-compare-sample.png)\n\nReports are written to explicit `--out <path>` when provided, otherwise `.evalset/reports/*.json` under the current project directory.\n\nEach report includes run identity metadata (`runId`, `datasetHash`, `casesHash`, and variant hashes). Session messages keep lightweight report metadata only, not full report bodies.\n\n## Export report JSON to static HTML\n\n```bash\nnpm run evalset:export-html -- --in .evalset/reports/compare-your-dataset-YYYYMMDDTHHMMSS.json\n# optional:\nnpm run evalset:export-html -- --in .evalset/reports/run-your-dataset-YYYYMMDDTHHMMSS.json --out .evalset/reports/run-your-dataset.html --title \"Evalset run report\"\n```\n\nScript: [scripts/export-evalset-report-html.mjs](scripts/export-evalset-report-html.mjs)\n\n## Validation and release checks\n\nPackage-local validation:\n\n```bash\nnpm run check\nnpm run release:check:quick\n```\n\nMonorepo-scoped validation:\n\n```bash\ncd ../..\nbash ./scripts/package-quality-gate.sh ci packages/pi-evalset-lab\nnode ./scripts/release-components.mjs validate\n```\n\nRelease metadata is root-managed through `x-pi-template.releaseConfigMode=component` and component key `pi-evalset-lab`.\n\nThe scoped package `@tryinget/pi-evalset-lab` is the canonical npm identity for future releases. The old unscoped `pi-evalset-lab@0.2.0` package remains historical registry state, not the canonical development target.\n\n## Optional core hooks (future, not required)\n\nThis extension works today without Pi core changes. Optional hardening could include stable agent-level lineage IDs, explicit reproducibility metadata in `pi-ai`, shared provider payload hashing, or a headless agent-eval API for tool-heavy/full agent-loop benchmark runs.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "evalset",
+    "llm-eval",
+    "prompt-evaluation",
+    "fixed-task-set",
+    "ux-observability",
+    "safety-governance",
+    "review-quality-loops",
+    "model-prompt-management",
+    "monorepo"
+  ],
+  "author": null,
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://github.com/tryingET/pi-extensions/tree/main/packages/pi-evalset-lab",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tryingET/pi-extensions.git",
+    "directory": "packages/pi-evalset-lab"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/evalset.ts"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-14T08:10:49.238Z",
+    "0.2.0": "2026-05-14T08:10:49.606Z",
+    "modified": "2026-05-14T08:10:49.933Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 7,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 71
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

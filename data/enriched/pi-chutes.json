@@ -1,0 +1,39 @@
+{
+  "name": "pi-chutes",
+  "latest_version": "1.2.0",
+  "description": "Pi coding agent extension to integrate Chutes.ai as a provider.",
+  "readme": "# Pi Chutes Extension\n\nA pi coding agent extension that provides access to models from [Chutes.ai](https://chutes.ai), a platform offering various open and proprietary LLM models via an OpenAI-compatible API.\n\n<video src=\"https://github.com/user-attachments/assets/14d8cd6d-bec0-49af-b21b-1858548c551a\" width=\"100%\" autoplay loop muted playsinline></video>\n\n## Features\n\n- **Automatic Model Discovery**: Fetches the latest models from Chutes.ai on every startup\n- **Offline Fallback**: Uses cached models from previous fetch if API is unreachable\n- **Multiple Input Types**: Supports both text-only and vision (text + image) models\n- **Reasoning Detection**: Automatically identifies models with reasoning capabilities\n- **Cost Tracking**: Preserves pricing information from the API\n- **Secure API Key Storage**: Stores keys as `api_key` type with atomic writes and rollback\n\n## Installation\n\n### Option 1: npm (recommended)\n\n```shell\npi install npm:pi-chutes\n```\n\nThen restart pi.\n\n### Option 2: Git\n\n```shell\npi install git:github.com/mark182es/pi-chutes\n```\n\nThen restart pi.\n\n### Option 3: Manual\n\n1. Create the directory:\n\n   ```bash\n   mkdir -p ~/.pi/agent/extensions/pi-chutes\n   ```\n\n2. Copy or create the `index.ts` file in that directory\n\n## Quick Start\n\nAfter the extension is loaded:\n\n```bash\n# 1. Login with your API key (select Chutes.ai from the list)\n/login\n\n# 2. Select a model\n/model chutes\n```\n\nThat's it. Models are fetched automatically on every pi startup.\n\n## Usage\n\n### Login\n\nUse the standard `/login` command to authenticate:\n\n```\n/login\n```\n\nSelect **Chutes.ai** from the provider list and enter your API key when prompted (format: `cpk_...`). The key will be:\n\n1. Validated for correct format\n2. Verified against the Chutes API\n3. Saved securely to `~/.pi/agent/auth.json`\n\nTo logout and clear credentials:\n\n```\n/logout chutes\n```\n\n### Model Selection\n\nUse the `/model` command to select a chutes model:\n\n```\n/model chutes\n```\n\nThis will show all available chutes models in the model selector.\n\n### Automatic Model Updates\n\nModels are **fetched automatically from the Chutes API every time pi starts**. No manual update command is needed. If the API is unreachable, cached models from the previous fetch are used instead.\n\nThe model cache is stored at `~/.pi/agent/extensions/pi-chutes/models.json`.\n\n## Configuration\n\n### Option 1: Using /login (Recommended)\n\n```\n/login\n```\n\nSelect **Chutes.ai** from the provider list and enter your API key. This integrates with pi's built-in authentication system.\n\n### Option 2: Environment Variable\n\n| Variable         | Description                |\n| ---------------- | -------------------------- |\n| `CHUTES_API_KEY` | Your API key for chutes.ai |\n\n```bash\nexport CHUTES_API_KEY=cpk_...\n```\n\n### Option 3: Auth File\n\nManually add your API key to `~/.pi/agent/auth.json`:\n\n```json\n{\n  \"chutes\": { \"type\": \"api_key\", \"key\": \"cpk_...\" }\n}\n```\n\n## Model Properties\n\nThe extension automatically converts these properties from the Chutes API:\n\n| API Field                                 | Model Property   | Description                       |\n| ----------------------------------------- | ---------------- | --------------------------------- |\n| `id`                                      | `id`             | Model identifier                  |\n| `id`                                      | `name`           | Display name                      |\n| `supported_features` includes \"reasoning\" | `reasoning`      | Supports extended thinking        |\n| `input_modalities`                        | `input`          | `[\"text\"]` or `[\"text\", \"image\"]` |\n| `pricing.prompt`                          | `cost.input`     | Input cost per 1M tokens          |\n| `pricing.completion`                      | `cost.output`    | Output cost per 1M tokens         |\n| `pricing.input_cache_read`                | `cost.cacheRead` | Cache read cost per 1M tokens     |\n| `context_length` / `max_model_len`        | `contextWindow`  | Context window size               |\n| `max_output_length`                       | `maxTokens`      | Maximum output tokens             |\n\n## Files\n\n- `index.ts` \u2014 Main extension code\n- `~/.pi/agent/extensions/pi-chutes/models.json` \u2014 Cached models (auto-created)\n\n## Troubleshooting\n\n### \"API key contains invalid characters\" error\n\nMake sure you're entering your full API key including dots (e.g., `cpk_xxx.yyy.zzz`). The key format uses dot-separated segments.\n\n### \"API key is invalid or unauthorized\" error\n\n- Verify your API key is correct and active at [chutes.ai](https://chutes.ai)\n- Make sure the key hasn't been revoked\n- Try logging in again with `/login`\n\n### Models not appearing\n\n- Models are fetched automatically on startup \u2014 just restart pi\n- If offline, cached models from the last successful fetch are used\n- Check your internet connection if models seem outdated\n\n### Startup is slow\n\nThe extension fetches models from the Chutes API on startup. If the API is slow to respond, pi will take a moment longer to start. The fetched models are cached, so offline startups use the cache instantly.\n\n### Migrating from a previous version\n\nIf you previously used an older version of this extension that stored credentials in OAuth format, they will be automatically migrated to the proper `api_key` format on startup. No action needed.\n\n## Security\n\n### API Key Validation\n\n- API keys are validated for length (16-512 characters)\n- Only alphanumeric characters, dots, hyphens, and underscores are allowed (matching Chutes.ai key format: `cpk_<hex>.<hex>.<base64>`)\n- Invalid keys are rejected before saving\n\n### API Key Verification\n\n- The `/login` flow verifies your API key against the Chutes API before accepting it\n- This prevents storing invalid keys that would fail at runtime\n\n### Secure Credential Storage\n\n- API keys are stored as `type: \"api_key\"` in auth.json (not as OAuth credentials)\n- Credentials are written to a temporary file first, then atomically renamed\n- File permissions are set to `0600` (owner read/write only)\n- Write failures include automatic rollback to prevent corrupted auth files\n\n### Automatic Migration\n\n- Legacy OAuth-type credentials are automatically converted to `api_key` format on startup\n\n### Model Data Validation\n\n- All model data from the API is validated before registration\n- Invalid or malformed models are filtered out\n\n## License\n\nThis extension is provided as-is for use with pi coding agent.\n",
+  "keywords": [
+    "pi-package",
+    "pi-coding-agent",
+    "ai",
+    "bug-detection",
+    "code-quality"
+  ],
+  "author": {
+    "name": "Gianmarco Martinelli"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/mark182es/pi-chutes#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mark182es/pi-chutes.git"
+  },
+  "pi": {
+    "extensions": [
+      "index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-05T12:40:15.448Z",
+    "modified": "2026-06-16T19:35:45.685Z",
+    "1.0.0": "2026-03-05T12:40:15.621Z",
+    "1.1.0": "2026-04-28T11:41:21.451Z",
+    "1.1.1": "2026-04-28T11:46:26.425Z",
+    "1.1.2": "2026-04-28T12:25:30.945Z",
+    "1.2.0": "2026-06-16T19:35:45.561Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 24,
+  "download_trend": []
+}

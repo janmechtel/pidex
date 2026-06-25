@@ -1,0 +1,352 @@
+{
+  "name": "pi-todo-md",
+  "latest_version": "0.4.0",
+  "description": "A shareable pi extension for managing a repo-local TODO.md file.",
+  "readme": "# pi-todo-md\n\n[![CI](https://img.shields.io/github/actions/workflow/status/forjd/pi-todo-md/ci.yml?branch=main&style=flat-square&label=ci)](https://github.com/forjd/pi-todo-md/actions/workflows/ci.yml)\n[![npm version](https://img.shields.io/npm/v/pi-todo-md?style=flat-square)](https://www.npmjs.com/package/pi-todo-md)\n\nA shareable [pi](https://www.npmjs.com/package/@mariozechner/pi-coding-agent) package that gives the agent a structured `todo_md` tool backed by a repo-local `TODO.md` file.\n\n## What it does\n\n- manages `TODO.md` through a structured tool instead of ad-hoc file edits\n- finds the nearest `TODO.md` in the current directory or a parent directory\n- creates `TODO.md` at the git repo root when none exists yet\n- keeps stable task IDs with hidden HTML comments\n- writes a hidden file schema marker for future migrations\n- supports sections, reordering, bulk add, rename, focus mode, priority metadata, notes, subtasks, check/uncheck, archive, and prioritize\n- adds an interactive `/todos [section]` browser inside pi with keyboard actions\n- injects a compact active-task summary into relevant agent turns so pi can stay aligned with the current working set\n\n## Install\n\n### From npm\n\n```bash\npi install npm:pi-todo-md\n```\n\n### From a local checkout\n\n```bash\npi install /absolute/path/to/pi-todo-md -l\n```\n\n## Quick start\n\nAfter installing, start `pi` in your project and ask things like:\n\n- `Show me the current todo list`\n- `Add a task to TODO.md to publish the plugin`\n- `Add these tasks to TODO.md: write docs, record demo, publish package`\n- `What should I work on next from TODO.md?`\n- `Focus task #2 and show me the current focus list`\n- `Mark task #3 as high priority`\n- `Create an Inbox section and move task #5 there`\n- `Rename task #2 to finish README polish`\n- `Add a note to task #2 saying publish after the docs land`\n- `Add subtasks to #2 for writing docs and publishing the package`\n- `Mark task #2 as done`\n- `Archive all completed tasks`\n- `Move task #3 to In Progress`\n- `Prioritize task #5`\n- `/todos`\n- `/todos In Progress`\n\n## Tool API\n\nThe extension registers a tool named `todo_md`.\n\n| Action | Required | Optional | Description |\n|---|---|---|---|\n| `list` | \u2014 | `section` | Show the current task list |\n| `list_focused` | \u2014 | \u2014 | Show the current focused tasks |\n| `next_task` | \u2014 | `section` | Recommend the next open task |\n| `create_section` | `section` | \u2014 | Create a new section |\n| `rename_section` | `section` | `targetSection` | Rename a section |\n| `remove_section` | `section` | `targetSection` | Remove a section, optionally moving its tasks |\n| `move_section` | `section`, `index` | \u2014 | Reorder sections |\n| `add` | `text` | `section`, `index` | Add one task |\n| `bulk_add` | `items` | `section`, `index` | Add multiple tasks at once |\n| `check` | `id` | \u2014 | Mark a task done |\n| `uncheck` | `id` | \u2014 | Mark a task not done |\n| `rename` | `id`, `text` | \u2014 | Change task text |\n| `focus_task` | `id` | \u2014 | Mark a task as part of the active working set |\n| `unfocus_task` | `id` | \u2014 | Remove a task from the active working set |\n| `set_priority` | `id`, `priority` | \u2014 | Set priority to `low`, `medium`, or `high` |\n| `clear_priority` | `id` | \u2014 | Remove priority metadata |\n| `set_note` | `id`, `text` | \u2014 | Replace a task's note text |\n| `append_note` | `id`, `text` | \u2014 | Append note line(s) to a task |\n| `clear_note` | `id` | \u2014 | Remove all notes from a task |\n| `add_subtask` | `id`, `text` | \u2014 | Add a subtask to a task |\n| `check_subtask` | `id`, `subtask` | \u2014 | Mark a subtask done |\n| `uncheck_subtask` | `id`, `subtask` | \u2014 | Mark a subtask not done |\n| `remove_subtask` | `id`, `subtask` | \u2014 | Delete a subtask |\n| `archive_done` | \u2014 | `section` | Move completed tasks into `Archive` |\n| `remove` | `id` | \u2014 | Delete a task |\n| `move` | `id` | `section`, `index` | Move a task to another section or position |\n| `prioritize` | `id` | `section` | Move a task to the top of a section |\n\nThere is also a `/todos [section]` command for an interactive view. Inside the browser you can use:\n\n- `\u2191\u2193` or `j/k` to move\n- `x` to toggle the selected task or subtask\n- `f` to focus or unfocus the selected task\n- `h`, `m`, `l`, or `0` to set high, medium, low, or no priority\n- `r` to rename a task\n- `n` to edit a task note\n- `s` to add a subtask\n- `p` to prioritize a task\n- `d` to delete the selected task or subtask\n- `a` to archive completed tasks\n- `o` to toggle done items on and off\n\n## Managed file format\n\n`pi-todo-md` normalizes `TODO.md` into a canonical format like this:\n\n```md\n# TODO\n<!-- pi-todo-md:schema=1 -->\n\n## Tasks\n- [ ] ship the plugin [focus] [high] <!-- pi-todo-md:id=1 -->\n  - note: publish after trusted publishing works\n  - [ ] write docs\n  - [ ] publish package\n- [x] read the docs <!-- pi-todo-md:id=2 -->\n\n## In Progress\n- [ ] package it for sharing <!-- pi-todo-md:id=3 -->\n\n## Archive\n- [x] initial release <!-- pi-todo-md:id=4 -->\n```\n\nThe hidden `<!-- pi-todo-md:schema=1 -->` marker reserves room for future file migrations, and the hidden `<!-- pi-todo-md:id=... -->` markers keep task IDs stable across edits.\n\n## File placement rules\n\nWhen the tool runs, it will:\n\n1. use `TODO.md` in the current directory if present\n2. otherwise walk up parent directories looking for `TODO.md`\n3. if none exists, create one at the nearest git repo root\n4. if not inside a git repo, create one in the current directory\n\n## Local development\n\nRun the tests:\n\n```bash\nnpm test\n```\n\nPreview the publish tarball:\n\n```bash\nnpm pack --dry-run\n```\n\nTry the extension directly without installing it globally:\n\n```bash\npi -e ./extensions/todo-md.js\n```\n\n## Contributing\n\nSee [CONTRIBUTING.md](./CONTRIBUTING.md) for:\n\n- release conventions\n- Release Please workflow details\n- npm trusted publishing setup\n- release debugging notes\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "todo",
+    "markdown"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/forjd/pi-todo-md#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forjd/pi-todo-md.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/todo-md.js"
+    ],
+    "image": "https://raw.githubusercontent.com/forjd/pi-todo-md/main/.github/social-preview.png"
+  },
+  "time": {
+    "created": "2026-04-17T21:17:24.176Z",
+    "modified": "2026-04-17T23:15:34.881Z",
+    "0.1.0": "2026-04-17T21:17:24.410Z",
+    "0.1.1": "2026-04-17T21:26:09.067Z",
+    "0.1.4": "2026-04-17T22:06:56.780Z",
+    "0.2.0": "2026-04-17T23:02:05.317Z",
+    "0.3.0": "2026-04-17T23:09:31.783Z",
+    "0.4.0": "2026-04-17T23:15:34.624Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 21,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 708
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 34
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 49
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 30
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 20
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 25
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 6
+    }
+  ]
+}

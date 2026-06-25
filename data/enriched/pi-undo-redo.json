@@ -1,0 +1,38 @@
+{
+  "name": "pi-undo-redo",
+  "latest_version": "0.1.1",
+  "description": "Undo/redo for Pi conversations and workspace changes with hybrid git and non-git snapshots.",
+  "readme": "# pi-undo-redo\r\n\r\nUndo/redo for Pi conversations and workspace changes with hybrid git/non-git behavior.\r\n\r\nIn git repositories this extension keeps file snapshots in a shadow git repository and records per-message patch metadata in the Pi session. `/undo` navigates the conversation tree back to the previous user message and reverts only the files changed by the undone message(s). `/redo` restores the files and conversation leaf captured before undo.\r\n\r\nIn non-git directories it does **not** scan or snapshot the whole workspace. It snapshots only explicit file paths touched by Pi file tools that provide a path (`write` and `edit`). Shell commands and custom tools without explicit path metadata are not parsed for paths and are not promised to be undo-restorable.\r\n\r\nA dirty guard blocks `/undo`, `/redo`, and `/tree` when unsnapshotted workspace changes would be overwritten.\r\n\r\n## Commands\r\n\r\n- `/undo` - undo the latest checkpointed user message and restore changed files\r\n- `/redo` - restore the last undone conversation/file state\r\n- `/undo-cleanup` - conservatively prune old protected snapshot refs while keeping snapshots referenced by the current session state\r\n\r\n## Configuration\r\n\r\nConfigure in `~/.pi/agent/settings.json` or `.pi/settings.json`:\r\n\r\n```json\r\n{\r\n  \"undoRedo\": {\r\n    \"storageDir\": \"E:/pi-undo-redo\",\r\n    \"largeFileLimitBytes\": 2097152,\r\n    \"gitTimeoutMs\": 30000,\r\n    \"enabled\": true\r\n  }\r\n}\r\n```\r\n\r\nDefaults:\r\n\r\n- `storageDir`: `~/.pi/agent/state/pi-undo-redo`\r\n- `largeFileLimitBytes`: `2097152` (2 MiB; large explicit non-git files are skipped/fail closed with a warning instead of silently claiming undo support)\r\n- `gitTimeoutMs`: `30000`\r\n- `enabled`: `true`\r\n\r\n## Hybrid behavior\r\n\r\n### Git repositories\r\n\r\n- Uses the existing shadow git snapshot behavior.\r\n- Catches tracked modifications and ordinary non-ignored untracked files, including files created by shell/filesystem commands.\r\n- Respects `.gitignore` and `.git/info/exclude` from the source repository.\r\n- Maintains a shadow snapshot of source tracked files plus changed ordinary non-ignored untracked files; ignored files and large untracked files are not copied into the shadow repository.\r\n- `/tree` restores the workspace snapshot that matches the selected conversation node.\r\n\r\n### Non-git directories\r\n\r\n- Does not root-wide scan/snapshot the cwd, home directory, or project root.\r\n- Before-agent snapshots are empty and cheap; when a Pi `write` or `edit` tool is about to run, the extension snapshots only that explicit path's current state.\r\n- Finalization snapshots after-state for those touched files only, supporting create/modify/delete for normal files where possible.\r\n- `/undo` and `/redo` restore only `checkpoint.files` from the session checkpoint.\r\n- `/tree` restores only the cumulative explicit checkpoint files along the branch up to the target node; it never restores or diffs a whole cwd snapshot.\r\n- Dirty guard checks only affected checkpoint/touched paths, so unrelated sentinel files are not included.\r\n- Shell-created files in non-git mode are not parsed or restored. The extension warns once per agent turn when a bash tool runs in non-git mode.\r\n\r\n## Path safety in non-git mode\r\n\r\nExplicit paths are normalized relative to the workspace root. Relative paths resolve against Pi's current `ctx.cwd`; absolute paths are accepted only when they remain inside the workspace root. Paths containing NUL, escaping via `..`, or targeting dangerous workspace directories such as `.git`, `.pi`, or `node_modules` are rejected. Windows-style paths normalize to `/`-separated relative paths in checkpoint metadata.\r\n\r\n## Notes\r\n\r\n- Snapshots are protected with internal shadow-git refs so stored tree objects are not immediately lost to Git GC.\r\n- Restore avoids recursive directory deletion for file/dir conflicts; unsafe conflicts fail closed instead of deleting unknown directory contents.\r\n- Non-git mode intentionally trades shell/filesystem auto-discovery for safety and bounded scope. Use a git repository when full OpenCode-style shell/file-system change capture is required.\r\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "pi-coding-agent",
+    "opencode",
+    "undo",
+    "redo",
+    "snapshot",
+    "rollback"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/Yueby/pi-undo-redo#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yueby/pi-undo-redo.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/extension.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-04T14:14:04.930Z",
+    "modified": "2026-06-04T14:14:05.505Z",
+    "0.1.0": "2026-02-04T01:11:37.756Z",
+    "0.1.1": "2026-06-04T14:14:05.241Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 22,
+  "download_trend": []
+}

@@ -1,0 +1,355 @@
+{
+  "name": "@mem0/pi-agent-plugin",
+  "latest_version": "0.1.2",
+  "description": "Mem0 memory extension for Pi Agent persistent, scoped, semantic memory across sessions and projects",
+  "readme": "# @mem0/pi-agent-plugin\n\nPersistent semantic memory for [Pi Agent](https://pi.dev), powered by [Mem0](https://mem0.ai).\n\nThis extension gives Pi Agent long-term memory that persists across sessions, projects, and devices. Memories are automatically captured from conversations and can be searched, managed, and consolidated through slash commands and an agent-accessible tool.\n\n## Features\n\n- **Automatic memory capture** \u2014 learns from every conversation (both user and assistant messages)\n- **Semantic search** \u2014 find memories by meaning, not just keywords\n- **Scoped memory** \u2014 project, session, or global scope\n- **Monorepo-aware** \u2014 uses git root for project detection, consistent app_id across subdirectories\n- **Dream consolidation** \u2014 merges duplicates, resolves contradictions, prunes stale entries\n- **Confirmation dialogs** \u2014 destructive commands ask before acting\n- **8 slash commands** \u2014 essential memory management from the command line\n- **Agent tool** \u2014 `mem0_memory` tool lets the agent search and store memories autonomously\n\n## Setup\n\n### 1. Get an API key\n\nSign up at [app.mem0.ai](https://app.mem0.ai/dashboard/api-keys) and copy your API key.\n\n### 2. Install\n\n```bash\npi install npm:@mem0/pi-agent-plugin\n```\n\n### 3. Configure\n\nSet the API key as an environment variable:\n\n```bash\nexport MEM0_API_KEY=\"m0-your-key-here\"\n```\n\nOr create a config file at `~/.pi/agent/mem0-config.json`:\n\n```json\n{\n  \"apiKey\": \"m0-your-key-here\",\n  \"userId\": \"your-username\",\n  \"autoCapture\": true,\n  \"defaultScope\": \"project\",\n  \"searchThreshold\": 0.2,\n  \"dream\": {\n    \"enabled\": true,\n    \"auto\": true,\n    \"minHours\": 24,\n    \"minSessions\": 5,\n    \"minMemories\": 20\n  }\n}\n```\n\nEnvironment variables (`MEM0_API_KEY`, `MEM0_USER_ID`) override the config file.\n\n`searchThreshold` (default `0.3`) is the minimum similarity score (0\u20131) a memory must reach to count as a match for `/mem0-search`, `/mem0-forget`, and `/mem0-pin`. It is passed to the mem0 search API (along with reranking for higher-precision ordering), so a query with no sufficiently similar memory reports no match instead of returning the closest unrelated memories. Raise it to be stricter; lower it if relevant results are missed.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/mem0-remember <text>` | Store a memory verbatim (no inference) |\n| `/mem0-forget <query>` | Search and delete memories (with confirmation) |\n| `/mem0-search <query>` | Semantic search across memories |\n| `/mem0-tour [scope]` | Browse all memories grouped by category |\n| `/mem0-dream` | Consolidate \u2014 merge duplicates, prune stale, resolve contradictions |\n| `/mem0-pin <query>` | Pin a memory to protect from dream pruning (preserves ID) |\n| `/mem0-scope <scope>` | Change default scope for this session |\n| `/mem0-status` | Connection health, identity, and memory count |\n\n## Skills\n\nThe plugin includes 8 skills that guide the agent on how to use each capability:\n\n| Skill | Purpose |\n|-------|---------|\n| `context-loader` | Pre-fetch relevant memories at session start |\n| `remember` | Store facts with category classification |\n| `search` | Quick semantic search with compact results |\n| `forget` | Delete memories with confirmation |\n| `dream` | Memory consolidation workflow |\n| `tour` | Full memory walkthrough by category |\n| `pin` | Protect critical memories from pruning |\n| `status` | Health check and diagnostics |\n\n## Memory Scopes\n\n| Scope | Filters | Use case |\n|-------|---------|----------|\n| `project` | user + app_id (git root) | Default. Project-specific knowledge |\n| `session` | user + app_id + run_id | Ephemeral, session-only context |\n| `global` | user only | All memories across all your projects |\n\nProject scoping uses `git rev-parse --show-toplevel` to detect the repository root, so all subdirectories within a monorepo share the same memory pool.\n\n## Memory Categories\n\nMemories are automatically classified into 10 general-purpose categories:\n\n| Category | Description |\n|----------|-------------|\n| `identity` | Personal details, background, self-descriptions |\n| `preferences` | Likes, dislikes, habits, preferred approaches |\n| `goals` | Objectives, aspirations, targets |\n| `projects` | Ongoing work, initiatives, areas of focus |\n| `decisions` | Choices made, rationale, trade-offs |\n| `technical` | Technical knowledge, tools, configurations |\n| `relationships` | People, teams, organizations |\n| `routines` | Recurring patterns, workflows, schedules |\n| `lessons` | Insights learned, mistakes to avoid |\n| `work` | Professional context, role, responsibilities |\n\n## Architecture\n\n```\npi-agent-plugin/\n\u251c\u2500\u2500 src/\n\u2502   \u251c\u2500\u2500 entry.ts          # Extension entry point\n\u2502   \u251c\u2500\u2500 index.ts          # Barrel exports\n\u2502   \u251c\u2500\u2500 commands.ts       # 8 slash commands\n\u2502   \u251c\u2500\u2500 prompt.ts         # System prompt injection (MEMORY_POLICY)\n\u2502   \u251c\u2500\u2500 types.ts          # Shared interfaces and categories\n\u2502   \u251c\u2500\u2500 telemetry.ts      # PostHog telemetry (batched, PII-safe)\n\u2502   \u251c\u2500\u2500 config/           # Config loading (~/.pi/agent/mem0-config.json)\n\u2502   \u251c\u2500\u2500 memory/           # Tool registration, scoping (git root), formatting\n\u2502   \u251c\u2500\u2500 capture/          # Auto-capture from conversations (user + assistant)\n\u2502   \u2514\u2500\u2500 dream/            # Consolidation state, gating, locking, prompts\n\u251c\u2500\u2500 skills/               # 8 SKILL.md files for Pi Agent\n\u251c\u2500\u2500 tests/                # Vitest unit tests\n\u2514\u2500\u2500 dist/                 # Built output (ESM + DTS)\n```\n\n## Development\n\n```bash\npnpm install          # Install dependencies\npnpm run typecheck    # Type check\npnpm run test         # Run tests\npnpm run build        # Build (ESM + declarations)\n```\n\n## License\n\n[Apache-2.0](LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "skills",
+    "memory",
+    "mem0",
+    "semantic-memory",
+    "persistent-memory",
+    "agent-memory"
+  ],
+  "author": null,
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/mem0ai/mem0#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mem0ai/mem0.git",
+    "directory": "integrations/pi-agent-plugin"
+  },
+  "pi": {
+    "extensions": [
+      "./src/entry.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-09T19:43:45.315Z",
+    "modified": "2026-06-12T13:47:01.139Z",
+    "0.1.0": "2026-06-09T19:43:45.612Z",
+    "0.1.1": "2026-06-10T16:01:34.301Z",
+    "0.1.2": "2026-06-12T13:47:00.849Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 49,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 46
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 197
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 39
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 14
+    }
+  ]
+}

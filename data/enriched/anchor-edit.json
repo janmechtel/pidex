@@ -1,0 +1,41 @@
+{
+  "name": "anchor-edit",
+  "latest_version": "0.0.3",
+  "description": "Stateful single-token anchored file editing (Dirac-style). MCP server via `anchor-edit mcp`.",
+  "readme": "# anchor-edit\n\nStateful single-token anchored file editing tools for coding agents, bringing[^dirac-post]:\n\n- ~60% less token usage for file editing (from `O(S+R)` to `O(R)`)\n- Smaller context, better LLM reasoning\n\n## Usage\n\nThe `anchor-edit mcp` subcommand exposes the editor as an MCP server for coding agents like Claude Code.\n\n### Claude Code as MCP\n\n- CLI: `claude mcp add anchor-edit --scope user -- npx -y anchor-edit mcp`\n\n- Example `.mcp.json`:\n\n    ```json\n    {\n      \"mcpServers\": {\n        \"anchor-edit\": {\n          \"command\": \"npx\",\n          \"args\": [\"-y\", \"anchor-edit\", \"mcp\"]\n        }\n      }\n    }\n    ```\n\n- Verify: `claude mcp list`\n\n### Pi coding agent as extension\n\n`anchor-edit` also ships a native [pi](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) extension.\n\n```sh\npi install npm:anchor-edit\n```\n\nRestart pi, or run `/reload` in an existing pi session. The extension registers:\n\n1. `read_anchored`\n2. `edit_anchored`\n3. `write_to_file`\n\nPaths may be relative to pi's current working directory or absolute. The extension keeps anchor state in memory for the active pi runtime. After `/reload`, restart, `/new`, `/resume`, or `/fork`, call `read_anchored` again before `edit_anchored`.\n\nFor local development from this repository:\n\n```sh\npi -e ./src/pi-extension.ts\n```\n\n## Implementation\n\nReimplements the design from [Dirac](https://github.com/dirac-run/dirac) (anchored edits + Myers-diff reconciler) in TypeScript with AI assistance.\n\n`anchor-edit` is the **stateful single-token** variant:\n\n1. Pool of ~6,744 single-BPE English words from `o200k_base` is the anchor namespace.\n2. Per-session in-memory `Map<file_path, FileState>` (lines, anchors, used-pool words) persists across edits.\n3. After every edit, a Myers-diff reconciler reassigns anchors only on changed lines, so unchanged lines keep their identity across the session.\n\nFor the full mechanism and design rationale, see Dirac's blog post[^dirac-post] and the [`dirac-run/dirac`](https://github.com/dirac-run/dirac) source.\n\n### Allocation\n\nMirrors Dirac's `AnchorStateManager`. Implementation: [`src/state.ts`](src/state.ts).\n\n1. Each file has its own monotonically growing `usedWords` set. Anchors are pulled from the pool in order on first allocation; deleted lines do **not** return their anchors to the pool.\n2. When the pool (6,744 words from `o200k_base`) is exhausted, the allocator falls back to random two-word combinations (`MorelloMagnificent`); on collision, three-word, then four-word.\n3. Line splitting is `/\\r?\\n/` (CRLF tolerated). Anchored edits rewrite logical lines with `\\n`; `write_to_file` writes content as supplied.\n\n### Tools\n\n1. `read_anchored`: returns file content with one anchor prefix per line in the format `<anchor>\u00a7<content>`.\n2. `edit_anchored`: `replace` / `insert_before` / `insert_after` / `delete` by anchor; empty `new_content` with `mode=replace` also deletes the range.\n3. `write_to_file`: creates or overwrites a file; returns newly-allocated anchor runs (Myers-added regions). Call `read_anchored` afterwards if you need the full post-write anchor map.\n\nFor multi-line `content` and `new_content`, pass real newline characters (LF, U+000A); literal backslash-n is written to the file verbatim.\n\n## When not\n\nEdits made via anchor-edit don't render in Claude Code's native diff UI; tool responses are text-only. Reach for Claude Code's built-in `Edit` tool when visual diffs matter.\n\nAnchor-edit's value is chained surgical edits where line stability matters. Skip it for:\n\n1. **Bulk same-string rename in one file**: prefer the host's existing replace-all tool, or a CLI command (`sed`/`sd`, `rg --replace`). One tool call.\n2. **Same-string rename across many files**: prefer a CLI command (`sd`, `rg --replace`) or a one-shot script. One tool call total.\n\n## Development\n\n```sh\n# Install dependencies\npnpm install\n\n# Build the bin and types\npnpm run build:pool # one-time pool generation\npnpm run build\n\n# Run tests\npnpm test           # bun test, all suites\npnpm run typecheck\npnpm run lint\n```\n\n## Credits\n\nOriginal idea comes from [Dirac](https://github.com/dirac-run/dirac) (Apache-2.0).\n\n[^dirac-post]: [Hash Anchors + Myers Diff + Single-Token Anchors](https://dirac.run/posts/hash-anchors-myers-diff-single-token)\n",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "pi",
+    "pi-package",
+    "claude",
+    "claude-code",
+    "anchor-edit",
+    "file-editing",
+    "agent-tools"
+  ],
+  "author": {
+    "name": "Joilence",
+    "email": "14588641+Joilence@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Joilence/anchor-edit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Joilence/anchor-edit.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/pi-extension.js"
+    ]
+  },
+  "time": {
+    "created": "2026-05-03T15:46:54.273Z",
+    "modified": "2026-05-07T23:08:13.444Z",
+    "0.0.1": "2026-05-03T15:46:54.522Z",
+    "0.0.3": "2026-05-07T23:08:13.318Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 11,
+  "download_trend": []
+}

@@ -1,0 +1,33 @@
+{
+  "name": "@blackbelt-technology/pi-image-fit",
+  "latest_version": "0.5.4",
+  "description": "Pi extension that resizes oversize images at Read-time so they fit model byte and pixel ceilings.",
+  "readme": "# @blackbelt-technology/pi-image-fit\n\nPi extension that resizes oversize images at Read-time so they fit model\nbyte and pixel ceilings.\n\nThe extension hooks `pi.on(\"tool_call\", ...)`. When the agent runs the\nbuilt-in `read` tool with an image path (`.png`, `.jpg`, `.jpeg`, `.webp`,\n`.gif`), the extension:\n\n1. Stats the file and (lazily) probes dimensions via [jimp](https://github.com/jimp-dev/jimp).\n2. If the image already fits both thresholds, leaves `event.input.path`\n   untouched \u2014 built-in Read sees the original bytes, no temp file, no\n   telemetry.\n3. Otherwise, re-encodes the image (long-edge scaled, aspect-ratio\n   preserved) into a session-scoped temp file under\n   `os.tmpdir()/pi-image-fit/<session>/<sha256>.<ext>` and mutates\n   `event.input.path` to point at it. Built-in Read attaches the smaller\n   image to the agent's context window.\n\nNo native binary deps \u2014 `jimp` only. No `electron-rebuild` step, no\nplatform-specific prebuilt downloads. Pure JS install on every supported\npi target.\n\n## Install\n\n```bash\npi install @blackbelt-technology/pi-image-fit\n```\n\nThe next pi session loads the extension. No dashboard or other workspace\npackage required.\n\n## Default thresholds\n\n| Setting | Default | Env var |\n| --- | --- | --- |\n| Long-edge pixels | 1568 | `PI_IMAGE_FIT_MAX_EDGE` |\n| Byte size | 4,194,304 (4 MiB) | `PI_IMAGE_FIT_MAX_BYTES` |\n| JPEG quality | 85 | `PI_IMAGE_FIT_QUALITY` |\n| Kill switch | off | `PI_IMAGE_FIT_DISABLE` |\n\nResize triggers when **either** the byte size **or** the long edge\nexceeds its threshold. When both are at or below their thresholds, the\nextension is a no-op.\n\n## Environment variables\n\n- `PI_IMAGE_FIT_DISABLE` \u2014 truthy (`1`, `true`, `yes`, case-insensitive)\n  skips the `pi.on(\"tool_call\", ...)` registration entirely; the\n  extension logs a single disabled-message line on load and does nothing\n  else.\n- `PI_IMAGE_FIT_MAX_EDGE=<px>` \u2014 positive integer; override the\n  long-edge threshold.\n- `PI_IMAGE_FIT_MAX_BYTES=<bytes>` \u2014 positive integer; override the byte\n  threshold.\n- `PI_IMAGE_FIT_QUALITY=<1-100>` \u2014 JPEG output quality. Ignored for\n  PNG-in \u2192 PNG-out path (always lossless).\n\nInvalid values fall back to the documented default and log a single\nwarning line naming the variable.\n\n## Output format\n\nFormat-adaptive:\n\n- `.png` source \u2192 PNG output (lossless re-encode preserves transparency).\n- everything else \u2192 JPEG at the configured quality.\n\nCache file extension matches the chosen output format.\n\n## Telemetry\n\nOn a successful resize the extension emits exactly one line:\n\n```\n[pi-image-fit] <path> <srcW>\u00d7<srcH> <srcBytes>B \u2192 <dstW>\u00d7<dstH> <dstBytes>B\n```\n\nNo log on already-small pass-throughs, on non-image reads, or on\nnon-`read` tool calls. Failures log a single `[pi-image-fit] WARN ...`\nline and fall through to the original path (the agent's Read behaves\nexactly as if the extension were not installed).\n\n## Caveat: silent quality loss\n\nA 4K screenshot squashed to 1568 px may lose fine text. The agent has no\nway to tell that resize fired beyond the console log line. If pixel\nperfect Read matters for a workflow, set `PI_IMAGE_FIT_DISABLE=1` in\nthat environment.\n\n## License\n\nMIT. Part of the [pi-agent-dashboard](https://github.com/BlackBeltTechnology/pi-agent-dashboard)\nmonorepo; versions move in lockstep with the rest of the workspace.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "image",
+    "resize"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/BlackBeltTechnology/pi-agent-dashboard#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BlackBeltTechnology/pi-agent-dashboard.git",
+    "directory": "packages/image-fit-extension"
+  },
+  "pi": {
+    "extensions": [
+      "src/extension.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-12T23:09:08.359Z",
+    "0.5.4": "2026-06-12T23:09:08.685Z",
+    "modified": "2026-06-12T23:09:08.916Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 9,
+  "download_trend": []
+}

@@ -1,0 +1,33 @@
+{
+  "name": "pi-git-context",
+  "latest_version": "0.1.3",
+  "description": "Opinionated git state context injection for pi",
+  "readme": "# pi-git-context\n\n[![npm](https://img.shields.io/npm/v/pi-git-context)](https://www.npmjs.com/package/pi-git-context)\n\nOpinionated git state context injection for [pi](https://github.com/badlogic/pi-mono).\n\n## What it does\n\nInjects a concise, current git snapshot into the LLM context on **every prompt**, while keeping the session history clean by only persisting snapshots when state actually changes.\n\n### Snapshot contents\n\n| Section | Condition | Example |\n|---------|-----------|---------|\n| Remote | If remote exists | `Remote: github.com/h14h/pi-packages` |\n| Default branch | If determinable, and not current branch | `Default branch (main, a1b2c3d): synced with origin` |\n| Current branch / HEAD | Always in repo | `Branch: feat/auth-refactor (b2c3d4e), +3 commits from main, ahead 1 / behind 0` |\n| PR status | If `gh` CLI available and branch has PR | `PR: #42 (Ready)` |\n| Worktrees | If linked worktrees exist | `Linked worktrees: 6 total` |\n| Working tree | Always | `Working tree: dirty (2M, 1S, 1U, 0D)` |\n| Primary worktree | If CWD is a linked worktree | `Primary worktree (main, a1b2c3d): synced with origin, clean` |\n\nAbbreviations: **M** = modified, **S** = staged, **U** = untracked, **D** = deleted.\n\n## Footer status\n\nA persistent footer segment shows:\n\n```\n\u25c8 \u25cf (a1b2c3d) \u2713\n```\n\n- `\u25c8` = linked worktree (`\u00b7` = primary worktree, fixed-width)\n- `\u25cf` = clean / `\u25d0` = dirty / `\u2716` = conflicted\n- `(a1b2c3d)` = short SHA\n- `\u2713` = snapshot up to date / `?` = warning / Braille spinner = refreshing\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/git` | Open a read-only overlay showing the exact snapshot the agent will see on the next turn |\n\n## How it works\n\n- **Before each agent loop**: computes snapshot. If it changed from the last persisted snapshot, a new `custom_message` entry is appended to the session (visible in TUI, collapsible).\n- **Before every LLM call**: the `context` handler strips all prior git snapshots and injects exactly one fresh, ephemeral snapshot. The LLM never sees stale state.\n- **After each agent turn**: if `write`, `edit`, or `bash` tools ran, an optimistic background refresh is kicked off so the next prompt sees current state.\n- **Cache**: a quick fingerprint (branch + SHA + worktree path + dirty count) avoids recomputing the full snapshot when nothing changed.\n\n## Install\n\n```bash\npi install ./packages/pi-git-context\n```\n\nOr from npm (once published):\n\n```bash\npi install pi-git-context\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/h14h/pi-packages#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/h14h/pi-packages.git",
+    "directory": "packages/pi-git-context"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-04-21T20:47:58.653Z",
+    "modified": "2026-04-21T22:02:55.162Z",
+    "0.1.1": "2026-04-21T20:47:58.954Z",
+    "0.1.2": "2026-04-21T22:01:21.699Z",
+    "0.1.3": "2026-04-21T22:02:55.063Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

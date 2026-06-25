@@ -1,0 +1,39 @@
+{
+  "name": "@q.roy/pi-remote",
+  "latest_version": "0.1.2",
+  "description": "Remote terminal access for pi via WebSocket and browser",
+  "readme": "# @q.roy/pi-remote\n\nRemote terminal access for pi via WebSocket. Connect to your pi session from mobile browsers over LAN.\n\n## Features\n\n- **PTY-based remote access** - Wraps pi in a pseudo-terminal for optimal performance\n- **WebSocket bridge** - Real-time bidirectional terminal I/O\n- **Mobile-first** - Touch scroll with momentum, virtual keybar (arrows, Ctrl+C, etc.)\n- **Token authentication** - Secure LAN access with auto-generated tokens\n- **QR code** - Scan to connect instantly from mobile\n- **`/remote` command** - Restart pi in remote mode from within a running session\n\n## Usage as a pi Extension\n\nThis package is primarily used as a [pi coding agent](https://github.com/badlogic/pi-mono) extension. The extension registers a `/remote` command that lets you switch your current pi session into remote access mode without losing context.\n\n### Global (all projects)\n\nAdd to `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"extensions\": [\n    \"~/path/to/pi-mono-extensions/packages/remote\"\n  ]\n}\n```\n\nOr install from npm and reference the package:\n\n```json\n{\n  \"packages\": [\"@q.roy/pi-remote\"]\n}\n```\n\n### Project-local\n\nAdd to `.pi/settings.json` in your project root:\n\n```json\n{\n  \"extensions\": [\n    \"~/path/to/pi-mono-extensions/packages/remote\"\n  ]\n}\n```\n\n### Temporary (one-off)\n\n```bash\npi -e ~/path/to/pi-mono-extensions/packages/remote/extension/index.ts\n```\n\n### Using `/remote` inside pi\n\nOnce the extension is loaded, run `/remote` in pi:\n\n```\n/remote\n```\n\nThis will:\n1. Save your current session\n2. Shut down the current pi process\n3. Restart pi wrapped in a PTY with a WebSocket server\n4. Display a QR code and URL \u2014 scan from mobile or open in a browser\n\nWhen running inside a remote session, a persistent widget above the editor shows the remote URL.\n\n---\n\n## Usage as a CLI Tool\n\nYou can also launch remote mode directly from the terminal without a running pi session:\n\n```bash\nnpm install -g @q.roy/pi-remote\npi-remote\n```\n\n### Options\n\n```bash\n# Specify a custom pi binary path\npi-remote --pi-path /path/to/pi\n\n# Pass extra arguments to pi\npi-remote -- --continue\n\n# Custom port (default: 7009)\nPORT=8080 pi-remote\n```\n\n---\n\n## Architecture\n\n```\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502   Browser   \u2502  (mobile / desktop)\n\u2502  (xterm.js) \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n       \u2502 WebSocket\n       \u25bc\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 HTTP Server \u2502  (token auth, static files)\n\u2502   + WS      \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n       \u2502\n       \u25bc\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502     PTY     \u2502  (node-pty)\n\u2502   (pi CLI)  \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\n### Source Layout\n\n| Path | Description |\n|------|-------------|\n| `extension/index.ts` | Pi extension entry \u2014 registers `/remote` command and remote URL widget |\n| `src/cli.ts` | `pi-remote` binary entry point |\n| `src/pty.ts` | PTY management (node-pty), stdin/stdout attachment |\n| `src/ws.ts` | WebSocket bridge, mobile-priority resize logic |\n| `src/server.ts` | HTTP server with token auth, `/api/local-url` endpoint |\n| `web/` | Browser frontend (xterm.js, touch scroll, virtual keybar) |\n\n---\n\n## API\n\n### `startRemote(options)`\n\n```typescript\nimport { startRemote } from \"@q.roy/pi-remote\";\n\nconst cleanup = await startRemote({\n  piPath: \"/usr/local/bin/pi\",  // optional, auto-detected\n  args: [\"--continue\"],          // optional, passed to pi\n  cwd: process.cwd(),            // optional\n  env: process.env,              // optional\n});\n\n// Stop the server and kill the PTY process\ncleanup();\n```\n\n### Environment Variables\n\n| Variable | Description |\n|----------|-------------|\n| `PORT` | HTTP server port (default: `7009`) |\n| `PI_REMOTE_URL` | Set automatically when running inside `pi-remote`; the extension uses this to show the URL widget |\n\n---\n\n## Security\n\n- **Token-based auth** \u2014 Random 16-byte token required for all remote connections\n- **Localhost exempt** \u2014 `127.0.0.1` connections skip token verification\n- **LAN only** \u2014 Designed for local network use, not intended to be exposed to the internet\n\n---\n\n## Development\n\n```bash\n# Install dependencies (from monorepo root)\nnpm install\n\n# Build TypeScript\nnpm run build:ts\n\n# Build web UI\nnpm run build:web\n\n# Full build\nnpm run build\n\n# Watch mode (TypeScript only)\nnpm run dev\n\n# Link globally for testing\nnpm link\n```\n\n---\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "remote",
+    "terminal",
+    "pty",
+    "websocket"
+  ],
+  "author": {
+    "name": "Q.Roy",
+    "email": "ruanqisevik@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ruanqisevik/pi-mono-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ruanqisevik/pi-mono-extensions.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extension/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-07T07:05:14.066Z",
+    "modified": "2026-03-07T07:49:20.506Z",
+    "0.1.0": "2026-03-07T07:05:14.376Z",
+    "0.1.1": "2026-03-07T07:20:29.091Z",
+    "0.1.2": "2026-03-07T07:49:20.396Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 18,
+  "download_trend": []
+}

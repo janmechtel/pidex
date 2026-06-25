@@ -1,0 +1,47 @@
+{
+  "name": "@rxreyn3/pi-azure-devops",
+  "latest_version": "0.2.0",
+  "description": "Azure DevOps diagnostics extension and CLI for Pi/OMP",
+  "readme": "# pi-azure-devops\n\nAzure DevOps diagnostics for Pi and OMP.\n\nUse your coding agent to inspect Azure DevOps builds, fetch bounded logs, list artifacts, and safely preview artifact downloads without giving the agent Azure DevOps mutation powers.\n\n## What you can do\n\n- Check Azure DevOps configuration and token readiness.\n- Inspect build status and timeline failures.\n- Fetch logs by build, stage, job, task, or explicit log ID.\n- Diagnose failed builds with timeline issues and selected log evidence.\n- List recent pipelines, recent builds, and build artifacts.\n- Preview artifact downloads before writing anything locally.\n- Run mock diagnostics with no network access and no token.\n\n## Safety model\n\nThis package is intentionally conservative:\n\n- Azure DevOps operations are read-only: no queue, cancel, rerun, approval, or remote mutation APIs are exposed.\n- Artifact download is local-write only. It writes under the current workspace only after an explicit confirmation flag or `confirm: true`.\n- Artifact download previews write nothing.\n- Output paths reject absolute paths, traversal outside the workspace, Windows drive prefixes, UNC prefixes, and NUL bytes.\n- ZIP extraction preflights entries for Zip Slip and file/directory conflicts before writing.\n- PATs, auth headers, and signed URL secrets are redacted from output and errors.\n- Pipeline artifact signed URLs are fetched without the Azure DevOps Authorization header.\n- Mock mode uses local fixtures and does not require credentials.\n\n## Install in OMP\n\n```bash\nomp plugin install @rxreyn3/pi-azure-devops\nomp plugin doctor --json\n```\n\nThen start OMP and ask for an Azure DevOps diagnostic task. For example:\n\n```text\nUse the Azure DevOps extension in mock mode to diagnose build 101 and summarize the failed task.\n```\n\n```text\nUse Azure DevOps diagnostics to list artifacts for build 101 in mock mode. Do not download anything.\n```\n\n## Install in Pi\n\nPi package installs use the npm source prefix:\n\n```bash\npi install npm:@rxreyn3/pi-azure-devops\n```\n\nTo try the package for one run without adding it to settings:\n\n```bash\npi -e npm:@rxreyn3/pi-azure-devops\n```\n\n## What this adds to Pi/OMP\n\nInstalling the package registers these resources from `package.json`:\n\n| Resource | What it provides |\n| --- | --- |\n| Extension | Azure DevOps tools callable by the agent |\n| Skill | Safe Azure DevOps operating rules and missing-info behavior |\n| Prompt templates | Reusable `ado-*` workflows for doctor, status, logs, artifacts, and diagnose tasks |\n| CLI | `pi-ado`, a standalone command line interface for the same core operations |\n\nThe extension tools are:\n\n| Tool | Purpose |\n| --- | --- |\n| `azure_devops_doctor` | Check resolved config and auth readiness |\n| `azure_devops_get_status` | Fetch build status and timeline summary |\n| `azure_devops_get_logs` | Fetch bounded selected log content |\n| `azure_devops_diagnose_failure` | Collect failure evidence from status, timeline, logs, and artifact metadata |\n| `azure_devops_list_artifacts` | List build artifact metadata |\n| `azure_devops_list_pipelines` | List recent pipeline summaries |\n| `azure_devops_list_builds` | List recent build summaries |\n| `azure_devops_download_artifact` | Preview or confirm a local artifact ZIP download/extract |\n\n## First run without credentials\n\nUse mock mode to verify the package and see the shape of responses without touching Azure DevOps:\n\n```bash\npi-ado doctor --mock --json\npi-ado status --mock --build-id 101 --json\npi-ado diagnose --mock --build-id 101 --json\n```\n\nMock mode is also useful inside Pi/OMP prompts:\n\n```text\nUse Azure DevOps diagnostics in mock mode to explain build 101.\n```\n\n## Configure Azure DevOps access\n\nLive Azure DevOps calls need an organization, project, and token. The fastest setup is environment variables:\n\n```bash\nexport PI_AZURE_DEVOPS_ORGANIZATION=\"<your-org-or-url>\"\nexport PI_AZURE_DEVOPS_PROJECT=\"<your-project>\"\nexport PI_AZURE_DEVOPS_PAT=\"<your-pat>\"\n```\n\nSupported token environment variables, in lookup order:\n\n1. `PI_AZURE_DEVOPS_PAT`\n2. `PI_ADO_PAT`\n3. `AZURE_DEVOPS_PAT`\n4. `AZURE_DEVOPS_EXT_PAT`\n5. `ADO_PAT`\n6. `SYSTEM_ACCESSTOKEN`\n\nFor file-based profiles and the full resolution order, see `docs/configuration.md`.\n\n## Common agent requests\n\nAfter installation, ask Pi/OMP for the outcome you want rather than for a specific REST call:\n\n```text\nDiagnose Azure DevOps build 12345 and explain the most likely failure cause.\n```\n\n```text\nFetch the log for task name \"Build\" in Azure DevOps build 12345. Keep the output bounded.\n```\n\n```text\nList artifacts for Azure DevOps build 12345 and tell me which one looks like the drop artifact.\n```\n\n```text\nPreview downloading artifact \"drop\" from build 12345 to artifacts/drop.zip. Do not confirm the write.\n```\n\n```text\nDownload artifact \"drop\" from build 12345 to artifacts/drop.zip only after showing me the preview and asking for confirmation.\n```\n\n## CLI reference\n\nThe `pi-ado` CLI is available for shell workflows and for smoke testing outside the agent.\n\n```bash\npi-ado doctor [--json] [--mock]\n\npi-ado status --build-id <id> \\\n  [--stage-id <guid>] [--stage-name <name>] \\\n  [--job-id <guid>] [--job-name <name>] \\\n  [--task-id <guid>] [--task-name <name>] \\\n  [--json] [--mock]\n\npi-ado logs --build-id <id> \\\n  [--stage-id <guid>] [--stage-name <name>] \\\n  [--job-id <guid>] [--job-name <name>] \\\n  [--task-id <guid>] [--task-name <name>] \\\n  [--log-id <id>] [--max-bytes <n>] \\\n  [--start-line <n>] [--end-line <n>] \\\n  [--json] [--mock]\n\npi-ado diagnose --build-id <id> \\\n  [--stage-id <guid>] [--stage-name <name>] \\\n  [--job-id <guid>] [--job-name <name>] \\\n  [--task-id <guid>] [--task-name <name>] \\\n  [--log-id <id>] [--max-bytes <n>] \\\n  [--start-line <n>] [--end-line <n>] \\\n  [--json] [--mock]\n\npi-ado artifacts --build-id <id> [--json] [--mock]\n```\n\n### Timeline display-name selectors\n\n`status`, `logs`, and `diagnose` accept human-readable selectors in addition to ID/GUID selectors:\n\n- CLI: `--stage-name`, `--job-name`, `--task-name`\n- Extension tools: `stageName`, `jobName`, `taskName`\n\nName matching is exact, then case-insensitive exact, then substring. Ambiguous matches return candidates and do not auto-pick a record. Stage selectors provide status/evidence context only; they do not infer a child job/task log.\n\n### Local artifact download\n\n```bash\npi-ado artifacts download \\\n  --build-id <id> \\\n  --artifact-name <name> \\\n  --output <relative-path> \\\n  [--artifact-kind auto|build|pipeline] \\\n  [--pipeline-id <id>] [--run-id <id>] \\\n  [--max-bytes <n>] \\\n  [--confirm] [--extract] [--overwrite] \\\n  [--json] [--mock]\n```\n\nBehavior:\n\n- Without `--confirm`, the command prints a preview and writes nothing.\n- With `--confirm`, it downloads the artifact ZIP. Add `--extract` to extract entries into the destination directory.\n- `--artifact-kind auto` checks both Build Artifacts and Pipelines Artifacts APIs. If both match, the preview reports `ambiguous` and refuses to write.\n- Pipeline-source resolution defaults `pipelineId = build.definitionId` and `runId = buildId`; pass `--pipeline-id` / `--run-id` when auto-inference is not enough.\n- Existing files are never overwritten without `--overwrite`.\n\n## Local development\n\n```bash\nnpm install\nnpm test\nnpm run typecheck\nnpm run build\nnpm run --silent spike:rest -- --mock --json\n```\n\n`npm run build` generates the `dist/` files used by the CLI binary and Pi extension metadata. `dist/` stays gitignored and is regenerated by `prepack` for package tarballs.\n\n## Package and publication notes\n\n- Published npm package: `@rxreyn3/pi-azure-devops`\n- No custom registry mapping is required.\n- GitHub Actions button publication and live-install steps are documented in `docs/publication.md`.\n- Staged implementation history lives in `generic-pi-azure-devops-plan.md`.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "omp-plugin",
+    "azure-devops",
+    "diagnostics"
+  ],
+  "author": {
+    "name": "rxreyn3"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/rxreyn3/pi-azure-devops#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rxreyn3/pi-azure-devops.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/extension/index.js"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts/ado-doctor.md",
+      "./prompts/ado-status.md",
+      "./prompts/ado-logs.md",
+      "./prompts/ado-artifacts.md",
+      "./prompts/ado-diagnose.md"
+    ]
+  },
+  "time": {
+    "created": "2026-05-06T14:49:04.098Z",
+    "modified": "2026-05-07T18:24:01.925Z",
+    "0.1.1": "2026-05-06T14:49:04.325Z",
+    "0.1.2": "2026-05-06T19:14:46.240Z",
+    "0.2.0": "2026-05-07T18:24:01.637Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

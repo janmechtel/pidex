@@ -1,0 +1,345 @@
+{
+  "name": "@leing2021/super-cli",
+  "latest_version": "0.1.2",
+  "description": "\u6781\u7b80 CLI \u8def\u7531\u5668 \u2014 \u7edf\u4e00\u5165\u53e3\uff0c\u81ea\u52a8\u8def\u7531\u5230 OpenCLI \u6216 CLI-Anything \u540e\u7aef",
+  "readme": "# super-cli\n\n[\u7b80\u4f53\u4e2d\u6587](README-CN.md)\n\nA minimalist CLI router \u2014 one command to control websites, browsers, Electron apps, and desktop GUI software.\n\n```bash\nnpm install -g @leing2021/super-cli\nsuper-cli list              # discover all available targets\nsuper-cli doctor            # check your environment\nsuper-cli hackernews top -f json\nsuper-cli make https://xiaohongshu.com\n```\n\n## What it does\n\n`super-cli` is a unified entry point that automatically routes your commands to the right backend:\n\n- **[OpenCLI](https://github.com/jackwener/opencli)** \u2014 controls websites, browsers, and Electron apps (100+ adapters)\n- **[CLI-Anything](https://github.com/HKUDS/CLI-Anything)** \u2014 controls installed desktop GUI software like Blender, GIMP, and Inkscape (60+ harnesses)\n\nRemember `super-cli`. Forget which backend does what.\n\n> **Note:** OpenCLI comes bundled with `super-cli`. CLI-Anything harnesses require a separate one-time setup \u2014 see [Installation](#installation).\n\n## Quickstart\n\n```bash\n# 1. Install\nnpm install -g @leing2021/super-cli\n\n# 2. See what's available\nsuper-cli list\n\n# 3. Use a target\nsuper-cli hackernews top -f json       # OpenCLI target\nsuper-cli blender --json scene info    # CLI-Anything target (requires cli-hub)\n```\n\n## Routing\n\n```\nsuper-cli <target> [args]\n        \u2502\n        \u251c\u2500\u2500 target = \"browser\"        \u2192 opencli browser [args]\n        \u251c\u2500\u2500 cli-anything-<target> on PATH \u2192 runs directly\n        \u2514\u2500\u2500 otherwise                  \u2192 opencli <target> [args]\n```\n\nDesktop software targets are detected at runtime. If `cli-anything-<target>` is installed, `super-cli` uses it; otherwise it falls back to OpenCLI.\n\n## Commands\n\n| Command | Description |\n|---|---|\n| `super-cli list` | List all available targets (web + desktop) |\n| `super-cli doctor` | Diagnose Node, Python, OpenCLI, and cli-hub |\n| `super-cli <target> [args]` | Run a command on a target (auto-routed to the right backend) |\n| `super-cli make <source>` | Get guidance for creating a new CLI adapter (website \u2192 OpenCLI, GitHub project \u2192 CLI-Anything) |\n\nAll commands support structured output with `-f json`.\n\n## Examples\n\n```bash\n# Discover targets\nsuper-cli list -f json\nsuper-cli list --type web\nsuper-cli list --type desktop\n\n# Check environment\nsuper-cli doctor -f json\n\n# Control a website\nsuper-cli zhihu search \"TypeScript\" -f json\nsuper-cli twitter user elonmusk -f json\n\n# Control desktop software (requires cli-hub)\ncli-hub install blender\nsuper-cli blender --json scene info\n```\n\n## Creating new targets\n\nUse `super-cli make` to get guidance for creating a CLI adapter for a new target:\n\n```bash\n# For a website \u2192 get OpenCLI adapter authoring guidance\nsuper-cli make https://xiaohongshu.com\n\n# For a GitHub open-source project \u2192 get CLI-Anything harness guidance\nsuper-cli make https://github.com/blender/blender\n```\n\nThe `make` command prints step-by-step guidance. The actual adapter/harness is created using the upstream authoring tools (OpenCLI or CLI-Anything), not by super-cli itself.\n\n## Installation\n\n### Prerequisites\n\n| Dependency | Required | Bundled with super-cli? |\n|---|---|---|\n| **Node.js** 18+ | Yes | \u2014 |\n| **OpenCLI** | Yes (for web targets) | \u2705 Auto-installed via npm |\n| **Python** 3.10+ | Only for CLI-Anything targets | \u274c Install separately |\n| **cli-hub** | Only for CLI-Anything targets | \u274c `pip install cli-anything-hub` |\n\n### Step 1: Install super-cli (includes OpenCLI)\n\n```bash\nnpm install -g @leing2021/super-cli\n```\n\nAfter this, `super-cli hackernews top -f json` and all web/browser targets work immediately.\n\n### Step 2: Set up CLI-Anything (for desktop software targets only)\n\nIf you want to control desktop GUI software (Blender, GIMP, etc.), install the CLI-Anything ecosystem once:\n\n```bash\n# Install the CLI-Anything package manager\npip install cli-anything-hub\n\n# Install harnesses for the desktop software you need\ncli-hub install blender\ncli-hub install gimp\n```\n\nNow `super-cli blender --json scene info` works.\n\nSkip this step if you only use web/browser targets.\n\n## Development\n\n```bash\ngit clone https://github.com/leing2021/super-cli.git\ncd super-cli\nnpm install\nnpm run build      # compile TypeScript\nnpm test           # run 40 tests with vitest\n```\n\n## Project structure\n\n```text\nsuper-cli/\n\u251c\u2500\u2500 src/\n\u2502   \u251c\u2500\u2500 cli.ts          # entry point + argument parser\n\u2502   \u251c\u2500\u2500 router.ts       # target \u2192 backend routing logic\n\u2502   \u251c\u2500\u2500 registry.ts     # target list aggregation\n\u2502   \u251c\u2500\u2500 doctor.ts       # environment diagnostics\n\u2502   \u251c\u2500\u2500 runner.ts       # subprocess execution plan\n\u2502   \u251c\u2500\u2500 make.ts         # make command (source classifier)\n\u2502   \u2514\u2500\u2500 utils.ts        # cross-platform which()\n\u251c\u2500\u2500 registries/\n\u2502   \u2514\u2500\u2500 cli-anything.json  # desktop target registry snapshot\n\u251c\u2500\u2500 skills/\n\u2502   \u2514\u2500\u2500 super-cli/SKILL.md # AI agent discovery skill\n\u251c\u2500\u2500 tests/              # 40 vitest tests across 9 files\n\u2514\u2500\u2500 docs/\n    \u251c\u2500\u2500 brainstorms/    # product requirements\n    \u251c\u2500\u2500 plans/          # implementation plan\n    \u2514\u2500\u2500 report/         # analysis reports\n```\n\n## Agent Integration\n\n`super-cli` is designed for AI agents. The SKILL.md follows the [Agent Skills](https://agentskills.io/specification) standard so your agent knows when and how to use it.\n\n### Pi (Primary)\n\n```bash\n# Step 1: Install the CLI tool globally\nnpm install -g @leing2021/super-cli\n\n# Step 2: Register the skill in pi\npi install npm:@leing2021/super-cli\n```\n\nPi loads the skill description on startup (~100 bytes). When a task involves controlling websites or desktop software, the agent reads the full SKILL.md, then discovers available targets via `super-cli list -f json`.\n\n### Claude Code\n\n```bash\nnpm install -g @leing2021/super-cli\nmkdir -p ~/.claude/skills/super-cli\ncp \"$(npm root -g)/@leing2021/super-cli/skills/super-cli/SKILL.md\" \\\n   ~/.claude/skills/super-cli/SKILL.md\n```\n\nOr add to `.claude/settings.json`:\n\n```json\n{ \"skills\": [\"~/.claude/skills\"] }\n```\n\n### OpenAI Codex\n\n```bash\nnpm install -g @leing2021/super-cli\nmkdir -p ~/.codex/skills/super-cli\ncp \"$(npm root -g)/@leing2021/super-cli/skills/super-cli/SKILL.md\" \\\n   ~/.codex/skills/super-cli/SKILL.md\n```\n\n### Any bash-capable agent\n\nIf your agent can run bash commands, just install the CLI:\n\n```bash\nnpm install -g @leing2021/super-cli\n```\n\nThen instruct it with a one-liner:\n\n> Use `super-cli list -f json` to discover available targets. Use `super-cli <target> --help` for target-specific commands. Always pass `-f json`.\n\n## License\n\nMIT. Backend tools have independent licenses (OpenCLI: Apache-2.0, CLI-Anything: Apache-2.0).\n",
+  "keywords": [
+    "pi-package",
+    "cli",
+    "router",
+    "opencli",
+    "cli-anything"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-19T04:21:50.233Z",
+    "modified": "2026-05-19T04:31:39.345Z",
+    "0.1.0": "2026-05-19T04:21:50.555Z",
+    "0.1.1": "2026-05-19T04:25:48.240Z",
+    "0.1.2": "2026-05-19T04:31:39.151Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 21,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 397
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 35
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 20
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 3
+    }
+  ]
+}

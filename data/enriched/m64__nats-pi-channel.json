@@ -1,0 +1,350 @@
+{
+  "name": "@m64/nats-pi-channel",
+  "latest_version": "0.4.1",
+  "description": "NATS Agent Protocol channel for PI Agent. Makes every PI session a discoverable, spec-compliant agent on NATS.",
+  "readme": "# @synadia/nats-pi-channel\n\n> Currently published on npm as `@m64/nats-pi-channel`; moving to `@synadia/nats-pi-channel` once Synadia publishing access lands. Install commands below use the current name.\n\nNATS channel for [PI Agent](https://github.com/badlogic/pi-mono), implementing the **[NATS Agent Protocol](https://github.com/synadia-ai/nats-agent-sdk-docs) v0.2.0**.\n\nEvery PI session becomes a discoverable, addressable, streaming agent on NATS. Callers using any SDK that speaks the protocol - e.g. [`@synadia/agents`](../../client-sdk/typescript) - can enumerate running PI sessions, prompt them, and stream responses back.\n\nSibling implementations (same wire protocol): [`claude-code`](../claude-code), [`openclaw`](../openclaw).\n\n## How it works\n\nOn session start the extension:\n\n1. Connects to NATS using a configured context (or `demo.nats.io` by default).\n2. Registers a NATS micro service named `agents` with spec metadata (`agent`, `owner`, `session`, `protocol_version`).\n3. Adds a `prompt` endpoint at `agents.pi.<owner>.<session>` advertising `max_payload: 1MB` and `attachments_ok: true`.\n4. Begins publishing heartbeats on `agents.pi.<owner>.<session>.heartbeat` every 30 s.\n5. On each inbound prompt: decodes any attached files to `~/.pi/agent/attachments/<session>/<uuid>/<filename>`, prepends their absolute paths to the prompt text, emits a `status: ack` chunk, injects the augmented prompt into PI via `pi.sendUserMessage()`, streams `text_delta` events back as typed `{type:\"response\",data}` chunks, and closes with the spec-mandated empty-body no-headers terminator.\n6. Malformed envelopes, oversized payloads, invalid base64, and unsafe filenames are rejected at the wire with `Nats-Service-Error-Code: 400`. Staging failures (disk full, permission denied) return `500`.\n\nMultiple PI sessions on the same host register as distinct instances of the same service, each with a unique `prompt` endpoint subject - `nats micro info agents` aggregates across all of them.\n\n## Install\n\n```bash\n# From npm (once published)\npi install npm:@m64/nats-pi-channel\n\n# From a local clone during development\npi install /absolute/path/to/nats-pi-channel\n```\n\nThen start PI normally:\n\n```bash\npi\n```\n\nYou should see `Connected to NATS (<server>) as agents.pi.<you>.<session>` and a footer status `NATS: agents.pi.<you>.<session>`.\n\n## Configure\n\nConfig lives at `~/.pi/agent/nats-channel.json`:\n\n```json\n{\n  \"context\": \"my-nats-context\",\n  \"sessionName\": \"my-session\"\n}\n```\n\n| Field | Required | Default | Description |\n|-------|----------|---------|-------------|\n| `context` | no | `demo.nats.io` | NATS CLI context name in `~/.config/nats/context/` |\n| `sessionName` | no | sanitized basename of CWD | Overrides the 4th subject token |\n\nEnvironment variables take precedence over the file:\n- `NATS_CONTEXT` - select a NATS CLI context\n- `NATS_SESSION_NAME` - override the session name\n\n### In-PI commands\n\n- `/nats-status` - show current subject, service, instance id, protocol version, pending/queued counts\n- `/nats-configure` - print current config\n- `/nats-configure <context>` - switch NATS context\n- `/nats-configure session <name>` - override session name\n- `/nats-configure session clear` - revert to CWD basename\n\nChanges take effect after restarting PI.\n\n### Tenant isolation\n\nThe spec reserves the subject structure for protocol use; there is no `org` segment. For multi-tenant isolation, use NATS accounts and subject permissions (spec \u00a710.1). Within an account, collisions between two PI sessions on the same `owner + session` auto-suffix `-2`, `-3`, \u2026\n\n## Subject hierarchy\n\n```\nagents.pi.<owner>.<session>             # prompt endpoint (spec \u00a72, \u00a75)\nagents.pi.<owner>.<session>.heartbeat   # liveness beacon (spec \u00a78)\n```\n\n- `pi` is both `metadata.agent` and its subject abbreviation (Appendix C).\n- `owner`: sanitized `$USER`.\n- `session`: sanitized basename of CWD, overridable.\n\n## Talking to a running PI session\n\nAny caller speaking the protocol - a spec-compliant SDK or the `nats` CLI - can:\n\n```bash\n# Enumerate all compliant agents (includes Claude Code, OpenClaw, etc.)\nnats req '$SRV.INFO.agents' '' --replies=0 --timeout=2s\n\n# Send a plain-text prompt\nnats req agents.pi.<owner>.<session> \"What files are in the current directory?\" --wait-for-empty --timeout 120s\n\n# Or a JSON envelope\nnats req agents.pi.<owner>.<session> '{\"prompt\":\"What files are here?\"}' --wait-for-empty --timeout 120s\n```\n\nWith the TypeScript SDK:\n\n```ts\nimport { connect } from \"@nats-io/transport-node\";\nimport { Agents } from \"@synadia/agents\";\n\nconst nc = await connect({ servers: \"nats://localhost:4222\" });\nconst agents = new Agents({ nc });\n\nconst [agent] = await agents.discover({ filter: { agent: \"pi\" } });\n\nfor await (const msg of await agent!.prompt(\"What files are here?\")) {\n  if (msg.type === \"response\") process.stdout.write(msg.text);\n}\n\nawait agents.close();\nawait nc.close();\n```\n\n## Wire protocol (summary)\n\nFull spec: <https://github.com/synadia-ai/nats-agent-sdk-docs>. Quick reference:\n\n- **Request**: plain UTF-8 text OR JSON `{\"prompt\":\"\u2026\",\"attachments\":[{\"filename\":\"\u2026\",\"content\":\"<base64>\"},\u2026]}`. Attachment `content` must be RFC 4648 \u00a74 base64 (standard alphabet, padded, no URL-safe variant, no whitespace).\n- **Response**: one or more typed chunks on the reply subject:\n  - `{\"type\":\"response\",\"data\":\"<text>\"}` - content\n  - `{\"type\":\"status\",\"data\":\"ack\"}` - accepted / keep-alive\n- **Terminator**: empty body **and no headers** (spec \u00a76.5).\n- **Errors**: `Nats-Service-Error-Code` header with `400`/`500`, followed by the terminator.\n\n## Discovery\n\nAny NATS Agent Protocol SDK will enumerate PI sessions automatically. Without an SDK:\n\n```bash\n# Micro service framework\nnats micro list           # shows all agents instances\nnats micro info agents\n\n# Heartbeats - track liveness without polling\nnats sub 'agents.*.*.*.heartbeat'\n```\n\n## Concurrency\n\nEach PI session processes one NATS request at a time. Additional requests queue until the agent is idle. The user's local TUI input and inbound NATS prompts share the same agent session.\n\n## Attachments\n\nWhen a request envelope contains `attachments`, each file is decoded and staged on disk at:\n\n```\n~/.pi/agent/attachments/<session>/<uuid>/<filename>\n```\n\nThe absolute paths are then prepended to the prompt as:\n\n```\n[Attachments available at the following absolute paths]\n- /home/you/.pi/agent/attachments/myproj/abcd-\u2026/vacation.jpg\n\n<original prompt text>\n```\n\nPI's model sees the list in the user message and can open the files with its file tools. The entire `<session>` directory is removed on `session_shutdown`; within a session, attachments from earlier turns remain on disk so follow-up turns can still reference them.\n\nCaller-side constraints (rejected at the wire with `400` if violated):\n- `content` must be strict RFC 4648 \u00a74 base64 - standard alphabet, padded, no URL-safe, no whitespace.\n- `filename` must be a plain basename. Path separators (`/`, `\\`), `..`, absolute paths, and NUL bytes are rejected rather than silently flattened.\n- Full encoded envelope must fit within `max_payload` (1 MB).\n\nSpec \u00a75.5 reserves a future `attachments` endpoint at `agents.pi.<owner>.<session>.attachments` for chunked large-file upload; that lands in protocol 0.2 and will coexist with inline attachments.\n\n## Limitations\n\nDeliberate deferrals:\n\n- **No mid-stream queries.** PI doesn't currently initiate permission prompts or clarifications over this channel; the spec's `query` chunk type (\u00a77) is supported by callers but never emitted.\n- **No live reconfigure.** `/nats-configure` writes the config file; restart PI to apply.\n- **TUI bleed.** If the user types locally during a NATS-driven turn, that output flows to the NATS reply subject alongside the prompt's response.\n\n## Troubleshooting\n\n- **`NATS: disconnected` in footer.** Check `/nats-status`, the context file at `~/.config/nats/context/<context>.json`, and NATS server reachability.\n- **`NATS: reconnecting\u2026`.** Connection dropped; restoring automatically.\n- **My session got a `-2` suffix.** Another PI session on the same `owner + session` was already registered. Use `/nats-configure session <name>` to pick a different name.\n- **`nats req` returns nothing or hangs.** Pass `--wait-for-empty`; the protocol signals end-of-stream with an empty-body message, not a single response.\n- **`400 attachment[N] has invalid base64 content`.** The SDK / client emitted URL-safe base64 or unpadded output. Switch to RFC 4648 \u00a74 (standard alphabet, padded) - Node's `Buffer.from(bytes).toString(\"base64\")` produces the correct form.\n- **`400 attachment[N] has unsafe filename`.** Path separators, `..`, absolute paths, or NUL in `filename`. Send the basename only (e.g. `\"report.pdf\"`, not `\"./reports/report.pdf\"`).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-agent",
+    "nats",
+    "agent",
+    "channel",
+    "nats-agent-protocol",
+    "synadia-agents"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions/nats-channel.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-07T11:34:58.710Z",
+    "modified": "2026-04-24T10:56:54.817Z",
+    "0.1.0": "2026-04-07T11:34:58.962Z",
+    "0.1.1": "2026-04-07T11:37:04.340Z",
+    "0.2.1": "2026-04-21T09:32:01.752Z",
+    "0.3.0": "2026-04-21T09:48:31.674Z",
+    "0.4.0": "2026-04-22T15:13:09.220Z",
+    "0.4.1": "2026-04-24T10:56:54.720Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 17,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 86
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 52
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 227
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 323
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 43
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 39
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 17
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

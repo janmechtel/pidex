@@ -1,0 +1,45 @@
+{
+  "name": "pi-breaker",
+  "latest_version": "1.0.1",
+  "description": "Prevents macOS freezes during pi sessions. Auto-kills runaway processes when memory runs out.",
+  "readme": "# pi-breaker\n\nPrevents macOS freezes during pi sessions. Auto-kills runaway processes when memory runs out.\n\n## Install\n\n```bash\npi install npm:pi-breaker\n```\n\nOn first run, it calibrates a baseline for your machine (~10 seconds). After that, it runs silently in the background.\n\n**macOS only.** Silent no-op on other platforms.\n\n## How It Works\n\n**Monitor** \u2014 Polls system health in the background. Classifies into GREEN, YELLOW, ORANGE, or RED.\n\n**Watchdog** \u2014 In confirmed RED, automatically kills the process most likely causing the pressure. No prompts, no questions.\n\n**Notification** \u2014 After a kill, you see a one-line message telling you what was killed and why. That's the only time you'll know it's there.\n\n## Commands\n\n| Command | Description |\n|---|---|\n| `/breaker` | Crashes prevented since install |\n\n## Security & System Calls\n\npi-breaker makes **no network requests** and reads **no environment variables**. All system access is local and documented here:\n\n**Shell commands** (all read-only queries, no mutations):\n| Command | File | Purpose |\n|---|---|---|\n| `sysctl -n kern.ostype` | canary.ts | Canary timing benchmark |\n| `/usr/bin/true` | canary.ts | Canary timing benchmark |\n| `sysctl -n vm.swapusage` | signals.ts | Read swap usage stats |\n| `sysctl -n kern.memorystatus_vm_pressure_level` | signals.ts | Read memory pressure level |\n| `sysctl -n kern.memorystatus_level` | signals.ts | Read memorystatus level |\n| `vm_stat` | signals.ts | Read VM page statistics |\n| `ps -eo pid,rss,comm -r` | processes.ts | List processes by memory |\n| `ps -eo pid,ppid,etime,comm` | monitor.ts | Process tree for watchdog |\n| `python3 helpers/footprint.py` | processes.ts | Read process footprints via `proc_pid_rusage` |\n| `python3 helpers/footprint_worker.py` | worker.ts | Persistent worker for fast footprint queries |\n\n**Process kills** (only pi's own child processes, only in confirmed RED):\n| Signal | File | Trigger |\n|---|---|---|\n| `SIGKILL` | monitor.ts | Watchdog auto-kill in confirmed RED zone |\n\n**Filesystem writes** (scoped to `~/.pi/breaker/` only):\n| What | File | Purpose |\n|---|---|---|\n| `~/.pi/breaker/baseline.json` | calibration.ts | Persisted canary baseline |\n| `~/.pi/breaker/stats.json` | index.ts | Kill counter (crashes prevented) |\n| `~/.pi/breaker/logs/*.jsonl` | logging.ts | Structured logs (auto-GC after 3 days) |\n\n## Development\n\n```bash\nnpm install\nnpm test\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "memory",
+    "macos",
+    "watchdog",
+    "breaker",
+    "freeze",
+    "crash",
+    "oom",
+    "swap",
+    "ram",
+    "memory-pressure",
+    "kill",
+    "process-manager",
+    "system-health"
+  ],
+  "author": {
+    "name": "gaherwar"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/gaherwar/pi-breaker#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gaherwar/pi-breaker.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-19T12:56:57.936Z",
+    "modified": "2026-03-19T13:04:13.671Z",
+    "1.0.0": "2026-03-19T12:56:58.240Z",
+    "1.0.1": "2026-03-19T13:04:13.582Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 18,
+  "download_trend": []
+}

@@ -1,0 +1,342 @@
+{
+  "name": "pi-search-agent",
+  "latest_version": "1.0.1",
+  "description": "Semantic codebase search with sub-agent processing",
+  "readme": "# pi-search-agent extension\n\n## Overview\n\n`pi-search-agent` adds local semantic search to pi. It builds a semantic index of your codebase, runs embedding-based retrieval, and uses a configurable LLM to filter and summarize results via a search subagent.\n\n## First-time setup\n\nOn first run you will be prompted (via UI) to:\n1. Enter your `OPENAI_API_KEY` (used for embeddings).\n2. Choose a search model (recommended: **cerebras / zai-glm-4.7**).\n   - Alternatively, **anthropic / claude-haiku-4-5** is a good default if you want reasoning.\n\nConfiguration is stored in:\n```\n~/.pi/extensions/pi-search-agent/.env\n```\n\nYou can edit the file manually later. Supported keys:\n- `OPENAI_API_KEY`\n- `SEARCH_PROVIDER` (e.g. `cerebras`, `openai`)\n- `SEARCH_MODEL` (e.g. `zai-glm-4.7`, `gpt-4o-mini`)\n- `SEARCH_THINKING` (optional: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`)\n\n## Tools\n\n### `search_agent(query, cwd?, queryExtrapolation?, path?, mode?, logSubagent?)`\nSearch locally and run a subagent to refine results.\n\n- **query**: natural language search query\n- **cwd**: directory to search (defaults to current workspace)\n- **queryExtrapolation**: additional queries to run and merge\n- **path**: optional filter (file/dir/glob/substring)\n- **mode**: currently ignored (defaults to `code`)\n- **logSubagent**: writes JSON log to disk when true\n\nExample:\n```\nsearch_agent(query: \"How do we authenticate API requests?\", path: \"src\", logSubagent: true)\n```\n\n### `local_embedding_search(query, cwd?, path?, mode?)`\nRun embedding search only (one result per file).\n\nExample:\n```\nlocal_embedding_search(query: \"retry logic\", path: \"packages/api\")\n```\n\n## Commands\n\n### `/search-agent-settings`\nOpen an interactive UI to configure or change:\n- `OPENAI_API_KEY`\n- `SEARCH_PROVIDER` + `SEARCH_MODEL`\n- `SEARCH_THINKING`\n\nSettings are saved to:\n```\n~/.pi/extensions/pi-search-agent/.env\n```\n\n### `/search-agent <query> [--path <filter>] [--cwd <dir>] [--mode <mode>] [--log]`\nRun the semantic search pipeline directly from a user command (no need to ask the model to call the tool).\n\nExamples:\n```\n/search-agent How do we authenticate API requests?\n/search-agent \"retry logic\" --path packages/api\n/search-agent \"where is initializeOpenAI\" --cwd ~/src/ai-extensions/semantic-search --log\n```\n\n## How it works\n\n1. **File discovery**: streams `find` results and yields to the event loop to avoid blocking the UI.\n2. **Chunking**: files are split into overlapping chunks for stable embeddings.\n3. **Embeddings**: generated with OpenAI (`text-embedding-3-small`) and cached on disk.\n4. **Index storage**: index metadata + chunks are persisted per-cwd.\n5. **Search pipeline**:\n   - embedding matches \u2192 merged per file\n   - subagent refines results and provides a concise answer\n6. **Summaries / filtering**: uses the configured `SEARCH_PROVIDER` + `SEARCH_MODEL` (and optional `SEARCH_THINKING`).\n\n## Data locations\n\n- **Index**: `~/.pi/agent/cache/semantic-search/<hash>/`\n- **Embedding cache**: `~/.pi/agent/cache/semantic-search/embeddings/`\n- **Subagent logs** (when enabled): `~/.pi/agent/cache/semantic-search/subagent-logs/`\n\n## Legacy tools / UI\n\nLegacy tools are disabled by default. Enable them with:\n```\nPI_SEMANTIC_LEGACY=1\n```\nThis re-enables:\n- `semantic_index`, `semantic_search`\n- `/semantic` interactive UI\n\n## Notes\n\n- `mode` is accepted but currently ignored; `code` includes markdown.\n- Indexing is per-cwd. If no index exists, it is created automatically.\n- The recommended search model is **cerebras / zai-glm-4.7**.\n- `SEARCH_THINKING` is clamped to `off` for non-reasoning models (so it has no effect for cerebras/zai-glm-4.7).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "semantic-search"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-01-26T20:43:56.288Z",
+    "modified": "2026-02-06T15:02:57.724Z",
+    "1.0.0": "2026-01-26T20:43:56.439Z",
+    "1.0.1": "2026-02-06T15:02:57.615Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 11,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 113
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

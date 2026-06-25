@@ -1,0 +1,34 @@
+{
+  "name": "@a-canary/pi-upskill",
+  "latest_version": "1.0.0",
+  "description": "Learn from failures, reduce token waste, improve automatically",
+  "readme": "# pi-upskill\n\nLearn from failures. Reduce token waste. Improve automatically.\n\n## Overview\n\npi-upskill tracks corrections (failures \u2192 fixes) and generates skills/rules to prevent future mistakes.\n\n**Core flow:**\n1. Log corrections during conversation (`upskill-log` tool)\n2. Backfill from past sessions (`/upskill-backfill`)\n3. At threshold, analyze and generate ONE high-impact edit (`/upskill-analyze`)\n\n## Installation\n\n```bash\n# From git (recommended)\npi install git:github.com/a-canary/pi-upskill\n\n# Or from npm after publishing\npi install npm:pi-upskill\n\n# Try without installing\npi -e git:github.com/a-canary/pi-upskill\n```\n\nAfter install, reload: `/reload`\n\n## Usage\n\n### During conversation: log corrections\n\nThe agent uses the `upskill-log` tool:\n\n```\nAgent: [uses upskill-log tool]\n  failure: \"Committed without running tests\"\n  correction: \"Always run tests before commit\"\n  strength: \"strong\"\n  tokens_wasted: 3000\n\nResult: Logged correction #5 to .pi/corrections.jsonl\n        Progress: 5/20 corrections\n```\n\n**Strength levels:**\n- `strong` \u2014 User said \"always/never/remember\" \u2192 single occurrence = skill\n- `pattern` \u2014 Self-correction or repeated issue \u2192 needs 3x occurrences\n\n### One-time: scan past sessions\n\n```\n/upskill-backfill\n```\n\nScans session files from pi, claude, opencode, codex. Extracts corrections for review.\n\n### At threshold: analyze and improve\n\n```\n/upskill-analyze\n```\n\nWhen 20+ corrections logged, triggers background analysis:\n1. LLM reviews all corrections\n2. Selects ONE edit for maximum token impact\n3. Applies surgical edit (skill/AGENTS.md/MEMORY.md)\n4. Removes addressed corrections\n\n### Check progress\n\n```\n/upskill-status\n```\n\nShows: count, threshold, strong vs pattern, total tokens wasted.\n\n## Data Format\n\n`.pi/corrections.jsonl` \u2014 one JSON object per line:\n\n```json\n{\"timestamp\":\"2025-03-13T01:30:00Z\",\"failure\":\"Committed without tests\",\"correction\":\"Always run tests first\",\"context\":\"User reminder after broken CI\",\"tokens_wasted\":3000,\"source\":\"user\",\"strength\":\"strong\"}\n```\n\n**Required fields (max 30 words each):**\n- `timestamp` \u2014 ISO 8601\n- `failure` \u2014 What went wrong\n- `correction` \u2014 How to fix / what to do instead\n- `source` \u2014 \"user\" or \"self\"\n- `strength` \u2014 \"strong\" or \"pattern\"\n\n**Optional:**\n- `context` \u2014 Relevant context\n- `tokens_wasted` \u2014 Estimated tokens\n\n## Configuration\n\n`.pi/settings.json`:\n\n```json\n{\n  \"upskill\": {\n    \"threshold\": 20,\n    \"autoAnalyze\": false,\n    \"lookbackDays\": 7\n  }\n}\n```\n\n## Architecture\n\n```\n~/pi-upskill/\n\u251c\u2500\u2500 CHOICES.md           # Decision record\n\u251c\u2500\u2500 PLAN.md              # Implementation phases\n\u251c\u2500\u2500 README.md            # This file\n\u251c\u2500\u2500 extension/\n\u2502   \u2514\u2500\u2500 index.ts         # upskill-log tool, commands\n\u2514\u2500\u2500 skills/\n    \u251c\u2500\u2500 analyze/SKILL.md # Pattern analysis workflow\n    \u2514\u2500\u2500 backfill/SKILL.md # Historical scan workflow\n```\n\n**Hybrid interface:**\n- Extension provides `upskill-log` tool (inline during conversation)\n- Skills provide `/upskill-backfill` and `/upskill-analyze` commands\n\n## Key Decisions\n\nSee [CHOICES.md](CHOICES.md) for full decision record.\n\n| ID | Decision |\n|----|----------|\n| UX-0001 | User corrections with \"always/never/remember\" \u2192 immediate skill |\n| UX-0002 | Self-corrections \u2192 need 3x pattern before skill |\n| F-0003 | At 20 corrections \u2192 background analysis, ONE edit for max impact |\n| D-0003 | Processed corrections removed after edit applied |\n\n## Inspiration\n\n- [upskill.md](https://github.com/claude-admin/cc-plugins) \u2014 Pattern extraction from memory\n- [pi-reflect](https://github.com/jo-inc/pi-reflect) \u2014 Iterative self-improvement\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "a-canary"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/a-canary/pi-upskill#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a-canary/pi-upskill.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extension"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-03-17T17:14:50.710Z",
+    "1.0.0": "2026-03-17T17:14:50.967Z",
+    "modified": "2026-03-17T17:14:51.195Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

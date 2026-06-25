@@ -1,0 +1,39 @@
+{
+  "name": "@arvoretech/pi-git-review",
+  "latest_version": "0.2.1",
+  "description": "PI extension that opens a browser-based git diff reviewer; selected code + comments are sent to the agent in real time",
+  "readme": "# @arvoretech/pi-git-review\n\nA PI extension that opens a **browser-based git diff & PR reviewer**. You read the diff in a\ntab, select lines or code, type a question, and it lands in your PI session in real time as\na user message. The agent's answers appear in your terminal (PI TUI).\n\n## How it works\n\n```\n/review  \u2500\u2500\u25ba  extension starts a localhost HTTP+WS server, opens a browser tab\n              \u2502\n   browser \u2500\u2500\u2524  GET /api/diff     \u2192 parsed `git diff` (per file + hunks)\n              \u2502  GET /api/prs      \u2192 open PRs per repo (`gh pr list`)\n              \u2502  GET /api/pr-diff  \u2192 parsed PR diff + metadata (`gh pr diff/view`)\n              \u2502  WS /ws            \u2192 you send { file, lines, code, question }\n              \u2502                       or a pr_context primer when a PR is opened\n              \u25bc\n   extension calls pi.sendUserMessage(...)  \u2192 agent answers in the terminal\n```\n\n- **HTTP** serves the single-file SPA (`web/index.html`) and the diff JSON.\n- **WebSocket** carries each comment from the browser into the agent (`steer` while\n  streaming, normal message when idle).\n- Replies are **terminal-only** by design \u2014 the browser is a pure input surface.\n\n## Usage\n\n```\n/review                 # working tree vs HEAD (default, includes untracked files)\n/review staged          # staged changes\n/review branch          # current branch vs `main`\n/review branch develop  # current branch vs `develop`\n/review prs             # list open PRs across all repos and review them\n```\n\nThe scope and base can also be changed live from the toolbar in the browser tab. The\n**Diff / PRs** tabs at the top switch between reviewing local changes and reviewing open\npull requests.\n\n### Reviewing PRs\n\nThe **PRs** tab runs `gh pr list` in each discovered repo and shows every open PR\n(grouped by repo, newest first). Click a PR to load its full diff via `gh pr diff`\n(base...head, independent of your local checkout). When you open a PR, a one-time\n**context primer** \u2014 title, author, branch, link, and the PR description \u2014 is sent to the\nagent so it understands what it is reviewing. Every line question you ask afterwards is\nanswered with that context in mind. The banner links back to the PR list and out to\nGitHub.\n\n> Requires the [`gh` CLI](https://cli.github.com) installed and authenticated\n> (`gh auth status`).\n\nIn the tab:\n\n- Click a line number to start a comment on that line.\n- **Shift-click** another line number in the same file to select a range.\n- Type your question and hit **Send to agent** (or `Enter`). Use `Shift+Enter` for newlines.\n- The question, the file/line location, and the selected code are sent to the agent.\n\nIt scans the workspace for git repos (`.git` up to depth 4, pruning `node_modules`) and aggregates their diffs,\nprefixing paths per repo \u2014 so it works in a multi-repo workspace too.\n\n## Security\n\n- The server binds to **`127.0.0.1` only** \u2014 never exposed on the network.\n- Every request (HTTP and WS) is gated by a **random per-session token** in the URL, so\n  other local processes or unrelated browser pages cannot post comments into your agent.\n- It is a local developer tool; do not port-forward or proxy it.\n\n## Install\n\nIt's a workspace package. Build it and load it like the other extensions:\n\n```\npnpm --filter @arvoretech/pi-git-review build\n```\n\nThen ensure the package is on PI's extension path (auto-discovered when installed, or load\nthe built `dist/index.js` directly during development).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "git",
+    "diff",
+    "code-review"
+  ],
+  "author": {
+    "name": "Arvore"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/arvoreeducacao/arvore-pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arvoreeducacao/arvore-pi-extensions.git",
+    "directory": "packages/git-review"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-06-23T01:13:45.587Z",
+    "modified": "2026-06-25T19:59:23.507Z",
+    "0.1.0": "2026-06-23T01:13:45.832Z",
+    "0.1.1": "2026-06-23T12:11:50.386Z",
+    "0.2.1": "2026-06-25T19:59:23.183Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

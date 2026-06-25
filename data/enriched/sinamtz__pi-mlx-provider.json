@@ -1,0 +1,44 @@
+{
+  "name": "@sinamtz/pi-mlx-provider",
+  "latest_version": "0.1.1",
+  "description": "Pi coding agent provider for MLX local AI models on Apple Silicon",
+  "readme": "# Pi Provider - MLX Local\n\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)\n\n> **Note:** This is an unofficial, community-built provider. It runs local AI models on Apple Silicon using Apple's MLX framework.\n\nA [Pi coding agent](https://github.com/badlogic/pi-mono) provider extension for local AI inference using Apple's MLX framework.\n\n## Features\n\n- **Local AI Inference**: Run AI models entirely on your Mac (Apple Silicon)\n- **No API Costs**: Free inference using your local GPU/memory\n- **Privacy-First**: Your data never leaves your machine\n- **Apple Silicon Optimized**: Leverages MLX for efficient inference on M1/M2/M3/M4 chips\n- **Vision Support**: Supports vision-language models for image understanding\n- **OpenAI-Compatible**: Uses MLX-VLM server with OpenAI-compatible API\n\n## Requirements\n\n- **macOS**: Monterey 12.3 or later\n- **Apple Silicon**: M1, M2, M3, or M4 chip\n- **Python**: 3.10+ with pip\n- **MLX-VLM**: Installed automatically via `/mlx_init`\n\n## Installation\n\n### Option 1: Using pi install (npm)\n\n```bash\npi install npm:@sinamtz/pi-mlx-provider\n```\n\n### Option 2: Using pi install (git)\n\n```bash\npi install git:https://github.com/sinamtz/pi-mlx-provider\n```\n\n### Option 3: Install globally via npm\n\n```bash\nnpm install -g @sinamtz/pi-mlx-provider\n```\n\n### Option 4: Clone locally\n\n```bash\ngit clone https://github.com/sinamtz/pi-mlx-provider.git\ncd pi-mlx-provider\nnpm install\n```\n\n## Configuration\n\n### Enable Local AI\n\n1. Edit `~/.pi/settings.json` to add the MLX provider settings:\n\n```json\n{\n  \"mlx-provider\": {\n    \"local_intelligence\": true,\n    \"local_model\": true,\n    \"mlx_model\": \"mlx-community/gemma-4-e2b-it-4bit\",\n    \"mlx_port\": 8080,\n    \"mlx_host\": \"127.0.0.1\"\n  }\n}\n```\n\n| Setting | Type | Default | Description |\n|---------|------|---------|-------------|\n| `local_intelligence` | boolean | `false` | Enable local AI processing |\n| `local_model` | boolean | `false` | Use local model (requires local_intelligence=true) |\n| `mlx_model` | string | `mlx-community/gemma-4-e2b-it-4bit` | MLX model to use |\n| `mlx_port` | number | `8080` | Server port |\n| `mlx_host` | string | `127.0.0.1` | Server host |\n\n**Note**: Both `local_intelligence` AND `local_model` must be `true` to enable local mode.\n\n### Auto-Start Behavior\n\nThe extension automatically starts the MLX server on load when:\n1. Local mode is enabled in settings (`local_intelligence` and `local_model` are both `true`)\n2. A state file exists at `~/.pi/agent/extensions/mlx-settings.json` (created by `/mlx_init`)\n\nThis means after running `/mlx_init` once, the server will automatically start on future loads without needing to re-run `/mlx_init`.\n\n## Usage\n\n### Initialize MLX Server (First Time)\n\n```bash\npi -e ./pi-mlx-provider\n/mlx_init\n```\n\nThis will:\n1. Install/upgrade mlx-vlm package\n2. Download the MLX model (first time only)\n3. Start the MLX-VLM server\n4. Save state to `~/.pi/agent/extensions/mlx-settings.json`\n5. Register the mlx-local provider\n\n### Auto-Start on Future Loads\n\nOnce initialized, the server will automatically start on future loads when local mode is enabled. No need to run `/mlx_init` each time.\n\n### Check Server Status\n\n```bash\n/mlx_status\n```\n\n### Stop Server\n\n```bash\n/mlx_stop\n```\n\nThis stops the server and removes the state file, preventing auto-start on future loads.\n\n### Select Model\n\nIn pi's interactive mode:\n\n```\n/model mlx-local\n```\n\nOr use the model selector UI.\n\n## Supported Models\n\n| Model Type | Example | Input |\n|------------|---------|-------|\n| Text-only LLM | `mlx-community/Llama-3.2-3B-Instruct-4bit` | text |\n| Vision-Language | `mlx-community/Qwen2-VL-2B-Instruct-4bit` | text, image |\n| Gemma | `mlx-community/gemma-4-e2b-it-4bit` | text |\n\n### Recommended Models\n\n- **gemma-4-e2b-it-4bit**: Good balance of quality and speed (default)\n- **Llama-3.2-3B-Instruct-4bit**: Fast, good for simple tasks\n- **Qwen2-VL-2B-Instruct-4bit**: Vision support for image understanding\n\n## Troubleshooting\n\n### \"MLX server is not running\"\n- Run `/mlx_init` to start the server\n\n### \"Failed to install mlx-vlm\"\n- Ensure Python 3.10+ is installed\n- Try: `pip3 install --upgrade mlx-vlm`\n\n### \"Model download failed\"\n- Check internet connection\n- Ensure sufficient disk space for model files\n\n### Port already in use\n- Change `mlx_port` in settings.json to a different port (e.g., 8081)\n\n### Out of memory\n- Use a smaller/quantized model (4bit variants)\n- Close other memory-intensive applications\n\n## How It Works\n\n```\npi agent\n    \u2514\u2500\u2500 pi-mlx-provider extension\n            \u251c\u2500\u2500 Reads settings from ~/.pi/settings.json\n            \u251c\u2500\u2500 If local_intelligence + local_model enabled AND state file exists:\n            \u2502   \u251c\u2500\u2500 Auto-starts mlx-vlm server (or reconnects if already running)\n            \u2502   \u251c\u2500\u2500 Registers \"mlx-local\" provider\n            \u2502   \u2514\u2500\u2500 Routes requests to localhost:PORT\n            \u251c\u2500\u2500 If enabled but no state file:\n            \u2502   \u2514\u2500\u2500 Waits for /mlx_init command\n            \u2514\u2500\u2500 If disabled: uses default cloud provider\n```\n\n### State Persistence\n\nThe extension maintains state in `~/.pi/agent/extensions/mlx-settings.json`:\n- Created by `/mlx_init` after successful server start\n- Read on extension load to determine if auto-start should occur\n- Removed by `/mlx_stop` to prevent auto-start on future loads\n\n## License\n\nMIT\n\n## Contributing\n\nContributions welcome! Please open an issue or PR on GitHub.\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "pi-agent",
+    "pi-provider",
+    "mlx",
+    "mlx-vlm",
+    "apple-silicon",
+    "local-ai",
+    "llm",
+    "inference",
+    "gemma",
+    "llama"
+  ],
+  "author": {
+    "name": "Sina Montazeri",
+    "url": "https://github.com/sinamtz"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/sinamtz/pi-mlx-provider#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sinamtz/pi-mlx-provider.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-04-24T08:12:23.655Z",
+    "0.1.1": "2026-04-24T08:12:23.886Z",
+    "modified": "2026-04-24T08:12:24.336Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

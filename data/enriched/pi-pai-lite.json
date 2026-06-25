@@ -1,0 +1,343 @@
+{
+  "name": "pi-pai-lite",
+  "latest_version": "1.0.0",
+  "description": "Structured thinking modes and lightweight persistent memory for pi",
+  "readme": "<div align=\"center\">\n\n<img src=\"images/banner.jpg\" alt=\"pi-pai-lite \u2014 The Skeptic, The Red Team, The Scientist, and The Creative surround a developer at their workstation\" width=\"800\">\n\n# pi-pai-lite\n\nStructured thinking modes and lightweight persistent memory for [pi](https://github.com/badlogic/pi-mono).\n\n</div>\n\n## Origin\n\nThis project is directly inspired by Daniel Miessler's [Personal AI Infrastructure (PAI)](https://github.com/danielmiessler/Personal_AI_Infrastructure) \u2014 an ambitious open-source platform built on the belief that *AI should magnify everyone, not just the top 1%*. PAI provides a full-featured personal AI system with multi-agent councils, adversarial red teams, a 7-phase execution algorithm, persistent memory, skill systems, voice, observability, and much more.\n\npi-pai-lite distills PAI's core thinking patterns into a single lightweight [pi extension](https://github.com/badlogic/pi-mono). No multi-agent swarms, no hooks, no voice, no dashboard. Just the structured thinking engine and a place to remember things \u2014 PAI's best ideas in their simplest possible form.\n\n### What we kept from PAI\n\n| PAI Concept | What pi-pai-lite takes | What it leaves behind |\n|---|---|---|\n| **Council** (multi-perspective debate) | Structured 4-perspective analysis prompt | Multi-agent dispatch, spawned agent personas |\n| **Red Team** (adversarial analysis) | Failure mode prompt scaffold with deal-breakers | 32-agent adversarial swarm, severity scoring |\n| **First Principles** (assumption challenging) | Assumption audit + rebuilt reasoning scaffold | \u2014 |\n| **BeCreative** (lateral thinking) | Inversion, adjacent domains, constraint removal scaffold | \u2014 |\n| **The Algorithm** (7-phase execution) | Success criteria on every output | ISC tables, LCARS display, phase tooling |\n| **Memory System** | 3 markdown files, on-demand loading | JSONL logs, session harvesting, signals, WORK/ dirs |\n\nEverything else \u2014 Telos, Skill System, Hook System, Agent Factory, Voice System, Observability \u2014 is deliberately out of scope. PAI is the full platform; this is one small sharp tool.\n\n## Install\n\n```bash\npi install npm:pi-pai-lite\n```\n\nFor development/testing without installing:\n\n```bash\npi -e ./index.ts\n```\n\nThe extension registers its tools and commands on load. No configuration needed.\n\n## Tools\n\nTwo tools the LLM can call on its own or when prompted:\n\n### `think` \u2014 Structured Thinking\n\nProvides a structured prompt scaffold that the LLM reasons through. Zero extra API calls \u2014 the scaffold is returned as a tool result and the LLM fills it out in the same turn.\n\n**Modes:**\n\n| Mode | What it does | When to use |\n|---|---|---|\n| `council` | 4 perspectives: Pragmatist, Architect, Skeptic, User Advocate. Forces disagreements before synthesis. | Architectural decisions, trade-off analysis, design reviews |\n| `red_team` | 5+ failure modes with worst-case scenarios, deal-breakers, mitigations | Risk assessment, security review, pre-launch checks |\n| `first_principles` | Lists assumptions, audits each (true/inherited/false), rebuilds reasoning from base truths | Challenging \"that's how we've always done it\", questioning conventions |\n| `be_creative` | Inversion, adjacent-domain inspiration, constraint removal, 3 genuinely novel approaches | When stuck, exploring alternatives, breaking out of local optima |\n\n**Auto-routing:** When no mode is specified, conservative keyword matching selects the mode. Security terms \u2192 `red_team`. Assumption language \u2192 `first_principles`. \"Stuck\" or \"what if\" \u2192 `be_creative`. Everything else \u2192 `council` (the safest general-purpose default).\n\n**Memory integration:** The think tool automatically reads any stored memory files and includes them as context. The LLM doesn't need to call `memory` first.\n\nEvery response ends with **Success Criteria** \u2014 a checklist defining what \"done\" looks like. This is PAI's ISC (Initial Success Criteria) pattern distilled to its minimum.\n\n### `memory` \u2014 Persistent Files\n\nThree markdown files under `~/.pi/pai/`, created on first use:\n\n| File | Purpose | Typical use |\n|---|---|---|\n| `preferences.md` | Tech stack, coding style, how you like things | Replace when preferences change |\n| `learnings.md` | Discoveries made during work | Append-only \u2014 grows over time |\n| `context.md` | Current projects, goals, focus areas | Replace when context shifts |\n\n**Actions:**\n- `read` \u2014 Get file contents (truncated to last 4K characters if large)\n- `append` \u2014 Add timestamped entry to a file\n- `replace` \u2014 Overwrite a file completely\n\nMemory is loaded on demand \u2014 no system prompt overhead during normal use.\n\n## Commands\n\n| Command | What it does |\n|---|---|\n| `/council <question>` | Force council mode thinking |\n| `/redteam <question>` | Force red team mode thinking |\n| `/firstprinciples <question>` | Force first principles mode thinking |\n| `/creative <question>` | Force creative/lateral mode thinking |\n| `/pai` | Show help |\n| `/pai memory` | Show memory file summary |\n\nCommands inject a user message with the forced mode. The LLM calls the think tool and reasons through the scaffold naturally.\n\n## Examples\n\n```\n/council Should we use a monorepo or multi-repo for our 5-person team?\n```\n\nThe LLM receives a council scaffold and responds with four distinct perspectives, identifies where they conflict, and synthesizes a recommendation with success criteria.\n\n```\n/redteam Deploying to production without a staging environment\n```\n\nReturns 5+ specific failure modes, worst-case scenarios, a deal-breaker analysis, and concrete mitigations.\n\n```\nAsk the LLM directly:\n\"Use the think tool to analyze whether we should add a database to this project\"\n```\n\nAuto-routes to council mode. If you'd previously stored preferences via the memory tool, they're included as context.\n\n## Design Principles\n\n- **Scaffold, not inference.** The think tool returns structured prompts. The LLM reasons through them. No sub-agent calls, no extra API round-trips, no added latency or cost.\n- **Memory on demand.** Files are only read when tools are called. Simple tasks get zero context overhead.\n- **Conservative auto-routing.** Narrow keyword triggers with council as the default. Misrouting toward council is harmless; misrouting away from it is confusing.\n- **Never fail.** Memory errors degrade gracefully \u2014 think continues without memory and notes it. File I/O errors throw to the framework for proper error signaling.\n\n## File Structure\n\n```\npi-pai-lite/\n\u251c\u2500\u2500 index.ts                     # Extension entry: registers tools + commands\n\u251c\u2500\u2500 src/\n\u2502   \u251c\u2500\u2500 memory.ts                # Memory tool: read/append/replace + truncation\n\u2502   \u251c\u2500\u2500 think.ts                 # Think tool: routing, memory integration, status\n\u2502   \u251c\u2500\u2500 router.ts                # Auto-mode selection (conservative keyword matching)\n\u2502   \u2514\u2500\u2500 modes/\n\u2502       \u251c\u2500\u2500 council.ts           # Council prompt scaffold\n\u2502       \u251c\u2500\u2500 red-team.ts          # Red team prompt scaffold\n\u2502       \u251c\u2500\u2500 first-principles.ts  # First principles prompt scaffold\n\u2502       \u2514\u2500\u2500 be-creative.ts       # Creative/lateral prompt scaffold\n\u2514\u2500\u2500 README.md\n\n~/.pi/pai/                       # User data (created on first use)\n\u251c\u2500\u2500 preferences.md\n\u251c\u2500\u2500 learnings.md\n\u2514\u2500\u2500 context.md\n```\n\n## Acknowledgments\n\n**[Daniel Miessler](https://danielmiessler.com)** and [PAI (Personal AI Infrastructure)](https://github.com/danielmiessler/Personal_AI_Infrastructure) \u2014 the original vision of structured thinking modes, persistent memory, and personal AI infrastructure that this project adapts. PAI's Council, Red Team, First Principles, and BeCreative systems are the direct ancestors of the four modes in pi-pai-lite. If you want the full platform \u2014 agents, voice, observability, the Algorithm, Telos, and everything else \u2014 go use PAI. This is just the seed.\n\n**[Mario Zechner](https://github.com/badlogic)** and [pi](https://github.com/badlogic/pi-mono) \u2014 the coding agent and extension API that makes this possible.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/coctostan/pi-pai-lite#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coctostan/pi-pai-lite.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/coctostan/pi-pai-lite/main/images/banner.jpg"
+  },
+  "time": {
+    "created": "2026-02-09T13:49:29.857Z",
+    "1.0.0": "2026-02-09T13:49:30.010Z",
+    "modified": "2026-02-09T13:49:30.234Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 12,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 80
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 17
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 52
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 31
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 22
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

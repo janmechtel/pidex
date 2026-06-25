@@ -1,0 +1,47 @@
+{
+  "name": "pi-kapso-whatsapp",
+  "latest_version": "1.0.2",
+  "description": "Pi extension for WhatsApp via Kapso AI \u2014 contacts access control with SQLite",
+  "readme": "# pi-kapso-whatsapp\n\nPi coding agent extension for WhatsApp via [Kapso AI](https://kapso.ai).  \nGives Pi a full set of WhatsApp tools: send messages, manage contacts, control the webhook service, set up Cloudflare tunnels, and handle incoming messages with access control.\n\n[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/I2I3177MUT)\n\n---\n\n## Installation\n\n```bash\npi install pi-kapso-whatsapp\n```\n\nOr manually:\n\n```bash\ncd ~/.pi/agent/extensions\ngit clone https://github.com/serlismaldonado/pi-kapso-whatsapp\n```\n\nThen reload Pi's extensions.\n\n---\n\n## Initial setup\n\nOnce installed, tell Pi:\n\n> \"Set up the WhatsApp bot\"\n\nPi will run the full autonomous setup \u2014 no questions, no manual steps:\n\n1. Checks system requirements (PM2, `pi-whatsapp-service`, `.env`)\n2. Installs PM2 if missing\n3. Builds and starts the service\n4. Sets up a Cloudflare tunnel (temporary or custom domain)\n5. Registers the webhook in Kapso\n6. Adds you to the contact allowlist\n7. Verifies everything is running\n\nThe only step that may require you is `pm2 startup` (requires sudo once).\n\n---\n\n## Commands\n\n| Command | Description |\n|---|---|\n| `/kapso-setup` | Set API key and phone number ID |\n| `/kapso-contacts` | List contacts with notes |\n| `/kapso-instructions` | Show paths to `SYSTEM.md` and `PROMPT.md` |\n\n---\n\n## Tools reference\n\n### Receiving messages\n\n| Tool | Description |\n|---|---|\n| `whatsapp_receive` | Process an incoming webhook payload \u2014 checks access, loads history, reads `SYSTEM.md` / `PROMPT.md` |\n| `whatsapp_history` | Get conversation history for a contact |\n| `whatsapp_log_out` | Log an outgoing message to the session history |\n| `whatsapp_session_end` | End the active session for a contact |\n| `whatsapp_status` | Check current processing status |\n\n### Sending messages\n\n| Tool | Description |\n|---|---|\n| `whatsapp_send` | Send a text message |\n| `whatsapp_send_image` | Send an image (URL or `media_id`) |\n| `whatsapp_send_document` | Send a document/file (URL or `media_id`) |\n| `whatsapp_send_audio` | Send audio or a voice note (`voice: true` for transcription) |\n| `whatsapp_send_video` | Send a video with optional caption |\n| `whatsapp_send_sticker` | Send a sticker (WEBP format) |\n| `whatsapp_send_reaction` | React to a message with an emoji |\n| `whatsapp_send_contact` | Send a contact card (vCard) |\n| `whatsapp_send_location` | Send a location pin |\n| `whatsapp_send_buttons` | Interactive message with up to 3 quick-reply buttons |\n| `whatsapp_send_list` | Interactive list menu (up to 10 sections) |\n| `whatsapp_send_cta` | Message with a call-to-action URL button |\n| `whatsapp_upload_media` | Upload a local file and get a `media_id` |\n\n### Templates\n\n| Tool | Description |\n|---|---|\n| `whatsapp_templates_list` | List approved message templates |\n| `whatsapp_send_template` | Send a template (works outside the 24h conversation window) |\n\n### Contact management\n\n| Tool | Description |\n|---|---|\n| `whatsapp_contacts_list` | List all contacts and their access status |\n| `whatsapp_contact_add` | Add a contact to the allowlist |\n| `whatsapp_contact_remove` | Remove a contact |\n| `whatsapp_contact_update` | Update name, notes, or enabled status |\n| `whatsapp_check_access` | Check if a phone number has access |\n\n### Webhooks\n\n| Tool | Description |\n|---|---|\n| `whatsapp_webhook_setup` | Register a new Kapso webhook |\n| `whatsapp_webhooks_list` | List all registered webhooks |\n| `whatsapp_webhook_register` | Register or update the active webhook URL |\n| `whatsapp_numbers_list` | List connected WhatsApp numbers (to get `phone_number_id`) |\n\n### Service management\n\n| Tool | Description |\n|---|---|\n| `whatsapp_setup_check` | Inspect all system requirements and current state |\n| `whatsapp_service_status` | Check if the service is running |\n| `whatsapp_service_start` | Build and start the service with PM2 |\n| `whatsapp_service_stop` | Stop the service |\n| `whatsapp_service_restart` | Restart the service |\n| `whatsapp_service_logs` | View recent logs |\n| `whatsapp_service_configure` | Write the `.env` file |\n| `whatsapp_service_setup_autostart` | Configure PM2 to start on login |\n| `whatsapp_tunnel_setup` | Start a Cloudflare tunnel and register the webhook URL |\n\n---\n\n## Customizing the bot\n\n### Identity and behavior\n\nEdit these two files to define who the agent is and how it responds:\n\n- `~/.pi/agent/extensions/pi-kapso-whatsapp/SYSTEM.md` \u2014 agent name, personality, scope\n- `~/.pi/agent/extensions/pi-kapso-whatsapp/PROMPT.md` \u2014 step-by-step response instructions\n\nChanges take effect immediately \u2014 no restart needed.\n\nExample: tell Pi:\n\n> \"Edit SYSTEM.md and PROMPT.md. The agent is called Javi, responds in Spanish with a professional but direct tone, and only handles questions about my services.\"\n\n### Access control\n\nOnly contacts in the allowlist receive responses. Others are silently ignored.\n\n```\nwhatsapp_contact_add    with {\"name\": \"Ana\", \"phone_number\": \"+50488887777\"}\nwhatsapp_contact_update with {\"phone_number\": \"+50488887777\", \"enabled\": false}\nwhatsapp_contacts_list\n```\n\n---\n\n## Incoming message flow\n\n```\nKapso webhook \u2192 whatsapp_receive\n  \u2192 ACCESS DENIED  \u2192 silent ignore\n  \u2192 ACCESS GRANTED \u2192\n      read contact data + notes\n      read session history\n      read SYSTEM.md + PROMPT.md\n      \u2192 Pi processes and replies \u2192\n          whatsapp_send (or send_image, send_document, etc.)\n          whatsapp_log_out\n```\n\n---\n\n## Sending files\n\nTo send a local file:\n\n```\n1. whatsapp_upload_media with {\"file_path\": \"/path/to/file.pdf\"}\n   \u2192 returns media_id\n\n2. whatsapp_send_document with {\"to\": \"+504...\", \"media_id\": \"<id>\", \"filename\": \"file.pdf\"}\n```\n\nMIME type is auto-detected from the file extension.\n\n---\n\n## Tunnel modes\n\n**Quick tunnel** (no account, URL changes on restart):\n```\nwhatsapp_tunnel_setup with {\"port\": 4721}\n```\nUses `trycloudflare.com`. The webhook in Kapso is updated automatically on each restart.\n\n**Permanent tunnel** (Cloudflare account + custom domain):\n```\nwhatsapp_tunnel_setup with {\"port\": 4721, \"customDomain\": \"whatsapp.yourdomain.com\"}\n```\nRequires a DNS CNAME in Cloudflare pointing to your named tunnel UUID.\n\n---\n\n## Related packages\n\n| Package | Description |\n|---|---|\n| [pi-whatsapp-service](https://github.com/serlismaldonado/pi-whatsapp-service) | The always-on webhook receiver service |\n| [pi-mono](https://github.com/badlogic/pi-mono) | Pi coding agent SDK |\n\n---\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-extension",
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "whatsapp",
+    "kapso",
+    "sqlite",
+    "contacts",
+    "whatsapp-bot",
+    "chatbot",
+    "ai"
+  ],
+  "author": {
+    "name": "Serlis Maldonado"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/serlismaldonado/pi-kapso-whatsapp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/serlismaldonado/pi-kapso-whatsapp.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "image": "https://raw.githubusercontent.com/serlismaldonado/pi-kapso-whatsapp/main/docs/screenshot.png"
+  },
+  "time": {
+    "created": "2026-05-07T07:17:09.341Z",
+    "modified": "2026-05-07T07:55:28.778Z",
+    "1.0.0": "2026-05-07T07:17:09.557Z",
+    "1.0.1": "2026-05-07T07:19:59.563Z",
+    "1.0.2": "2026-05-07T07:55:28.601Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

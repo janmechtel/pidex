@@ -1,0 +1,36 @@
+{
+  "name": "agent-hooks-playground",
+  "latest_version": "0.1.0",
+  "description": "Shared logger for AI coding agent lifecycle events",
+  "readme": "# Agent Hooks Playground\n\nA TypeScript/Node.js CLI toolkit that normalizes lifecycle events from three different AI coding agents (Claude Code, Codex, Pi) into a shared JSONL log file.\n\n## Overview\n\nEach AI coding agent uses different hook mechanisms:\n- **Claude Code**: Shell-based hooks in settings.json\n- **Codex**: JavaScript hooks in hooks.json with trust flow\n- **Pi**: TypeScript extensions with event subscriptions\n\nAll three agents funnel events to a single normalized logger that writes to `logs/agent-events.jsonl`.\n\n## Quick Start\n\n1. Install dependencies:\n   ```bash\n   npm install\n   ```\n\n2. Build the project:\n   ```bash\n   npx tsc\n   ```\n\n3. Test the logger:\n   ```bash\n   npm run summary\n   ```\n\n## Integration Guides\n\nChoose your agent:\n\n### [Claude Code Integration](./claude/README.md)\n- Copy `claude/settings.example.json` to `~/.claude/settings.json`\n- Ensure hook scripts are executable\n- Automatic event logging on Claude session\n\n### [Codex Integration](./codex/README.md)\n- Copy `codex/hooks.example.json` to `.codex/hooks.json`\n- Run `/hooks` in Codex to review and trust hooks\n- Automatic event logging after trust\n\n### [Pi Integration](./pi/README.md)\n- Copy or symlink `pi/extensions/agent-hooks-logger.ts` to `~/.pi/agent/extensions/`\n- Restart Pi (or run `/reload`) to load extension\n- Automatic event logging via extension events (`source: \"extension\"`)\n\n## CLI Commands\n\n### log\nLog events programmatically:\n```bash\nnpm run log -- --agent claude --event session_start --summary \"Session started\" --source hook < data.json\n```\n\n### summary\nDisplay event statistics and recent events:\n```bash\nnpm run summary\n```\n\nOutput includes:\n- Total event count by agent\n- Event breakdown by type\n- Last 10 events with timestamps\n\n### welcome\nGenerate welcome message for specific agent:\n```bash\nnpm run welcome -- --agent claude\n```\n\n### reset-logs\nClear the log file:\n```bash\nnpm run reset-logs\n```\n\n## Event Schema\n\nAll events follow a standardized format:\n\n```typescript\ntype AgentEvent = {\n  id: string;           // Unique event ID\n  ts: string;           // ISO 8601 timestamp\n  agent: AgentName;     // \"claude\" | \"codex\" | \"pi\" | \"manual\"\n  event: string;        // Event type (e.g., \"session_start\", \"tool_call\")\n  sessionId?: string;   // Optional session identifier\n  cwd?: string;         // Current working directory\n  toolName?: string;    // Tool name for tool events\n  promptPreview?: string; // First 100 chars of user prompt\n  summary: string;      // Human-readable event summary\n  source: \"hook\" | \"extension\" | \"manual\"; // Event source\n  raw?: unknown;        // Original agent-specific data\n};\n```\n\n## Supported Events\n\n### Claude Code\n- `SessionStart`: Session initialization\n- `UserPromptSubmit`: User submits a prompt\n- `PreToolUse`: Before tool execution\n- `PostToolUse`: After tool execution completes\n- `Stop`: Claude completes its response\n\n### Codex\n- `SessionStart`: Session initialization\n- `UserPromptSubmit`: User submits a prompt\n- `PreToolUse`: Before tool execution\n- `PostToolUse`: After tool execution completes\n- `Stop`: Codex completes its response\n\n### Pi\n- `session_start`: Session initialization\n- `tool_call`: Tool execution\n\n## Log Format\n\nEvents are written as JSONL (one JSON object per line) to `logs/agent-events.jsonl`:\n\n```jsonl\n{\"id\":\"evt_2026-05-23T12-00-00-000Z_abc1\",\"ts\":\"2026-05-23T12:00:00.000Z\",\"agent\":\"claude\",\"event\":\"SessionStart\",\"summary\":\"Claude Code session started\",\"source\":\"hook\"}\n{\"id\":\"evt_2026-05-23T12-00-05-000Z_abc2\",\"ts\":\"2026-05-23T12:00:05.000Z\",\"agent\":\"claude\",\"event\":\"UserPromptSubmit\",\"summary\":\"User submitted prompt\",\"source\":\"hook\",\"promptPreview\":\"Implement feature X\"}\n```\n\n## Agent Comparison\n\n| Feature | Claude Code | Codex | Pi |\n|---------|-------------|-------|-----|\n| Hook Type | Shell scripts | JavaScript hooks | TypeScript extensions |\n| Configuration | `settings.json` | `hooks.json` | Extension files |\n| Trust Required | No | Yes (`/hooks` command) | No |\n| Event Source | Hook API | Hook API | Extension events |\n| Session Events | Yes | Yes | Yes |\n| Tool Events | Yes | Yes | Yes |\n| Setup Complexity | Low | Medium | Low |\n\n## Architecture\n\n```\nAgent Session \u2192 Hook/Extension \u2192 Normalized Event \u2192 Logger \u2192 JSONL\n                                                      \u2193\n                                              Summary CLI reads\n```\n\n### Components\n\n- **`src/logger.ts`**: Core logger that writes to JSONL\n- **`src/cli.ts`**: CLI interface with four commands\n- **`src/schema.ts`**: TypeScript event schema definitions\n- **`src/summarize.ts`**: Summary generation logic\n- **`src/welcome.ts`**: Welcome message generation\n- **`claude/hooks/`**: Claude-specific hook scripts\n- **`codex/hooks/`**: Codex-specific hook scripts\n- **`pi/extensions/`**: Pi-specific TypeScript extension\n\n## Error Handling\n\n- Logger never throws \u2014 failures display as warnings to stderr\n- CLI commands surface errors to user\n- All scripts use absolute path resolution from git root\n- Failed log attempts don't interrupt agent operation\n\n## Testing\n\nManual verification per agent:\n1. Follow the integration guide for your agent\n2. Trigger events by using the agent normally\n3. Run `npm run summary` to verify events logged\n4. Check for warning output on failures\n\n## License\n\nMIT",
+  "keywords": [
+    "hooks",
+    "observability",
+    "ai-agents",
+    "pi-package"
+  ],
+  "author": {
+    "name": "Heru Joko P. Utomo",
+    "email": "herujokoutomo@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/heruujoko/ai-weekend-lab/tree/main/weekend-01/experiments/hooks-lifecycle",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/heruujoko/ai-weekend-lab.git",
+    "directory": "weekend-01/experiments/hooks-lifecycle"
+  },
+  "pi": {
+    "extensions": [
+      "./pi/extensions/agent-hooks-logger.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-24T02:26:20.135Z",
+    "0.1.0": "2026-05-24T02:26:20.340Z",
+    "modified": "2026-05-24T02:26:20.617Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 23,
+  "download_trend": []
+}

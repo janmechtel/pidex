@@ -1,0 +1,345 @@
+{
+  "name": "@eovidiu/pi-extensions",
+  "latest_version": "0.1.1",
+  "description": "Pi extensions, including an opt-in MCP bridge.",
+  "readme": "# @eovidiu/pi-extensions\n\nPersonal [Pi](https://pi.dev) extension package.\n\nThis repository currently contains one extension: **`mcp-bridge`**, an explicit opt-in MCP compatibility bridge for Pi.\n\n> Security note: Pi extensions run as local TypeScript with your user permissions. MCP servers started by this extension also run with your user permissions. Review the source and every MCP server command before enabling it.\n\n## Why this exists\n\nPi intentionally does not ship built-in MCP support. The usual Pi approach is to integrate tools directly through skills, CLI wrappers, or extensions.\n\nThis package is a compatibility bridge for users who already have trusted MCP server configs in other tools and want to reuse them from Pi without giving up Pi's explicit opt-in model.\n\nThe bridge never starts newly discovered MCP servers automatically. Discovery only records servers as disabled. A server must be explicitly enabled before its process starts or its tools are exposed to Pi.\n\n## Features\n\n- Discovers MCP server configs from common Claude Desktop, Claude Code, and Codex locations.\n- Syncs discovered servers into a Pi-owned config file: `~/.pi/mcp.json`.\n- Preserves manually added Pi MCP server entries.\n- Preserves existing `enabled` values across resyncs.\n- Defaults newly discovered servers to `enabled: false`.\n- Starts only explicitly enabled MCP stdio servers.\n- Initializes MCP sessions and calls `tools/list`.\n- Converts a conservative MCP JSON Schema subset into Pi/typebox tool schemas.\n- Registers supported MCP tools as Pi tools.\n- Forwards Pi tool calls to MCP `tools/call`.\n- Stops and deactivates tools on disable, restart, session shutdown, and reload.\n- Supports interactive `/mcp-enable` and `/mcp-disable` selectors in Pi's TUI.\n- Supports project-local `.pi/mcp.json` overrides.\n- Supports `allowServers`, `denyServers`, and `maxOutputChars` hardening settings.\n- Writes detailed redacted diagnostics to `~/.pi/mcp-bridge.log` instead of stdout.\n\n## Installation\n\n### Local development install\n\n```bash\npi install /path/to/pi-extensions\n```\n\nAfter editing the extension, run this inside Pi:\n\n```text\n/reload\n```\n\n### Temporary one-off load\n\n```bash\npi -e /path/to/pi-extensions\n```\n\nUse this for quick testing only. A normal `pi install` is better for ongoing use because the package remains in Pi's resource set.\n\n### npm install, after publishing\n\n```bash\npi install npm:@eovidiu/pi-extensions\n```\n\nTo pin a published version:\n\n```bash\npi install npm:@eovidiu/pi-extensions@0.1.0\n```\n\n## Quick start\n\n1. Install the package.\n2. Start or reload Pi.\n3. Sync detected MCP configs:\n\n```text\n/mcp-sync\n```\n\n4. Inspect what was found:\n\n```text\n/mcp-status\n```\n\n5. Enable trusted servers explicitly.\n\nInteractive TUI selector:\n\n```text\n/mcp-enable\n```\n\nDirect enable by name:\n\n```text\n/mcp-enable claude_desktop__filesystem\n```\n\n6. Ask Pi to use one of the registered MCP-backed tools.\n\n7. Disable servers when you no longer need them.\n\nInteractive TUI selector:\n\n```text\n/mcp-disable\n```\n\nDirect disable by name:\n\n```text\n/mcp-disable claude_desktop__filesystem\n```\n\n## Commands\n\n| Command | Behavior |\n|---|---|\n| `/mcp-sync` | Rescan known Claude/Codex MCP config locations and update `~/.pi/mcp.json`. Newly discovered servers remain disabled. Enabled servers are started/registered after sync. |\n| `/mcp-status` | Show tracked servers, enabled/disabled state, connection summary, config paths, and log path. |\n| `/mcp-enable` | In interactive Pi sessions, rescan configs and open a selector for disabled detected servers. Selected servers are enabled, started, and registered. |\n| `/mcp-enable <server>` | Enable one server directly, then start/register enabled MCP tools. |\n| `/mcp-disable` | In interactive Pi sessions, open a selector for currently enabled servers. Selected servers are disabled, stopped, and their tools are deactivated. |\n| `/mcp-disable <server>` | Disable one server directly, stop it, and deactivate its tools. |\n| `/mcp-restart` | Restart all enabled MCP servers. |\n| `/mcp-restart <server>` | Restart one MCP server. |\n\nInteractive selectors use Pi's `ctx.ui.select()` API. They work in TUI/RPC-capable interactive contexts. In non-UI print/JSON mode, the extension avoids dialogs and reports direct command usage instead.\n\n## Config files\n\n### Global config\n\nThe extension owns this file:\n\n```text\n~/.pi/mcp.json\n```\n\nExample:\n\n```json\n{\n  \"version\": 1,\n  \"autoStart\": false,\n  \"servers\": {\n    \"claude_desktop__filesystem\": {\n      \"enabled\": false,\n      \"managedBy\": \"pi-mcp-bridge\",\n      \"source\": \"claude-desktop\",\n      \"sourceName\": \"filesystem\",\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"@modelcontextprotocol/server-filesystem\", \"/Users/me/work\"],\n      \"env\": {}\n    }\n  },\n  \"maxOutputChars\": 20000\n}\n```\n\nRules:\n\n- Managed discovered entries have `managedBy: \"pi-mcp-bridge\"`.\n- Managed entries may be updated or removed by `/mcp-sync` when source configs change.\n- Manual entries without that `managedBy` value are preserved.\n- Existing managed `enabled` values are preserved during sync.\n- Newly discovered managed entries are always added with `enabled: false`.\n\n### Project override\n\nA project can provide an override at:\n\n```text\n.pi/mcp.json\n```\n\nProject entries override global entries with the same server name for the current working directory. Project settings can also provide policy controls:\n\n```json\n{\n  \"version\": 1,\n  \"autoStart\": false,\n  \"servers\": {},\n  \"allowServers\": [\"claude_desktop__filesystem\", \"codex__*\"],\n  \"denyServers\": [\"*production*\"],\n  \"maxOutputChars\": 20000\n}\n```\n\nUse project overrides carefully. Review `.pi/mcp.json` before running Pi in repositories you do not trust.\n\n## Discovery sources\n\nThe extension probes common locations for MCP server definitions.\n\n### Claude Desktop\n\n```text\n~/Library/Application Support/Claude/claude_desktop_config.json\n```\n\n### Claude Code\n\n```text\n~/.claude.json\n~/.claude/settings.json\n~/.config/claude-code/config.json\n~/.config/claude-code/settings.json\n```\n\n### Codex\n\n```text\n~/.codex/config.toml\n~/.codex/config.json\n~/.config/codex/config.toml\n~/.config/codex/config.json\n```\n\nSupported config maps include common `mcpServers`, `mcp_servers`, and `mcpServersConfig` shapes. Unsupported or malformed entries are skipped and logged.\n\n## Implementation details\n\nThe extension is implemented as a Pi package with this manifest in `package.json`:\n\n```json\n{\n  \"keywords\": [\"pi-package\", \"pi-extension\", \"mcp\"],\n  \"pi\": {\n    \"extensions\": [\"./extensions/mcp-bridge\"]\n  }\n}\n```\n\nMain modules:\n\n| File | Purpose |\n|---|---|\n| `extensions/mcp-bridge/index.ts` | Pi extension entry point. Registers lifecycle hooks and slash commands. Starts/stops enabled servers and registers tools. |\n| `config-discovery.ts` | Finds and parses known third-party MCP config files. Normalizes discovered server definitions. |\n| `config-sync.ts` | Reads/writes `~/.pi/mcp.json`, merges discovered servers, preserves manual entries, validates names, and performs atomic writes. |\n| `mcp-client.ts` | Starts MCP stdio server processes, initializes MCP clients, lists tools, forwards calls, and stops processes. |\n| `schema-conversion.ts` | Converts supported MCP JSON Schema input schemas to Pi/typebox schemas. |\n| `tool-registration.ts` | Generates Pi tool names, registers MCP-backed tools, truncates large outputs, and deactivates tools when servers stop. |\n| `logger.ts` | Writes redacted diagnostic logs to `~/.pi/mcp-bridge.log`. |\n| `types.ts` | Shared config and discovery types. |\n\n### Startup/session lifecycle\n\nOn `session_start`:\n\n1. Discover external MCP configs.\n2. Sync discovered servers into `~/.pi/mcp.json`.\n3. Read the effective config, including optional project overrides.\n4. Stop servers that are no longer enabled.\n5. Start enabled servers only.\n6. Register supported tools from running servers.\n7. Notify a short summary in the TUI.\n\nOn `session_shutdown`:\n\n1. Deactivate all registered MCP-backed tools.\n2. Stop all running MCP server processes.\n\n### Enable/disable lifecycle\n\n`/mcp-enable` with no argument:\n\n1. Runs discovery/sync first so newly detected servers appear.\n2. Reads the global config.\n3. Lists disabled servers.\n4. Opens a selector in interactive Pi sessions.\n5. Enables selected servers in `~/.pi/mcp.json`.\n6. Starts enabled servers and registers tools.\n\n`/mcp-disable` with no argument:\n\n1. Reads the effective config.\n2. Lists enabled servers.\n3. Opens a selector in interactive Pi sessions.\n4. Disables selected servers in `~/.pi/mcp.json`.\n5. Stops selected servers and deactivates their tools.\n\nDirect commands, such as `/mcp-enable <server>` and `/mcp-disable <server>`, skip the selector.\n\n### Tool naming\n\nGenerated Pi tool names are prefixed with `mcp_` and include the normalized source/server/tool identity. Example:\n\n```text\nmcp_claude_desktop_filesystem_read_file\n```\n\nIf a generated name collides, the registrar appends a deterministic short suffix.\n\n### Schema conversion\n\nThe initial schema converter intentionally supports a conservative subset:\n\n- object schemas\n- required fields\n- strings\n- numbers\n- integers\n- booleans\n- arrays\n- nested objects\n- simple string enums\n\nUnsupported complex schemas are skipped for that specific MCP tool rather than crashing the extension.\n\n### Output handling\n\nMCP tool outputs can be large. The extension respects `maxOutputChars` and truncates returned tool text so Pi conversations do not balloon unexpectedly.\n\n### Logging and secrets\n\nThe extension does not log to stdout because Pi owns stdout/TUI rendering. Detailed diagnostics go to:\n\n```text\n~/.pi/mcp-bridge.log\n```\n\nLogs redact common secret-bearing keys such as token, key, secret, password, auth, and credential. Still, avoid storing literal secrets in config files when possible.\n\n## Examples and fixtures\n\n- `examples/mcp.json.example` \u2014 example global Pi MCP config.\n- `examples/project-mcp.override.example.json` \u2014 example project override.\n- `fixtures/` \u2014 known third-party config shapes used by tests.\n\n## Development\n\nInstall dependencies:\n\n```bash\nnpm install\n```\n\nRun checks:\n\n```bash\nnpm run typecheck\nnpm test\n```\n\nPreview npm package contents before publishing:\n\n```bash\nnpm pack --dry-run\n```\n\n## Publishing\n\nFor a scoped public npm package:\n\n```bash\nnpm run typecheck\nnpm test\nnpm pack --dry-run\nnpm publish --access public\n```\n\nThe package includes only the files listed in `package.json`'s `files` field.\n\n## Security checklist before enabling a server\n\n1. Run `/mcp-status` and inspect the server name, source, and command.\n2. Open `~/.pi/mcp.json` and review `command`, `args`, and `env`.\n3. Prefer environment variable references over literal secret values.\n4. Use `allowServers` and `denyServers` for project-level hardening.\n5. Review project-local `.pi/mcp.json` files before using Pi in untrusted repositories.\n6. Disable servers you are not actively using.\n\nSee `SECURITY.md` for the short-form security policy.\n\n## License\n\nMIT. See `LICENSE`.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "mcp"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/eovidiu/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eovidiu/pi-extensions.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/mcp-bridge"
+    ]
+  },
+  "time": {
+    "created": "2026-05-15T15:05:06.752Z",
+    "modified": "2026-05-16T05:54:43.778Z",
+    "0.1.0": "2026-05-15T15:05:06.992Z",
+    "0.1.1": "2026-05-16T05:54:43.680Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 19,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 268
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 12
+    }
+  ]
+}

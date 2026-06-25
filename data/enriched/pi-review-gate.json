@@ -1,0 +1,42 @@
+{
+  "name": "pi-review-gate",
+  "latest_version": "1.1.2",
+  "description": "CI-level merge guardian for AI agents \u2014 required reviewers, breaking change detection, stale PR cleanup, and review automation.",
+  "readme": "# Review Gate for Pi\n\n[![npm version](https://img.shields.io/npm/v/pi-review-gate)](https://www.npmjs.com/package/pi-review-gate)\n[![license](https://img.shields.io/npm/l/pi-review-gate)](./LICENSE)\n\n> CI-level merge guardian for AI agents \u2014 required reviewers, breaking change detection, stale PR cleanup, and review automation. **Agents don't `git merge` \u2014 CI merges only after all gates pass.**\n\n## Philosophy\n\n`pi-contrib-gate` handles the *contribution* side (branch \u2192 commit \u2192 PR).\n`pi-review-gate` handles the *review* side (check \u2192 approve \u2192 merge).\n\nCore enforcement runs in Gitea Actions \u2014 agents **cannot bypass** these gates.\n\n## Install\n\n```bash\npi install npm:pi-review-gate\n```\n\n## Tools\n\n| Tool | What it does |\n|---|---|\n| `review_check(pr_number)` | Check PR merge readiness \u2014 CI, reviewers, breaking changes, staleness |\n| `review_approve(pr_number, comment)` | Submit an approval review |\n| `review_request(pr_number, reviewers)` | Request reviewers by username |\n| `review_status(pr_number)` | Show detailed review + CI status |\n| `review_close_stale(pr_number, reason)` | Close stale PR with comment |\n\n## Safety Intercepts\n\nThe gate **passively monitors** all `bash` tool calls and:\n\n- \u26d4 Blocks `git merge` \u2014 directs agents to use review tools instead\n- \u26a0\ufe0f Warns on `gh pr close` or branch deletion\n\n## Review Gates (CI-enforced)\n\nThese run in Gitea Actions \u2014 agents cannot skip them:\n\n| Gate | Config | Description |\n|---|---|---|\n| CI green | `quality.*` in .contribrc.yml | lint, test, build, doctor audit |\n| Required reviewers | `requiredReviewers.*` in .reviewrc.yml | Path-based required reviewer mapping |\n| Breaking change detection | `breakingChangePatterns` | API surface changes flagged for human review |\n| Stale PR closure | `staleDays` | Auto-close PRs inactive past threshold |\n| Protected paths | `protectedPaths` | Modifications to CI, agents, Docker \u2192 human review |\n| Model diversity | `minDiverseReviews` | Different model families must review (from #42) |\n\n## Configuration\n\nCreate `.reviewrc.yml` in your project root:\n\n```yaml\n# Required reviewers by path pattern\nrequiredReviewers.factory/**: factory-admin\nrequiredReviewers.agents/**: agent-owner\nrequiredReviewers..gitea/**: ci-admin\n\n# Stale PR threshold (days)\nstaleDays: 14\n\n# Minimum distinct model families that must review (0 = disabled)\nminDiverseReviews: 1\n\n# Paths that always require human review\nprotectedPaths: .gitea/workflows/,docker-compose.yml,Dockerfile,agents/,factory/package.json\n\n# Patterns that signal API-breaking changes\nbreakingChangePatterns: export interface,export type,export function,export class,BREAKING CHANGE:\n```\n\n> Tip: Start with `staleDays: 14` and `minDiverseReviews: 0` during adoption, then tighten.\n\n## Workflow\n\n```\ncontrib_submit() from pi-contrib-gate\n  \u2502\n  \u25bc\nPR opened on Gitea\n  \u2502\n  \u25bc\nCI runs (lint, test, build, doctor audit)\n  \u2502\n  \u25bc\nreview_check(pr_number)        \u2190 agent checks readiness\n  \u2502\n  \u25bc\nreview_request(pr_number, ...)  \u2190 request specific reviewers\n  \u2502\n  \u25bc\n[reviewer approves]\n  \u2502\n  \u25bc\nreview_check(pr_number)        \u2190 re-check: all green? required reviewers satisfied?\n  \u2502\n  \u25bc\nCI auto-merges (squash)        \u2190 only CI can merge\n  \u2502\n  \u25bc\nPR closed, branch deleted\n```\n\n## Stale PR Cleanup\n\nPRs older than `staleDays` (default 14) are flagged. A CI scheduled job can auto-close them:\n\n```bash\n# Runs nightly in Gitea Actions\nreview-gate-stale.sh --repo factory/wrok.in --days 14\n```\n\n## Breaking Change Detection\n\nEvery CI run diffs against the base branch and scans for:\n- `export interface` / `export type` / `export function` / `export class` additions\n- `BREAKING CHANGE:` in commit messages\n\nIf detected, CI adds a `\u26a0\ufe0f breaking-change` label and requires human review.\n\n## Integration with pi-contrib-gate\n\nThe two gates work together:\n\n```\npi-contrib-gate          pi-review-gate\n     \u2502                        \u2502\n     \u2502  contrib_start_work    \u2502\n     \u2502  contrib_propose       \u2502\n     \u2502  contrib_submit  \u2500\u2500\u2500\u2500\u2192 PR created\n     \u2502                        \u2502\n     \u2502                        \u2502  review_check\n     \u2502                        \u2502  review_request\n     \u2502                        \u2502  review_approve\n     \u2502                        \u2502  [CI enforcement]\n     \u2502                        \u2502  auto-merge (squash)\n```\n\nInstall both for full agent governance:\n\n```bash\npi install npm:pi-contrib-gate\npi install npm:pi-review-gate\n```\n\n## License\n\nMIT \u00a9 [nandal](https://github.com/nandal)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "governance",
+    "ci",
+    "code-review",
+    "merge-gate",
+    "breaking-changes"
+  ],
+  "author": {
+    "name": "nandal",
+    "email": "nandal@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/nandal/pi-ext/tree/main/review-gate",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nandal/pi-ext.git",
+    "directory": "review-gate"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-13T22:52:13.489Z",
+    "modified": "2026-05-14T16:53:09.918Z",
+    "1.0.0": "2026-05-13T22:52:13.640Z",
+    "1.1.0": "2026-05-14T00:46:25.909Z",
+    "1.1.1": "2026-05-14T00:55:51.912Z",
+    "1.1.2": "2026-05-14T16:53:09.800Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 11,
+  "download_trend": []
+}

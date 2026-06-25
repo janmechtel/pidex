@@ -1,0 +1,44 @@
+{
+  "name": "@complexthings/pi-dynamic-context-pruning",
+  "latest_version": "1.0.7",
+  "description": "PI coding agent extension \u2014 Dynamic Context Pruning (DCP)",
+  "readme": "# Dynamic Context Pruning (DCP) for Pi\n\nAutomatically reduces token usage in Pi coding agent sessions by managing conversation context through compression, deduplication, and smart nudges.\n\n## Features\n\n- **Compress tool** \u2014 LLM-callable tool that replaces stale conversation ranges with exhaustive technical summaries, preserving full context fidelity at a fraction of the token cost\n- **Deduplication** \u2014 automatically removes duplicate tool call outputs (same tool, same args) keeping only the most recent result\n- **Error purging** \u2014 cleans up failed tool inputs after a configurable number of user turns\n- **Context nudges** \u2014 injects compression reminders into the context at configurable thresholds: soft housekeeping notices, strong emergency warnings, and iteration reminders after long tool-call chains\n- **Manual mode** \u2014 disable autonomous compression nudges; trigger compression only via `/dcp compress` or explicit user request\n- **Session persistence** \u2014 compression blocks and pruning state survive session restarts\n- **`/dcp` commands** \u2014 inspect context usage, view stats, sweep tool outputs, and manage compression blocks interactively\n\n## Installation\n\n### Global (applies to all pi sessions)\n\n```bash\npi install npm:@complexthings/pi-dynamic-context-pruning\n```\n\n### Install globally from GitHub\n\n```bash\npi install https://github.com/complexthings/pi-dynamic-context-pruning\n```\n\n### Try it without installing\n\n```bash\npi -e https://github.com/complexthings/pi-dynamic-context-pruning\n```\n\n## Configuration\n\nDCP uses a layered configuration system (later layers override earlier ones):\n\n1. Built-in defaults\n2. `~/.config/pi/dcp.jsonc` \u2014 global user config (auto-created with defaults on first run)\n3. `$PI_CONFIG_DIR/dcp.jsonc` \u2014 if the env var is set\n4. `<project>/.pi/dcp.jsonc` \u2014 project-local overrides (walk up from cwd)\n\n### Example: `~/.config/pi/dcp.jsonc`\n\n```jsonc\n{\n  // Disable the extension entirely\n  // \"enabled\": false,\n\n  // Start every session in manual mode\n  // \"manualMode\": { \"enabled\": true, \"automaticStrategies\": true },\n\n  \"compress\": {\n    // Above 80 % context: fire a nudge (every nudgeFrequency context events)\n    \"maxContextPercent\": 0.8,\n    // Below 40 % context: no nudges\n    \"minContextPercent\": 0.4,\n    // How many context events between nudges\n    \"nudgeFrequency\": 5,\n    // Nudge after this many tool calls since the last user message\n    \"iterationNudgeThreshold\": 15,\n    // \"strong\" = emergency tone, \"soft\" = housekeeping tone\n    \"nudgeForce\": \"soft\",\n    // These tool outputs are never auto-pruned\n    \"protectedTools\": [\"compress\", \"write\", \"edit\"]\n  },\n  \"strategies\": {\n    \"deduplication\": {\n      \"enabled\": true,\n      // Additional tools to exclude from dedup\n      \"protectedTools\": []\n    },\n    \"purgeErrors\": {\n      \"enabled\": true,\n      // Purge failed tool inputs after N user turns\n      \"turns\": 4,\n      \"protectedTools\": []\n    }\n  },\n  // Glob patterns \u2014 matching file paths are never pruned\n  \"protectedFilePatterns\": [],\n  // \"off\" | \"minimal\" | \"detailed\"\n  \"pruneNotification\": \"detailed\"\n}\n```\n\n## Commands\n\nAll commands are available in the pi TUI via `/dcp <subcommand>`:\n\n| Command | Description |\n|---|---|\n| `/dcp` or `/dcp help` | Show command reference |\n| `/dcp context` | Show context window usage and session stats |\n| `/dcp stats` | Show pruning statistics (tokens saved, blocks, operations) |\n| `/dcp sweep [N]` | Mark last N tool outputs for pruning (default: all since last user message) |\n| `/dcp manual` | Show current manual mode status |\n| `/dcp manual on` | Enable manual mode \u2014 autonomous nudges disabled |\n| `/dcp manual off` | Disable manual mode \u2014 autonomous nudges re-enabled |\n| `/dcp compress` | Trigger LLM compression immediately (sends a followUp message) |\n| `/dcp decompress` | List all active compression blocks |\n| `/dcp decompress N` | Restore compression block `bN` (re-expands it in context) |\n\n## How It Works\n\n### Compression blocks\n\nWhen the LLM calls the `compress` tool it provides one or more `{startId, endId, summary}` ranges. DCP:\n\n1. Records the range as a `CompressionBlock` with start/end timestamps\n2. On every `context` event, splices out the raw messages in that range\n3. Injects a synthetic `[Compressed section: \u2026]` user message containing the summary\n4. Keeps the block state in the session so it survives restarts\n\nMessage IDs (`m001`, `m042`, etc.) and block IDs (`b1`, `b3`) are injected into every message in the context so the LLM can reference exact boundaries.\n\n### Atomic tool pair removal\n\nWhen a compression range touches any part of an assistant\u2192toolResult group, DCP automatically expands the range to include the entire group. This prevents orphaned `tool_use` or `tool_result` blocks that would cause API validation errors. The expansion logic skips over PI-internal passthrough messages (`compaction`, `branch_summary`, `custom_message`) that may sit between an assistant and its tool results. A post-compression repair pass acts as a safety net to catch any orphaned pairs that the expansion heuristics miss.\n\n### Nudge types\n\n| Nudge | Condition |\n|---|---|\n| **context-strong** | Above `maxContextPercent`, nudge counter \u2265 `nudgeFrequency`, `nudgeForce = \"strong\"` |\n| **context-soft** | Same as above with `nudgeForce = \"soft\"` |\n| **iteration** | Between min/max percent AND \u2265 `iterationNudgeThreshold` tool calls since last user message |\n| **turn** | Between min/max percent, standard cadence |\n\n### Deduplication\n\nTwo tool results share the same fingerprint (`toolName::JSON(sorted-args)`) if they were called with identical arguments. All but the last occurrence are replaced with a tombstone message.\n\n### Error purging\n\nTool results that were errors are replaced with a tombstone after `purgeErrors.turns` user turns have passed, keeping the context clean of long-dead failure traces.\n\n## Status indicator\n\nA `DCP` badge is shown in the pi status bar. In manual mode it displays `DCP [manual]`.\n\n## Development\n\n```bash\nnpm install\nnpx tsc --noEmit   # type-check without emitting\n```\n\nThe extension is loaded by pi via [jiti](https://github.com/unjs/jiti) so TypeScript is executed directly \u2014 no build step required for normal use.\n\n## Contributors\n\n[![complexthings](https://github.com/complexthings.png?size=50)](https://github.com/complexthings)\n[![wassname](https://github.com/wassname.png?size=50)](https://github.com/wassname) \n\nFull contributor list: https://github.com/complexthings/pi-dynamic-context-pruning/graphs/contributors\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "coding-agent",
+    "dynamic-context-pruning",
+    "dcp",
+    "context",
+    "pruning"
+  ],
+  "author": {
+    "name": "Greg",
+    "email": "greg.harvell@complexthings.com",
+    "url": "https://github.com/complexthings"
+  },
+  "license": null,
+  "homepage": "https://github.com/complexthings/pi-dynamic-context-pruning#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/complexthings/pi-dynamic-context-pruning.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-27T21:51:50.916Z",
+    "modified": "2026-04-14T18:25:22.381Z",
+    "1.0.0": "2026-03-27T21:51:52.427Z",
+    "1.0.3": "2026-03-27T23:38:59.950Z",
+    "1.0.4": "2026-03-27T23:52:11.478Z",
+    "1.0.5": "2026-03-30T21:34:34.470Z",
+    "1.0.6": "2026-04-10T00:05:04.163Z",
+    "1.0.7": "2026-04-14T18:25:22.283Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 57,
+  "download_trend": []
+}

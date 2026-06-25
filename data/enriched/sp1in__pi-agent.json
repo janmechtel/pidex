@@ -1,0 +1,30 @@
+{
+  "name": "@sp1in/pi-agent",
+  "latest_version": "0.1.3",
+  "description": "Pi extension \u2014 type /wechat, scan QR code, chat with Pi from WeChat",
+  "readme": "# @wechatanybot/pi-agent\n\nPi extension \u2014 type `/wechat` in pi, scan QR code in terminal, chat with Pi from WeChat.\n\n## Install\n\n### From npm (recommended)\n\n```bash\npi install npm:@wechatanybot/pi-agent\n```\n\nDone. The extension auto-loads on next `pi` session. Type `/wechat` to start.\n\n### From git\n\n```bash\npi install https://github.com/jiweiyuan/wechatanybot\n```\n\n### Quick test (no install)\n\n```bash\npi -e npm:@wechatanybot/pi-agent\n```\n\n### Manual (local development)\n\n```bash\ngit clone https://github.com/jiweiyuan/wechatanybot\ncd wechatanybot/pi-agent && npm install\n\n# Load directly\npi -e ./src/index.ts\n\n# Or copy to auto-discovery directory\ncp -r . ~/.pi/agent/extensions/wechat/\n```\n\n## Usage\n\n```\n/wechat              Scan QR code \u2192 connect WeChat to this pi session\n/weixin              Alias for /wechat\n/wechat --force      Force re-login (new QR code)\n/wechat-disconnect   Disconnect\n/wechat-send <text>  Send text to WeChat user manually\n```\n\n### What happens\n\n```\n> /wechat\n\n  \ud83d\udcf1 Scan this QR code in WeChat:\n\n    \u2584\u2584\u2584\u2584\u2584\u2584\u2584 \u2584\u2584\u2584 \u2584\u2584\u2584\u2584\u2584\u2584\u2584\n    \u2588 \u2584\u2584\u2584 \u2588 \u2588\u2580\u2588 \u2588 \u2584\u2584\u2584 \u2588\n    \u2588 \u2588\u2588\u2588 \u2588 \u2584\u2580\u2584 \u2588 \u2588\u2588\u2588 \u2588\n    \u2588\u2584\u2584\u2584\u2584\u2584\u2588 \u2588 \u2584 \u2588\u2584\u2584\u2584\u2584\u2584\u2588\n    \u2584\u2584\u2584\u2584\u2584 \u2584\u2584\u2584\u2588\u2584\u2584\u2584 \u2584\u2584\u2584\u2584\u2584\n    \u2588\u2584\u2588\u2580\u2588\u2584\u2584 \u2580\u2580\u2584\u2580\u2580\u2588\u2584\u2580\u2588\u2580\u2584\n    \u2584\u2584\u2584\u2584\u2584\u2584\u2584 \u2580\u2584 \u2588\u2580\u2584\u2588\u2584\u2588\u2580\u2584\n    \u2588\u2584\u2584\u2584\u2584\u2584\u2588 \u2588\u2580\u2584\u2588\u2580\u2580\u2588\u2580\u2588\u2588\u2588\n\n  [wechat] \u2713 Connected: e06c1ceea05e@im.bot\n\n# Now send \"\u5e2e\u6211\u770b\u770b\u8fd9\u4e2abug\" from WeChat...\n# Pi processes it, sends reply back to WeChat.\n# \"\u5bf9\u65b9\u6b63\u5728\u8f93\u5165\u4e2d...\" shown while Pi thinks.\n```\n\n## How It Works\n\n```\nWeChat User (phone)\n    \u2502\n    \u25bc\niLink API (Tencent) \u2190\u2500\u2500 @wechatanybot/wechatanybot SDK\n    \u2502\n    \u25bc\nPi Extension\n    \u2502\n    \u251c\u2500\u2500 WeChat msg \u2192 pi.sendUserMessage(text)  \u2192 pi processes as prompt\n    \u2502\n    \u2514\u2500\u2500 pi.on('agent_end') \u2192 bot.reply(text)   \u2192 sent back to WeChat\n```\n\n1. `/wechat` creates a `WeChatAnyBot` instance (SDK)\n2. SDK calls iLink API \u2192 gets QR URL\n3. `qrcode-terminal` renders QR code in pi TUI via `ctx.ui.setWidget()`\n4. User scans QR in WeChat \u2192 login confirmed \u2192 credentials saved\n5. SDK starts long-poll \u2192 incoming WeChat messages trigger `pi.sendUserMessage()`\n6. When pi finishes (`agent_end` event), response is sent back via `bot.reply()`\n7. `bot.sendTyping()` shows \"\u5bf9\u65b9\u6b63\u5728\u8f93\u5165\u4e2d...\" while pi thinks\n\n## QR Code Display\n\nThe QR code is rendered using `qrcode-terminal` \u2014 a real scannable QR code in the terminal.\n\nThe **SDK does NOT render QR codes** \u2014 that is the developer's responsibility.\nThis extension is the developer. It receives the URL via `onQrUrl` callback and renders it.\n\n## Dependencies\n\n| Package | Purpose |\n|---|---|\n| `@wechatanybot/wechatanybot` | WeChat iLink Bot SDK \u2014 login, poll, send, typing, context_token |\n| `qrcode-terminal` | Render scannable QR code in terminal |\n| `@mariozechner/pi-coding-agent` | Pi extension API (peer dependency) |\n\n## Pi Package\n\nThis is a [pi package](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/packages.md). It declares `\"keywords\": [\"pi-package\"]` and `\"pi\": { \"extensions\": [...] }` in package.json. Pi auto-discovers the extension after install.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/corespeed-io/wechatbot#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/corespeed-io/wechatbot.git",
+    "directory": "pi-agent"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-29T15:50:11.874Z",
+    "0.1.3": "2026-04-29T15:50:12.156Z",
+    "modified": "2026-04-29T15:50:12.344Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 5,
+  "download_trend": []
+}

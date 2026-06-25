@@ -1,0 +1,36 @@
+{
+  "name": "@czottmann/pi-zai-api",
+  "latest_version": "1.1.0",
+  "description": "Z.AI API provider extension for pi coding agent. Install with `pi install npm:@czottmann/pi-zai-api`.",
+  "readme": "# @czottmann/pi-zai-api\n\nZ.AI API provider extension for [pi](https://pi.dev). It registers the [Z.AI](https://z.ai/) GLM models under a `zai-api` provider that points at the general Z.AI API endpoint.\n\n## Why this exists\n\npi already ships a built-in `zai` provider, but it points at the Coding Plan endpoint (`https://api.z.ai/api/coding/paas/v4`), which needs a Z.AI coding subscription. If you have a regular pay-as-you-go Z.AI API key, that endpoint won't work for you.\n\nThis extension registers the same GLM models under a separate `zai-api` provider that uses the general API endpoint (`https://api.z.ai/api/paas/v4`) instead, authenticated with `ZAI_API_KEY`. The built-in `zai` provider is left untouched.\n\n## Requirements\n\n```bash\nnpm install -g @earendil-works/pi-coding-agent\n```\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:@czottmann/pi-zai-api\n```\n\nFrom a local checkout:\n\n```bash\ncd path/to/pi-zai-api\nnpm install\npi install \"$PWD\"\n```\n\n## Set up auth\n\nUse pi's API-key flow:\n\n```bash\npi\n/login\n# Choose \"Use an API key\", then \"ZAI\" (same as with the built-in `zai` provider).\n```\n\nOr set an environment variable before starting pi:\n\n```bash\nexport ZAI_API_KEY=your-key-here\n```\n\nGet a key from the [Z.AI Dashboard](https://z.ai/manage-apikey/apikey-list). It must be set as API keys in `/login`, not as a subscription.\n\n## Use\n\nList registered models:\n\n```bash\npi --list-models | grep zai-api\n```\n\nStart pi with the provider:\n\n```bash\npi --provider zai-api\n```\n\nIn interactive mode, `/zai-api-models` lists the models registered by the extension.\n\n## How it works\n\nOn startup, the extension reads pi's own built-in `zai` model definitions via `getModels(\"zai\")` from `@earendil-works/pi-ai`, drops their per-model base URL, and re-registers them under the `zai-api` provider with the general API base URL and `ZAI_API_KEY`.\n\nEverything else is carried over from pi's catalog verbatim: context window, max output tokens, reasoning support, input types, and the z.ai-specific compatibility flags (thinking format, tool streaming). Because the list is mirrored at runtime, it tracks pi's built-in `zai` models as you update pi: new GLM models pi adds show up here too, with the corrected endpoint.\n\npi resolves `@earendil-works/pi-ai` to its own bundled copy when it loads the extension, so the mirrored list always matches the pi version you're running.\n\n## Development\n\n```bash\nnpm run check\nnpm run build\npi -e . --provider zai-api\n```\n\n### A note on local dev and the mirrored list\n\nWhen you load the extension from a local checkout (`pi -e .` or `pi install \"$PWD\"`), Node resolves `@earendil-works/pi-ai` to the copy in this project's `node_modules`, not to the one inside your pi install. If that dev copy is older than your pi, the mirrored model list reflects the dev copy and can miss models your pi actually ships.\n\nThe published package bundles no dependencies, so a real install always mirrors the pi you're running. To check the published behavior locally, install a packed build:\n\n```bash\nnpm pack\nmkdir -p /tmp/zai-test && tar -xzf czottmann-pi-zai-api-*.tgz -C /tmp/zai-test --strip-components=1\npi install /tmp/zai-test\n```\n\n## Publishing\n\nGitHub Actions publishes the package to npm when a GitHub Release is published. The release tag must match `package.json` exactly, with or without a leading `v` (`v1.0.0` and `1.0.0` both work for version `1.0.0`).\n\nThe workflow uses npm Trusted Publishing, so it does not need an npm token secret. Configure this package on npm with this repository and workflow file (`.github/workflows/publish.yml`). The workflow builds the package, runs `npm run check`, and publishes with npm provenance.\n\n## Author\n\nCarlo Zottmann, <carlo@zottmann.dev>\n\n- Website: https://actions.work\n- GitHub: https://github.com/czottmann\n- Bluesky: https://bsky.app/profile/zottmann.dev\n- Mastodon: https://norden.social/@czottmann\n",
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "pi-package",
+    "zai",
+    "z.ai",
+    "glm",
+    "llm",
+    "coding-agent"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/czottmann/pi-zai-api#readme",
+  "repository": {
+    "url": "git+https://github.com/czottmann/pi-zai-api.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/zai-api.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-22T11:25:20.817Z",
+    "modified": "2026-06-22T11:49:53.289Z",
+    "1.0.0": "2026-06-22T11:25:21.220Z",
+    "1.1.0": "2026-06-22T11:49:53.003Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 254,
+  "download_trend": []
+}

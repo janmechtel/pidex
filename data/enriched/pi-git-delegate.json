@@ -1,0 +1,34 @@
+{
+  "name": "pi-git-delegate",
+  "latest_version": "0.2.0",
+  "description": "Pi extension: delegate git operations (diff/log/blame) to cheaper models via subagents, saving costs and keeping parent context clean.",
+  "readme": "# Pi Git Delegate\n\n[![CI](https://github.com/eiei114/pi-git-delegate/actions/workflows/ci.yml/badge.svg)](https://github.com/eiei114/pi-git-delegate/actions/workflows/ci.yml)\n[![Publish](https://github.com/eiei114/pi-git-delegate/actions/workflows/publish.yml/badge.svg)](https://github.com/eiei114/pi-git-delegate/actions/workflows/publish.yml)\n[![npm version](https://img.shields.io/npm/v/pi-git-delegate.svg)](https://www.npmjs.com/package/pi-git-delegate)\n[![npm downloads](https://img.shields.io/npm/dm/pi-git-delegate.svg)](https://www.npmjs.com/package/pi-git-delegate)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)\n[![Pi package](https://img.shields.io/badge/pi-package-purple.svg)](https://pi.dev/packages)\n\n> Delegate git operations (diff/log/blame) to cheaper models via subagents \u2014 keeping parent context clean and cutting costs.\n\n## What this is\n\nPi Git Delegate provides typed tools that internally delegate heavy git read operations (diff, log, blame) to subagents. The subagent processes the raw git output and returns only a concise summary to the parent session. This prevents large diffs from polluting the parent's context window and lets you route expensive operations to cheaper models.\n\n## When to delegate\n\nThe cost leverage principle: **delegate only when input is large and output is small.**\n\n| Operation | Delegation | Why |\n|---|---|---|\n| `git diff` (\u2192 summary) | \u2705 Delegate | Diff is large (1000+ tokens), summary is tiny |\n| `git log` (\u2192 changelog) | \u2705 Delegate | Many commits \u2192 compact digest |\n| `git blame` (\u2192 context) | \u2705 Delegate | Full blame is verbose; what matters is who/when/why |\n| `git status` | \u274c Direct | Output is tiny; subagent overhead not worth it |\n| `git push` / `git commit` | \u274c Direct | Write operations stay in parent for safety |\n\n## Features\n\n- **`git_diff_summary`** \u2014 delegate `git diff` to a subagent, return a 1-3 sentence summary\n- **`git_log_summary`** \u2014 delegate `git log` range, return a structured digest\n- **`git_blame_summary`** \u2014 delegate `git blame`, return who changed what and why\n- **Per-tool model routing** \u2014 set `provider` and `model` per tool in `.pi/settings.json` (`null` uses the session defaults)\n- **`/git-delegate:configure`** \u2014 interactive help for writing the settings block\n- **`/git-delegate:status`** \u2014 show current model routing and example JSON\n- **Model override parameter** \u2014 override model per-call via tool parameter\n- **Fallback to current model** \u2014 no config needed; uses the parent session model\n- **Write guard** \u2014 no write operations exposed as tools\n\n## Install\n\n```bash\npi install npm:pi-git-delegate\n```\n\nInstall locally (project-scoped):\n\n```bash\npi install npm:pi-git-delegate -l\n```\n\nTry without installing:\n\n```bash\npi -e .\n```\n\n## Usage\n\nOnce installed, the tools are available automatically. Pi calls them via `pi list`.\n\n### Configure model per tool (optional)\n\nRun in Pi:\n\n```txt\n/git-delegate:configure\n```\n\nThis shows what each key does, prints a starter JSON block, and can save it to `.pi/settings.json` interactively.\n\nCheck the current routing anytime with:\n\n```txt\n/git-delegate:status\n```\n\nManual example for `.pi/settings.json`:\n\n```json\n{\n  \"pi-git-delegate\": {\n    \"diff\": { \"provider\": \"anthropic\", \"model\": \"claude-3-5-haiku-latest\" },\n    \"log\": { \"provider\": null, \"model\": null },\n    \"blame\": { \"provider\": null, \"model\": null }\n  }\n}\n```\n\n`null` means \"use the current session provider/model\".\n\n### Call a tool\n\n```txt\ngit_diff_summary({ref: \"HEAD~3\"})\n\u2192 \"feat: add avatar upload with resize (3 files, 2 commits)\"\n\ngit_log_summary({range: \"main..feature\"})\n\u2192 \"3 commits: feat(avatar), fix(crop), chore(deps)\"\n\ngit_blame_summary({path: \"src/auth.ts\"})\n\u2192 \"src/auth.ts: 3 authors, most recent by @alice (2026-06-01)\"\n```\n\n## Package contents\n\n| Path | Purpose |\n|---|---|\n| `extensions/` | Pi TypeScript extension entrypoints |\n| `lib/` | Shared TypeScript helpers |\n| `docs/` | Optional supporting docs |\n\n## Development\n\n```bash\nnpm install\nnpm run ci\n```\n\n## Release\n\nThis package is set up for npm Trusted Publishing, so no `NPM_TOKEN` is required.\n\n```bash\nnpm version patch\ngit push\n```\n\nSee [`docs/release.md`](docs/release.md) for setup details.\n\n## Docs\n\n`docs/` is optional supporting documentation, not a fixed six-file set. README stays the GitHub/npm entrypoint; add `docs/*.md` only when they help users or maintainers.\n\n- [`docs/examples.md`](docs/examples.md) \u2014 tool usage examples\n- [`docs/release.md`](docs/release.md) \u2014 Trusted Publishing details (README Release summarizes the flow)\n\n## Security\n\nPi packages can execute code with your local permissions. Review extensions before installing third-party packages.\n\nFor vulnerability reporting, see [`SECURITY.md`](SECURITY.md).\n\n## Links\n\n- npm: https://www.npmjs.com/package/pi-git-delegate\n- GitHub: https://github.com/eiei114/pi-git-delegate\n- Issues: https://github.com/eiei114/pi-git-delegate/issues\n\n## License\n\nMIT\\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "git",
+    "typescript"
+  ],
+  "author": {
+    "name": "eiei114"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/eiei114/pi-git-delegate#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eiei114/pi-git-delegate.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-13T13:11:49.124Z",
+    "0.2.0": "2026-06-13T13:11:49.420Z",
+    "modified": "2026-06-13T13:11:49.611Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

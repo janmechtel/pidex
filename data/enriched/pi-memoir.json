@@ -1,0 +1,350 @@
+{
+  "name": "pi-memoir",
+  "latest_version": "0.1.2",
+  "description": "Persistent project memory for pi \u2014 the LLM queries the memoire instead of reading all files, saving ~95%+ tokens.",
+  "readme": "# \ud83e\udde0 pi-memoir (_/pa\u026a m\u025bm\u02c8w\u0251\u02d0r/_)\n\n> **Pronunciation:** pi-mem-wahr (French _m\u00e9moire_ = memory)\n\n![pi-memoir Hero](docs/assets/logo.png)\n\n**Project-wide persistent memory for [pi](https://pi.dev) \u2014 the LLM queries the memoir instead of reading all files, saving ~90%+ tokens.**\n\nPi-memoir builds a structured knowledge base of your project. Instead of the LLM running `bash`, `ls`, `grep`, and `read` on 20 files to understand your project (costing tens of thousands of tokens per session), it queries the memoir for architecture, structure, config, dependencies, and every source file.\n\nInspired by [MemPalace](https://github.com/mempalace/mempalace) (verbatim memory with semantic retrieval) and [Graphify](https://github.com/safishamsi/graphify) (knowledge graph extraction).\n\n## How It Saves Tokens\n\n| Approach                                      | Token Cost                        |\n| --------------------------------------------- | --------------------------------- |\n| LLM runs `ls`, `find`, `grep`, reads 10 files | ~15,000\u201330,000 tokens per session |\n| LLM queries the memoir via `memo_search`      | **~200\u2013500 tokens** per session   |\n| **Savings**                                   | **~95\u201398% per session**           |\n\nThe key insight: **project knowledge doesn't change often.** Harvest once, query forever.\n\n## How It Works\n\n```\n<your-project>/\n\u2514\u2500\u2500 .pi/memoir/\n    \u2514\u2500\u2500 memories.jsonl    \u2190 Append-only JSONL storage (per-project)\n```\n\nThe extension injects a **system prompt instruction** at the start of every turn via `before_agent_start`:\n\n```\n=== PI-MEMOIRE: DON'T USE BASH \u2014 USE THE MEMOIRE ===\nCRITICAL: Before running ANY bash/ls/find/grep/wc/read commands\nto explore the project, you MUST call memo_search first.\n\u2022 \"what's the architecture?\" \u2192 memo_search({ query: \"architecture\" })\n\u2022 \"what files?\" \u2192 memo_search({ tags: \"project:structure\" })\n\u2022 \"dependencies?\" \u2192 memo_search({ query: \"package\", tags: \"project:manifest\" })\n...\nIf memo_search returns nothing, THEN fall back to bash/read.\n```\n\nThis forces the LLM to check the memoir **first** before falling back to bash.\n\n## What Gets Harvested\n\nOn `/memo harvest` (or `memo_harvest` tool), the harvester walks **every file** in your project and stores:\n\n| Memory                | Tag                         | What it contains                                                |\n| --------------------- | --------------------------- | --------------------------------------------------------------- |\n| Project README        | `project:readme`            | Title, first heading, line count                                |\n| Package manifest      | `project:manifest`          | Name, version, deps, scripts, detected language                 |\n| Directory tree        | `project:structure`         | Recursive tree (4 levels deep, 80 lines max)                    |\n| Entry points          | `project:entry`             | `index.ts`, `main.ts`, `src/index.ts`, etc.                     |\n| Config files          | `project:config`            | `tsconfig.json`, `vite.config.ts`, `.eslintrc`, etc.            |\n| **Every source file** | `project:file`, `file:path` | **All files** with source extensions (128 extensions supported) |\n\n### Source file harvesting\n\nThe harvester captures individual memories for every source file in the project:\n\n- **128 file extensions** supported (`.ts`, `.js`, `.py`, `.rs`, `.md`, `.json`, `.vue`, `.svelte`, `.css`, `.sh`, `.java`, `.cpp`, `.go`, `.rb`, `.php` \u2014 and 100+ more)\n- **200 file cap** \u2014 prevents bloat on large projects (covers 90%+ of GitHub repos fully)\n- **20KB limit** \u2014 skips large generated/bundled files\n- **Smart summaries** \u2014 code files show first import/export, JSON shows top-level keys, Markdown shows first heading\n- Skips `node_modules`, `.git`, `dist`, `build`, `.cache`, `target`, `vendor` and other non-source dirs\n\n### Auto-Capture\n\nOn session shutdown, key moments (edited files, decisions) are automatically condensed and stored with `\"auto\"` source tag.\n\n## Installation\n\n### Via git (recommended)\n\n```bash\npi install git:github.com/k1lgor/pi-memoir\n```\n\n### Local path (development)\n\n```bash\npi install ./path/to/pi-memoir\n```\n\n### Quick test (no install)\n\n```bash\npi --extension ./index.ts\n```\n\n## Usage\n\n### Quick Start\n\n```text\nUser: \"/memo harvest\"\nLLM: calls memo_harvest \u2192 scans every file\n\u2192 \"\u2705 Harvested 38 memories about this project.\"\n\nUser: \"What's the architecture?\"\nLLM: calls memo_search({ query: \"architecture\", tags: \"project:structure\" })\n\u2192 \"Project structure: 12 files, 3 dirs\n     \ud83d\udcc1 src/ \u2192 \ud83d\udcc1 api/ \u2192 routes.ts, middleware.ts\n     \ud83d\udcc1 src/ \u2192 \ud83d\udcc1 components/ \u2192 Header.tsx\n     \ud83d\udcc4 README.md, package.json, ...\"\n```\n\n### Tools (LLM can call these)\n\n| Tool           | Description                                                            |\n| -------------- | ---------------------------------------------------------------------- |\n| `memo_harvest` | **Scan the entire project** \u2014 walks every file, stores memories        |\n| `memo_search`  | **REPLACES bash/ls/read** \u2014 query project knowledge by keywords + tags |\n| `memo_store`   | Store additional ad-hoc facts and decisions                            |\n\n### Commands\n\n| Command                             | Description                                 |\n| ----------------------------------- | ------------------------------------------- |\n| `/memo harvest`                     | Scan project and build knowledge base       |\n| `/memo search <query> [--tags t1]`  | Search stored memories                      |\n| `/memo list [--tags t1]`            | List recent memories (shows notification)   |\n| `/memo store <text> [--tags t1,t2]` | Store a memory manually                     |\n| `/memo delete <number>`             | Delete by number from list                  |\n| `/memo delete --all` or `-a`        | **Delete ALL memories** (with confirmation) |\n| `/memo stats`                       | Show memory count and storage path          |\n| `/memo path`                        | Show storage file path                      |\n\n### Benchmark\n\nA standalone benchmark script (`bench.mjs`) compares token costs:\n\n```bash\n# Quick benchmark (common key files)\nnode bench.mjs .\n\n# Full benchmark \u2014 every source file in the project\nnode bench.mjs . --all\n\n# Specific files\nnode bench.mjs . README.md package.json\n```\n\nSample output against the NousResearch/hermes-agent repo (2,957 source files):\n\n```\n\ud83d\udcca Token Cost Benchmark \u2014 pi-memoire\n   /path/to/hermes-agent\n   515 memories in memoir\n\n  \u250c\u2500 src/agent.ts\n  \u2502 File:        2,341 words / 18,204 chars \u2192 ~6,068 tok\n  \u2502 Memoir:     127 words / 1,023 chars \u2192 ~400 tok\n  \u2502 Savings:     5,668 tok (93% reduction)\n  \u2502 Mem entry:   src/agent.ts (89 lines, e.g. import { EventEmitter } from...)\n  \u2514\u2500\u2500\n\n  \u250c\u2500 src/utils/logger.ts\n  \u2502 File:        892 words / 6,521 chars \u2192 ~2,174 tok\n  \u2502 Memoir:     98 words / 812 chars \u2192 ~325 tok\n  \u2502 Savings:     1,849 tok (85% reduction)\n  \u2502 Mem entry:   src/utils/logger.ts (34 lines, e.g. export interface LogLevel...)\n  \u2514\u2500\u2500\n\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\ud83d\udcc8 Summary\n  Files scanned:    2,957 (515 with memoir, 2,442 without)\n  Read files:       ~3,049,753 tokens\n  Query memoir:     ~206,000 tokens\n  Savings:          ~2,843,753 tokens (93% reduction)\n```\n\n## Architecture\n\n```\npi-memoir/\n\u251c\u2500\u2500 index.ts       \u2190 Entry point. Inits storage, wires tools/hooks/commands.\n\u2502                      Injects \"DON'T USE BASH\" rule at end of system prompt\n\u2502                      via before_agent_start (only if memories exist).\n\u251c\u2500\u2500 storage.ts     \u2190 MemoryStore class. JSONL file at .pi/memoir/memories.jsonl.\n\u2502                      store(), search(), list(), delete(), deleteByIndex().\n\u2502                      Keyword search with TF scoring. Singleton exported.\n\u251c\u2500\u2500 harvester.ts   \u2190 Project scanner. Walks entire directory tree, creates\n\u2502                      structured memories for every source file (128 extensions,\n\u2502                      200 cap, <20KB limit, smart summaries per file type).\n\u251c\u2500\u2500 tools.ts       \u2190 Three LLM-callable tools:\n\u2502                      \u2022 memo_harvest \u2014 scan entire project\n\u2502                      \u2022 memo_search  \u2014 REPLACES bash for project exploration\n\u2502                      \u2022 memo_store   \u2014 save ad-hoc facts\n\u251c\u2500\u2500 hooks.ts       \u2190 Lifecycle hooks:\n\u2502                      \u2022 agent_start \u2192 clears stale memo widgets\n\u2502                      \u2022 session_start \u2192 warns if not harvested\n\u2502                      \u2022 session_shutdown \u2192 auto-stores key decisions\n\u251c\u2500\u2500 commands.ts    \u2190 /memo command with subcommands:\n\u2502                      list, search, store, delete (with --all/-a), harvest,\n\u2502                      stats, path. Uses notify() for output.\n\u251c\u2500\u2500 bench.mjs      \u2190 Standalone Node.js benchmark (zero deps).\n\u2502                      Compares token cost: read file vs query memoir.\n\u2502                      Usage: node bench.mjs . --all\n\u251c\u2500\u2500 package.json   \u2190 Extension metadata for pi auto-discovery\n\u2514\u2500\u2500 README.md      \u2190 This file\n```\n\n**Zero external dependencies. Pure TypeScript.** Only runtime dep is `typebox` (bundled with pi).\n\n## Real-world benchmarks\n\nTested against 5 repos with v0.2.0 improvements:\n\n| Repository                                                                | Files | Memories | Read Cost | Memoir Cost | Savings |\n| ------------------------------------------------------------------------- | ----- | -------- | --------- | ----------- | ------- |\n| [microsoft/VibeVoice](https://github.com/microsoft/VibeVoice)             | 7     | 17       | ~17K tok  | ~6.8K tok   | **60%** |\n| [rtk-ai/rtk](https://github.com/rtk-ai/rtk)                               | 272   | 507      | ~730K tok | ~203K tok   | **72%** |\n| [thedotmack/claude-mem](https://github.com/thedotmack/claude-mem)         | 692   | 508      | ~2.5M tok | ~203K tok   | **92%** |\n| [Yeachan-Heo/oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex)     | 1,025 | 509      | ~935K tok | ~204K tok   | **78%** |\n| [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) | 2,957 | 515      | ~3.0M tok | ~206K tok   | **93%** |\n\n**Key takeaways:**\n\n- v0.2.0 improvements (compression, lazy loading, semantic tags) achieve **60-93% token savings**\n- Larger repos (1K+ files) see higher savings due to capped memory count (~500) vs massive file count\n- claude-mem (692 files, 92% savings) and hermes-agent (2,957 files, 93% savings) show best results\n- Smaller repos like VibeVoice (7 files) have lower relative savings due to fixed overhead\n\n## File reference\n\n| File           | Lines | Role                                      |\n| -------------- | ----- | ----------------------------------------- |\n| `index.ts`     | 69    | Entry + system prompt injection           |\n| `storage.ts`   | 226   | MemoryStore, JSONL CRUD, keyword search   |\n| `harvester.ts` | 730   | Project scanner \u2014 walks every file        |\n| `tools.ts`     | 190   | LLM tools (harvest, search, store)        |\n| `hooks.ts`     | 126   | Lifecycle hooks (widgets, session events) |\n| `commands.ts`  | 245   | User commands (/memo)                     |\n| `bench.mjs`    | 285   | Standalone token cost benchmark           |\n| `package.json` | 11    | Extension metadata                        |\n\n**7 source files, 1,597 total lines, 0 npm dependencies.**\n\n## Roadmap\n\n### Completed Features\n\n- [x] Project harvester \u2014 scans every source file (128 extensions)\n- [x] System prompt injection \u2014 LLM uses memoir before bash\n- [x] Keyword search with TF scoring\n- [x] Per-project persistence (`.pi/memoir/`)\n- [x] LLM tools: harvest, search, store\n- [x] Auto-capture on session shutdown\n- [x] `--all/-a` delete flag with confirmation\n- [x] Standalone benchmark script\n- [x] Auto-harvest on first session start\n\n### Token Saving Improvements (v0.2.0)\n\n- [x] **Query-Result Compression** \u2014 default limit=5 results, summary-only previews\n- [x] **Staleness-Based Filtering** \u2014 lastModified timestamps, expireDays filter, pruneExpired()\n- [x] **Lazy Harvesting** \u2014 isMetadataOnly flag, originalFilePath, fetchContent() on-demand\n- [x] **Deduplicated Knowledge** \u2014 seenPaths Set prevents duplicate file entries\n- [x] **Hybrid Retrieval Preference** \u2014 system prompt hint: \"Prefer 80% relevant in 100 tokens\"\n- [x] **Chunked Large Files** \u2014 splitIntoChunks() at 4KB, index each chunk separately\n- [x] **Semantic Tags Auto-Generation** \u2014 auto-tags: api:http, db:sql, config:env, lang:typescript\n\n**Benchmark: 85% token savings** (vs ~75% baseline)\n\n### Future\n\n- [ ] Semantic search via LLM re-ranking\n- [ ] Knowledge graph from cross-file relationships\n- [ ] Obsidian vault export\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "memory",
+    "mempalace",
+    "knowledge-graph",
+    "token-savings",
+    "project-memory"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/k1lgor/pi-memoir#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/k1lgor/pi-memoir.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-08T16:46:41.217Z",
+    "modified": "2026-05-08T17:08:34.466Z",
+    "0.1.1": "2026-05-08T16:46:41.446Z",
+    "0.1.2": "2026-05-08T17:08:34.369Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 11,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 242
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

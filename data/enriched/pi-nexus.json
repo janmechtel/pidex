@@ -1,0 +1,33 @@
+{
+  "name": "pi-nexus",
+  "latest_version": "1.0.0",
+  "description": "Nexus Router provider for pi \u2014 private OpenAI-compatible inference via nexus-projects.ai",
+  "readme": "# pi-nexus\n\n[Nexus Router](https://nexus-projects.ai) provider for [pi](https://pi.dev) \u2014\nprivate, OpenAI-compatible inference through Geramy Loveless's Nexus Router\ngateway. Models are discovered live at startup so your catalog is always\ncurrent, and each is probed so only models with a healthy backend are\nregistered.\n\n## Features\n\n- **Dynamic model discovery** \u2014 fetches the catalog from `GET /models?show_all=true` on every startup\n- **Liveness probing** \u2014 each candidate gets a tiny chat call; models with no healthy backend (or embedding-only models) are skipped\n- **Reasoning support** \u2014 uses pi's `qwen` thinking format, which sends the top-level `enable_thinking` flag and streams `reasoning_content` into pi's thinking block\n- **Cost attribution** \u2014 every request carries `X-Nexus-Agent: pi` so usage rolls up correctly on your Nexus dashboard\n- **Two auth paths** \u2014 environment variable or `auth.json`\n\n## Quick Start\n\n### 1. Get your Nexus token\n\nSign in at <https://nexus-projects.ai/dashboard> and copy your API token\n(format `nxr_...`). Your account token is also your inference credential.\n\n### 2. Authenticate (pick one)\n\n```bash\n# Option A: Environment variable\nexport NEXUS_API_KEY=\"nxr_...\"\n\n# Option B: auth.json (add a \"nexus\" entry)\n# ~/.pi/agent/auth.json\n{\n  \"nexus\": { \"type\": \"api_key\", \"key\": \"nxr_...\" }\n}\n```\n\n### 3. Install\n\n```bash\n# from a local checkout\npi install ./pi-nexus\n\n# or from git\npi install git:github.com/bong-water-water-bong/pi-nexus\n\n# or from npm\npi install npm:pi-nexus\n```\n\n### 4. Use it\n\n```bash\npi\n/model nexus            # pick from the discovered models\n```\n\nOr non-interactively:\n\n```bash\npi --print --model \"nexus/Qwen3.6-35B-A3B-MTP-GGUF\" \"hello\"\n```\n\n## How it works\n\nAt startup the extension:\n\n1. Resolves your API key from `$NEXUS_API_KEY` or the `nexus` entry in `~/.pi/agent/auth.json`.\n2. Fetches `GET /models?show_all=true` from `https://api.nexus-projects.ai/api/v1`.\n3. Filters to **downloaded** models that are **chat-capable** (`modality:\"text\"` or `recipe:\"collection.omni\"`).\n4. Probes each with a minimal non-streaming chat call and keeps only the ones that return HTTP 2xx \u2014 this drops models with no healthy backend (e.g. `LMX-Omni-5.5B-Lite`) and embedding-only models (e.g. `Qwen3-Embedding-0.6B-GGUF`).\n5. Registers the survivors under the `nexus` provider using pi's built-in `openai-completions` API.\n\nNo custom streaming code is required: the Router's `enable_thinking` boolean\nand `reasoning_content` delta streaming are an exact match for pi's built-in\n`qwen` thinking format.\n\n## Configuration\n\n| Env var | Default | Purpose |\n|---------|---------|---------|\n| `NEXUS_API_KEY` | \u2014 | API token (also read from `auth.json`) |\n| `NEXUS_AGENT` | `pi` | Value of the `X-Nexus-Agent` cost-attribution header (\u2264128 chars) |\n\n## Notes & caveats\n\n- **Keep thinking on.** The Nexus reasoning models emit a `reasoning_content`\n  trace even when `enable_thinking:false`, and truncate badly if the output\n  budget is too small. pi's default `maxTokens` for these models is set to a\n  generous 16384 so reasoning doesn't eat the whole budget before the answer.\n  Keep your thinking level at `medium`/`high` for best results.\n- **Cost is zeroed in pi.** Nexus meters usage server-side against your\n  subscription, so pi reports zero cost locally to avoid double-counting. Check\n  real usage on your dashboard.\n- **Over-quota never hard-fails.** The Router paces (throttles) output instead\n  of erroring, so pi just sees slower streaming when you go over.\n- **Text-only.** All models are registered as text-only for now; vision support\n  can be added if a model is confirmed vision-capable.\n\n## Troubleshooting\n\n| Symptom | Fix |\n|---------|-----|\n| `no API key found` at startup | Set `NEXUS_API_KEY` or add a `nexus` entry to `~/.pi/agent/auth.json` |\n| No nexus models in `/model` | Check your token is valid (`curl -H \"Authorization: Bearer $NEXUS_API_KEY\" https://api.nexus-projects.ai/api/v1/account`) |\n| `probe failed / no healthy backend` | That model has no live backend right now; it's skipped. Try another. |\n| Empty answers / `finish_reason: length` | Raise the thinking level and ensure the model isn't being starved of output tokens |\n\n## Requirements\n\n- **pi** `>= 0.80.0`\n- A Nexus Projects account with an API token\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "nexus",
+    "nexus-router",
+    "llm",
+    "api-gateway"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/bong-water-water-bong/pi-nexus#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bong-water-water-bong/pi-nexus.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-24T19:21:55.117Z",
+    "1.0.0": "2026-06-24T19:21:55.356Z",
+    "modified": "2026-06-24T19:21:55.665Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

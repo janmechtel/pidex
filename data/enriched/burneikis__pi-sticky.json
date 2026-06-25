@@ -1,0 +1,31 @@
+{
+  "name": "@burneikis/pi-sticky",
+  "latest_version": "1.0.0",
+  "description": "Keeps the chat input and footer pinned to the bottom of the terminal while you scroll \u2014 works alongside pi-vim, pi-status, and any other extensions",
+  "readme": "# pi-sticky\n\n> **Fully vibe-coded.** Might break. Works for me.\n\nKeeps the chat input and footer pinned to the bottom of the terminal while you scroll through chat history.\n\nWorks alongside your other extensions \u2014 it does not replace the editor or footer, it pins whatever is already registered.\n\n## What it does\n\nUses a terminal scroll-region technique (vendored from `pi-powerline-footer`) to split the terminal into two zones:\n\n- **Scrollable zone** \u2014 chat history\n- **Pinned zone** \u2014 status indicator, editor (e.g. from pi-vim), widgets, footer (e.g. from pi-status)\n\nMouse scroll and `super+up` / `super+down` (or Page Up / Page Down) move through chat history without the input area disappearing.\n\n## Installation\n\n```\npi install https://github.com/burneikis/pi-sticky\n```\n\nThen add to your `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"extensions\": [\n    \"~/.pi/agent/extensions/pi-sticky\",\n    \"~/.pi/agent/extensions/pi-vim\",\n    \"~/.pi/agent/extensions/pi-status\"\n  ]\n}\n```\n\n### Load order is required\n\n**pi-sticky must be listed first.** It wraps `ctx.ui.setEditorComponent` and `ctx.ui.setFooter` before other extensions call them. If pi-vim or pi-status loads first, their registrations will not be intercepted and the sticky behavior will not work.\n\n## Compatibility\n\n| Extension | Works? | Notes |\n|---|---|---|\n| pi-vim | Yes | Editor is pinned as-is, vim modes fully preserved |\n| pi-status | Yes | Footer is pinned at the very bottom |\n| pi-powerline-footer | No | Both extensions patch the same terminal primitives; use one or the other |\n| Any `setWidget` extension | Yes | Widgets above/below editor are pinned alongside the editor |\n\n## Configuration\n\nNo configuration required. The extension works with sensible defaults:\n\n- Mouse scroll enabled\n- Keyboard scroll: `super+up` / `super+down`, `PageUp` / `PageDown`, `ctrl+shift+up` / `ctrl+shift+down`\n- Mouse text selection and copy-to-clipboard on release\n\n## Credits\n\nThe `fixed-editor/` directory is vendored from [pi-powerline-footer](https://github.com/nicobailon/pi-powerline-footer) by Nico Bailon (MIT licensed).\n\n## How it works (technical)\n\nAll extensions registered in the same session share a single `ctx` object (the extension runner creates it once and passes it to every `session_start` handler). pi-sticky uses this to intercept `ctx.ui.setEditorComponent` and `ctx.ui.setFooter` in its own `session_start` before other extensions run theirs.\n\nThe interception wraps each factory to capture:\n- The `tui` reference (the TUI instance, from the factory's first argument)\n- The editor renderable (the object returned by the editor factory)\n\nCompositor installation is deferred via `setTimeout(0)` so it runs after **all** extensions' `session_start` handlers complete. This ensures the footer (registered by pi-status) is already in `tui.children` when the compositor searches for it positionally.\n\nThe pinned layout from top to bottom:\n\n```\nstatusContainer     (loading / thinking animation)\nwidgetContainerAbove (extensions using setWidget \"aboveEditor\")\neditorContainer     (the chat input)\nwidgetContainerBelow (extensions using setWidget \"belowEditor\")\nfooter              (pi-status or built-in footer)\n```\n\nThese elements are hidden from the scrollable TUI render and re-rendered explicitly in the pinned cluster on every frame.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "burneikis"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/burneikis/pi-sticky#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/burneikis/pi-sticky.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-14T21:39:55.538Z",
+    "1.0.0": "2026-05-14T21:39:55.975Z",
+    "modified": "2026-05-14T21:39:56.162Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,36 @@
+{
+  "name": "pi-agented",
+  "latest_version": "0.2.0",
+  "description": "Generic subagent switcher for pi. Header bar above chat, Ctrl+Shift+S to cycle, /agent slash command. Works with any agent in ~/.pi/agent/agents/.",
+  "readme": "# pi-switch \u2014 generic subagent switcher for pi\n\nA tiny pi extension that gives you a **persistent indicator of the current subagent** (header bar above chat) and lets you **cycle / set / create** agents. Generic \u2014 works with any agent in `~/.pi/agent/agents/`.\n\n## Features\n\n- **Header bar above chat** \u2014 shows current agent with emoji + description\n- **Ctrl+Shift+S** to cycle to next agent (Shift+Tab is taken by pi's thinking-level cycler)\n- **`/agent`** slash command to show current + available\n- **`/agent <name>`** to set explicitly\n- **`/agent create <name>`** to scaffold a new user agent\n- **`/agent doctor`** to diagnose\n- **`/agent recommend <task>`** to suggest the right agent for a task\n- **Task \u2192 agent heuristics** baked into the system prompt so the LLM picks the right agent for the task\n- Persists to `.soly/agent` (if soly project) or `~/.pi-switch/agent` (standalone)\n- Reads user agents from `~/.pi/agent/agents/*.md` on every cycle \u2014 drop a file and Ctrl+Shift+S to see it\n\n## How agents work\n\nAgents are markdown files with YAML frontmatter. pi-subagents (and pi-switch) discover them from these locations:\n\n| Path | Type | Editable |\n|---|---|---|\n| `~/.pi/agent/npm/node_modules/pi-subagents/agents/*.md` | built-in (worker, oracle, scout, ...) | \u274c |\n| `~/.pi/agent/agents/*.md` | user-defined | \u2705 |\n| `~/.pi/agent/extensions/soly/agents/*.md` (auto-installed if `useSolyWorkerSubagents: true` in `.soly/config.json`) | soly-augmented (soly-worker, soly-debugger, ...) | \u2705 source |\n\n### Frontmatter schema\n\n```markdown\n---\nname: my-reviewer              # required, unique, [a-zA-Z0-9_-]{1,64}\ndescription: One-liner shown in picker\nthinking: medium               # off | minimal | low | medium | high | xhigh\nsystemPromptMode: replace      # replace | append\ninheritProjectContext: true\ninheritSkills: false\ntools: read, grep, find, ls, bash, edit, write\ndefaultContext: fork           # fresh | fork\n---\n\nYou are `my-reviewer`. The system prompt goes here.\n```\n\n## Create a new agent\n\n### Option A: manually\nDrop a markdown file in `~/.pi/agent/agents/<name>.md` (see schema above). Press `Ctrl+Shift+S` in pi \u2014 it joins the cycle.\n\n### Option B: via slash command\n```\n/agent create my-debugger\n```\nYou'll be prompted for a one-liner description. Then edit the file to specialize the system prompt.\n\n## Test agents\n\n| Action | How |\n|---|---|\n| See current + available | `/agent` |\n| Cycle | `Ctrl+Shift+S` |\n| Set explicitly | `/agent soly-debugger` |\n| Diagnose | `/agent doctor` |\n| Recommend for a task | `/agent recommend investigate React Server Components` |\n\nThe LLM can also auto-pick \u2014 see \"Task \u2192 agent\" below.\n\n## Task \u2192 agent heuristics\n\nThe LLM's system prompt includes a table mapping task keywords to agents. When the user request matches, the LLM should call `/agent <name>` first, then `subagent({ agent: <name>, ... })`.\n\n| Keywords | Agent | Why |\n|---|---|---|\n| research, investigate, look up, find out, explore, compare libraries | \ud83d\udcda researcher | external docs, ecosystem behavior |\n| scout, scan, map, where is, locate, skim | \ud83d\udd0d scout | codebase recon |\n| plan, design, architect, outline, structure | \ud83d\udccb planner | decompose into steps |\n| review, audit, check, adversarial, critique, qa | \ud83d\udc40 reviewer | adversarial review |\n| oracle, decision, tradeoff, which approach, drift | \ud83d\udd2e oracle | decision consistency |\n| debug, bug, fix, crash, error, repro | \ud83d\udc1e soly-debugger | bug investigation |\n| test, tests, coverage, spec, assert | \ud83e\uddea soly-tester | test-only work |\n| refactor, clean up, simplify, extract, rename | \ud83d\udd04 soly-refactor | pure refactoring |\n| document, docs, readme, jsdoc | \ud83d\udcdd soly-documenter | doc updates |\n| implement, build, write code, add feature | \u26a1 worker | implementation |\n| orchestrate, coordinate, dispatch, chain | \ud83e\udd1d delegate | multi-agent |\n\nSame keywords in Russian work (\u0438\u0437\u0443\u0447\u0438, \u0431\u0430\u0433, \u0442\u0435\u0441\u0442, etc.).\n\n## Integration with other extensions\n\n- **soly** reads `globalThis.__PI_SWITCH_AGENT__` to know which subagent to launch for `soly execute`. Falls back to `\"worker\"` if pi-switch isn't loaded.\n- **Soly** also auto-installs soly-augmented agents (soly-worker, soly-debugger, etc.) to `~/.pi/agent/agents/` when `useSolyWorkerSubagents: true` in `.soly/config.json`.\n\n## Files\n\n- `core.ts` \u2014 agent metadata, discovery, cycling, persistence\n- `prompt.ts` \u2014 system-prompt section + task\u2192agent heuristics + `recommendAgent`\n- `index.ts` \u2014 header bar, Ctrl+Shift+S, `/agent` slash command, `/agent create`/`/agent doctor`/`/agent recommend`\n- `tests/core.test.ts` \u2014 21 tests for core logic\n- `tests/prompt.test.ts` \u2014 20 tests for prompt + recommendAgent\n\n## Development\n\n```bash\ncd ~/.pi/agent/extensions/pi-switch\nbun test          # 41 tests\nbun run typecheck # tsc --noEmit\n```\n",
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "pi-package",
+    "subagent",
+    "agent-switcher",
+    "task-routing"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": {
+    "type": "git",
+    "url": "http://git.local.stbl/lowern1ght/pi-soly.framework.git",
+    "directory": "packages/pi-switch"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-15T20:14:18.239Z",
+    "modified": "2026-06-15T21:19:58.803Z",
+    "0.1.0": "2026-06-15T20:14:18.521Z",
+    "0.2.0": "2026-06-15T21:19:58.686Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 17,
+  "download_trend": []
+}

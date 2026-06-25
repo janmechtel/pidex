@@ -1,0 +1,346 @@
+{
+  "name": "pi-lazy-extensions",
+  "latest_version": "0.1.1",
+  "description": "Lazy-load pi extensions on demand via a ToolSearch-style proxy tool",
+  "readme": "<div align=\"center\">\n\n# \ud83e\udda5 pi-lazy-extensions\n\n**Lazy-load [pi](https://github.com/earendil-works/pi-coding-agent) extensions on demand**\n\n_ToolSearch-style proxy tool \u2014 extensions only load when you need them._\n\n[![pi extension](https://img.shields.io/badge/pi-extension-blueviolet)](https://github.com/earendil-works/pi-coding-agent)\n[![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)\n\n</div>\n\n---\n\n---\n\n## The Problem\n\nEvery extension in `~/.pi/agent/extensions/` loads at startup. If you have many extensions, they all register their tools, commands, and event handlers immediately \u2014 even if you rarely use them. This clutters the tool list and wastes resources.\n\n## The Solution\n\n`pi-lazy-extensions` registers a single `ext` proxy tool. The LLM discovers and activates extensions on demand, just like Anthropic's ToolSearch for MCP tools. Extensions stay unloaded until needed.\n\n```\nStartup: only eager extensions load\n    \u2502\n    \u25bc\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502  ext tool   \u2502  \u2190 always available\n\u2502  (pi-lazy)  \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n       \u2502\n       \u2502 LLM calls ext({ activate: \"todo\" })\n       \u25bc\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502  todo ext   \u2502  \u2190 loaded on demand\n\u2502  (lazy)     \u2502     tools appear instantly\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\n---\n\n## Install\n\n```bash\npi install npm:pi-lazy-extensions\n```\n\n---\n\n## Setup\n\nCreate a `lazy-extensions.json` manifest in your project root or `.pi/` directory:\n\n```json\n{\n  \"version\": 1,\n  \"extensions\": [\n    {\n      \"name\": \"todo\",\n      \"path\": \"~/.pi/agent/extensions/todo.ts\",\n      \"lifecycle\": \"lazy\",\n      \"description\": \"Task management - create, list, and track todos\",\n      \"toolSummary\": [\"todo_list\", \"todo_add\", \"todo_complete\"],\n      \"tags\": [\"productivity\", \"tasks\"]\n    },\n    {\n      \"name\": \"snake\",\n      \"path\": \"~/.pi/agent/extensions/snake.ts\",\n      \"lifecycle\": \"lazy\",\n      \"description\": \"Snake game while you wait\",\n      \"tags\": [\"fun\"]\n    },\n    {\n      \"name\": \"git-checkpoint\",\n      \"path\": \"~/.pi/agent/extensions/git-checkpoint.ts\",\n      \"lifecycle\": \"eager\",\n      \"description\": \"Auto git stash/restore on each turn\"\n    }\n  ],\n  \"settings\": {\n    \"idleTimeout\": 10,\n    \"eagerOverrides\": \"\"\n  }\n}\n```\n\n### Manifest Location\n\nThe manifest is searched in this order:\n\n1. `LAZY_EXTENSIONS_CONFIG` environment variable (explicit path)\n2. `<cwd>/.pi/lazy-extensions.json` (project `.pi` dir)\n3. `~/.pi/agent/lazy-extensions.json` (global)\n4. `<cwd>/lazy-extensions.json` (project root)\n\n### Extension Config\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `name` | string | Unique identifier for the extension |\n| `path` | string | Path to the extension's entry point (`.ts` or `.js`) |\n| `lifecycle` | `\"lazy\"` \\| `\"eager\"` \\| `\"keep-alive\"` | Default: `\"lazy\"`. Eager loads at startup, keep-alive never unloads |\n| `description` | string? | What the extension does (shown in search results) |\n| `toolSummary` | string[]? | Names of tools this extension registers (for discovery before load) |\n| `tags` | string[]? | Search/filter tags |\n\n### Settings\n\n| Setting | Type | Default | Description |\n|---------|------|---------|-------------|\n| `disableProxyTool` | boolean | false | If true, don't register the `ext` proxy tool |\n| `idleTimeout` | number | 10 | Minutes before unloading idle lazy extensions (0 = never) |\n| `eagerOverrides` | string | \"\" | Comma-separated extension names to force eager loading |\n\n---\n\n## Usage\n\n### Via the `ext` tool (LLM calls)\n\n```\next({})                                    \u2192 Status: list all extensions\next({ search: \"todo\" })                   \u2192 Search extensions matching \"todo\"\next({ activate: \"todo\" })                 \u2192 Load and activate the \"todo\" extension\next({ tools: \"todo\" })                    \u2192 List tools registered by \"todo\"\n```\n\nAfter `ext({ activate: \"todo\" })`, the `todo` extension's tools become directly available to the LLM.\n\n### Via the `/ext` command (user calls)\n\n```\n/ext                           \u2192 Show status\n/ext activate todo             \u2192 Activate an extension\n/ext search productivity       \u2192 Search extensions\n/ext tools todo                \u2192 List extension tools\n```\n\n---\n\n## How It Works\n\n1. At startup, `pi-lazy-extensions` reads the manifest and registers the `ext` proxy tool\n2. **Eager** and **keep-alive** extensions are loaded immediately during `session_start`\n3. **Lazy** extensions stay unloaded \u2014 their metadata is available for search/discovery\n4. When the LLM (or user) calls `ext({ activate: \"name\" })`, the extension is dynamically loaded via jiti (with the same module alias map that pi's own loader uses, so `import { Type } from \"typebox\"` and `import type { ExtensionAPI } from \"@earendil-works/pi-coding-agent\"` work correctly), and its factory function is called with the shared `ExtensionAPI`\n5. New tools registered by the activated extension appear immediately \u2014 no `/reload` needed\n6. After an idle timeout, lazy extensions are \"soft unloaded\" (their tools are deactivated)\n\n---\n\n### Limitations\n\n- **No full unloading:** Once an extension's factory runs, its event handlers are permanent. Idle unloading only removes tools from the active set.\n- **Shortcuts, flags, and message renderers persist:** These registrations have no deactivate/remove API in the current ExtensionAPI. They remain active even after idle-unload. The `ext` status display shows counts of these for awareness.\n- **`sourceInfo` attribution:** Tools registered by lazy-loaded extensions will show the `pi-lazy-extensions` extension's `sourceInfo`, not the original extension's. This is because `pi.registerTool()` stamps each tool with the `sourceInfo` of the *extension that made the call* \u2014 and since the lazy extension's factory receives the same `ExtensionAPI` as `pi-lazy-extensions`, all registered tools are attributed to `pi-lazy-extensions`. There is no SDK API to override this.\n- **`/ext` command vs `ext` tool:** The `/ext` command uses `ctx.ui.notify()` for output, which may truncate large results. For rich output (search results, detailed status), prefer the `ext` tool interface which renders properly in the TUI.\n- **`session_start` handlers never fire for the current session:** When a lazy extension is activated mid-session, any `session_start` handlers it registers will not fire until the next session or `/reload`. Extensions that depend on `session_start` for initialization (reading config, setting up state) may not work correctly when lazy-loaded. The `ext` tool displays a warning when this is detected.\n- **Duplicate tool names:** If a lazy extension registers a tool with the same name as an already-registered tool, pi's \"first registration wins\" policy silently skips it. The `ext` tool displays a warning when this is detected during activation.\n\n---\n\n## Example: Converting an Existing Extension\n\nBefore (always loaded):\n```\n~/.pi/agent/extensions/my-heavy-ext.ts\n```\n\nAfter (lazy loaded):\n\n1. Move or keep the extension in its existing path\n2. Add to `lazy-extensions.json`:\n```json\n{\n  \"version\": 1,\n  \"extensions\": [\n    {\n      \"name\": \"my-heavy-ext\",\n      \"path\": \"~/.pi/agent/extensions/my-heavy-ext.ts\",\n      \"lifecycle\": \"lazy\",\n      \"description\": \"My heavy extension with 5 tools\",\n      \"toolSummary\": [\"heavy_tool_1\", \"heavy_tool_2\", \"heavy_tool_3\", \"heavy_tool_4\", \"heavy_tool_5\"]\n    }\n  ]\n}\n```\n3. Rename or remove the original from auto-discovery (add a `.bak` suffix or move it out of `~/.pi/agent/extensions/`) so it isn't loaded eagerly by pi itself\n\n---\n\n## Motivation\n\nThis is an experiment. If the pattern proves useful, the goal is to propose a `pi.loadExtension(path)` method to the pi SDK that handles proper `sourceInfo` attribution, deduplication, and full lifecycle management. This package serves as a working prototype to validate the approach.\n\n### Module Resolution\n\nLazy extensions are loaded via `jiti` \u2014 the same TypeScript/ESM transpiler that pi uses for its own extension loader. The jiti instance is configured with the same alias map that pi builds internally, which resolves:\n\n- `typebox` (and `typebox/compile`, `typebox/value`)\n- `@earendil-works/pi-coding-agent`\n- `@earendil-works/pi-agent-core`\n- `@earendil-works/pi-tui`\n- `@earendil-works/pi-ai` (and `@earendil-works/pi-ai/oauth`)\n- `@sinclair/typebox` (legacy alias)\n\nThis ensures lazy extensions can use the same imports as normally-loaded extensions. If jiti is unavailable (e.g. stripped from the runtime), the loader falls back to raw `import()`, which only works for `.js` files without SDK imports.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "lazy",
+    "extension",
+    "coding-agent",
+    "tool-search"
+  ],
+  "author": {
+    "name": "Nico Bailon"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-15T19:56:27.173Z",
+    "0.1.1": "2026-06-15T19:56:27.559Z",
+    "modified": "2026-06-15T19:56:27.735Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 10,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 131
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

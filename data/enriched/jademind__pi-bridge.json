@@ -1,0 +1,41 @@
+{
+  "name": "@jademind/pi-bridge",
+  "latest_version": "0.1.6",
+  "description": "Minimal secure inbox bridge for Pi: reliable queued/steering message delivery to running sessions.",
+  "readme": "# @jademind/pi-bridge\n\n> Package scope: use `@jademind/pi-bridge` (scoped). Older unscoped naming should be considered deprecated.\n\nMinimal secure inbox bridge for Pi sessions.\n\n`@jademind/pi-bridge` is designed for status bar and mobile clients that must send messages reliably to running Pi agents, including plain terminal sessions where tty injection is unreliable.\n\nIt is primarily consumed by the free open-source macOS app [`pi-statusbar`](https://github.com/jademind/pi-statusbar), and complements [`@jademind/pi-telemetry`](https://github.com/jademind/pi-telemetry) for runtime observability.\n\n---\n\n## Related projects\n\n- [`pi-statusbar`](https://github.com/jademind/pi-statusbar): macOS menu bar app for Pi (daemon + UI)\n- [`@jademind/pi-telemetry`](https://github.com/jademind/pi-telemetry): per-process telemetry heartbeat + snapshot CLI\n\n## What it does\n\n- Watches a per-PID inbox directory\n- Validates signed/structured message envelopes\n- Delivers to Pi using user-message semantics\n  - queued mode -> `followUp` when busy\n  - interrupt mode -> `steer` when busy\n- Writes delivery acknowledgements per message\n- Publishes lightweight per-session registry heartbeat\n- Enforces size limits, TTL, path safety, idempotency, and rate limits\n\n## Install\n\n```bash\npi install npm:@jademind/pi-bridge\n```\n\nRestart active Pi sessions after install so the extension loads.\n\nIf you use `pi-statusbar`, install/start everything with:\n\n```bash\nbrew install jademind/tap/pi-statusbar\nstatusbar-setup enable\n```\n\n## Filesystem layout\n\nDefault base directory:\n\n```text\n~/.pi/agent/statusbridge/\n  registry/<pid>.json\n  inbox/<pid>/<message-id>.json\n  processing/<pid>/*.processing\n  acks/<pid>/<message-id>.json\n```\n\nOverride base with:\n\n- `PI_BRIDGE_DIR`\n\n## Envelope (`send-v1`)\n\n```json\n{\n  \"v\": 1,\n  \"id\": \"4a4c5295-d3e4-4f91-b562-8f0f4cc6f413\",\n  \"pid\": 12345,\n  \"text\": \"Please summarize current progress and blockers.\",\n  \"source\": \"statusbar\",\n  \"createdAt\": \"2026-02-24T15:50:00Z\",\n  \"expiresAt\": \"2026-02-24T15:51:00Z\",\n  \"delivery\": {\n    \"mode\": \"queued\"\n  },\n  \"meta\": {\n    \"requestId\": \"ios-123\"\n  }\n}\n```\n\n`delivery.mode` values:\n\n- `queued` (default): queue politely if busy\n- `interrupt`: steering interrupt if busy\n\n## Ack (`ack-v1`)\n\n```json\n{\n  \"v\": 1,\n  \"id\": \"4a4c5295-d3e4-4f91-b562-8f0f4cc6f413\",\n  \"pid\": 12345,\n  \"status\": \"delivered\",\n  \"at\": 1771948234000,\n  \"resolvedMode\": \"queued\"\n}\n```\n\nPossible statuses:\n\n- `delivered`\n- `failed`\n- `duplicate`\n\n## Security defaults\n\n- file size cap: 32 KB\n- message length cap: 4000 chars\n- strict PID matching\n- TTL expiry enforcement\n- symlink and path traversal rejection\n- bounded queue depth\n- separate normal/interrupt rate limiters\n\n## Runtime config\n\n- `PI_BRIDGE_MAX_TEXT` (default `4000`, minimum `256`)\n- `PI_BRIDGE_MAX_SKEW_MS` (default `120000`)\n- `PI_BRIDGE_HEARTBEAT_MS` (default `2000`)\n- `PI_BRIDGE_SCAN_MS` (default `750`)\n- `PI_BRIDGE_QUEUE_DEPTH` (default `64`, minimum `8`)\n- `PI_BRIDGE_RATE_PER_MIN` (default `20`, minimum `20`)\n- `PI_BRIDGE_RATE_BURST` (default `6`, minimum `4`)\n- `PI_BRIDGE_INTERRUPT_RATE_PER_MIN` (default `20`, minimum `20`)\n- `PI_BRIDGE_INTERRUPT_RATE_BURST` (default `4`, minimum `4`)\n\n## Command\n\n- `/pi-bridge-status`\n\n## Development\n\n```bash\nnpm test\nnpm pack --dry-run\n```\n\nSuggested release checklist:\n\n1. Update version in `package.json`\n2. Run tests (`npm test`)\n3. Validate package tarball (`npm pack --dry-run`)\n4. Tag and push release commit\n5. Publish to npm (`npm publish --access public`)\n\n## OSS best practices\n\n- Keep package references scoped in docs/examples (`@jademind/pi-bridge`, `@jademind/pi-telemetry`).\n- Keep bridge inbox/ack directories user-local (`~/.pi/agent/statusbridge`) and avoid world-writable permissions.\n- Treat all inbox payloads as untrusted: validate PID, TTL, size, and path constraints before delivery.\n- Keep rate limits enabled (normal + interrupt) to protect active sessions from spam and accidental loops.\n- When changing envelope/ack schema, bump docs with explicit compatibility notes.\n- Keep release notes aligned across npm package, Git tag, and dependent clients (status bar / mobile).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "bridge",
+    "messaging",
+    "statusbar",
+    "ios"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/jademind/pi-bridge#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jademind/pi-bridge.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/pi-bridge.js"
+    ]
+  },
+  "time": {
+    "created": "2026-02-24T15:29:10.600Z",
+    "modified": "2026-02-25T11:52:19.727Z",
+    "0.1.0": "2026-02-24T15:29:10.866Z",
+    "0.1.1": "2026-02-24T19:19:06.099Z",
+    "0.1.2": "2026-02-25T10:34:30.799Z",
+    "0.1.3": "2026-02-25T11:00:07.078Z",
+    "0.1.4": "2026-02-25T11:18:14.333Z",
+    "0.1.5": "2026-02-25T11:51:20.659Z",
+    "0.1.6": "2026-02-25T11:52:19.591Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 19,
+  "download_trend": []
+}

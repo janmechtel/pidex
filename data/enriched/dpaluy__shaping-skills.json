@@ -1,0 +1,352 @@
+{
+  "name": "@dpaluy/shaping-skills",
+  "latest_version": "0.1.1",
+  "description": "Cross-tool shaping, breadboarding, and transcript-to-document skills.",
+  "readme": "# Shaping Skills\n\nSkills for shaping product ideas into buildable software with LLM coding agents.\n\nThis repo encodes a workflow from [Shape Up](https://basecamp.com/shapeup):\n\n1. Capture the problem and initial solution shape\n2. Check fit between requirements and the shape\n3. Spike unknowns\n4. Breadboard the selected shape into concrete affordances and wiring\n5. Slice the system into demoable vertical scopes\n6. Build slice by slice\n\nThe skills work with Pi, Codex, and Claude.\n\nCanonical skill content lives in `skills/`. Tool-specific manifests and plugin folders point at that single source of truth.\n\n## What These Skills Produce\n\n- **Frame**: source material, problem, and outcome\n- **Shaping doc**: requirements (`R`), shapes (`A`, `B`, `C`), fit checks, and breadboards\n- **Spike docs**: separate investigation files for unknowns\n- **Slices doc**: vertical implementation slices with demos and wiring\n- **Slice plans**: markdown build-plan files for each slice (`V1-plan.md`, etc.)\n\nThe point is not to make prettier markdown. The point is to force the agent to separate requirements from mechanisms, expose unknowns, and make scope decisions explicit before it starts coding.\n\n## Skills\n\n| Skill | What it does | Use it when |\n|------|---------------|-------------|\n| `shaping` | Captures requirements, shapes, fit checks, spikes, and slice handoff | You are defining a feature, comparing solutions, or scoping work before implementation |\n| `breadboarding` | Maps UI affordances, code affordances, stores, places, and wiring | You need to understand or detail how a system works in concrete terms |\n| `breadboard-reflection` | Syncs a breadboard to the implementation and surfaces design smells | You already have a breadboard and want to check it against the code |\n| `framing-doc` | Distills transcripts into a frame with problem, outcome, and evidence | You have source conversations and need the \"why now\" documented |\n| `kickoff-doc` | Converts a kickoff transcript into a builder-facing territory map | The work is shaped and you want a usable handoff doc |\n\n## Typical Workflow\n\n### 1. Start with shaping\n\nAsk the agent to use the `shaping` skill before implementation starts.\n\nExamples:\n\n```text\nUse your shaping skill to capture the requirements and tease apart the key parts of solution A.\n```\n\n```text\nHelp me shape this feature before we build it.\n```\n\n### 2. Check fit\n\nOnce the first shape exists, inspect how well it satisfies the requirements.\n\nExamples:\n\n```text\nShow me R x A.\n```\n\n```text\nRotate the fit check and show me A x R.\n```\n\nThis is the core move. It shows what is solved, what is still fuzzy, and what needs investigation.\n\n### 3. Spike the unknowns\n\nWhen part of the shape is still hand-wavy, spike it.\n\nExamples:\n\n```text\nPlease spike A2.\n```\n\n```text\nCan you spike the local LLM piece?\n```\n\nSpikes should produce separate markdown files so the findings are preserved and can feed back into the shape.\n\n### 4. Breadboard the chosen shape\n\nOnce the shape is good enough, translate it into concrete affordances and wiring.\n\nExample:\n\n```text\nLet's breadboard A.\n```\n\nBreadboarding is what makes slicing sane. Without it, vertical slicing turns into guesswork.\n\n### 5. Slice vertically\n\nOnce the breadboard exists, slice the system into demoable scopes.\n\nExample:\n\n```text\nLet's slice it.\n```\n\nEach slice should end in a real demo, not a horizontal layer. The goal is to build something you can show, learn from, and either continue or cut.\n\n### 6. Build one slice at a time\n\nAfter slicing, have the agent write the first slice's implementation plan and self-test approach into a markdown file instead of presenting the plan in terminal output.\n\nExample:\n\n```text\nPlease write `V1-plan.md` for the first slice. Include how you will test it yourself to ensure it's working, then open the markdown file for review.\n```\n\n## Installation\n\n### Claude Code\n\n```\n/plugin marketplace add dpaluy/shaping-skills\n/plugin install shaping-skills\n```\n\n### Pi\n\nInstall directly from a local path:\n\n```bash\npi install /absolute/path/to/shaping-skills\n```\n\nOr install from git:\n\n```bash\npi install git:github.com/dpaluy/shaping-skills\n```\n\nAfter publishing to npm, install with:\n\n```bash\npi install npm:@dpaluy/shaping-skills\n```\n\nPi discovers the skills from the package manifest and conventional `skills/` directory.\n\n### Codex\n\nYou can use this repo in Codex in three ways:\n\n1. Open this repo directly in Codex. The repo already exposes the skills through `.agents/skills/`.\n2. Install the skills globally for your user:\n\n```bash\n./install.sh --user\n```\n\nThis copies the skills into `~/.agents/skills/` and symlinks them into `~/.claude/skills/`.\n\n3. Install the skills only into the current project:\n\n```bash\n./install.sh --project\n```\n\nThis copies the skills into `.agents/skills/` and symlinks them into `.claude/skills/` for the directory where you run the command.\n\nA publishable Codex plugin layout is also available in `plugins/shaping-skills/`.\n\n## Ripple Hook\n\nThe repo includes a hook that reminds Claude to check ripple effects when editing shaping documents. When a `.md` file with `shaping: true` in its frontmatter is written or edited, the hook prompts a short checklist:\n\n- update affordance tables before re-rendering Mermaid\n- update fit checks when requirements or shape parts change\n- update work stream detail when the work stream design changes\n\nTo install:\n\n1. Symlink the hook script:\n\n```bash\nREPO=/absolute/path/to/shaping-skills\nmkdir -p ~/.claude/hooks\nln -s \"$REPO/hooks/shaping-ripple.sh\" ~/.claude/hooks/shaping-ripple.sh\n```\n\n2. Add the hook to `~/.claude/settings.json`:\n\n```json\n{\n  \"hooks\": {\n    \"PostToolUse\": [\n      {\n        \"matcher\": \"Write|Edit\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"~/.claude/hooks/shaping-ripple.sh\",\n            \"timeout\": 5\n          }\n        ]\n      }\n    ]\n  }\n}\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "codex",
+    "claude",
+    "skills",
+    "shape-up",
+    "shaping",
+    "breadboarding"
+  ],
+  "author": {
+    "name": "David Paluy",
+    "url": "https://github.com/dpaluy"
+  },
+  "license": null,
+  "homepage": "https://github.com/dpaluy/shaping-skills",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dpaluy/shaping-skills.git"
+  },
+  "pi": {
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-04-04T02:53:21.335Z",
+    "0.1.1": "2026-04-04T02:53:21.567Z",
+    "modified": "2026-04-04T02:53:21.802Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 3,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 57
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 2
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

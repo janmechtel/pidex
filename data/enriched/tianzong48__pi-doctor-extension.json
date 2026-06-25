@@ -1,0 +1,36 @@
+{
+  "name": "@tianzong48/pi-doctor-extension",
+  "latest_version": "0.1.4",
+  "description": "Pi diagnostics extension package, starting with startup timing probes.",
+  "readme": "# pi-doctor\n\nPi diagnostics package. The first diagnostic area is startup timing and skill path hygiene.\n\n## Pi package shape\n\n`pi-doctor` follows the Pi package convention: Pi loads runtime behavior from the `pi` manifest in `package.json`.\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./extensions/pi-doctor/index.ts\"]\n  }\n}\n```\n\nThere is intentionally no runtime `bin` entry. Diagnostics are exposed as Pi slash commands instead of standalone shell commands.\n\n## Install\n\nInstall a local checkout:\n\n```bash\npi install /Users/bytedance/dev/pi-doctor\n```\n\nInstall from npm:\n\n```bash\nnpm_config_registry=https://registry.npmjs.org pi install npm:@tianzong48/pi-doctor-extension\n```\n\nUse the explicit registry when your npm default points at an internal mirror such as `bnpm.byted.org`.\n\n## Command\n\nRun the startup doctor:\n\n```text\n/doctor-startup\n```\n\n`/doctor-startup` launches a nested child process:\n\n```bash\npi --no-session -p \"/doctor-startup-marks\"\n```\n\nIt then reports:\n\n- child `pi` process wall-clock startup time\n- nested extension-visible startup marks\n- slow startup warnings\n- slow lifecycle step warnings\n- broken skill symlinks under known skill roots\n\n`/doctor-startup-marks` is an internal helper used by the nested process.\n\n## Example output\n\n```text\nPi Doctor startup report\n\n- command: pi --no-session -p /doctor-startup-marks\n- process_total: 1636.1ms\n- status: exit=0\n- output_bytes: 306\n\nNested startup marks\n\nPi Doctor startup timing\n\n- module_loaded: step +0.0ms, total +0.0ms \u2014 pi-doctor module evaluated\n- factory_called: step +0.1ms, total +0.1ms \u2014 extension factory entered\n- session_start: step +82.9ms, total +83.0ms \u2014 reason=startup\n- resources_discover: step +0.1ms, total +83.1ms \u2014 reason=startup\n\nSkill path checks\n\n\u26a0\ufe0f Found 8 skill path issues:\n- broken symlink: ~/.agents/skills/example \u2014 target=/missing/path; Error: ENOENT...\n```\n\n## Warning thresholds\n\n- `process_total >= 5s`: marked `\u26a0\ufe0f SLOW`\n- `process_total >= 10s`: marked `\ud83d\udea8 VERY SLOW`\n- lifecycle step `>= 1s`: marked `\u26a0\ufe0f SLOW STEP`\n\n## Current observability boundary\n\nA Pi extension cannot observe time before Pi discovers and evaluates that extension. `process_total` covers the full nested child process, while nested startup marks cover only the extension-visible lifecycle inside that child.\n\nStartup work before `module_loaded` may include:\n\n- Node.js process startup\n- Pi CLI argument parsing\n- settings loading\n- package discovery\n- extension path resolution\n- dependency loading before this module is evaluated\n- provider/model registry initialization that happens before extension loading\n\nTo diagnose finer-grained cold-start latency later, add a Pi core timing hook in `pi-mono` before settings/package/provider/resource initialization, then expose those marks to extensions or a debug command.\n\n## Source layout\n\n```text\nextensions/pi-doctor/\n\u251c\u2500\u2500 index.ts            # Pi extension entrypoint and lifecycle wiring\n\u251c\u2500\u2500 launcher-probe.ts   # nested pi process startup measurement\n\u251c\u2500\u2500 output.ts           # UI vs print-mode output helper\n\u251c\u2500\u2500 skill-paths.ts      # skill root and broken symlink diagnostics\n\u251c\u2500\u2500 startup-report.ts   # text report rendering\n\u2514\u2500\u2500 startup-timing.ts   # timing mark data model and recorder\n```\n\n## Development\n\n```bash\ncd /Users/bytedance/dev/pi-doctor\nnpm install\nnpm run check\npi --no-session -p \"/doctor-startup\"\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "diagnostics"
+  ],
+  "author": {
+    "name": "Tianyang.Ni"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/t1anz0ng/pi-doctor#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/t1anz0ng/pi-doctor.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/pi-doctor/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-08T05:25:04.816Z",
+    "modified": "2026-05-08T06:14:01.240Z",
+    "0.1.0": "2026-05-08T05:25:05.084Z",
+    "0.1.2": "2026-05-08T05:54:56.338Z",
+    "0.1.3": "2026-05-08T05:58:13.921Z",
+    "0.1.4": "2026-05-08T06:14:01.148Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 15,
+  "download_trend": []
+}

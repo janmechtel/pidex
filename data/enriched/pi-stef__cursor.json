@@ -1,0 +1,36 @@
+{
+  "name": "@pi-stef/cursor",
+  "latest_version": "0.1.3",
+  "description": "Cursor AI editor as a native Pi stream provider \u2014 OAuth login, protobuf/HTTP2 protocol, tool-call recovery",
+  "readme": "# @pi-stef/cursor\n\nCursor AI editor as a native Pi stream provider \u2014 OAuth login, protobuf/HTTP2 protocol, tool-call recovery.\n\n## Overview\n\nThis package registers Cursor as a Pi provider named `cursor`. It enables Pi to use Cursor models (Claude, GPT, Gemini, Grok) through Cursor OAuth and Cursor's native agent protocol.\n\nKey features:\n- OAuth PKCE authentication with Cursor\n- Protobuf/HTTP2 protocol for efficient streaming\n- Three-tier bridge recovery for tool-call continuity\n- Exact model routing (no invented reasoning-effort suffixes)\n- Dynamic agent endpoint resolution\n\n## Install\n\n```sh\npi install npm:@pi-stef/cursor\n```\n\nThen open Pi and run:\n\n```text\n/login cursor\n```\n\n## Usage\n\nAfter installing and logging in, ask Pi to use Cursor-backed models:\n\n```text\n\"Use the cursor provider for this session and compare the failing test output with the latest diff.\"\n\"Use Cursor MAX mode through the cursor provider for this larger refactor.\"\n\"Use the cursor provider with the exact gemini-3.1-pro model; do not force a reasoning level unless Cursor advertises one.\"\n```\n\n## Remove\n\n```sh\npi remove @pi-stef/cursor\n```\n\n## Update\n\n```sh\npi update @pi-stef/cursor\n```\n\n## Endpoint And Model Routing\n\nCursor model discovery and streaming use Cursor's agent endpoint. The provider resolves that endpoint in this order:\n\n1. `PI_CURSOR_AGENT_URL`\n2. `CURSOR_AGENT_URL`\n3. Cursor CLI config at `~/.cursor/cli-config.json`, from `serverConfigCache.agentUrlConfig.agentnUrl` or `serverConfigCache.agentUrlConfig.agentUrl`\n4. Fallback `https://agentn.us.api5.cursor.sh`\n\nUse an environment override only when Cursor has moved your account or region to a different agent endpoint:\n\n```sh\nPI_CURSOR_AGENT_URL=\"https://agentn.us.api5.cursor.sh\" pi\n```\n\nThe provider sends exact Cursor model ids without inventing reasoning-effort suffixes. If a model is listed as an exact non-effort model, a Pi reasoning request such as `high` is omitted instead of turning `gemini-3.1-pro` into a fake `gemini-3.1-pro-high` route. Reasoning effort is forwarded only when Cursor model metadata advertises effort support or provides an explicit mapping.\n\nParameterized and MAX variants still route through Cursor metadata. Native agent model discovery uses the resolved agent endpoint; legacy parameterized model discovery is used only when Cursor's older available-models endpoint returns it.\n\n## Architecture\n\n### Bridge Recovery\n\nThe provider implements three-tier bridge recovery for tool-call continuity:\n\n1. **Tier 1**: Resume from existing bridge connection\n2. **Tier 2**: Rebuild from checkpoint/blob state\n3. **Tier 3**: Full history rebuild from Pi request context\n\nSee [bridge recovery docs](docs/bridge-recovery.md) for details.\n\n### Protocol\n\nThe provider uses protobuf over HTTP/2 for efficient communication with Cursor's agent endpoint. See [protocol docs](src/docs/protocol.md) for details.\n\n## Configuration\n\n### Environment Variables\n\n- `PI_CURSOR_AGENT_URL` \u2014 Override Cursor agent endpoint\n- `CURSOR_AGENT_URL` \u2014 Alternative agent endpoint override\n- `PI_CURSOR_PROVIDER_DEBUG=1` \u2014 Enable debug logging\n- `PI_CURSOR_STREAM_IDLE_TIMEOUT_MS` \u2014 Stream idle timeout (default: 120000ms)\n- `PI_CURSOR_STREAM_IDLE_MAX_RETRIES` \u2014 Max idle retries (default: 3)\n- `PI_CURSOR_RESUME_IDLE_TIMEOUT_MS` \u2014 Resume stream timeout (default: 240000ms)\n\n### Debug Logging\n\n```sh\nPI_CURSOR_PROVIDER_DEBUG=1 pi\n```\n\nDebug summaries redact token-like values and image payload bytes. Logs are intended for protocol debugging, not for sharing outside a trusted workspace.\n\n## Troubleshooting\n\n### Authentication Fails\n\nRemove the package and reinstall after updating Pi:\n\n```sh\npi remove @pi-stef/cursor\npi install npm:@pi-stef/cursor\n```\n\n### Provider Starts Offline\n\nIf the provider starts offline, it registers bundled fallback models and retries live model discovery after successful OAuth login or refresh.\n\n### Stream Idle Timeout\n\nNative streams retry in place when Cursor stops sending upstream data. The default idle timeout is 2 minutes, outbound heartbeat frames do not extend it, and the provider retries 3 times before returning a final error. The default can spend up to 8 minutes on a fully silent turn, and each retry may repeat upstream Cursor work.\n\n## Live Verification\n\nThe repo tests do not require Cursor credentials. To smoke-test with a real account after installing:\n\n1. Start Pi.\n2. Run `/login cursor`.\n3. Select a Cursor model from `/model`.\n4. Send a simple text prompt.\n5. Send a prompt with a small PNG/JPEG if image support is needed.\n\n## Upstream Attribution\n\nThis package adapts `ndraiman/pi-cursor-provider` PR #8 at pinned commit `06c894e76989cb961c65c6b48914d12fe26cf90b`, authored by Matthew Leong. The upstream repo is by Netanel Draiman and is MIT licensed.\n\nAdditional protocol and model-quality references:\n- `sudosubin/pi-frontier` by Subin Kim\n- `netandreus/pi-cursor-provider` by Andrey\n- `kenryu42/pi-cursor-oauth`\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "cursor",
+    "provider",
+    "ai-editor"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://sfiorini.github.io/pi-stef/packages/cursor.html",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sfiorini/pi-stef.git",
+    "directory": "packages/cursor"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-15T21:24:39.274Z",
+    "modified": "2026-06-20T21:15:23.437Z",
+    "0.1.1": "2026-06-15T21:24:39.641Z",
+    "0.1.2": "2026-06-17T03:34:23.620Z",
+    "0.1.3": "2026-06-20T21:15:23.330Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 190,
+  "download_trend": []
+}

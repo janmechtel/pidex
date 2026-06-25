@@ -1,0 +1,350 @@
+{
+  "name": "@alexgorbatchev/pi-agentation",
+  "latest_version": "3.1.2",
+  "description": "pi extension launcher for Agentation Fork",
+  "readme": "# pi-agentation\n\nA pi extension launcher for Agentation Fork.\n\nIt resolves the repository's Agentation Fork `projectId`, starts an\nextension-managed watch loop, and dispatches a **one-shot** Agentation Fork\nbatch-processing skill when real annotations arrive.\n\nSee:\n\n- [agentation-fork.vercel.app](https://agentation-fork.vercel.app)\n- [Agentation Fork](https://github.com/alexgorbatchev/agentation)\n- [Agentation Fork CLI](https://github.com/alexgorbatchev/agentation-cli)\n- [Agentation Skills](https://github.com/alexgorbatchev/agentation-skills)\n\n> [!IMPORTANT]\n> When idle, this keeps an Agentation Fork watch loop running but does not\n> spend model tokens. Tokens are only used when a real annotation batch is\n> dispatched for autonomous code-fix work.\n\n## Architecture\n\n`pi-agentation` now splits responsibilities cleanly:\n\n- **Extension**\n  - resolves the project for the current repo\n  - runs `agentation pending` once on startup\n  - then keeps a live `agentation watch <project-id> --timeout 300 --json` loop running\n  - dispatches exactly one skill run per fetched batch\n  - pauses queue polling while the current batch is still in progress\n\n- **Skill**\n  - processes exactly one already-fetched batch\n  - acknowledges each annotation\n  - edits code\n  - resolves, replies, or dismisses annotations\n  - exits when that batch is done\n\nThis avoids the old brittle design where the extension kept re-queuing the same\nskill prompt after every agent turn.\n\n## Behavior\n\n- The launcher (`pi-agentation`) injects the bundled `agentation` skill via `--skill`\n- The extension checks that `/skill:agentation` is available before starting\n- On session start/switch/fork, the extension:\n  - runs `agentation projects --json`\n  - runs `rg` to discover literal `projectId=\"...\"` or `projectId='...'` values in the repo\n  - intersects both lists\n  - auto-starts if exactly one project matches, otherwise prompts you to choose in the TUI\n- The resolved project ID is stored in the current Pi session so reloads/resume do not re-prompt that same session\n- The extension manages the polling loop itself; it does one startup `agentation pending` check and then relies on a live `agentation watch` loop as the primary mechanism\n- When a batch arrives, the extension injects batch context and dispatches `/skill:agentation <project-id>`\n- The UI widget is intentionally conservative: after startup it reports live-watch status, not an authoritative queue-empty claim\n- If a batch is left incomplete, restart `pi-agentation` to retry from a clean watch loop\n- On `session_shutdown`, the extension stops its internal watch loop automatically\n- If the skill is missing, no repo project IDs are found, or no discovered repo IDs are known to Agentation Fork yet: the plugin requests shutdown and exits with code `1`\n\n## Installation\n\nInstall both project packages:\n\n```bash\nnpm install -D @alexgorbatchev/agentation @alexgorbatchev/pi-agentation\n```\n\n`@alexgorbatchev/pi-agentation` ships a bundled `agentation` skill, so you do not need to install a separate skill package for local use.\n\nExecutable resolution order:\n\n- `pi-agentation` resolves `pi` from the nearest `node_modules/.bin/pi` first, then falls back to `PATH`\n- the extension resolves `agentation` from the nearest `node_modules/.bin/agentation` first, then falls back to `PATH`\n- `rg` is still expected on `PATH`\n\nThis makes the package work cleanly when `pi-agentation`, `pi`, and the Agentation Fork CLI are installed into the same Node project, while still supporting global installations.\n\n## Usage\n\nBefore running pi, start the [Agentation Fork CLI](https://github.com/alexgorbatchev/agentation-cli) and connect from the front end which uses `<Agentation projectId=\"...\" />` at least once in the last 24h. Then run the launcher from your project:\n\n```bash\nnpx pi-agentation\n```\n\nIf your shell already exposes local package binaries on `PATH`, you can run:\n\n```bash\npi-agentation\n```\n\n## Notes\n\n- The extension now owns polling; the skill is intentionally one-shot.\n- If you leave a batch partially handled, restart `pi-agentation` to retry from a clean watch loop.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "agentation"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/alexgorbatchev/pi-agentation#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexgorbatchev/pi-agentation.git"
+  },
+  "pi": {
+    "extensions": [
+      "./agentation.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-03-21T18:30:57.514Z",
+    "modified": "2026-03-27T05:56:18.822Z",
+    "3.0.0": "2026-03-21T18:30:57.810Z",
+    "3.1.0": "2026-03-23T22:14:19.651Z",
+    "3.1.1": "2026-03-26T22:58:16.524Z",
+    "3.1.2": "2026-03-27T05:56:18.556Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 26,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 177
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 265
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 31
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 28
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 50
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 17
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 38
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 28
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 45
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 26
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 31
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 3
+    }
+  ]
+}

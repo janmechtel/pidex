@@ -1,0 +1,40 @@
+{
+  "name": "pi-guard",
+  "latest_version": "1.3.0",
+  "description": "General-purpose permission system for pi tools, handling permissions for bash and file tools with extensible matchers for custom tools.",
+  "readme": "# pi-guard\n\nGeneral-purpose permission system for pi tools. Handles permissions for bash and file tools (read/edit/write) with extensible matchers for custom tools.\n\n## Overview\n\npi-guard intercepts tool calls and checks them against permission rules before execution.\n\n**rules** define what's allowed. **matchers** define how to match tool calls to rules.\n\nBuilt-in matchers for `bash`, `read`, `write`, and `edit`. Other tools can be guarded by configuring matchers in settings.\n\n## Installation\n\n```bash\npi install npm:pi-guard\n```\n\n## Configuration\n\nConfigure in `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"guard\": {\n    \"enabled\": true,\n    \"matchers\": {\n      \"spawn\": { \"param\": \"agent\", \"type\": \"exact\" },\n      \"webfetch\": { \"param\": \"url\", \"type\": \"glob\" }\n    },\n    \"rules\": {\n      \"*\": \"ask\",\n      \"bash\": {\n        \"*\": \"ask\",\n        \"git status\": \"allow\",\n        \"git log\": \"allow\",\n        \"rm\": \"deny\"\n      },\n      \"read\": {\n        \"*\": \"allow\",\n        \"**/*.env\": \"deny\",\n        \"**/*.pem\": \"deny\"\n      },\n      \"write\": { \"*\": \"ask\" },\n      \"edit\": { \"*\": \"ask\" },\n      \"spawn\": {\n        \"build\": \"allow\",\n        \"test\": \"allow\",\n        \"*\": \"deny\"\n      },\n      \"webfetch\": {\n        \"*\": \"ask\",\n        \"https://github.com/*\": \"allow\"\n      }\n    }\n  }\n}\n```\n\n### Shorthand\n\nDisable all checks:\n```json\n{ \"guard\": { \"enabled\": false } }\n```\n\nWhole-tool action (no pattern matching needed):\n```json\n{ \"guard\": { \"rules\": { \"write\": \"allow\" } } }\n```\n\n### Environment Variable\n\nSet `PI_GUARD` to inject rules from outside (e.g., by pi-spawn or CI/CD):\n\n```bash\nPI_GUARD='{\"*\":\"deny\",\"bash\":{\"git diff\":\"allow\"}}'\n```\n\n## Matchers\n\nMatchers define how to extract and match input from a tool call. Each matcher has a `param` (which tool parameter to extract) and a `type` (how to match).\n\n| Type | Description | Use case |\n|------|-------------|----------|\n| `bash` | Parse command, extract all commands, subsequence match | Bash commands |\n| `glob` | `*` and `**` matching (paths, URLs) | File paths, URLs |\n| `exact` | String equality | Enum values, agent names |\n\nTools without a matcher get simple allow/ask/deny for the whole tool.\n\n## Matching Algorithms\n\n### Bash (type: \"bash\")\n\n1. Parse command with unbash AST parser\n2. Extract all commands from the AST\n3. For each command, check rules using subsequence matching\n4. Tokens in rule must appear in order, extra arguments allowed\n\nExample: `\"git log\"` matches `git log`, `git log --oneline`, `git log --oneline -10`\n\n### Glob (type: \"glob\")\n\nStandard glob matching:\n- `*` matches anything except `/`\n- `**` matches anything including `/`\n- `?` matches single character\n- `~` expands to home directory\n\n### Exact (type: \"exact\")\n\nSimple string equality. Rule `\"build\"` only matches input `build`.\n\n## Rule Precedence\n\n```\ndefault \u2192 user config \u2192 project config \u2192 env (PI_GUARD) \u2192 profile \u2192 session rules\n```\n\n**Last match wins** within a tool's rules. Put catch-all `\"*\"` first, specific rules after:\n\n```json\n\"bash\": {\n  \"*\": \"ask\",\n  \"git status\": \"allow\",\n  \"git log\": \"allow\",\n  \"rm\": \"deny\"\n}\n```\n\n## Actions\n\nEach permission rule resolves to one of:\n- `\"allow\"` \u2014 run without approval\n- `\"ask\"` \u2014 prompt for approval (or block in non-interactive mode)\n- `\"deny\"` \u2014 block the action\n\n## Default Rules\n\nSee [src/defaults.ts](src/defaults.ts) for the built-in default rules.\n\nThe defaults follow a simple principle: **reading is safe, writing is dangerous**. Bash commands that only read (ls, cat, git log) are allowed, while anything that modifies state asks for approval. File reads are mostly allowed except for sensitive patterns (*.env, *.pem). All edits and writes require approval since they change the codebase.\n\nTo trust the agent with file modifications (useful in containers or trusted environments), allow all edits and writes:\n\n```json\n{\n  \"guard\": {\n    \"rules\": {\n      \"edit\": \"allow\",\n      \"write\": \"allow\"\n    }\n  }\n}\n```\n\n## Profiles\n\nProfiles let you define named rule overlays that can be activated during a session. This is useful for switching between permission modes without editing config. Only one profile can be active at a time \u2014 activating a new one replaces the previous.\n\nProfiles are layered between env (`PI_GUARD`) and session rules in the precedence chain. Rules are merged in layer order with last-match-wins semantics, so a profile with `\"*\": \"allow\"` will override any specific rules from earlier layers (like `\"rm\": \"deny\"`) \u2014 `\"*\"` always matches last and wins.\n\nFor example, define a profile that allows writes so you can switch to it when you want to make changes:\n\n```json\n{\n  \"guard\": {\n    \"profiles\": {\n      \"read-write\": {\n        \"edit\": { \"*\": \"allow\" },\n        \"write\": { \"*\": \"allow\" }\n      }\n    }\n  }\n}\n```\n\nActivate it with `/guard profile read-write` and deactivate with `/guard profile off`.\n\n### Profile Commands\n\n```\n/guard profile           # Show active profile and available profiles\n/guard profile <name>    # Activate a profile by name\n/guard profile off       # Deactivate current profile\n```\n\n### Shortcuts\n\nShortcuts are custom commands that execute guard subcommands, so you don't have to type commands like `/guard profile read-write` every time:\n\n```json\n{\n  \"guard\": {\n    \"profiles\": {\n      \"read-write\": {\n        \"edit\": { \"*\": \"allow\" },\n        \"write\": { \"*\": \"allow\" }\n      }\n    },\n    \"shortcuts\": {\n      \"rw\": \"profile read-write\",\n      \"ro\": \"profile off\",\n      \"yolo\": \"disable\",\n      \"safe\": \"enable\"\n    }\n  }\n}\n```\n\nNow `/rw` activates the read-write profile, `/ro` deactivates it, and `/yolo`/`/safe` quickly toggle the guard off and on.\n\nShortcuts can reference any guard subcommand: `profile`, `list`, `toggle`, `enable`, or `disable`.\n\n## Commands\n\n### `/guard`\n\nManage pi-guard security settings.\n\n```\n/guard enable           # Enable guard\n/guard disable          # Disable guard\n/guard toggle           # Toggle guard on/off\n/guard list             # Show current rules\n/guard profile          # Show active profile and available profiles\n/guard profile <name>   # Activate a profile by name\n/guard profile off      # Deactivate current profile\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "security",
+    "permissions",
+    "bash",
+    "file",
+    "guard"
+  ],
+  "author": {
+    "name": "Jason Diamond",
+    "email": "jason@diamond.name"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/jdiamond/pi-guard#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jdiamond/pi-guard.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-28T00:55:08.575Z",
+    "modified": "2026-04-25T16:31:43.338Z",
+    "1.0.0": "2026-03-28T00:55:08.717Z",
+    "1.1.0": "2026-04-01T03:45:54.820Z",
+    "1.2.0": "2026-04-19T04:55:44.372Z",
+    "1.3.0": "2026-04-25T16:31:43.047Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": null,
+  "download_trend": []
+}

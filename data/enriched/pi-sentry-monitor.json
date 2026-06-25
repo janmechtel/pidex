@@ -1,0 +1,44 @@
+{
+  "name": "pi-sentry-monitor",
+  "latest_version": "0.1.12",
+  "description": "Sentry AI Monitoring extension for pi coding agent sessions and tool calls",
+  "readme": "# pi-sentry-monitor\n\nSentry AI Monitoring extension for [pi coding agent](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) sessions and tool calls.\n\nMirrors what [opencode-sentry-monitor](https://github.com/stolinski/opencode-sentry-monitor) does for OpenCode \u2014 tracks agent sessions, tool executions, token usage, and errors as Sentry traces.\n\n## Trace Hierarchy\n\n```\ngen_ai.invoke_agent (session span)\n\u251c\u2500\u2500 gen_ai.execute_tool (per tool call)\n\u2502   \u251c\u2500\u2500 gen_ai.tool.input  (if recordInputs enabled)\n\u2502   \u2514\u2500\u2500 gen_ai.tool.output (if recordOutputs enabled)\n\u2514\u2500\u2500 gen_ai.request (per assistant message)\n    \u2514\u2500\u2500 token usage attributes (input, output, cached)\n```\n\n## Installation\n\n**Global** (applies to all projects):\n```bash\npi install npm:pi-sentry-monitor\n```\n\n**Project-local** (checked into the repo, shared with teammates):\n```bash\npi install npm:pi-sentry-monitor -l\n```\n\nThen run `/reload` in pi to activate without restarting.\n\nA companion skill is included \u2014 once installed, ask pi to \"set up Sentry monitoring\" and it will walk through creating a Sentry project, configuring the DSN, and verifying traces are flowing.\n\n## Configuration\n\nCreate `.pi/sentry-monitor.json` (or `.jsonc`) in your project:\n\n```json\n{\n  \"dsn\": \"https://your-key@o123.ingest.sentry.io/456\"\n}\n```\n\n### Config File Locations (searched in order)\n\n1. Path in `PI_SENTRY_CONFIG` env var\n2. `<cwd>/.pi/sentry-monitor.json[c]`\n3. `~/.pi/agent/sentry-monitor.json[c]`\n\n### Environment Variable Overrides\n\n| Variable | Description |\n|---|---|\n| `PI_SENTRY_DSN` / `SENTRY_DSN` | Sentry DSN |\n| `PI_SENTRY_TRACES_SAMPLE_RATE` | Sample rate (0-1) |\n| `PI_SENTRY_RECORD_INPUTS` | Record tool inputs (true/false) |\n| `PI_SENTRY_RECORD_OUTPUTS` | Record tool outputs (true/false) |\n| `PI_SENTRY_ENABLE_METRICS` | Enable metrics (true/false) |\n| `PI_SENTRY_TAGS` | Custom tags (format: `key:value,key:value`) |\n| `SENTRY_ENVIRONMENT` | Environment name |\n| `SENTRY_RELEASE` | Release version |\n\n### Full Config Schema\n\n```json\n{\n  \"dsn\": \"https://...\",\n  \"tracesSampleRate\": 1,\n  \"environment\": \"production\",\n  \"release\": \"1.0.0\",\n  \"debug\": false,\n  \"agentName\": \"my-agent\",\n  \"projectName\": \"my-project\",\n  \"recordInputs\": true,\n  \"recordOutputs\": true,\n  \"maxAttributeLength\": 12000,\n  \"includeMessageUsageSpans\": true,\n  \"includeSessionEvents\": true,\n  \"enableMetrics\": false,\n  \"tags\": {\n    \"team\": \"platform\"\n  }\n}\n```\n\n## Event Mapping\n\n| pi event | Sentry span/action |\n|---|---|\n| `session_start` | Create root `gen_ai.invoke_agent` span |\n| `session_shutdown` | End session span, flush Sentry |\n| `model_select` | Track model/provider changes |\n| `tool_execution_start` | Start `gen_ai.execute_tool` child span |\n| `tool_execution_end` | End tool span, capture errors |\n| `message_start` (assistant) | Open `gen_ai.request` span (captures real LLM latency) |\n| `message_end` (assistant) | Close `gen_ai.request` span, attach token usage + content |\n| `agent_end` | Flush pending data to Sentry |\n\n## Development\n\n```bash\ngit clone https://github.com/sergical/pi-sentry-monitor && cd pi-sentry-monitor\nnpm install\nnpm run build\n\n# Install local copy for testing\npi install ./path/to/pi-sentry-monitor\n# or test without installing (ephemeral)\npi -e ./dist/index.js\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "extension",
+    "sentry",
+    "observability",
+    "ai-monitoring"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "dist/index.js"
+    ],
+    "skills": [
+      "skills"
+    ]
+  },
+  "time": {
+    "created": "2026-03-13T18:55:40.690Z",
+    "modified": "2026-03-31T21:49:05.520Z",
+    "0.1.1": "2026-03-13T18:55:40.958Z",
+    "0.1.2": "2026-03-13T18:58:26.569Z",
+    "0.1.3": "2026-03-13T19:29:38.239Z",
+    "0.1.5": "2026-03-13T19:47:09.805Z",
+    "0.1.6": "2026-03-13T23:49:31.592Z",
+    "0.1.7": "2026-03-14T23:07:06.398Z",
+    "0.1.8": "2026-03-19T16:26:03.878Z",
+    "0.1.9": "2026-03-19T17:33:56.105Z",
+    "0.1.10": "2026-03-19T18:11:57.447Z",
+    "0.1.11": "2026-03-19T18:53:44.473Z",
+    "0.1.12": "2026-03-31T21:49:05.393Z"
+  },
+  "versions_count": 11,
+  "downloads_last_week": 23,
+  "download_trend": []
+}

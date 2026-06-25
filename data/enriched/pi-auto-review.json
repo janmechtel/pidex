@@ -1,0 +1,346 @@
+{
+  "name": "pi-auto-review",
+  "latest_version": "1.7.3",
+  "description": "Automated project review for Pi \u2014 scans for problems, writes TODO.md, and optionally auto-fixes in bounded fix loops",
+  "readme": "# pi-auto-review\n\nEvent-driven project review for [Pi](https://pi.dev) \u2014 automatically scans for problems after work completes, writes findings to `TODO.md`, and optionally auto-fixes them.\n\n## The Point\n\nThis extension is **invisible to the agent**. No commands, no skills, no markers, no branding. Reviews trigger automatically when configured conditions are met \u2014 the agent just receives a follow-up message and does the work.\n\n## Install\n\n```bash\npi install /path/to/pi-auto-review\n```\n\n## How It Works\n\n```\nRalph loop done \u2192 review \u2192 TODO.md \u2192 fix \u2192 re-review \u2192 fix \u2192 re-review (clean) \u2192 \u2705\n```\n\n1. **Work completes** (Ralph loop done, agent finishes, session starts)\n2. **Review triggers automatically** \u2014 scans for problems, writes TODO.md\n3. **If `autoFix: true`** \u2014 agent fixes items, then re-reviews\n4. **Fix loop continues** until project is clean or max rounds hit\n5. **Convergence check** \u2014 if fixes cause MORE problems, bail immediately\n\n### The fix loop is bounded\n\n- **maxFixRounds** (default 3) \u2014 hard cap\n- **Divergence detection** \u2014 if a re-review finds MORE items than before, stops immediately\n- **Clean exit** \u2014 0 items \u2192 done right away\n\n## Triggers\n\n| Trigger | Default | Description |\n|---------|---------|-------------|\n| `onRalphDone` | `true` | Auto-review when a Ralph loop completes |\n| `onAgentEnd` | `false` | Auto-review after any agent finishes (after `minTurns`) |\n| `onSessionStart` | `false` | Auto-review when a session starts |\n\n## Configuration\n\nAdd to `.pi/settings.json` (project) or `~/.pi/agent/settings.json` (global):\n\n```json\n{\n  \"autoReview\": {\n    \"enabled\": true,\n    \"todoPath\": \"TODO.md\",\n    \"autoFix\": false,\n    \"maxFixRounds\": 3,\n    \"onRalphDone\": true,\n    \"onAgentEnd\": false,\n    \"onSessionStart\": false,\n    \"minTurns\": 3,\n    \"cooldownMs\": 120000,\n    \"scope\": \"full\",\n    \"excludePatterns\": [\"node_modules\", \".git\", \"dist\", \"build\", \"coverage\"]\n  }\n}\n```\n\n### Settings Reference\n\n| Setting | Type | Default | Description |\n|---------|------|---------|-------------|\n| `enabled` | `boolean` | `true` | Master toggle \u2014 disable without uninstalling |\n| `todoPath` | `string` | `\"TODO.md\"` | Path to the todo file |\n| `autoFix` | `boolean` | `false` | After building the todo, go fix the problems |\n| `maxFixRounds` | `number` | `3` | Max review\u2192fix\u2192re-review loops |\n| `onRalphDone` | `boolean` | `true` | Auto-review when Ralph loop completes |\n| `onAgentEnd` | `boolean` | `false` | Auto-review after agent finishes |\n| `onSessionStart` | `boolean` | `false` | Auto-review on session start |\n| `minTurns` | `number` | `3` | Minimum turns before `onAgentEnd` fires |\n| `cooldownMs` | `number` | `120000` | Minimum ms between auto-reviews |\n| `scope` | `\"full\"\\|\"staged\"\\|\"diff\"` | `\"full\"` | Review scope |\n| `excludePatterns` | `string[]` | `[\"node_modules\", ...]` | Directories to skip |\n| `prompt` | `string\\|null` | `null` | Custom first-review prompt |\n| `rereviewPrompt` | `string\\|null` | `null` | Custom re-review prompt. Placeholders: `{round}`, `{maxRounds}`, `{previousItems}`, `{focusAreas}` |\n| `fixInstruction` | `string\\|null` | `null` | Custom instruction appended when autoFix is on |\n| `focusAreas` | `string[]\\|null` | `null` | Override default list of things to look for |\n\n## Fix-Only Philosophy\n\nAuto-review finds **what's broken**, not what's missing:\n- \u2705 Build errors, type errors, lint failures\n- \u2705 Failing tests, missing tests\n- \u2705 Security vulnerabilities, hardcoded secrets\n- \u2705 Broken imports, dead code\n- \u2705 FIXME/HACK markers (bugs, not ideas)\n- \u2705 Debug leftovers (console.log in prod)\n- \u274c Feature requests (\"add dark mode\")\n- \u274c Architecture proposals (\"should use microservices\")\n- \u274c Nice-to-haves (\"consider using X pattern\")\n\n## Custom Prompts\n\nAll prompts are customizable. Use `null` or omit to keep defaults.\n\n```json\n{\n  \"autoReview\": {\n    \"prompt\": \"Focus on TypeScript strict mode errors and security issues in the API routes.\",\n    \"rereviewPrompt\": \"Check round {round}/{maxRounds}. Previously found {previousItems} issues.\",\n    \"fixInstruction\": \"Fix each item, then run the test suite to verify.\",\n    \"focusAreas\": [\n      \"Type errors in src/api/\",\n      \"Security issues (hardcoded secrets, eval usage)\",\n      \"Failing tests\"\n    ]\n  }\n}\n```\n\nNote: format instructions (TODO.md markers, `_Items found: N_`) are always appended, even with custom prompts. This ensures the fix loop's item counting works correctly.\n\n## Cooldown\n\n2-minute cooldown by default (`cooldownMs: 120000`). Prevents review spam when multiple events fire close together.\n\n## License\n\nMIT",
+  "keywords": [
+    "pi-package",
+    "auto-review",
+    "code-quality"
+  ],
+  "author": {
+    "name": "Dracon"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/dracon/pi-auto-review#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dracon/pi-auto-review.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/auto-review.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-19T11:16:34.694Z",
+    "1.7.3": "2026-05-19T11:16:35.148Z",
+    "modified": "2026-05-19T11:16:35.529Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 33,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 91
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 20
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 2
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 47
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

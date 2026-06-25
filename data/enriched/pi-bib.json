@@ -1,0 +1,32 @@
+{
+  "name": "pi-bib",
+  "latest_version": "0.1.0",
+  "description": "A pi extension for bibliography and BibTeX review workflows.",
+  "readme": "# pi-bib\n\nA pi extension for checking bibliography / BibTeX files against CrossRef and Semantic Scholar.\n\n## Based on Bibtex-Verifier\n\nThis project is based on [Bibtex-Verifier](https://github.com/merfanian/Bibtex-Verifier). The original project provides a browser-based UI for uploading or pasting BibTeX and reviewing suggested metadata changes interactively.\n\n`pi-bib` adapts the core idea for pi as a local command-line-style extension.\n\nImprovements / differences:\n\n- Runs directly inside pi via `/review:bib`.\n- Recursively finds `.bib` files in a project folder.\n- Produces a local Markdown report instead of requiring browser interaction.\n- Uses `@retorquere/bibtex-parser`, the parser behind Better BibTeX for Zotero, instead of regex-based BibTeX parsing.\n- Reports BibTeX parse issues alongside metadata checks.\n- Keeps API lookup logic for CrossRef and Semantic Scholar.\n- Uses DOI-first lookup when an entry has a `doi` field, then falls back to title lookup.\n- Writes suggested BibTeX files under `pi-bib-suggested/` instead of modifying original `.bib` files.\n- Applies only safe `updated` field suggestions to generated files; `needs_review`, `not_found`, and duplicates remain unchanged for manual review.\n- Uses the active pi model as an extra suspicious-match check before applying non-DOI metadata suggestions.\n- Adds citation-review guidance to pi's system prompt so the LLM behaves like a skeptical bibliography reviewer when helping with citations.\n\n## Install\n\nOnce published to npm:\n\n```bash\npi install npm:pi-bib\n```\n\nFor local development from this folder:\n\n```bash\nnpm install\npi -e .\n```\n\n## Commands\n\n### `/review:bib [path]`\n\nRecursively searches for `.bib` files under `path` or the current working directory, parses them with `@retorquere/bibtex-parser`, checks entries against CrossRef and Semantic Scholar, detects duplicate titles, writes a Markdown report, and creates safe suggested BibTeX files.\n\nLookup order per entry:\n\n1. If a `doi` field exists, look up the DOI directly in CrossRef and Semantic Scholar.\n2. If DOI lookup fails or no DOI is present, fall back to title-based lookup.\n3. Compare the found metadata with the local BibTeX entry and report field differences.\n4. For non-DOI matches that would otherwise be auto-updated, ask the active pi model whether the local entry and candidate metadata appear to describe the same paper. `different` or `uncertain` verdicts are kept as `needs_review` instead of being applied to suggested files.\n\nOutputs:\n\n```txt\npi-bib-report.md\npi-bib-suggested/<same relative path as each checked .bib file>\n```\n\nThe suggested files apply safe `updated` metadata suggestions only. Entries marked `needs_review`, `not_found`, or duplicate are kept unchanged so you can inspect them manually.\n\nIgnored folders: `node_modules`, `.git`, `.pi`, `dist`, `pi-bib-suggested`.\n\n## LLM citation-review guidance\n\nWhen the extension is loaded, it appends bibliography-review instructions to pi's system prompt. The guidance tells the LLM to:\n\n- treat citations as unverified until validated against reliable metadata\n- prefer DOI-based evidence over title-only matches\n- avoid inventing missing metadata\n- flag suspicious author, title, year, venue, DOI, and duplicate mismatches\n- treat `updated` as a safe suggestion, `needs_review` as uncertain, and `not_found` as unvalidated\n- inspect `pi-bib-report.md` first for broad bibliography reviews\n- avoid overwriting original `.bib` files unless explicitly asked\n\n## Development\n\nTypecheck:\n\n```bash\nnpm run typecheck\n```\n\nCheck what would be published:\n\n```bash\nnpm run pack:dry\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "bibliography",
+    "bibtex"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/fses91/pi-bib#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fses91/pi-bib.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-28T18:52:23.393Z",
+    "0.1.0": "2026-04-28T18:52:23.664Z",
+    "modified": "2026-04-28T18:52:23.876Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 10,
+  "download_trend": []
+}

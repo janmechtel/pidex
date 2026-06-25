@@ -1,0 +1,31 @@
+{
+  "name": "pi-command-guard",
+  "latest_version": "1.0.1",
+  "description": "A pi extension that intercepts potentially dangerous bash commands and prompts for confirmation before execution",
+  "readme": "# pi-command-guard\n\nA global [pi](https://pi.dev) extension that intercepts potentially dangerous bash commands and prompts the user for confirmation before execution.\n\n## Features\n\n- **Intercept dangerous commands** \u2014 Detects 14 categories of risky shell operations before they run\n- **Three-way decision** \u2014 Allow, Block, or provide Custom Instructions for the LLM to suggest a safer alternative\n- **Session-aware caching** \u2014 If you allow a command once in a session, it won't prompt again for the same command\n- **Configurable rules** \u2014 Add, remove, or modify detection rules via a simple JSON config file\n- **Non-interactive safety** \u2014 Blocks by default when running in print/JSON mode (no UI available)\n- **Styled overlay dialog** \u2014 Clear explanation of why the command was flagged, displayed with syntax-highlighted command text\n\n## Installation\n\n### Quick install (recommended)\n\n```bash\npi install npm:pi-command-guard\n```\n\nThen restart pi or run `/reload`.\n\n### Install from GitHub\n\n```bash\npi install git:github.com/shreyashp77/pi-command-guard\n```\n\nThen restart pi or run `/reload`.\n\n### Manual install\n\nClone the repo into your global extensions directory:\n\n```bash\ngit clone git@github.com:shreyashp77/pi-command-guard.git ~/.pi/agent/extensions/command-guard\n```\n\nThen restart pi or run `/reload`.\n\n### Verify installation\n\nAfter installing, you should see the extension loaded in pi's logs. Test it by asking the LLM to run a command like `rm -rf node_modules` \u2014 the guard dialog should appear with three options: **Allow**, **Block**, or **Custom Instructions**.\n\n## How It Works\n\nWhen the LLM calls the `bash` tool with a command, the extension checks it against a set of dangerous command patterns:\n\n1. **Detection** \u2014 Regex patterns match against the command string\n2. **Dialog** \u2014 A styled overlay appears with the command, rule label, and explanation\n3. **Decision** \u2014 Choose one of three options:\n\n| Option | What happens |\n|--------|-------------|\n| **Allow** | The command runs as intended. Cached for the session. |\n| **Block** | The command is cancelled with a reason. |\n| **Custom Instructions** | You type what you actually want to do in natural language. The original command is blocked, and the LLM receives both the blocked command and your instructions, so it can suggest a safer alternative. |\n\n## Built-in Rules\n\n| # | Rule | Patterns |\n|---|------|----------|\n| 1 | Recursive deletion | `rm -rf`, `rm -r`, `rm --recursive`, `rm --no-preserve-root` |\n| 2 | Privilege escalation | `sudo` |\n| 3 | Overly permissive permissions | `chmod 777`, `chmod 666`, `chmod 776`, `chown` with same |\n| 4 | Disk device operations | `dd` |\n| 5 | Filesystem creation | `mkfs`, `mkfs.ext4`, etc. |\n| 6 | Remote code execution via pipe | `curl \\| bash`, `wget \\| sh`, `curl \\| sudo sh` |\n| 7 | Netcat reverse shell | `nc -e`, `nc -c` |\n| 8 | Writing to system directories | Writing to `/etc/`, `/boot/`, `/sbin/`, `/usr/sbin/`, `/bin/` |\n| 9 | Package manager global uninstall | `npm uninstall`, `pip uninstall`, `apt purge`, `brew autoremove`, etc. |\n| 10 | Dangerous git operations | `git push --force`, `git reset --hard`, `git push --force-with-lease` |\n| 11 | Emptying file contents | `truncate -s 0` |\n| 12 | Kill all processes | `kill -9`, `kill --kill` |\n| 13 | Swap formatting | `mkswap` |\n| 14 | Dangerous eval/source | `eval` or `source` with `curl`/`wget` |\n\n## Configuration\n\nEdit `rules.json` to customize detection rules:\n\n```json\n{\n  \"addRules\": [\n    {\n      \"label\": \"My custom rule\",\n      \"pattern\": \"/\\\\bmy-dangerous\\\\b/g\",\n      \"explanation\": \"This command does something risky.\"\n    }\n  ],\n  \"removeRules\": [\n    \"default-2\"\n  ],\n  \"updateRules\": [\n    {\n      \"id\": \"default-0\",\n      \"pattern\": \"/\\\\brm\\\\s+-rf\\\\b/g\",\n      \"explanation\": \"Updated explanation for recursive deletion.\"\n    }\n  ]\n}\n```\n\n### Rule IDs\n\nDefault rules are auto-assigned IDs `default-0` through `default-13` (in order of definition). Custom rules get IDs like `custom-14`, `custom-15`, etc.\n\n### Pattern Format\n\nPatterns can be specified as:\n- A regex string: `\"\\\\brm\\\\s+-rf\\\\b\"`\n- A regex literal: `\"/\\\\brm\\\\s+-rf\\\\b/g\"`\n\n## Architecture\n\n```\nLLM calls bash tool\n        \u2502\n        \u25bc\n  tool_call event fires\n        \u2502\n        \u25bc\n  Command checked against patterns\n        \u2502\n        \u25bc\n  Dangerous? \u2500\u2500\u2500No\u2500\u2500\u2192 Let it run\n        \u2502\n       Yes\n        \u2502\n        \u25bc\n  Show overlay dialog\n        \u2502\n   \u250c\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n   Yes   No  Custom\n   \u2502      \u2502     \u2502\n   \u25bc      \u25bc     \u25bc\n Run     Block  Input dialog\n command  cmd    \"What do\n               you want\n               to do\n               instead?\"\n                   \u2502\n                   \u25bc\n            Block original,\n            send context +\n            user intent to LLM\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "extension",
+    "security",
+    "bash",
+    "command-guard"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-13T16:45:19.518Z",
+    "modified": "2026-06-13T16:51:24.831Z",
+    "1.0.0": "2026-06-13T16:45:19.709Z",
+    "1.0.1": "2026-06-13T16:51:24.718Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 12,
+  "download_trend": []
+}

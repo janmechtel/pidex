@@ -1,0 +1,43 @@
+{
+  "name": "@vaayne/pi-subagent",
+  "latest_version": "0.3.0",
+  "description": "Pi extension for delegating tasks to specialized agents",
+  "readme": "# Agent Extension\n\nA Pi extension that delegates work to specialized agents in isolated contexts.\n\n## Tool\n\n### `agent`\n\nDelegate work to a specialized agent. Each invocation spawns a separate `pi` process with its own isolated context and persistent session.\n\n## Slash Command\n\nThe extension registers these slash commands:\n\n- `/agent <name> <prompt>`\n- `/agent-resume <session-id> <prompt>`\n\nExample:\n\n```text\n/agent reviewer Audit the current diff for correctness risks\n```\n\nThis command does not run the subagent directly. Instead, it sends a user message that instructs the main agent to:\n\n- rewrite the raw request into a self-contained, context-aware subagent prompt\n- include relevant conversation, repository, working-directory, file, and constraint context\n- call the `agent` tool with `options.scope: \"both\"`\n- integrate the subagent result back into the normal conversation flow\n\nThis keeps the UI consistent with normal tool usage and ensures subagent output returns through the main agent.\n\n## Modes\n\n### Single Run\n\nRun one agent with one prompt.\n\n```json\n{\n  \"name\": \"worker\",\n  \"prompt\": \"List all files in the current directory\"\n}\n```\n\nOverride the agent's default model at runtime:\n\n```json\n{\n  \"name\": \"reviewer\",\n  \"prompt\": \"Audit the current diff for correctness risks\",\n  \"options\": {\n    \"model\": \"openai-codex/gpt-5.4\",\n    \"thinking\": \"high\"\n  }\n}\n```\n\n### Resume a Saved Session\n\nResume a previously saved subagent session with its original tools, system prompt, cwd, and model/thinking overrides.\n\n```json\n{\n  \"sessionId\": \"019d906a-3d5a-70b6-a359-1d16acea15dc\",\n  \"prompt\": \"Continue the review and focus on race conditions\"\n}\n```\n\n### Parallel Runs\n\nRun multiple agents concurrently.\n\n```json\n{\n  \"parallel\": [\n    { \"name\": \"worker\", \"prompt\": \"Task 1\" },\n    { \"name\": \"reviewer\", \"prompt\": \"Task 2\" }\n  ]\n}\n```\n\nPer-run overrides are also supported in parallel mode:\n\n```json\n{\n  \"parallel\": [\n    {\n      \"name\": \"worker\",\n      \"prompt\": \"Task 1\",\n      \"model\": \"google/gemini-2.5-pro\",\n      \"thinking\": \"medium\"\n    },\n    {\n      \"name\": \"reviewer\",\n      \"prompt\": \"Task 2\",\n      \"model\": \"openai-codex/gpt-5.4\",\n      \"thinking\": \"high\"\n    }\n  ]\n}\n```\n\n### Sequence Runs\n\nRun agents sequentially, passing output to the next step via `{previous}`.\n\n```json\n{\n  \"sequence\": [\n    { \"name\": \"worker\", \"prompt\": \"Generate a list of items\" },\n    { \"name\": \"reviewer\", \"prompt\": \"Process these items: {previous}\" }\n  ]\n}\n```\n\n## Parameters\n\n| Name       | Type   | Required | Description                                                            |\n| ---------- | ------ | -------- | ---------------------------------------------------------------------- |\n| `name`      | string | No       | Agent name for a single run                                             |\n| `sessionId` | string | No       | Saved subagent session ID to resume                                     |\n| `prompt`    | string | No       | Prompt for a single run or resumed session                              |\n| `parallel`  | array  | No       | Array of `{name, prompt, cwd?, model?, thinking?}` for parallel runs    |\n| `sequence`  | array  | No       | Array of `{name, prompt, cwd?, model?, thinking?}` for sequential runs  |\n| `options`   | object | No       | Optional configuration                                                  |\n\nTool results include a per-run `sessionId` in `details.results[]`. Use that ID with the `agent` tool's resume mode or `/agent-resume` to continue the same specialized subagent configuration later.\n\n### `options`\n\n| Name             | Type    | Required | Description                                                   |\n| ---------------- | ------- | -------- | ------------------------------------------------------------- |\n| `scope`          | string  | No       | `user`, `project`, or `both` (default: `user`)                |\n| `confirmProject` | boolean | No       | Prompt before running project agents (default: `true`)        |\n| `cwd`            | string  | No       | Working directory for a single run                            |\n| `model`          | string  | No       | Default model override for the whole tool call                |\n| `thinking`       | string  | No       | Default thinking override: `off|minimal|low|medium|high|xhigh` |\n\n## Agent Discovery\n\nAgent frontmatter may define default `model` and `thinking`, but both can now be overridden at runtime through tool parameters.\n\nAgents are discovered from:\n\n- **User agents:** `~/.pi/agent/agents/`\n- **Project agents:** `.pi/agents/` (in project root)\n",
+  "keywords": [
+    "agent",
+    "ai",
+    "delegation",
+    "pi-extension",
+    "pi-package",
+    "agent"
+  ],
+  "author": {
+    "name": "Vaayne",
+    "email": "liu.vaayne@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/vaayne/agent-kit/tree/main/extensions/subagent",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vaayne/agent-kit.git",
+    "directory": "extensions/subagent"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-05T06:15:39.851Z",
+    "modified": "2026-04-16T08:34:42.478Z",
+    "0.1.0": "2026-02-05T06:15:40.095Z",
+    "0.1.2": "2026-04-14T13:27:00.313Z",
+    "0.1.3": "2026-04-14T15:23:10.196Z",
+    "0.1.4": "2026-04-15T02:21:51.605Z",
+    "0.2.0": "2026-04-15T10:08:01.809Z",
+    "0.3.0": "2026-04-16T08:34:42.212Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": null,
+  "download_trend": []
+}

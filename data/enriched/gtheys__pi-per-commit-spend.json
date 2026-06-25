@@ -1,0 +1,33 @@
+{
+  "name": "@gtheys/pi-per-commit-spend",
+  "latest_version": "0.2.6",
+  "description": "Pi extension that tracks AI spend per git commit across sessions",
+  "readme": "# pi-per-commit-spend\n\nA [pi](https://github.com/badlogic/pi) extension that tracks AI spend per git commit across sessions.\n\nEvery time you commit in a repo, the extension records the total AI cost accumulated since the previous commit. Spend from multiple sessions is merged \u2014 if you work across three sessions before committing, all three sessions' costs roll into that commit's entry.\n\n## Works with subscription providers\n\nWhen using subscription services (GitHub Copilot, Claude Max, etc.) the API returns `cost = 0`. This extension automatically:\n\n1. Fetches pricing data from [models.dev](https://models.dev) (4,000+ models)\n2. Looks up the current model's real pricing across all providers\n3. Calculates cost from token counts when the API reports zero\n\nCalculated costs are tagged with `(calc)` in the `/spend` view.\n\n### How subscription cost calculation works\n\nSubscription providers (like GitHub Copilot) don't expose per-request pricing \u2014 the API reports `cost.total = 0` because you pay a flat monthly fee. This extension fills that gap:\n\n1. **On session start**, it fetches [models.dev/api.json](https://models.dev/api.json) \u2014 a community-maintained database with pricing for 4,000+ models across 80+ providers\n2. **On `model_select`**, it tracks which model is currently active (e.g. `claude-sonnet-4`, `gpt-5.1`)\n3. **On each assistant message**, if `cost.total = 0`:\n   - It searches models.dev for the model ID across **all providers** (not just the subscription one)\n   - It skips providers that report zero cost (other subscriptions)\n   - It picks the first provider with real per-token pricing\n   - It calculates: `(input \u00d7 input_price + output \u00d7 output_price + cache_read \u00d7 cache_read_price + cache_write \u00d7 cache_write_price) / 1,000,000`\n4. **Example**: You're using `claude-sonnet-4` via GitHub Copilot. The Copilot provider reports `cost: { input: 0, output: 0 }`. But the same model exists under the `anthropic` provider with `cost: { input: 3, output: 15, cache_read: 0.3, cache_write: 3.75 }` (per 1M tokens). The extension uses the Anthropic pricing to calculate your cost.\n\n**Note**: The calculated cost is an **estimate** \u2014 it reflects what you *would* have paid per-token, not your actual subscription cost. This is useful for comparing productivity across projects and understanding relative spend per commit.\n\nThe pricing cache is refreshed every 24 hours. Use `/spend-refresh` to force an update.\n\n## Install\n\n```bash\npi install npm:@gtheys/pi-per-commit-spend\n```\n\nOr install from git:\n\n```bash\npi install git:github.com/gtheys/pi-per-commit-spend\n```\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/spend` | Interactive spend breakdown per commit (Space to expand, Esc/q to close) |\n| `/spend-reset` | Clear all recorded spend data for the current repo |\n| `/spend-refresh` | Force-refresh models.dev pricing cache |\n\n## How it works\n\n1. **Fetches pricing** \u2014 On session start, loads [models.dev](https://models.dev) pricing data (cached 24h locally)\n2. **Tracks model** \u2014 Listens to `model_select` to know which model is active\n3. **Accumulates** \u2014 Every assistant message's usage is summed. If `cost.total > 0`, uses API cost. If `= 0`, calculates from tokens \u00d7 models.dev pricing\n4. **Records on commit** \u2014 When `git commit` succeeds, the accumulated spend is saved to disk\n5. **Persists across sessions** \u2014 Uncommitted spend is saved as \"pending\" on shutdown, then reloaded into the accumulator on the next session\n\n### Event flow\n\n```\nsession_start \u2192 load pending entries, fetch models.dev pricing\n       \u2193\nmodel_select \u2192 track current model ID\n       \u2193\nmessage_end \u2192 accumulate cost (API cost or calculated from tokens)\n       \u2193\ntool_result (git commit) \u2192 flush accumulator to DB, reset\n       \u2193\nsession_shutdown \u2192 save remaining accumulator as \"pending\" entry\n```\n\n### Cost calculation\n\n```\nFor subscription providers (cost.total = 0):\n  model = current model ID (e.g. \"claude-sonnet-4\")\n  pricing = lookup across all models.dev providers\n  cost = (input_tokens \u00d7 input_price\n        + output_tokens \u00d7 output_price\n        + cache_read_tokens \u00d7 cache_read_price\n        + cache_write_tokens \u00d7 cache_write_price) / 1,000,000\n```\n\n## Storage\n\nData lives in `~/.pi/agent/data/`:\n\n| File | Purpose |\n|------|---------|\n| `per-commit-spend.json` | Spend entries keyed by repo path |\n| `per-commit-spend-models.json` | Cached models.dev pricing (refreshed every 24h) |\n\nEntry format:\n\n```json\n{\n  \"commitHash\": \"abc1234\",\n  \"commitMessage\": \"feat: add login page\",\n  \"cost\": 0.0423,\n  \"calculatedCost\": true,\n  \"inputTokens\": 15000,\n  \"outputTokens\": 3000,\n  \"cacheReadTokens\": 24000,\n  \"cacheWriteTokens\": 5000,\n  \"timestamp\": 1709600000000,\n  \"pending\": false\n}\n```\n\n## Development\n\nThe extension is a single TypeScript file at `index.ts`. Pi loads `.ts` files directly \u2014 no build step needed.\n\n```bash\nnpm pack --dry-run # preview tarball contents\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/gtheys/pi-per-commit-spend#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gtheys/pi-per-commit-spend.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-03T05:36:19.016Z",
+    "modified": "2026-05-19T04:24:09.932Z",
+    "0.2.2": "2026-05-03T05:36:19.287Z",
+    "0.2.3": "2026-05-03T05:39:02.342Z",
+    "0.2.4": "2026-05-03T05:52:41.320Z",
+    "0.2.5": "2026-05-05T08:47:44.291Z",
+    "0.2.6": "2026-05-19T04:24:09.825Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": null,
+  "download_trend": []
+}

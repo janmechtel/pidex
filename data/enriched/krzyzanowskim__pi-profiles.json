@@ -1,0 +1,38 @@
+{
+  "name": "@krzyzanowskim/pi-profiles",
+  "latest_version": "0.3.1",
+  "description": "Run Pi with isolated auth profiles while sharing the standard session store.",
+  "readme": "# pi-profiles\n\nA small Pi package for running Pi with separate auth profiles such as `personal` and `work`.\n\n## Is this possible?\n\nYes, but not as a pure in-process extension.\n\nPi creates its `AuthStorage` before extensions run. The CLI auth file is derived from the Pi agent directory:\n\n- default: `~/.pi/agent/auth.json`\n- override: `PI_CODING_AGENT_DIR=/some/dir`, which makes Pi use `/some/dir/auth.json`\n\nThe SDK can also use `AuthStorage.create(\"/custom/auth.json\")`, but the stock CLI does not expose an `--auth-file` or `--profile` flag. So this package uses a launcher (`pi-profile`) to set `PI_CODING_AGENT_DIR` **before Pi starts**, then loads a tiny extension that shows which profile is active.\n\nTrade-off: `PI_CODING_AGENT_DIR` separates the whole Pi agent directory, not only auth. This launcher makes sessions shared again by setting `PI_CODING_AGENT_SESSION_DIR` to Pi's standard session location (`~/.pi/agent/sessions`) by default.\n\n## Install\n\nWith mise:\n\n```bash\nmise use -g npm:@krzyzanowskim/pi-profiles@latest\n```\n\nWith npm:\n\n```bash\nnpm install -g @krzyzanowskim/pi-profiles\n```\n\nThen run:\n\n```bash\npi-profile personal\npi-profile work\n```\n\n### Local development install\n\nFrom this directory:\n\n```bash\nnpm link\n```\n\nOr without linking:\n\n```bash\nnode ./bin/pi-profile.js personal\n```\n\n## Usage\n\n```bash\n# Start interactive Pi using ~/.pi/agent-profiles/personal/auth.json\npi-profile personal\n\n# Start a work profile\npi-profile work\n\n# Pass normal Pi flags through\npi-profile work --model claude-sonnet-4-5\npi-profile work -p \"Summarize this repo\"\n\n# Use normal Pi package commands with the profile's settings directory\npi-profile work list\npi-profile work install <source>\n\n# Show profile directories\npi-profile --list\npi-profile --dir work\n```\n\n## Shell shortcuts\n\nFor shorter commands, add shell functions to your `~/.zshrc`, `~/.bashrc`, or equivalent:\n\n```bash\npi_work() {\n    pi-profile work \"$@\"\n}\n\npi_personal() {\n    pi-profile personal \"$@\"\n}\n```\n\nThen use them like the launcher:\n\n```bash\npi_work\npi_work --model claude-sonnet-4-5\npi_personal -p \"Summarize this repo\"\n```\n\nYou can also generate these functions:\n\n```bash\n# Generate functions for existing profile directories\npi-profile --shell >> ~/.zshrc\n\n# Or name profiles explicitly\npi-profile --shell work personal >> ~/.zshrc\n```\n\nInside Pi, run:\n\n```text\n/auth-profile\n```\n\nThat reports the active profile, agent directory, auth file, stored providers, and package/settings sync status.\n\n## Automatic settings sync\n\nProfiles automatically copy non-auth settings from another profile before Pi starts. By default, a profile syncs all non-auth settings from `default`; auth storage stays isolated per profile.\n\nConfigure opt-outs from inside a profiled Pi session:\n\n```text\n/profile-sync default\n/profile-sync work\n/profile-sync off\n```\n\nThe command opens prompts for common keys such as `packages`, `npmCommand`, `extensions`, `skills`, `prompts`, `themes`, `enableSkillCommands`, and `mcp`. Turning a key off adds it to the profile's sync exclusions. Other non-auth settings continue to sync automatically.\n\nIf a setting is changed directly in the profile after it was synced, the launcher treats that key as a local override and stops syncing it automatically. Run `/profile-sync <source>` again and enable that key to opt back in.\n\nThe manual sync configuration is stored outside Pi's settings file:\n\n```text\n~/.pi/agent-profiles/<profile>/profile-sync.json\n```\n\nThe launcher keeps local override detection metadata separately in:\n\n```text\n~/.pi/agent-profiles/<profile>/profile-sync-state.json\n```\n\nExample:\n\n```json\n{\n  \"enabled\": true,\n  \"from\": \"default\",\n  \"exclude\": [\"theme\"],\n  \"autoOptOut\": [\"defaultModel\"],\n  \"mode\": \"all-except\"\n}\n```\n\nOn the next `pi-profile <profile>` launch, the launcher applies the sync before Pi loads packages and resources. Relative local package/resource paths from the source profile are converted to absolute paths so they still resolve correctly from the target profile. MCP server configuration is synced by copying `mcp.json`; generated MCP cache and onboarding files are intentionally left profile-local.\n\n## Login flow\n\n```bash\npi-profile work\n/login\n```\n\nOAuth credentials are stored in:\n\n```text\n~/.pi/agent-profiles/work/auth.json\n```\n\nRepeat for `personal` or any other profile.\n\n## Profile-specific API keys\n\nBy default the launcher clears common provider API-key environment variables so a global `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` does not silently bypass profile isolation.\n\nFor profile-specific environment variables, create:\n\n```text\n~/.pi/agent-profiles/work/env\n```\n\nExample:\n\n```bash\nANTHROPIC_API_KEY=sk-ant-work-...\nOPENAI_API_KEY=sk-work-...\n```\n\nIf you intentionally want to keep the shell's auth environment, use:\n\n```bash\npi-profile work --allow-env-auth\n```\n\n## Shared sessions\n\nSessions are shared automatically across profiles. The launcher sets:\n\n```text\nPI_CODING_AGENT_SESSION_DIR=~/.pi/agent/sessions\n```\n\nThat is Pi's standard session location, so `pi-profile personal`, `pi-profile work`, and regular `pi` all see the same session list:\n\n```bash\npi-profile personal\npi-profile work\n```\n\nNormal Pi `--session-dir <dir>` still works and takes precedence for that run, but you do not need it for profile sharing.\n\n## Pi package commands\n\nPi package commands such as `list`, `install`, `remove`, `uninstall`, `update`, and `config` must be the first argument passed to the real `pi` binary. The launcher preserves that shape, so commands like this work like regular Pi while using the selected profile's settings directory:\n\n```bash\npi-profile work list\npi-profile work install <source>\n```\n\n## Publishing\n\nPackage checks:\n\n```bash\nnpm run check\nnpm pack --dry-run\n```\n\nPublish:\n\n```bash\nnpm publish\n```\n\n## Notes\n\n- The extension alone only displays and validates profile state. The launcher is what makes auth separation reliable.\n- Auth/settings/models/resources are profile-specific. Sessions always use Pi's standard `~/.pi/agent/sessions` location by default.\n- Since the whole agent dir changes, global extensions/settings from `~/.pi/agent` are not automatically loaded inside profiles. Install or configure the resources you want per profile, or pass them via normal Pi flags.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "auth",
+    "profiles",
+    "oauth"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/krzyzanowskim/pi-profiles#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/krzyzanowskim/pi-profiles.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/auth-profile.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-04T11:56:06.255Z",
+    "modified": "2026-05-07T08:11:40.569Z",
+    "0.1.0": "2026-05-04T11:56:06.772Z",
+    "0.1.1": "2026-05-04T12:00:15.918Z",
+    "0.2.0": "2026-05-04T12:16:27.522Z",
+    "0.3.0": "2026-05-05T15:10:17.126Z",
+    "0.3.1": "2026-05-07T08:11:40.441Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 25,
+  "download_trend": []
+}

@@ -1,0 +1,344 @@
+{
+  "name": "@gordonb/pi-archive",
+  "latest_version": "0.1.0",
+  "description": "SQLite searchable archive of every conversation with Pi agent",
+  "readme": "# pi-archive\n\n> Minimum viable personal agent: save every message to a SQLite DB.\n\nA [Pi](https://github.com/nichochar/pi-coding-agent) coding agent extension that creates a searchable SQLite archive of every Pi session ever. Every message (user, assistant, tool results, bash executions) is saved locally and indexed for full-text search.\n\nThe agent can search its own history via the `search_archive` tool, and you can search manually with the `/archive` command.\n\n## Install\n\n```sh\npi package add @gordonb/pi-archive\n```\n\n## How it works\n\nPi stores sessions as JSONL files on disk. This extension syncs those files into a SQLite database at `.pi/archive.db` in your project directory.\n\n- **On session start**: all past session files for the project are synced into the database.\n- **After each agent turn**: the current session file is incrementally synced.\n- **On shutdown**: the database connection is closed cleanly.\n\nSync is idempotent \u2014 re-syncing the same file is a no-op. Appended entries are picked up incrementally by comparing file sizes.\n\n### What's stored\n\nEvery JSONL entry is parsed into structured columns:\n\n| Column         | Description                                                     |\n| -------------- | --------------------------------------------------------------- |\n| `role`         | `user`, `assistant`, `toolResult`, `bashExecution`, `custom`, \u2026 |\n| `tool_name`    | Tool name for tool result entries                               |\n| `model`        | Model ID (e.g. `claude-sonnet-4-5`)                             |\n| `provider`     | Provider (e.g. `anthropic`)                                     |\n| `text_content` | Extracted searchable text                                       |\n| `raw_json`     | Full original JSONL line                                        |\n\nThe tree structure of conversations is preserved via `parent_id`, so you can walk branches. Session metadata (cwd, timestamps, parent session for forks) is tracked in a separate `sessions` table.\n\nText content is indexed using SQLite FTS5 for fast full-text search.\n\n## Usage\n\n### `/archive` command\n\nSearch your archive or view stats from the Pi prompt:\n\n```\n/archive authentication JWT\n/archive stats\n```\n\n### `search_archive` tool\n\nThe agent can search past conversations automatically. It's guided to use the tool when you reference past work. You can also ask it directly:\n\n> Search our past conversations for when we discussed the database schema.\n\nThe tool accepts [FTS5 query syntax](https://www.sqlite.org/fts5.html#full_text_query_syntax):\n\n- Phrase search: `\"REST API\"`\n- Boolean: `authentication AND JWT`\n- Prefix: `Graph*`\n- Negation: `REST NOT GraphQL`\n\nResults are ordered by timestamp (newest first) and include highlighted snippets.\n\n### Direct SQL\n\nThe database is just a SQLite file. You can query it directly:\n\n```sh\nsqlite3 .pi/archive.db \"SELECT text_content FROM entries WHERE role = 'user' ORDER BY timestamp DESC LIMIT 10\"\n```\n\n## Development\n\nRequires Node.js 22+ (uses `node:sqlite`).\n\n```sh\nnpm install\nnpm test\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "memory",
+    "coding-agent"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/gordonbrander/pi-archive#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gordonbrander/pi-archive.git"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/archive.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-08T09:05:10.041Z",
+    "0.1.0": "2026-03-08T09:05:10.276Z",
+    "modified": "2026-03-08T09:05:10.539Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 4,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 41
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 2
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 1
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "name": "@elianiva/pi-starship",
+  "latest_version": "1.0.0",
+  "description": "Starship-style prompt for pi",
+  "readme": "# @elianiva/pi-starship\n\nStarship-style prompt components for pi. This is a **library package**, not an auto-loading extension. [See why](#why-a-library-package)\nThis will NOT work outside of Pi's environment, which loads the files using [jiti](https://github.com/unjs/jiti).\n\n## Installation\n\n```bash\n# or any other package manager of your choice\nbun add @elianiva/pi-starship\n```\n\n## Usage\n\nCreate your own extension in `~/.pi/extensions/my-extension/`:\n\n```typescript\nimport type { ExtensionAPI } from \"@mariozechner/pi-coding-agent\";\nimport {\n  StarshipEditor,\n  createStarshipWidget,\n  setupStarshipEvents,\n} from \"@elianiva/pi-starship\";\n\nexport default function myExtension(pi: ExtensionAPI) {\n  pi.on(\"session_start\", async (_event, ctx) => {\n    if (!ctx.hasUI) return;\n\n    // Use the starship editor\n    ctx.ui.setEditorComponent(\n      (tui, theme, kb) => new StarshipEditor(tui, theme, kb, undefined, ctx)\n    );\n\n    // Add the info widget (shows cwd, git/jj branch, tokens, etc)\n    createStarshipWidget(pi, ctx);\n  });\n\n  // Register event handlers for widget updates\n  setupStarshipEvents(pi);\n}\n```\n\n## API\n\n### `StarshipEditor`\n\nCustom editor class with a \u276f prompt prefix and suppressed borders.\n\n```typescript\nnew StarshipEditor(\n  tui: TUI,\n  editorTheme: EditorTheme,\n  keybindings: KeybindingsManager,\n  options?: EditorOptions,\n  context?: ExtensionContext\n)\n```\n\n### `createStarshipWidget(pi, ctx)`\n\nInitializes the info widget showing:\n- Current directory\n- Git/Jujutsu branch and commit\n- Model name\n- Thinking level\n- Token usage (input/output/cache)\n- Cost\n- Context window usage\n\n### `setupStarshipEvents(pi)`\n\nRegisters event handlers that update the widget:\n- `session_switch` - Refresh VCS info\n- `agent_start/agent_end` - Update stats\n- `turn_end` - Update after each turn\n- `model_select` - Update model display\n- `user_bash` - Debounced VCS refresh (after shell commands)\n\n### `refreshVcs(cwd, callback?)`\n\nManually refresh VCS info. Cached for 2 seconds.\n\n### `getVcs()`\n\nGet current VCS cache state:\n\n```typescript\n{\n  info: {\n    type: \"git\" | \"jj\",\n    branch: string,\n    commit: string,\n    commitRest?: string,\n    dirty: boolean\n  } | null,\n  time: number,\n  cwd: string\n}\n```\n\n## Why a Library Package?\n\n**Extensibility**: This is intentionally designed as a library you compose, not a ready-to-use extension. You can pick and choose which part you want, you might just want the editor, you might just want the info widget, or both!\n\n**No hard dependencies**: This extension was made alongside my other extension, [@elianiva/pi-ckers](https://github.com/elianiva/pi-ckers), which also overrides the editor, but I want to compose them and not have them have hard dependencies from one another.\n\n**Overrides editor**: Since this wraps/replaces the editor component, it can't be an auto-loading extension because you may have other extension that already overrides the editor. The extension loading in Pi have no particular order, so you can't stack overriding editors. You can still use this extension without overriding the editor, you just won't get the minimal look that removes the borders and adds the \u276f prompt.\n\nSee how I use it [in my configuration](https://github.com/elianiva/dotfiles/blob/master/agents/pi/extensions/composed-editor).\n\n## License\n\n[MIT](./LICENSE)\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "elianiva"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/elianiva/dotfiles/tree/main/packages/pi-starship",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elianiva/dotfiles.git",
+    "directory": "packages/pi-starship"
+  },
+  "pi": {},
+  "time": {
+    "created": "2026-03-10T11:29:02.131Z",
+    "1.0.0": "2026-03-10T11:29:02.367Z",
+    "modified": "2026-03-10T11:29:02.613Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 2,
+  "download_trend": []
+}

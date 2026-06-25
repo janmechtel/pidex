@@ -1,0 +1,37 @@
+{
+  "name": "@nukcole-xinluo9510/pi-fun-working",
+  "latest_version": "0.1.0",
+  "description": "Pi extension \u2014 turn the boring \"Working...\" line into themed, randomly-colored memes for every hook",
+  "readme": "# \ud83c\udf89 Fun Working\n\n**Your agent works hard \u2014 let it have fun doing it.** This pi extension retires the\nboring gray `Working...` line and replaces it with themed, randomly-colored memes \u2014\nacross **every** hook, from kickoff to the final whistle.\n\n`tool` passes? **GOOOAL! \u26bd** `tool` fails? **You died \u2014 Maidenless \u2694\ufe0f** Agent finishes?\n**It's coming home \ud83c\udfc6**\n\n<p align=\"center\">\n  <img src=\"https://raw.githubusercontent.com/luoxin9510/pi-packages/main/packages/pi-fun-working/assets/banner.png\" alt=\"Fun Working \u2014 themed memes for every hook\" width=\"840\">\n</p>\n\n---\n\n## Why it exists\n\nThe default loader says `Working...` and nothing else. It's correct. It's also asleep.\n\nFun Working treats the status line as a tiny stage. It hooks **15 of pi's lifecycle\nevents** and, on each one, rolls the dice to maybe show a themed one-liner \u2014 a goal\ncelebration when a tool passes, a red card when it fails, a level-up at the end of a turn.\nThe text flows through a random color palette, and a custom spinner ticks alongside.\n\nIt's pure vibe, zero behavior change: it only ever calls `setWorkingMessage`,\n`setWorkingIndicator`, `setStatus`, and `notify`. Your agent runs exactly the same \u2014 it\njust looks alive.\n\n## Highlights\n\n- \ud83e\ude9d **Every hook covered** \u2014 `agent_*`, `turn_*`, `tool_execution_*`, `message_*`,\n  `model_select`, `thinking_level_select`, `session_*`, `user_bash`, `input`. Pass/fail is\n  read straight from `tool_execution_end.isError`.\n- \ud83c\udfb2 **Random by design** \u2014 each hook has its own `chance` so even with everything on it\n  stays playful, not spammy. A global multiplier dials the whole thing up or down.\n- \ud83c\udf08 **Colors that move** \u2014 `solid`, flowing `rainbow`, or `random` (a fresh palette color\n  every time the phrase switches). Status memes get random colors too.\n- \ud83c\udfad **17+ themes out of the box** \u2014 Michael Jackson, Ronaldo (SIUUU), Fallout, Elder\n  Scrolls, Star Wars, LOTR, Pok\u00e9mon, Minecraft, Dark Souls, Elden Ring, GTA, God of War,\n  Cyberpunk 2077, The Witcher, **World Cup \u26bd\ud83c\udfc6**, plus internet + AI-agent memes.\n- \ud83e\udde9 **Edit, don't fork** \u2014 three plain data files. Add a meme, flip a switch, change a\n  color \u2014 no logic to touch.\n- \ud83e\udeb6 **Zero deps, zero behavior change** \u2014 display only. Nothing is intercepted or blocked.\n\n## Install\n\n```bash\n# From npm\npi install npm:@nukcole-xinluo9510/pi-fun-working\n\n# Or from a local checkout during development\npi add /path/to/pi-fun-working\n```\n\nRestart pi, send a message, watch it cook. \ud83e\uddd1\u200d\ud83c\udf73\n\n## What you'll see\n\n| Moment | Hook | Example |\n|---|---|---|\n| Tool succeeds | `tool_execution_end` (ok) | `GOOOAL! bash \u26bd` \u00b7 `Fus Ro Dah! read done \ud83d\udc09` |\n| Tool fails | `tool_execution_end` (error) | `edit took an arrow to the knee \ud83c\udff9` \u00b7 `Red card \ud83d\udfe5` |\n| Turn ends | `turn_end` | `Level up! Turn 3 \ud83c\udd99` \u00b7 `Combo x3 \ud83d\udd25` |\n| Agent done | `agent_end` | `It's coming home \ud83c\udfc6 (842ms)` \u00b7 `SIUUU \u2014 champions \u26bd` |\n| Model switch | `model_select` | `claude-opus, I choose you! \u26a1` |\n| Session opens | `session_start` | `Rise, Tarnished \u2694\ufe0f` \u00b7 `Welcome to Night City \ud83c\udf03` |\n\nFrequent hooks (`message_*`, `input`) ship with a low `chance` so they stay tasteful.\n\n## Configure\n\nEverything lives in three data files under `extensions/fun-working/`:\n\n| File | What's inside |\n|---|---|\n| **`messages.ts`** | The phrases that cycle in the live working line. Add or remove freely. |\n| **`events.ts`** | One entry per hook: its meme pool, `chance`, channel (`notify` / `status`), color, etc. |\n| **`settings.ts`** | Global knobs \u2014 `colorMode`, `palette`, spinner frames/colors, speeds, and the master event switch + `chanceMultiplier`. |\n\nA few common tweaks:\n\n```ts\n// settings.ts \u2014 pick how text is colored\ncolorMode: \"random\",   // \"solid\" | \"rainbow\" | \"random\"\n\n// settings.ts \u2014 turn the whole event system up, down, or off\nevents: { enabled: true, chanceMultiplier: 1, colorizeStatus: true },\n\n// events.ts \u2014 make goals fire almost every time\ntoolPass: { enabled: true, chance: 0.95, /* ... */ },\n```\n\n### How `chance` works\n\nEach event message fires with probability `chance \u00d7 chanceMultiplier` (clamped to\n`0..1`). So:\n\n- `chanceMultiplier: 0` \u2192 silence everything without deleting a thing.\n- `chanceMultiplier: 2` \u2192 everything roughly twice as likely (capped at 100%).\n- Per-event `chance` lets you keep failures loud (`1.0`) and chatter quiet (`0.12`).\n\n## How it works\n\nOn load the extension subscribes to pi's lifecycle hooks. For display events it calls a\nsingle `emit(key, ctx, vars)`:\n\n1. Bail if the global switch is off or the event is disabled.\n2. Roll `Math.random()` against `effectiveChance(chance, multiplier)`.\n3. Pick a random line from that event's pool and fill `{tool}` / `{turn}` / `{ms}` /\n   `{model}` / `{level}` placeholders.\n4. Send it to its channel \u2014 a toast (`notify`) or the footer (`setStatus`, auto-cleared),\n   optionally wrapped in a random palette color.\n\nThe live working line is driven separately by `agent_start` / `agent_end`, cycling\n`messages.ts` on a timer with the configured color mode and spinner.\n\n## Requirements\n\n- pi 0.79+\n\n## Development\n\n```bash\nnpm run check   # tsc --noEmit\nnpm test        # node --test (fillTemplate, effectiveChance, hslToRgb)\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "working-message",
+    "status",
+    "spinner",
+    "memes",
+    "fun"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/luoxin9510/pi-packages#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luoxin9510/pi-packages.git",
+    "directory": "packages/pi-fun-working"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/fun-working/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/luoxin9510/pi-packages/main/packages/pi-fun-working/assets/banner.png"
+  },
+  "time": {
+    "created": "2026-06-25T17:09:50.989Z",
+    "0.1.0": "2026-06-25T17:09:51.275Z",
+    "modified": "2026-06-25T17:09:51.440Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

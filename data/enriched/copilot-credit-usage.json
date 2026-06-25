@@ -1,0 +1,30 @@
+{
+  "name": "copilot-credit-usage",
+  "latest_version": "0.1.0",
+  "description": "Pi extension that tracks GitHub Copilot AI credit usage by session and project.",
+  "readme": "# copilot-credit-usage\n\nA Pi extension that monitors GitHub Copilot AI credit usage.\n\nIt provides:\n\n- A footer/status-line indicator for Copilot usage in the current Pi session.\n- A `/copilot-credits` command that shows Copilot usage grouped by local project, plus a total across all projects.\n- Optional authoritative GitHub Billing API totals for the month.\n- A `copilot_credit_usage` tool so the assistant can answer usage questions directly.\n\n## What it measures\n\nGitHub documents Copilot usage as GitHub AI Credits, where **1 AI credit = $0.01 USD**. This extension uses that conversion in two places:\n\n1. **Local Copilot session estimate**: Pi stores provider, model, token, and cost metadata on assistant messages. The extension includes only messages whose `provider`, `api`, or `model` matches `copilot|github-copilot`. If Pi records a non-zero USD cost, the extension converts that cost to AI credits. If Pi records `$0`, the extension estimates cost from GitHub's published per-token Copilot model pricing and groups it by session/project.\n2. **GitHub Billing API total**: When credentials are available, the extension calls GitHub's AI credit usage endpoint for the signed-in user:\n\n   ```text\n   GET /users/{username}/settings/billing/ai_credit/usage?year=YYYY&month=M\n   ```\n\nThe GitHub API total is account-level. It does not include your local Pi working directory, so per-project breakdown comes from Copilot-filtered local Pi sessions.\n\nThe local per-project report is still an estimate because GitHub's Billing API is account-level and does not expose local working directories. The GitHub Billing API section is the authoritative account total when available.\n\n## Install\n\nFrom this directory:\n\n```bash\npi install .\n```\n\nOr add this package to your Pi package list if you manage packages manually.\n\n## Usage\n\n### Footer/status line\n\nAfter the extension loads, the bottom status area shows current Copilot session usage:\n\n```text\nCopilot 12.3cr \u00b7 450.2ktok\n```\n\nIf you set a plan or allowance, it also shows the monthly allowance:\n\n```bash\nexport PI_COPILOT_PLAN=pro        # pro, pro+, max\n# or\nexport PI_COPILOT_CREDIT_ALLOWANCE=1500\n```\n\nStatus example:\n\n```text\nCopilot 12.3cr/1,500cr \u00b7 450.2ktok\n```\n\n### Monthly report command\n\n```text\n/copilot-credits\n/copilot-credits 2026-06\n/copilot-credits --month 2026-06 --no-github\n/copilot-credits --github-only --user monalisa\n/copilot-credits --json\n```\n\nOptions:\n\n```text\n--month YYYY-MM     Month to report. Default: current month.\n--local-only        Show local Copilot session estimate only.\n--github-only       Show GitHub billing API total only.\n--no-github         Skip GitHub billing API lookup.\n--user LOGIN        GitHub username for billing endpoint.\n--json              Emit JSON details.\n```\n\n## GitHub API authentication\n\nFor official GitHub Billing API totals, use either:\n\n```bash\nexport GITHUB_TOKEN=github_pat_...\n```\n\nor authenticate the GitHub CLI:\n\n```bash\ngh auth login\n```\n\nThe token must be a fine-grained token with **Plan: read** user permission for user billing endpoints.\n\nIf credentials are missing or the account is not billed as an individual Copilot account, the extension still shows Copilot-filtered local Pi session estimates and prints the GitHub API error.\n\n## Notes and limits\n\n- Local project totals are estimates based on Pi-recorded Copilot provider/model usage only.\n- When Pi records `$0` for a Copilot message, the extension estimates cost from GitHub's published per-token pricing for supported Copilot models.\n- Override the local Copilot filter with `PI_COPILOT_PROVIDER_PATTERN` or `COPILOT_PROVIDER_PATTERN` if your provider name differs.\n- GitHub Billing API totals are authoritative but account-level.\n- Code completions and next-edit suggestions are not billed in Copilot AI credits for paid plans, per GitHub docs.\n- Local monthly grouping uses calendar month (`YYYY-MM`). Your GitHub billing cycle may start on a different day.\n- Project rows are capped at 100 to avoid huge command output.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "copilot",
+    "billing",
+    "ai-credits"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-04T02:07:52.819Z",
+    "0.1.0": "2026-06-04T02:07:53.182Z",
+    "modified": "2026-06-04T02:07:53.339Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

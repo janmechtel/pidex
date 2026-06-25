@@ -1,0 +1,47 @@
+{
+  "name": "pi-green-loop",
+  "latest_version": "0.2.0",
+  "description": "Keep the build green: a polyglot, affected-test-scoped feedback loop for AI coding agents (Node/Python/Go/Rust/Make). Use as a CLI, an MCP server, a Claude/Cursor skill, or a pi extension.",
+  "readme": "# pi-green-loop\n\n**Keep the build green.** An autonomous test / lint / typecheck / build feedback loop for AI\ncoding agents. After code changes, pi-green-loop runs your project's checks and \u2014 when something is\nred \u2014 hands a parsed failure summary back to the agent so it fixes it, looping until green.\n\nBuilt to *just work* and stay fast:\n\n- **Polyglot detection** \u2014 Node (`package.json`), Python (`pyproject.toml`), Go (`go.mod`),\n  Rust (`Cargo.toml`), and `Makefile`, out of the box. No config required.\n- **Affected-test scoping** \u2014 runs only the tests impacted by the files that changed\n  (vitest / jest / pytest / go), so the loop stays fast on big suites.\n- **Parsed failures** \u2014 feeds the agent a compact list of failing test names, not a raw dump.\n- **Reliable loop** \u2014 debounced, capped, stops when it stops improving, and skips runs when\n  nothing changed.\n\nOne core engine, four ways to run it:\n\n| Surface | How |\n|---------|-----|\n| **CLI** | `npx pi-green-loop check` \u00b7 `pi-green-loop fix` \u00b7 `pi-green-loop watch` |\n| **MCP server** | `npx pi-green-loop mcp` (use from Claude, Cursor, any MCP client) |\n| **Claude / Cursor skill** | drop [`skills/pi-green-loop`](skills/pi-green-loop/SKILL.md) into your skills dir |\n| **pi extension** | `import piGreenLoop from \"pi-green-loop/pi\"` \u2014 closed loop on the pi event bus |\n\nThe core engine is dependency-free (Node built-ins only); the CLI, MCP server, and pi extension all\nsit on top of it.\n\n## Install into pi\n\n```bash\npi install git:github.com/vaibhav-patel/pi-green-loop   # extension (agent_end loop + /green) and skill\n# once published to npm:\npi install npm:pi-green-loop\n```\n\n`import \u2026 from \"pi-green-loop/pi\"` is for embedding in your own SDK app \u2014 pi users should `pi install` instead.\n\n## Quick start\n\n```bash\nnpm install\nnpm run build\n\n# what would run?\nnode dist/cli/index.js detect      # (or: npm run dev -- detect)\n\n# run the checks once\nnode dist/cli/index.js check\n```\n\n## How it decides what to run\n\n1. A `pi-green-loop.json` (or `.pi-green-loop.json`) in the project root, if present, wins.\n2. Otherwise it auto-detects per ecosystem (first match per kind, polyglot repos supported):\n\n   | Ecosystem | Detected from | Checks |\n   |-----------|---------------|--------|\n   | **Node** | `package.json` scripts | `typecheck` / `lint` / `test` / `build` (npm/pnpm/yarn/bun) |\n   | **Python** | `pyproject.toml` etc. | `pytest`, `ruff check .`, `mypy .` |\n   | **Go** | `go.mod` | `go test ./...`, `go vet ./...`, `golangci-lint run`, `go build ./...` |\n   | **Rust** | `Cargo.toml` | `cargo test`, `cargo clippy`, `cargo check`, `cargo build` |\n   | **Make** | `Makefile` | `make <test\\|lint\\|build>` (lowest priority) |\n\nGenerate a starter config (add `--ci` to also write a GitHub Actions workflow):\n\n```bash\nnode dist/cli/index.js init --ci\n```\n\n```jsonc\n// pi-green-loop.json\n{\n  \"timeoutMs\": 300000,\n  \"checks\": [\n    { \"name\": \"typecheck\", \"kind\": \"typecheck\", \"command\": \"npm run typecheck\" },\n    { \"name\": \"test\",      \"kind\": \"test\",      \"command\": \"npm test\" }\n  ]\n}\n```\n\n## Fast & focused\n\nScope a run to just the tests affected by what changed:\n\n```bash\nnode dist/cli/index.js check --since HEAD~1          # tests touching files changed since a git ref\nnode dist/cli/index.js check --affected src/a.ts,src/b.ts\n```\n\nWhen scoping isn't possible (no git, unknown framework, empty set) it safely falls back to the full\nsuite \u2014 it never reports a false pass by running zero tests. `watch` accumulates changed files and\nscopes each re-run automatically.\n\nRun formatters / autofixers, then re-check:\n\n```bash\nnode dist/cli/index.js fix    # prettier/eslint --fix, ruff format/--fix, gofmt, cargo fmt (only what's detected)\n```\n\n`fix` never installs anything \u2014 it only runs a tool when there's evidence it's already available\n(a dependency or its config file).\n\n## The loop (pi extension)\n\nThe pi adapter listens for `agent_end` and, once the agent is idle, runs the checks scoped to the\nfiles it just edited. On failure it injects a parsed failure summary back as a follow-up so the\nagent fixes it. The loop is guarded:\n\n- **Debounced** \u2014 only runs when idle with no queued messages.\n- **Capped** \u2014 at most `maxAttempts` (default 3) auto-fixes per interactive turn.\n- **Stops when stuck** \u2014 if a run reproduces the exact same failures, it pauses instead of looping\n  (`/green` resumes it).\n- **Skips redundant runs** \u2014 caches the last all-green commit and skips when `HEAD` is unchanged and\n  nothing was edited.\n- **Status gauge** \u2014 a footer status plus a widget listing the currently-failing checks.\n\n`/green` runs the checks now; `/green on` \u00b7 `/green off` toggle the auto-fix loop.\n\n## Development\n\n```bash\nnpm install\nnpm run build      # tsc -> dist/\nnpm test           # node --test suite\nnpm run typecheck  # tsc --noEmit\n```\n\npi-green-loop checks itself: `node dist/cli/index.js check` runs its own typecheck + test + build.\n\n## License\n\nMIT \u2014 see [LICENSE](LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi-green-loop",
+    "greenloop",
+    "ai",
+    "agent",
+    "mcp",
+    "tdd",
+    "ci",
+    "tests",
+    "lint",
+    "claude",
+    "cursor",
+    "pi",
+    "coding-agent"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/vaibhav-patel/pi-green-loop#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vaibhav-patel/pi-green-loop.git"
+  },
+  "pi": {
+    "extensions": [
+      "dist/pi/extension.js"
+    ],
+    "skills": [
+      "skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-18T18:53:20.824Z",
+    "modified": "2026-06-20T08:14:39.580Z",
+    "0.1.0": "2026-06-18T18:53:21.030Z",
+    "0.1.1": "2026-06-19T17:51:04.736Z",
+    "0.2.0": "2026-06-20T08:14:39.462Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 471,
+  "download_trend": []
+}

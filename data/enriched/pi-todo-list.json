@@ -1,0 +1,36 @@
+{
+  "name": "pi-todo-list",
+  "latest_version": "0.2.0",
+  "description": "Live, user-visible task list for pi. LLM tracks multi-step work via todo_update, users see real-time progress in the footer.",
+  "readme": "# pi-todo \u2014 visible, real-time task list for pi\n\nA tiny pi extension that gives the LLM a live, user-visible task list. LLM\ncalls `todo_update` to track multi-step work, the user sees a compact checklist\nin the footer (e.g. `todos 1/5 \u22ef Adding auth middleware`).\n\nInspired by Claude Code's `TodoWrite`. Generic, reusable by any pi session \u2014\nnot tied to soly, but **integrates automatically with soly** when both are\ninstalled (todos are written to `.soly/todos.json` and surfaced in soly's\nstatus line).\n\n## Install\n\nDrop the `pi-todo/` directory in `~/.pi/agent/extensions/`. No config\nrequired. No `package.json` deps.\n\n```bash\nls ~/.pi/agent/extensions/pi-todo/\n# index.ts  todo-store.ts  prompt.ts  tests/  package.json  tsconfig.json\n```\n\n## What it does\n\n### 1. Registers one LLM tool: `todo_update`\n\nThe LLM calls this to maintain a live task list. Schema:\n\n```ts\ntodo_update({\n  todos: [\n    { content: \"Add user model\",        status: \"in_progress\", activeForm: \"Adding user model\" },\n    { content: \"Add auth middleware\",   status: \"pending\",     activeForm: \"Adding auth middleware\" },\n    { content: \"Wire up routes\",        status: \"pending\",     activeForm: \"Wiring up routes\" },\n  ]\n})\n```\n\n**Rules** (enforced by validation, error message is precise):\n- Max **10** items\n- **Exactly 0 or 1** `in_progress` at a time\n- `content` + `activeForm` required, non-empty, max 200 chars\n- No duplicate `content`\n- Status must be `pending` | `in_progress` | `completed`\n\nEmpty list (`todo_update({todos: []})`) clears the list.\n\n### 2. Injects a system-prompt section\n\nTells the LLM **when** to use `todo_update` (multi-step work, \u22653 steps) and\n**when not to** (single-step, every tool call). The full guidance is in\n`prompt.ts`.\n\n### 3. Renders the list in the footer\n\n`pi.setStatus(\"pi-todo\", \"todos 1/5 \u22ef Adding auth middleware\")`. Updated on\nevery `todo_update` call. Pass `undefined` to hide when the list is empty.\n\n### 4. Persists state to disk\n\n- **soly mode** (`.soly/` exists in cwd): writes `.soly/todos.json` \u2014 soly\n  picks it up and shows the count in its own status line.\n- **standalone** (no `.soly/`): writes `.pi-todos.json` in cwd.\n\nOn `session_start` pi-todo auto-loads any persisted state so you can resume\nmid-task across sessions.\n\n## Soly integration\n\nIf **soly** is also installed and you run `soly doctor`, it will report\n`pi-todo extension (cross-extension) (pass)` when `todo_update` is in the\nactive tools list, or `(info)` if not (with a hint to install pi-todo).\n\nIf you run `soly execute <plan>`, the workflow template\n(`workflows-data/execute-plan.md`) tells the LLM to call `todo_update` at\nthe start of the plan with one item per `<task>`, and to clear the list\nwhen the SUMMARY is committed. The user sees a live checklist while the\nworker executes the plan.\n\nSoly's own status line shows `todos N/M` automatically when\n`.soly/todos.json` exists.\n\n## Limits\n\n- Max 10 items per call (more = noise)\n- In-memory + disk only (no sharing across machines)\n- One extension instance per pi session\n- Footer status line is plain text (no TUI widget \u2014 keeps it cheap)\n\n## Files\n\n- `index.ts` \u2014 extension entry, registers tool + system prompt + status\n- `todo-store.ts` \u2014 TodoItem / TodoState, validateTodos, buildStatusLine,\n  persistTodos, loadTodos, todoFilePath\n- `prompt.ts` \u2014 buildTodoSection (system-prompt section)\n- `tests/todo-store.test.ts` \u2014 28 tests for validation + persistence\n- `tests/prompt.test.ts` \u2014 7 tests for system-prompt content\n\n## Development\n\n```bash\ncd ~/.pi/agent/extensions/pi-todo\nbun test          # 35 tests\nbun run typecheck # tsc --noEmit\n```\n",
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "pi-package",
+    "todo",
+    "task-list",
+    "live-progress"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": {
+    "type": "git",
+    "url": "http://git.local.stbl/lowern1ght/pi-soly.framework.git",
+    "directory": "packages/pi-todo"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-15T20:11:41.899Z",
+    "modified": "2026-06-15T21:13:15.557Z",
+    "0.1.0": "2026-06-15T20:11:42.263Z",
+    "0.2.0": "2026-06-15T21:13:15.464Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

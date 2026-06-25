@@ -1,0 +1,33 @@
+{
+  "name": "@mjakl/pi-processes",
+  "latest_version": "0.8.1",
+  "description": "> **Note** > This is a stripped down fork of https://github.com/aliou/pi-processes. > Most people should likely use the original project instead.",
+  "readme": "# Processes Extension\n\n> **Note**\n> This is a stripped down fork of https://github.com/aliou/pi-processes.\n> Most people should likely use the original project instead.\n\nManage background processes from Pi without blocking the conversation.\n\n## Installation\n\nInstall from npm:\n\n```bash\npi install npm:@mjakl/pi-processes\n```\n\nFor development builds, install from git:\n\n```bash\npi install git:https://github.com/mjakl/pi-processes\n```\n\n## What this fork keeps\n\n- the `process` tool for starting, listing, inspecting, killing, and clearing managed processes\n- a single `/ps` overlay for monitoring processes\n- a tiny always-visible process status line while managed processes exist, showing active/finished counts\n- process completion notifications in the conversation\n- file-backed logs so process output is preserved outside agent context\n\n## What this fork removes\n\n- all `/ps:*` subcommands\n- the log dock\n- the settings UI\n- extra widget state and dock controls\n\n## Usage\n\n### Agent tool (LLM-facing)\n\nThe `process` tool is for the agent. Users should ask the agent to start or inspect long-running commands, then monitor them with `/ps`.\n\nTool-call examples:\n\n```text\nprocess start \"pnpm dev\" name=\"backend-dev\"\nprocess start \"pnpm test --watch\" name=\"tests\"\nprocess start \"pnpm dev\" name=\"backend-dev\" continueAfterStart=true\nprocess list\nprocess output id=\"backend-dev\"\nprocess logs id=\"proc_1\"\nprocess kill id=\"backend-dev\"\nprocess kill id=\"proc_1\" force=true\nprocess clear\n```\n\n#### Matching processes\n\nFor `output`, `logs`, and `kill`, `id` must be either:\n\n- the exact process ID (`proc_1`)\n- the exact friendly process name (`backend-dev`)\n\nIf multiple processes share the same name, use the process ID.\n\n#### Notifications for `start`\n\nDo not poll after starting a process.\n\nThis tool is event-driven: the agent is notified automatically when a process exits, fails, or is externally killed. By default, `process start` ends the current agent turn so the agent actually waits for that notification instead of immediately polling. If the next step is waiting, call `process start` by itself rather than batching it with unrelated tools.\n\nThe intended pattern is:\n\n1. `process start`\n2. let the turn stop and wait for the automatic notification if the process ends\n3. resume from that notification\n\nUse `continueAfterStart=true` only when the agent has immediate, specific, non-polling work to do after starting the process.\n\nRepeated `process list`, `process output`, or `process logs` calls just to see whether the process is still running are an anti-pattern.\n\n#### Logs and output\n\n- `process output` returns a one-off tailed stdout/stderr snapshot for agent consumption.\n- `process logs` returns file paths for `stdout`, `stderr`, and a combined view for the `/ps` overlay.\n- Use `output`/`logs` only when the user asks, when you need a diagnostic snapshot, or when investigating a problem - not as a polling loop.\n\n#### Killing processes\n\n- `process kill id=\"...\"` sends `SIGTERM`\n- `process kill id=\"...\" force=true` sends `SIGKILL`\n- tool-triggered kills never notify the agent\n\n### `/ps` overlay\n\n`/ps` opens the process overlay.\n\nInside the overlay:\n\n- `up/down` - move the highlighted process\n- `left/right` - scroll older/newer log output for the highlighted process\n- `g/G` - jump to the top or back to the live tail\n- `x` - terminate the highlighted process; press `x` again when it shows `needs kill` to force-kill it\n- `c` - clear finished processes\n- `q` or `Esc` - close the overlay\n\nThe right side always shows logs for the currently highlighted process.\n\n## Configuration\n\nGlobal config lives in `~/.pi/agent/extensions/process.json`.\n\n```json\n{\n  \"output\": {\n    \"defaultTailLines\": 100,\n    \"maxOutputLines\": 200\n  },\n  \"execution\": {\n    \"shellPath\": \"/absolute/path/to/bash\"\n  },\n  \"interception\": {\n    \"blockBackgroundCommands\": true\n  }\n}\n```\n\n- `output.defaultTailLines` - default number of lines returned by `process output`\n- `output.maxOutputLines` - hard cap for `process output`\n- `execution.shellPath` - absolute shell path override used for process startup\n- `interception.blockBackgroundCommands` - block shell backgrounding (`&`, `nohup`, `disown`, `setsid`) and obvious long-running foreground commands such as `pnpm dev`, `docker compose up`, `tail -f`, or `kubectl port-forward`, and guide the agent to use the `process` tool instead\n\n## Development\n\nThere are no Git hooks installed by this repository. Before committing or opening a PR, consider running:\n\n```bash\npnpm typecheck\npnpm lint\npnpm test\n```\n\nAfter dependency changes, also verify the lockfile with:\n\n```bash\npnpm install --frozen-lockfile --ignore-scripts\n```\n\n## Notes\n\n- Log files live in a temporary directory managed by the extension.\n- Background processes are cleaned up when the session shuts down.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "processes"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/mjakl/pi-processes#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mjakl/pi-processes.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-04T09:24:12.942Z",
+    "modified": "2026-06-13T17:21:56.982Z",
+    "0.8.0": "2026-06-04T09:24:13.302Z",
+    "0.8.1": "2026-06-13T17:21:56.892Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

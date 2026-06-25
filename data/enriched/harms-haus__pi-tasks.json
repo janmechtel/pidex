@@ -1,0 +1,344 @@
+{
+  "name": "@harms-haus/pi-tasks",
+  "latest_version": "0.1.0",
+  "description": "pi-coding-agent extension: phased task workflow with dependency tracking and strict status gating",
+  "readme": "# pi-tasks\n\nPhased task workflow extension for [pi coding agent](https://github.com/harms-haus/pi-coding-agent). Provides a structured task board with strict status gating, phase-based execution, dependency tracking, auto-continue, and session persistence.\n\n## Features\n\n- **Strict status lifecycle** \u2014 tasks progress through an enforced pipeline: `draft` \u2192 `configured` \u2192 `ready` \u2192 `implementing` \u2192 `reviewing` \u2192 `done`\n- **Phase gating** \u2014 tasks are grouped into numbered phases; later phases don't become ready until earlier ones complete\n- **Dependency tracking** \u2014 tasks can depend on other tasks within the same phase; cycles and missing references are detected at compile time\n- **Auto-continue** \u2014 after each agent turn, the board checks for actionable tasks and automatically prompts the agent to continue (with a configurable circuit breaker)\n- **Session persistence** \u2014 board state is persisted as snapshot entries in the session tree, so the board survives restarts and session switches\n- **Atomic batch edits** \u2014 all edits in a single `edit_tasks` call are validated before any are applied; a failure rolls back the entire batch\n\n## Installation\n\n```bash\n# npm\nnpm install pi-tasks\n\n# pi package manager\npi install pi-tasks\n```\n\nOr add as a local extension in your project's `.pi/extensions` directory.\n\n### Peer Dependencies\n\n```json\n{\n  \"@earendil-works/pi-ai\": \"*\",\n  \"@earendil-works/pi-coding-agent\": \"*\",\n  \"@earendil-works/pi-tui\": \"*\",\n  \"typebox\": \"*\"\n}\n```\n\n## Quick Start\n\nThe agent uses these tools in sequence. Here's a typical workflow:\n\n```\n1. write_tasks     \u2192 define phases (each with a title and tasks) and a mode ('replace' or 'append')\n2. edit_tasks      \u2192 set dependencies between tasks (type: \"blockers\")\n3. compile_tasks   \u2192 validate the board and activate phase 1\n4. get_ready_tasks \u2192 claim tasks that are ready to work on\n5. advance_tasks   \u2192 advance tasks: implementing \u2192 reviewing \u2192 done\n                     (repeat 4\u20135 until all tasks are done)\n```\n\n### Example Session\n\n```\nAgent: I'll break this feature into phased tasks.\n\n\u2192 write_tasks: mode=replace, 3 phases, 6 tasks\n\nTask Board:\n\n\u2500\u2500\u2500 Phase 1: Setup \u2500\u2500\u2500\n\u26aa t-1.1: Set up database schema\n\u26aa t-1.2: Create API endpoints\n\u26aa t-1.3: Write unit tests for API\n\n\u2500\u2500\u2500 Phase 2: Implementation \u2500\u2500\u2500\n\u26aa t-2.1: Build frontend components\n\u26aa t-2.2: Integration tests\n\n\u2500\u2500\u2500 Phase 3: QA \u2500\u2500\u2500\n\u26aa t-3.1: End-to-end QA\n\nSummary: 6 draft\n\n\u2192 edit_tasks: t-2.2 blockers \u2192 [t-1.2, t-2.1]\n\n\u2192 compile_tasks\n\nTask Board:\n\n\u2500\u2500\u2500 Phase 1: Setup \u2500\u2500\u2500\n\ud83d\udfe2 t-1.1: Set up database schema\n\ud83d\udfe2 t-1.2: Create API endpoints\n\ud83d\udfe2 t-1.3: Write unit tests for API\n\n\u2500\u2500\u2500 Phase 2: Implementation \u2500\u2500\u2500\n\ud83d\udd35 t-2.1: Build frontend components\n\ud83d\udd35 t-2.2: Integration tests \u2192 depends on t-1.2, t-2.1\n\n\u2500\u2500\u2500 Phase 3: QA \u2500\u2500\u2500\n\ud83d\udd35 t-3.1: End-to-end QA\n\nSummary: 3 ready, 3 configured\n\n\u2192 get_ready_tasks: count 2\n\nClaimed 2 task(s).\n\n\u25b6\ufe0f t-1.1: Set up database schema  (coder)\nCreate the database tables for ...\n\n\u25b6\ufe0f t-1.2: Create API endpoints  (coder)\nBuild REST endpoints for ...\n  ... (truncated)\n\nReview each claimed task and advance through\nimplementing \u2192 reviewing \u2192 done using advance_tasks.\n\n\u2192 advance_tasks: t-1.1\n  (implementing \u2192 reviewing)\n\n\u2192 advance_tasks: t-1.1\n  (reviewing \u2192 done)\n\n... Phase 2 unlocks when all Phase 1 tasks are done ...\n```\n\n## Tool Reference\n\n### `write_tasks`\n\nAdd tasks to the board grouped by phase. Each task is created in `draft` status.\n\n| Parameter | Type     | Required | Description                                                                                   |\n| --------- | -------- | -------- | --------------------------------------------------------------------------------------------- |\n| `mode`    | `string` | Yes      | `\"replace\"` clears the board before writing; `\"append\"` adds phases to an existing board      |\n| `phases`  | `array`  | Yes      | Array of phase objects (min 1). Phase numbers are auto-assigned from array position (1, 2, \u2026) |\n\nEach phase object:\n\n| Field   | Type     | Required | Description                      |\n| ------- | -------- | -------- | -------------------------------- |\n| `title` | `string` | Yes      | Short phase title (e.g. \"Setup\") |\n| `tasks` | `array`  | Yes      | Tasks in this phase (at least 1) |\n\nEach task object:\n\n| Field     | Type     | Required | Description                          |\n| --------- | -------- | -------- | ------------------------------------ |\n| `title`   | `string` | Yes      | Short task title                     |\n| `prompt`  | `string` | Yes      | Detailed implementation instructions |\n| `profile` | `string` | Yes      | Agent profile name for delegation    |\n\n**Constraints:**\n\n- Maximum 100 tasks per board (`MAX_TASKS`)\n- Phase title, task title, prompt, and profile must be non-empty strings\n- Each phase must contain at least 1 task\n- `mode: \"replace\"` cannot be used while tasks are `implementing` or `reviewing`\n- `mode: \"append\"` auto-computes the starting phase number as `max(existing phases) + 1`\n\n### `edit_tasks`\n\nBatch-edit tasks on the board. Supports three edit types. Edits are atomic \u2014 if any validation fails, none are applied.\n\n| Parameter | Type    | Required | Description                                       |\n| --------- | ------- | -------- | ------------------------------------------------- |\n| `tasks`   | `array` | Yes      | Array of edit objects (mixed types, max 50 items) |\n\n**Type: `data`** \u2014 modify task fields\n\n| Field          | Type      | Description                      |\n| -------------- | --------- | -------------------------------- |\n| `id`           | `string`  | Task ID                          |\n| `type`         | `\"data\"`  | Edit type                        |\n| `data.title`   | `string`  | Optional. New title              |\n| `data.prompt`  | `string`  | Optional. New prompt             |\n| `data.profile` | `string`  | Optional. New profile            |\n| `data.phase`   | `integer` | Optional. New phase number (\u2265 1) |\n\nStructural edits (data/blockers) cannot be applied while any task is `implementing` or `reviewing`. Applying a structural edit resets all non-terminal, non-active tasks back to `draft`, requiring a recompile.\n\n**Type: `blockers`** \u2014 set task dependencies\n\n| Field               | Type         | Description                            |\n| ------------------- | ------------ | -------------------------------------- |\n| `id`                | `string`     | Task ID                                |\n| `type`              | `\"blockers\"` | Edit type                              |\n| `data.dependencies` | `string[]`   | Array of task IDs this task depends on |\n\nValidates against self-dependencies, duplicate entries, and references to non-existent tasks.\n\n**Type: `abandon`** \u2014 mark task as abandoned\n\n| Field  | Type        | Description |\n| ------ | ----------- | ----------- |\n| `id`   | `string`    | Task ID     |\n| `type` | `\"abandon\"` | Edit type   |\n\nCannot abandon tasks already in `done` or `abandoned` status.\n\n### `compile_tasks`\n\nValidate the board and activate the first phase. Checks for:\n\n- Duplicate task IDs\n- Missing dependency references\n- Dependency cycles (detected via DFS)\n\nOn success, all `draft` tasks move to `configured`. Tasks in the active phase with satisfied dependencies move to `ready`.\n\nCannot compile while any task is `implementing` or `reviewing`.\n\n### `get_ready_tasks`\n\nClaim ready tasks for implementation. Moves claimed tasks to `implementing` status.\n\n| Parameter | Type      | Required | Description                    |\n| --------- | --------- | -------- | ------------------------------ |\n| `count`   | `integer` | Yes      | Number of tasks to claim (\u2265 1) |\n\nTasks are ordered by phase ascending, then by creation order. Cannot claim while any task is `implementing` or `reviewing`.\n\nClaimed task output shows the first 3 lines of each task's prompt, followed by `... (truncated)` if the prompt is longer. The board display after claiming shows only the active phase.\n\nError messages distinguish between:\n\n- **All tasks resolved** \u2014 board is complete\n- **Active tasks exist** \u2014 advance or complete them first\n- **Deadlock** \u2014 tasks remain but none are actionable; suggests resolving blockers\n\n### `advance_tasks`\n\nAdvance tasks through their lifecycle: `implementing` \u2192 `reviewing` \u2192 `done`. Each call advances each task by one step.\n\n| Parameter | Type       | Required | Description                                 |\n| --------- | ---------- | -------- | ------------------------------------------- |\n| `ids`     | `string[]` | Yes      | Array of task IDs to advance (max 50 items) |\n\nTasks must be in `implementing` or `reviewing` status. Duplicate IDs in the array are deduplicated.\n\nThe board display after advancing shows only the active phase (or the full board if all tasks are terminal).\n\n**Double-advance warning:** If `advance_tasks` is called twice in a row without any other tool usage in between, a warning is injected reminding the agent to actually review the work before advancing to `done`:\n\n> \u26a0\ufe0f Review should not be skipped. Please actually review the work before advancing to done.\n\n### `clear_tasks`\n\nClear the entire board. Removes all tasks, phases, and resets state. Takes no parameters.\n\nCannot clear the board while any task is `implementing` or `reviewing`. Complete or advance active tasks first.\n\n## Task Lifecycle\n\n```\ndraft \u2500\u2500\u2192 configured \u2500\u2500\u2192 ready \u2500\u2500\u2192 implementing \u2500\u2500\u2192 reviewing \u2500\u2500\u2192 done\n                              \u2502                                  \u2191\n                              \u2514\u2500\u2500\u2500 (any non-terminal) \u2500\u2500\u2192 abandoned\n```\n\n| Status         | Icon | Description                                                         |\n| -------------- | ---- | ------------------------------------------------------------------- |\n| `draft`        | `\u26aa` | Initial state after `write_tasks`                                   |\n| `configured`   | `\ud83d\udd35` | Validated by `compile_tasks`; awaiting readiness                    |\n| `ready`        | `\ud83d\udfe2` | Phase is active and all dependencies are done; available to claim   |\n| `implementing` | `\u25b6\ufe0f` | Claimed via `get_ready_tasks`; actively being worked on             |\n| `reviewing`    | `\ud83d\udd0d` | Advanced from `implementing`; awaiting final review                 |\n| `done`         | `\u2705` | Advanced from `reviewing`; terminal state                           |\n| `abandoned`    | `\u274c` | Explicitly skipped via `edit_tasks` (type: abandon); terminal state |\n\nTerminal statuses (`done`, `abandoned`) are permanent \u2014 tasks in these states cannot be edited or advanced.\n\n## Phases\n\nTasks are grouped into numbered phases (\u2265 1). Phases execute sequentially:\n\n1. **`compile_tasks`** determines the active phase (the lowest-numbered phase with non-terminal tasks).\n2. Only tasks in the active phase can transition to `ready` (after their dependencies are satisfied).\n3. When all tasks in a phase reach a terminal status, the phase is marked `completed` and the next phase becomes `active`.\n4. Pending phases remain locked until all preceding phases complete.\n\nPhase status tracking:\n\n| Phase Status | Meaning                                        |\n| ------------ | ---------------------------------------------- |\n| `pending`    | Not yet reached; tasks are locked              |\n| `active`     | Current phase; tasks can become ready          |\n| `completed`  | All tasks are terminal (`done` or `abandoned`) |\n\nWhen a phase completes and actionable tasks remain, a visible \"Phase N complete.\" notification is sent to the user. If a [prompt template](#configuration) is configured, the template message is also injected as hidden context for the next agent turn. When the final phase completes (all tasks terminal), the board summary in the tool output reflects completion without a separate notification. Phase completion can trigger auto-continue.\n\n## Dependencies\n\nEach task can declare dependencies on other tasks. Dependencies are validated during `compile_tasks` and `edit_tasks` (type: `blockers`):\n\n- **No self-references** \u2014 a task cannot depend on itself\n- **No duplicates** \u2014 each dependency ID must be unique within a task\n- **No missing references** \u2014 all dependency IDs must exist on the board\n- **No cycles** \u2014 the dependency graph must be a DAG (validated via DFS cycle detection)\n\nA task becomes `ready` only when:\n\n1. Its phase is active\n2. All of its dependencies have status `done`\n\nTasks with unsatisfied dependencies remain in `configured` even when their phase is active.\n\n## Configuration\n\nCreate `.pi/phased-tasks.json` in your project root:\n\n```json\n{\n  \"phaseCompletionPromptTemplate\": \"Phase {phase} is complete. Review the results and proceed to the next phase.\"\n}\n```\n\n| Field                           | Type     | Description                                                                                                             |\n| ------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------- |\n| `phaseCompletionPromptTemplate` | `string` | Optional. Template for the prompt injected when a phase completes. Use `{phase}` as a placeholder for the phase number. |\n\nThe template is resolved by replacing `{phase}` with the completed phase number. If no template is configured, phase completion is detected but no additional prompt is injected.\n\nConfiguration is loaded once per session and cached. It resets on `session_start`, `session_tree`, and `session_shutdown` events (i.e., whenever the session initializes or the branch changes).\n\n## Auto-Continue\n\nAfter each agent turn (`agent_end` event), the extension checks the board state:\n\n1. **No tasks on the board** \u2192 do nothing.\n2. **Agent turn was aborted** \u2192 do nothing (user interrupted).\n3. **Actionable tasks exist** (ready, implementing, or reviewing) \u2192 schedule an auto-continue prompt after a 3-second countdown.\n4. **Deadlock** (non-terminal tasks but none actionable) \u2192 schedule an auto-continue with a deadlock diagnostic.\n5. **All tasks terminal** \u2192 do nothing.\n\nThe auto-continue uses a 3-second countdown timer. In UI mode, a countdown widget is displayed (\"\u23f3 Auto-continuing in Xs...\"). Typing anything cancels the countdown. In headless mode, a simple 3-second timeout is used.\n\n### Circuit Breaker\n\nAuto-continue stops after **20 iterations** (`MAX_AUTO_CONTINUE`). When the limit is reached, a visible notice is sent to the user:\n\n> Auto-continue limit reached (20 iterations). N task(s) remain unresolved. Take over manually.\n\nThe counter resets whenever the board is mutated via `setBoard()`.\n\n### Hidden Context\n\nBefore each agent turn (`before_agent_start`), the extension injects a hidden context message summarizing the board state: active phase, status counts, claimed tasks, remaining tasks, and recently completed tasks. This keeps the agent informed without consuming visible context.\n\n## Event Persistence\n\nThe extension persists two types of custom entries to the session tree:\n\n| Custom Type             | Purpose                                                         |\n| ----------------------- | --------------------------------------------------------------- |\n| `phased-tasks:event`    | Individual workflow events (write, edit, compile, claim, clear) |\n| `phased-tasks:snapshot` | Full board snapshot after each mutation                         |\n\nOn `session_start` and `session_tree` events, the board is reconstructed by scanning the session branch in reverse for the latest valid snapshot.\n\nOn `session_shutdown`, all in-memory state is reset (board, auto-continue counter, advance-tracking flag) and any active countdown timers are cleared.\n\n## Status Bar Integration\n\npi-tasks integrates with [pi-powerline](https://github.com/harms-haus/pi-powerline) to display task progress in the status bar above the composer. No additional configuration is needed \u2014 the integration is automatic when both extensions are active.\n\n### What you'll see\n\nThe status bar shows two elements, updated after every board mutation:\n\n- **Progress line** \u2014 `{done}/{total} - Phase {n}`, where `done` counts both completed and abandoned tasks. Displays `No active phase` when tasks exist but no phase is active. When the board is empty, both status slots are removed entirely.\n- **Active tasks** \u2014 tasks in `implementing` or `reviewing` status are listed above the progress line, one per line: `[t-1.1] Set up database schema`\n\nExample status bar with active tasks:\n\n```\n[t-1.1] Set up database schema\n[t-1.2] Create API endpoints\n2/6 - Phase 1\n```\n\nWhen the board is cleared, both status slots are removed from the bar.\n\n### Coexistence with pi-til-done\n\npi-tasks publishes to the same `til-done` / `til-done-active` status slots used by [pi-til-done](https://github.com/harms-haus/pi-til-done). When both extensions are active, whichever extension last updates the slot wins the display \u2014 there is no merging or deduplication.\n\n## Architecture\n\n```\nsrc/\n\u251c\u2500\u2500 index.ts          # Extension entry point; registers tools, event handlers, and renderers\n\u251c\u2500\u2500 types.ts          # Type definitions, status constants, event types, edit types\n\u251c\u2500\u2500 engine.ts         # Pure functions: board creation, write/compile/edit/claim logic, phase computation\n\u251c\u2500\u2500 state.ts          # Mutable board state, session reconstruction, persistence helpers, UI sync\n\u251c\u2500\u2500 schemas.ts        # TypeBox schemas for tool parameters (extracted from tools.ts)\n\u251c\u2500\u2500 tools.ts          # Tool definitions: execute, renderCall, renderResult\n\u251c\u2500\u2500 events.ts         # Event handlers: session_start, session_tree, session_shutdown, before_agent_start, agent_end, input, tool_result\n\u251c\u2500\u2500 config.ts         # Configuration loading from .pi/phased-tasks.json\n\u251c\u2500\u2500 formatting.ts     # Plain-text formatting for board display, summaries, and prompts\n\u251c\u2500\u2500 validation.ts     # Input validation, dependency cycle detection, snapshot type guards\n\u2514\u2500\u2500 renderers.ts      # Message renderers for phased-tasks-context and phased-tasks-notice\n```\n\nKey design decisions:\n\n- **Engine is pure** \u2014 all board transformation functions are side-effect-free and return new snapshots. Mutability is confined to `state.ts`.\n- **Validation before mutation** \u2014 `applyEdits` and `compileBoard` validate all changes before modifying any state, ensuring atomic batch operations.\n- **Phase recomputation is recursive** \u2014 advancing the last task in a phase to `done` triggers recursive recomputation, automatically unlocking the next phase and cascading readiness.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "harms-haus"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/harms-haus/pi-tasks#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/harms-haus/pi-tasks.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-25T23:39:47.734Z",
+    "0.1.0": "2026-05-25T23:39:48.011Z",
+    "modified": "2026-05-25T23:39:48.210Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 7,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 142
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 3
+    }
+  ]
+}

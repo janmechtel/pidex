@@ -1,0 +1,42 @@
+{
+  "name": "@estebanforge/pi-codegraph-enhanced",
+  "latest_version": "1.0.1",
+  "description": "Pi-native CodeGraph tools with startup auto-indexing. Fork of @vndv/pi-codegraph that adds automatic index init/resync on every session start: creates the index when missing, incrementally syncs drift, rebuilds on corruption, and skips cleanly when anothe",
+  "readme": "# @estebanforge/pi-codegraph-enhanced\n\nPi-native [CodeGraph](https://github.com/colbymchenry/codegraph) tools with **automatic index management on every session start**. Fork of [`@vndv/pi-codegraph`](https://github.com/vndv/pi-codegraph): same eight structural-code tools, plus a startup gate that creates, syncs, or rebuilds the index so it's always fresh without you ever running `codegraph init` / `sync` by hand.\n\nAsk pi structural questions about your codebase without falling back to slow grep/read loops.\n\n## Install\n\n```\npi install npm:@estebanforge/pi-codegraph-enhanced\n```\n\nCodeGraph itself must be installed and on `PATH`:\n\n```\nnpm install -g @colbymchenry/codegraph\n```\n\nThen `/reload` in pi (or restart), and ask:\n\n```\nUse CodeGraph. Explain how authentication reaches the request handler.\nUse CodeGraph. What would break if I change UserRepository?\nUse CodeGraph. Show files under internal/services and important symbols.\n```\n\n## What it does\n\nTwo halves: the **tools** (unchanged from upstream) and the **auto-managed index** (the fork's reason for existing).\n\n### Tools\n\nExtension tools only, no MCP config to maintain. Each tool proxies one request to `codegraph serve --mcp`:\n\n| Tool | Description |\n| --- | --- |\n| `codegraph_search` | Symbol search by name |\n| `codegraph_node` | One symbol's signature, location, source, callers, and callees |\n| `codegraph_files` | Indexed file tree |\n| `codegraph_callers` | Functions or methods that call a symbol |\n| `codegraph_callees` | Functions or methods called by a symbol |\n| `codegraph_impact` | Impact radius for changing a symbol |\n| `codegraph_explore` | Source for several related symbols grouped by file |\n| `codegraph_status` | Index health and pending sync status |\n\n### Auto-managed index\n\nOn every session start and `/reload`, the extension probes the `codegraph` CLI and, when available, runs a status gate that performs the cheapest action leaving the index fresh:\n\n| State at startup | Action | Why |\n| --- | --- | --- |\n| `codegraph` not on `PATH` | nothing (`unavailable`) | Fail-safe: bail before any spawn, avoid a false \"initialized\" and wasted timeouts |\n| `.codegraph/` missing | `codegraph init -i` | Create the index and build the graph in one step |\n| `.codegraph/` present, `status` reports pending changes | `codegraph sync` | Incremental update for drift made outside the watcher (terminal `git pull`, another editor) |\n| `.codegraph/` present, `status` unreadable / `initialized: false` / non-zero exit | `codegraph index -f` | Treat the DB as corrupt or half-initialized and rebuild it |\n| `status` times out, or any command reports a live file-lock conflict | nothing (`busy`) | Another process owns the index (a `/reload` racing a long index). Skip rather than start a second writer or a wasteful full reindex |\n| `.codegraph/` present, `status` clean | nothing (`skipped`) | Already fresh |\n\nThe maintenance runs fire-and-forget and never blocks the agent from starting. Outcome surfaces in the footer (`CodeGraph: initialized` / `synced` / `rebuilt` / `busy` / `unavailable`); a one-time warning fires if the CLI is missing. This replaces the daily `codegraph index && codegraph sync` habit, `index -f` only runs when `status` genuinely cannot read the DB.\n\n## How it works\n\n```\npi agent\n  -> pi-codegraph extension tool\n  -> local CodeGraph MCP process (codegraph serve --mcp --path <project>)\n  -> .codegraph/codegraph.db\n  -> structured result back to pi\n```\n\nOn `resources_discover` (once per session start and `/reload`), the extension additionally runs the auto-managed index gate against the current project before any tool call.\n\n## `/codegraph` command\n\nInspect and toggle the CodeGraph settings flag without leaving Pi.\n\n| Invocation | Effect |\n| --- | --- |\n| `/codegraph` (TUI) | Opens an interactive settings menu (the same `SettingsList` component `/settings` uses). Flip the flag, then a single reload fires on close to apply it. |\n| `/codegraph` (non-TUI / RPC) | Falls back to a read-only status panel: the flag's on/off state and the last startup action. |\n| `/codegraph init` | Index the current folder now, regardless of the flag. Creates/syncs/rebuilds the `.codegraph` index on demand. |\n| `/codegraph toggle <flag>` | One-shot flip: persists, then reloads. |\n| `/codegraph <flag>` | Shorthand one-shot toggle (flag name without the `toggle` keyword). |\n\nTab-completion is offered for `init`, `toggle`, and the flag name.\n\nThe one flag today:\n\n| Flag | Default | What it does |\n| --- | --- | --- |\n| `codegraph-auto-index` | `false` | Create the `.codegraph` index automatically in folders that don't have one, on every session start. Off by default so opening Pi in a folder never triggers indexing unless you ask. Existing indexes are always kept fresh (sync/rebuild) regardless of this flag. Use `/codegraph init` to index a specific folder on demand. |\n\n**Two-tier behavior.** Creation is opt-in (flag, default off); maintenance is always-on. If a project already has a `.codegraph/` index (created via `/codegraph init`, a previous enabled session, or `codegraph init -i`), the extension keeps it fresh every startup, syncing drift and rebuilding on corruption, even with the flag off. The flag only controls whether to create new indexes in folders that have none.\n\n**Why a reload per apply.** Pi's extension API exposes `getFlag` but no live `setFlag`, and flag values are read into memory at load time. Changes persist via `pi config set` and a `/reload` picks them up. You can also set flags directly: `pi config set codegraph-auto-index false`.\n\n## Notes on concurrency and recovery\n\n- **Cancellable runner.** Every CLI invocation is wrapped in an `AbortSignal` with a 5-minute cap (10 seconds for the `--version` probe). A hung command is aborted and its child process killed, so it can never orphan a writer holding the codegraph lock.\n- **Lock conflicts.** `codegraph index -f` reclaims stale locks (verified against `@colbymchenry/codegraph`), so a crash-leftover lock never blocks recovery of a corrupt DB. A *live* lock (another active process) surfaces in stderr and is detected as `busy`, never escalated into a racing second writer.\n- **In-flight dedup.** Concurrent calls against the same project within a session collapse into one operation. Cross-`/reload` overlap is backstopped by codegraph's own `.lock` file.\n- **Windows parity.** The startup runner resolves the `codegraph` shim via the same PowerShell `Get-Command` discovery the MCP launcher uses, so global npm/Scoop installs are found. Shared `spawnCodeGraphProcess` helper used by both paths.\n\n## Requirements\n\n- Node.js 22.19.0 or newer (provided by pi).\n- CodeGraph CLI on `PATH`: `npm install -g @colbymchenry/codegraph`.\n\n## Credit\n\nFork of [`@vndv/pi-codegraph`](https://github.com/vndv/pi-codegraph) by the CodeGraph contributors, which itself wraps [`@colbymchenry/codegraph`](https://github.com/colbymchenry/codegraph). The tools, JSON-RPC MCP session, and Windows path handling are theirs; this fork adds the auto-managed index, the cancellable CLI runner, concurrency handling, and status feedback.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "codegraph",
+    "code-intelligence",
+    "code-index",
+    "auto-index",
+    "tree-sitter",
+    "call-graph",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "EstebanForge",
+    "email": "esteban@attitude.cl",
+    "url": "https://actitud.xyz"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/EstebanForge/pi-codegraph-enhanced#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EstebanForge/pi-codegraph-enhanced.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-25T17:01:51.389Z",
+    "modified": "2026-06-25T19:59:45.128Z",
+    "1.0.0": "2026-06-25T17:01:51.733Z",
+    "1.0.1": "2026-06-25T19:59:45.023Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

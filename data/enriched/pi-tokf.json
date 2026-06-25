@@ -1,0 +1,34 @@
+{
+  "name": "pi-tokf",
+  "latest_version": "0.1.0",
+  "description": "pi extension that wraps commands through tokf for compressed output.",
+  "readme": "# pi-tokf\n\n[![npm version](https://img.shields.io/npm/v/pi-tokf)](https://www.npmjs.com/package/pi-tokf)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)\n\n[pi](https://pi.dev) extension that wraps bash commands through [tokf](https://github.com/mpecan/tokf) \u2014 reducing LLM context consumption by 60\u201390%.\n\nZero config. Main agent and all subagents. Just install and every bash tool call is automatically compressed.\n\n## How It Works\n\nThe extension hooks into pi's `tool_call` event pipeline. Every time the agent (or any subagent) runs a bash command:\n\n1. The extension calls `tokf rewrite \"<command>\"` as a subprocess\n2. If tokf returns a rewritten command, it replaces the original in the event payload with `tokf run --no-mask-exit-code <rewritten>`\n3. If tokf is missing, times out, or returns nothing, the command passes through unmodified\n\nThis mirrors the approach used in tokf's Claude Code hook, adapted for pi's event system.\n\n**Example \u2014 running 207 tests:**\n\n```\n# Without tokf\n> bash(\"cd gateway && mix test\")\nwarning: undefined module attribute @kill_timeout...\n...\nRunning ExUnit with seed: 188487, max_cases: 32\n..........................................................................\nFinished in 0.4 seconds\n207 tests, 0 failures\n\n# With tokf (rewrites to: tokf run --no-mask-exit-code cd gateway && mix test)\n\u2713 All tests passed\n```\n\n## Install\n\n```bash\n# Global (user settings)\npi install npm:pi-tokf\n\n# Project-local (shared via .pi/settings.json)\npi install -l npm:pi-tokf\n\n# Try without installing (current run only)\npi -e npm:pi-tokf\n\n# From git\npi install git:github.com/AlexParamonov/pi-tokf\n```\n\n## Requirements\n\n- [tokf](https://github.com/mpecan/tokf) installed and on PATH\n- Node.js >= 14\n\n## Notes\n\n- Exit codes are preserved (`--no-mask-exit-code`) so failures are never masked\n- tokf is resolved from PATH \u2014 no hardcoded paths\n- Falls back to original command on any error (never blocks execution)\n\n## Debugging\n\nWhen tokf fails (missing, timeout, error), the extension logs to stderr via `console.error()`. To see these logs, run pi with:\n\n```bash\nPI_VERBOSE=1 pi\n```\n\nThis surfaces messages like:\n- `[pi-tokf] rewrite failed: spawn tokf ENOENT` \u2014 tokf is not installed\n- `[pi-tokf] rewrite timed out after 3000ms` \u2014 slow tokf rewrite\n\n## Development\n\n```bash\ngit clone https://github.com/AlexParamonov/pi-tokf.git\ncd pi-tokf\nnpm install\nnpm run typecheck       # TypeScript validation\n```\n\nTo test the extension locally without publishing:\n\n```bash\npi -e ./extensions/index.ts\n```\n\nOr register it in a project's `.pi/settings.json`:\n\n```json\n{\n  \"extensions\": [\"./extensions/index.ts\"]\n}\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "tokf"
+  ],
+  "author": {
+    "name": "AlexParamonov"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/AlexParamonov/pi-tokf#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlexParamonov/pi-tokf.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-26T13:20:03.302Z",
+    "0.1.0": "2026-05-26T13:20:03.504Z",
+    "modified": "2026-05-26T13:20:03.682Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

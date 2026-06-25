@@ -1,0 +1,43 @@
+{
+  "name": "@lustepe/elixir-pi",
+  "latest_version": "0.4.0",
+  "description": "Pi package for Elixir projects: Mix post-edit checks, Expert LSP bridge, commands, LLM tools, and Elixir/Phoenix/Ecto/OTP skills.",
+  "readme": "# elixir-pi\n\nPi package for Elixir projects: Mix post-edit hooks, Expert LSP bridge, commands, LLM tools, and Elixir/Phoenix/Ecto/OTP skills.\n\n## Features\n\n- **Auto-detection**: Detects Elixir projects via `mix.exs`\n- **Post-edit hooks**: Runs `mix format`, `mix compile`, and `mix credo` automatically after file edits\n- **Project health**: Track compile, credo, and test results automatically; view with `ctrl+shift+e` or `/elixir status`\n- **Expert LSP bridge**: Full language server integration for diagnostics, hover, definitions, references, symbols, completions, rename, and formatting\n- **LLM tools**: `elixir_mix` and `elixir_expert` tools callable by the agent\n- **Slash commands**: `/elixir` and `/expert` with argument completions\n- **Skills**: Domain-specific thinking skills for Elixir, Phoenix, Ecto, and OTP\n- **Credo caching**: Checks credo availability once per project instead of on every edit\n\n## Install\n\n```bash\n# Global (all projects)\npi install /path/to/elixir-pi\n\n# Project-local (shareable via .pi/settings.json)\npi install -l /path/to/elixir-pi\n\n# Try without installing\npi -e /path/to/elixir-pi\n```\n\n## Prerequisites\n\n- `mix` on PATH\n- [`expert`](https://expert-lsp.org/) on PATH (for LSP features)\n\n## Structure\n\n```\nelixir-pi/\n\u251c\u2500\u2500 README.md\n\u251c\u2500\u2500 package.json\n\u251c\u2500\u2500 extensions/\n\u2502   \u251c\u2500\u2500 mix-format.ts        # Post-edit: mix format\n\u2502   \u251c\u2500\u2500 mix-compile.ts       # Post-edit: mix compile --warnings-as-errors\n\u2502   \u251c\u2500\u2500 mix-credo.ts         # Post-edit: mix credo (cached availability check)\n\u2502   \u251c\u2500\u2500 elixir-tools.ts      # elixir_mix tool + /elixir command\n\u2502   \u251c\u2500\u2500 elixir-expert.ts     # elixir_expert tool + /expert command + auto-start\n\u2502   \u251c\u2500\u2500 elixir-session.ts    # Project detection + system prompt + health shortcut\n\u2502   \u2514\u2500\u2500 lib/\n\u2502       \u251c\u2500\u2500 elixir-utils.ts      # Shared utilities (run commands, find mix root, etc.)\n\u2502       \u251c\u2500\u2500 expert-lsp-client.ts # LSP client for Expert language server\n\u2502       \u2514\u2500\u2500 project-health.ts    # Health snapshot store + formatter\n\u2514\u2500\u2500 skills/\n    \u251c\u2500\u2500 elixir-thinking/     # General Elixir design patterns\n    \u251c\u2500\u2500 phoenix-thinking/    # Phoenix and LiveView patterns\n    \u251c\u2500\u2500 ecto-thinking/       # Ecto schemas, queries, migrations\n    \u2514\u2500\u2500 otp-thinking/        # OTP processes, supervisors, fault tolerance\n```\n\n## Slash Commands\n\n### Mix helpers (`/elixir`)\n\n```\n/elixir doctor              # Check mix, expert, credo availability\n/elixir format [file]       # Run mix format\n/elixir compile             # Run mix compile --warnings-as-errors\n/elixir credo               # Run mix credo\n/elixir test [args...]      # Run mix test\n/elixir status              # Project health snapshot\n```\n\n### Expert LSP (`/expert`)\n\n```\n/expert status              # Show session status\n/expert start               # Start Expert LSP\n/expert restart             # Restart Expert LSP\n/expert shutdown            # Shut down Expert LSP\n/expert diagnostics [file]  # Show diagnostics\n/expert hover <file> <line> <char>\n/expert definition <file> <line> <char>\n/expert references <file> <line> <char>\n/expert symbols <file>\n/expert completion <file> <line> <char>\n/expert rename <file> <line> <char> <newName> [--apply]\n/expert format <file> [--apply]\n```\n\nPositions are **1-based** for convenience. The extension converts to LSP's 0-based internally.\n\n## LLM Tools\n\n### `elixir_mix`\n\n| Action | Description |\n|--------|-------------|\n| `doctor` | Check tool availability |\n| `format` | Run mix format |\n| `compile` | Run mix compile --warnings-as-errors |\n| `credo` | Run mix credo (skips if not installed) |\n| `test` | Run mix test |\n| `status` | Project health snapshot |\n\n### `elixir_expert`\n\n| Action | Description |\n|--------|-------------|\n| `status` / `start` / `restart` / `shutdown` | Manage Expert sessions |\n| `diagnostics` | Get published diagnostics |\n| `hover` | Symbol information |\n| `definition` | Go to definition |\n| `references` | Find references |\n| `document_symbols` | List file symbols |\n| `completion` | Autocompletion candidates |\n| `rename` | Preview/apply rename edits |\n| `formatting` | Preview/apply formatting edits |\n\n## Skills\n\n| Skill | Use when |\n|-------|----------|\n| `/skill:elixir-thinking` | Designing modules, processes, protocols, behaviours |\n| `/skill:phoenix-thinking` | Working on Phoenix, LiveView, controllers, contexts |\n| `/skill:ecto-thinking` | Changing schemas, changesets, queries, migrations |\n| `/skill:otp-thinking` | Implementing GenServer, Supervisor, Task, Registry |\n\n## How Expert LSP Works\n\nThe bridge in `extensions/lib/expert-lsp-client.ts` implements a JSON-RPC/LSP client:\n\n1. Starts one Expert process per project root on session start\n2. Sends `initialize` with workspace/text-document capabilities\n3. Responds to server requests (`client/registerCapability`, `workspace/configuration`, etc.)\n4. Syncs `.ex`, `.exs`, `.heex`, `.leex` files with `didOpen`/`didChange`/`didSave`\n5. Caches `textDocument/publishDiagnostics` notifications\n6. Exposes LSP features as tools and commands\n7. Applies text-only workspace edits inside the project root\n\n## Keyboard Shortcuts\n\n| Shortcut | Action |\n|----------|--------|\n| `ctrl+shift+e` | Show Elixir project health status |\n\n## Configuration\n\n### Environment variables\n\n```bash\nPI_ELIXIR_EXPERT_COMMAND=/path/to/expert   # Override Expert binary\nPI_ELIXIR_EXPERT_ARGS=\"--stdio\"            # Override Expert args\n```\n\n### Disable post-edit hooks\n\nIn `.pi/settings.json`:\n\n```json\n{\n  \"packages\": [\n    {\n      \"source\": \"/path/to/elixir-pi\",\n      \"extensions\": [\n        \"extensions/mix-format.ts\",\n        \"extensions/elixir-tools.ts\",\n        \"extensions/elixir-expert.ts\",\n        \"extensions/elixir-session.ts\"\n      ]\n    }\n  ]\n}\n```\n\nThis keeps formatting, commands, Expert LSP, and skills but disables automatic compile/credo.\n\n## Notes\n\n- Expert connects lazily on first LSP request (no startup overhead)\n- Diagnostics depend on Expert publishing `textDocument/publishDiagnostics`; indexing may still be in progress after startup\n- `rename` and `formatting` default to preview-only; pass `apply=true` or `--apply` to write edits\n- Credo is only active when the dependency is installed in the project\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "elixir",
+    "phoenix",
+    "ecto",
+    "otp",
+    "mix",
+    "credo",
+    "expert",
+    "lsp"
+  ],
+  "author": null,
+  "license": "Apache-2.0",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions/mix-format.ts",
+      "./extensions/mix-compile.ts",
+      "./extensions/mix-credo.ts",
+      "./extensions/elixir-tools.ts",
+      "./extensions/elixir-expert.ts",
+      "./extensions/elixir-session.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-04-27T22:01:27.593Z",
+    "0.4.0": "2026-04-27T22:01:27.953Z",
+    "modified": "2026-04-27T22:01:28.189Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 4,
+  "download_trend": []
+}

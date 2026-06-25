@@ -1,0 +1,37 @@
+{
+  "name": "pi-assistant-provenance",
+  "latest_version": "0.1.0",
+  "description": "Gives models awareness of mid-session model switches in Pi",
+  "readme": "# assistant-provenance for Pi (`pi-assistant-provenance`)\n\nGives models awareness of mid-session model switches.\n\n<p align=\"center\">\n  <img width=\"450\" alt=\"assistant-provenance demo\" src=\"https://raw.githubusercontent.com/w-winter/dot314/main/assets/assistant-provenance-demo.gif\" />\n</p>\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:pi-assistant-provenance\n```\n\nFrom the dot314 git bundle (filtered install):\n\n```json\n{\n  \"packages\": [\n    {\n      \"source\": \"git:github.com/w-winter/dot314\",\n      \"extensions\": [\"extensions/assistant-provenance/index.ts\"],\n      \"skills\": [],\n      \"themes\": [],\n      \"prompts\": []\n    }\n  ]\n}\n```\n\n## Why\n\nWhen you switch models mid-session, the new model sees a conversation full of assistant replies it didn't write.  From the model's perspective, all assistant messages look identical, as provider and model metadata is stripped during LLM conversion.  This extension gives each model the context it needs to understand which replies came from a different model and where the handoffs occurred, which can be especially helpful when inviting different model families to critique, correct, or take cues from each other's outputs.\n\n## What it does\n\nOn each provider request, the extension scans the conversation for \"significant\" (see [Configuration](#configuration) below) assistant model transitions and inserts a compact note before each user message that follows a handoff:\n\n```text\n[Model handoff: previous assistant reply was authored by openai/gpt-5.5. Current assistant model anthropic/claude-opus-4-6 was selected before the following user message.]\n```\n\nThe notes are **provider context only** \u2014 they reach the model but aren't persisted to session JSONL files and aren't included in HTML exports.  They aren't rendered in the TUI either, since Pi already displays model changes there.  Note also that the extension doesn't do any of the following:\n\n- **No note per model-picker cycle.**  If the user cycles through several models before sending a message, only the model actually selected at send time matters.  Intermediate selections produce no notes.\n- **No note on every message.**  Notes appear only at the specific conversation boundaries where a meaningful handoff occurred, not on subsequent turns where the model hasn't changed.\n- **No ongoing prefix-cache churn.**  Notes are inserted at deterministic positions with deterministic content derived from assistant message metadata.  The `timestamp` field doesn't reach the provider, so repeated context builds produce a stable provider-facing prefix.\n\nHandoff notes are recreated from the conversation history on every context build, so later turns retain awareness of earlier model switches without any durable session artifacts.  Error and aborted assistant messages are ignored when determining handoff boundaries.  Tool-result continuation contexts are left untouched.\n\n## Configuration\n\nOptionally, you may create `config.json` within the extension folder to suppress noisy transitions within certain model families.  For example:\n\n```json\n{\n  \"silentModelGroups\": [\n    [\"*/claude-*\"],\n    [\"*/gpt-5*\"],\n    [\"*/gemini-*\"],\n    [\"*/kimi-*\"],\n    [\"*/glm-*\"],\n    [\"*/deepseek-*\"]\n  ]\n}\n```\n\nA transition is suppressed when both the prior and current models match at least one pattern in the same group (e.g., with `[\"*/claude-*\"]`, no model-facing note would be sent upon switching between `anthropic/claude-opus-4-7` and `anthropic/claude-opus-4-6`).  Patterns containing `/` match the full `provider/modelId` key; patterns without `/` match only the model ID.  Matching is case-insensitive.  Only `*` is special, matching any sequence of characters.\n\nMissing `config.json` uses the default empty configuration, and invalid `config.json` fails extension startup with a clear error so configuration mistakes are visible.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "model-handoff",
+    "provenance",
+    "multi-model",
+    "context"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/w-winter/dot314#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/w-winter/dot314.git",
+    "directory": "packages/pi-assistant-provenance"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/assistant-provenance/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/w-winter/dot314/main/assets/assistant-provenance-demo.gif"
+  },
+  "time": {
+    "created": "2026-05-11T17:24:47.019Z",
+    "0.1.0": "2026-05-11T17:24:47.174Z",
+    "modified": "2026-05-11T17:24:47.383Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

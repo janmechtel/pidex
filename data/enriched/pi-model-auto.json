@@ -1,0 +1,33 @@
+{
+  "name": "pi-model-auto",
+  "latest_version": "0.1.1",
+  "description": "Pi extension package that routes each turn to cheap or strong authenticated models.",
+  "readme": "# pi-model-auto\n\n`pi-model-auto` adds one Pi model: **Pi Router (Auto)**.\n\nChoose it once with `/model`. After that, Pi keeps using the router, and the router chooses one of your authenticated models for each turn.\n\n## Start\n\nInstall from npm:\n\n```bash\npi install npm:pi-model-auto\n```\n\nOr install from git (pin a release with `@vX.Y.Z`, or omit it to track the default branch):\n\n```bash\npi install git:github.com/maynewong/pi-model-auto@v0.1.0\n```\n\nUpdate later with `pi update --extensions`.\n\nTo try it once without installing, point `-e` at a local checkout:\n\n```bash\npi -e /path/to/pi-model-auto\n```\n\nThen:\n\n1. Run `/model`.\n2. Choose **Pi Router (Auto)**.\n3. Use Pi normally.\n\nNo config is required at first. If the router says no authenticated models are available, run `/login` for the providers you want to use, then reload Pi.\n\n## Use\n\nCheck what the router sees:\n\n```text\n/auto\n```\n\nForce one turn when you know what you want:\n\n```text\n@cheap update the README\n@strong debug this race condition\n@model:anthropic/claude-3-5-sonnet-20241022 use Sonnet here\n```\n\n- `@cheap` asks for the cheap end of the current pool.\n- `@strong` asks for the strong end.\n- `@model:provider/model-id` uses that exact model.\n\nThe prefix is removed before the model sees your prompt.\n\n## Configure When Needed\n\nMost people only need config for two reasons:\n\n1. Limit the pool to providers they trust.\n2. Tell the router what each model really costs them.\n\nConfig lives in either file:\n\n- `~/.pi/agent/model-router.json`\n- `.pi/model-router.json` in trusted projects\n\nProject config overrides user config.\n\n```jsonc\n{\n  \"router\": {\n    \"modelFilter\": { \"include\": [\"anthropic\", \"z-ai\"], \"exclude\": [] },\n    \"modelOverrides\": {\n      \"anthropic/claude-3-5-sonnet-20241022\": { \"costCoef\": 0.05 },\n      \"z-ai/glm-5.2\": {\n        \"costCoef\": 0.4,\n        \"costCoefHours\": [{ \"hours\": [14, 18], \"factor\": 3 }]\n      }\n    }\n  }\n}\n```\n\nUse provider/model ids exactly as they appear in your Pi registry. The names above are public examples.\n\n### `costCoef`\n\n`costCoef` multiplies the benchmark cost:\n\n- `< 1`: cheaper for you than the benchmark, such as a subscription or discount.\n- `= 1`: roughly benchmark cost.\n- `> 1`: more expensive for you.\n\nAvoid setting a limited subscription near zero unless you want it to win almost every turn.\n\n### `costCoefHours`\n\nUse this when a model is more expensive during local hours:\n\n```jsonc\n\"z-ai/glm-5.2\": {\n  \"costCoef\": 0.4,\n  \"costCoefHours\": [{ \"hours\": [14, 18], \"factor\": 3 }]\n}\n```\n\nThis means `0.4` normally, `1.2` from 14:00 through 17:59. Windows are half-open `[start, end)`. `[22, 2]` wraps across midnight.\n\n## How It Chooses\n\nThe router compares quality against your effective cost.\n\nQuality comes from one benchmark table. Cost starts from the same table, then applies your `costCoef` and any active time window. The router keeps to the efficient frontier: a model is only worth considering if no other available model is both better and cheaper.\n\n`capabilitySource` chooses the benchmark:\n\n- `\"ramp\"` (default): this package's [Ramp SWE-Bench](https://labs.ramp.com/swebench#score-vs-spend) table, using coding-agent resolve rate and measured cost per task. It is a narrow coding-agent slice, not a general model score. The task family follows [SWE-bench](https://arxiv.org/abs/2310.06770).\n- `\"aa\"`: [Artificial Analysis](https://artificialanalysis.ai/models) model data, using its Intelligence Index and blended price metrics.\n\nThe numeric tables live in [`src/canonical-models.ts`](src/canonical-models.ts). The two sources are not mixed.\n\nTask difficulty is judged from the request itself \u2014 context size, prompt length, keywords, and tool activity \u2014 never from your thinking level. Your thinking level (`low`/`medium`/`high`/`xhigh`) controls only how deeply the *chosen* model reasons; it does not change which model is chosen. So leaving thinking on `high` out of habit won't silently push every turn to the most expensive model. When you know a task is harder than it looks, say so in the prompt (or pin with `@strong`).\n\nOne user turn keeps one model, including tool-call continuations. Automatic routing also avoids quota-cooled plans and avoids switching away from a useful warm cache when the switch is not worth it.\n\n## Settings\n\n| setting | use |\n| --- | --- |\n| `capabilitySource` | Choose `\"ramp\"` or `\"aa\"`. |\n| `modelFilter` | Include or exclude providers/models by substring. |\n| `models` | Pin the configured `cheap` or `strong` endpoint. |\n| `modelOverrides` | Adjust cost or metadata for known/private/local models. |\n| `willingness` | Control how far each difficulty climbs toward stronger models. |\n| `cacheAware` | Keep warm prompt caches when switching is not worth it. Enabled by default. |\n| `quota` | Skip cooled-down plans after rate-limit headers or `429`. Enabled by default. |\n| `weights` | Difficulty-scoring weights. Advanced. |\n| `log` | Append routing decisions to `.pi/router.log`. |\n\nUseful override fields:\n\n| field | meaning |\n| --- | --- |\n| `costCoef` | Cost multiplier. |\n| `costCoefHours` | Local-hour multipliers. |\n| `canonical` | Name shown in `/auto`. |\n| `costTier` | `cheap`, `standard`, `premium`, or `unknown`. |\n| `profiles` | `deep`, `fast`, `coder`, `balanced`, `vision`, `frontier`. |\n| `frontier` | Whether the model can appear in the strong frontier. |\n| `priceBlended`, `intelligence`, `scores`, `tps` | Raw metrics for models without benchmark data. |\n\nQuota state is stored at `~/.pi/agent/quota-state.json`. Providers without remaining-quota headers only cool down after a real `429`.\n\n## Develop\n\n```bash\nnpm run typecheck\nnpm test\n```\n\nMaintainers: see [RELEASING.md](RELEASING.md) for the publish flow.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "model-router"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/maynewong/pi-model-auto#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maynewong/pi-model-auto.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-25T11:55:03.358Z",
+    "modified": "2026-06-25T13:01:44.480Z",
+    "0.1.0": "2026-06-25T11:55:03.620Z",
+    "0.1.1": "2026-06-25T13:01:44.371Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

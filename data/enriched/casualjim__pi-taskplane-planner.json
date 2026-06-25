@@ -1,0 +1,38 @@
+{
+  "name": "@casualjim/pi-taskplane-planner",
+  "latest_version": "0.2.1",
+  "description": "Planner-native pi extension and CLI companion to Taskplane",
+  "readme": "# @casualjim/pi-taskplane-planner\n\nGlue between OpenSpec long-horizon planning and Taskplane execution.\n\nThis package compiles approved OpenSpec change contracts into Taskplane-native\nexecution packets, runs whole-change conformance, and archives verified delta\nspecs into cumulative truth.\n\n**Planning is done by OpenSpec** (`/opsx:explore`, `/opsx:propose`).\n**Execution is done by Taskplane** (`/orch`).\n**This package bridges the two** \u2014 it does not duplicate either.\n\n## What it provides\n\n- **Pi extension commands** (thin orchestration glue):\n  - `/plan-stage` \u2014 validate an approved OpenSpec change and compile it into Taskplane packets\n  - `/plan-archive` \u2014 promote passing delta specs into cumulative truth and archive the change\n  - `/plan-reopen` \u2014 mark a change as reopened after a contract defect\n- **Thin CLI** for status and packet operations:\n  - `planner status [change]` \u2014 inspect staging and conformance state\n  - `planner stage <change>` \u2014 compile approved contracts into Taskplane packets\n  - `planner archive <change>` \u2014 archive a verified change\n  - `planner reopen <change> [reason]` \u2014 reopen after a contract defect\n- **Taskplane packet generation**\n  - one implementation packet per capability spec (coarse-grained, end-to-end steps)\n  - one terminal conformance packet for the whole change\n- **Archive flow** that promotes delta specs into cumulative captured truth\n\n## Layout\n\nOpenSpec owns the change contract:\n\n```text\nopenspec/\n  changes/\n    <change-slug>/\n      proposal.md\n      design.md\n      specs/\n        <capability>/spec.md\n      conformance.md          \u2190 written by the conformance Taskplane task\n  specs/\n    <capability>/spec.md      \u2190 cumulative truth (synced on archive)\n  changes/\n    archive/\n      YYYY-MM-DD-<change-slug>/\n```\n\nTaskplane owns execution:\n\n```text\ntaskplane-tasks/\n  CONTEXT.md\n  PHASE-IMPLEMENTATION.md\n  PHASE-CONFORMANCE.md\n  TP-xxx-.../\n    PROMPT.md\n    STATUS.md\n```\n\n## Installation\n\nThis package is published to npm as `@casualjim/pi-taskplane-planner` and requires Node.js 24+.\n\n### Install for pi\n\n```bash\npi install npm:@casualjim/pi-taskplane-planner\n```\n\n### Install the CLI on your PATH\n\n```bash\nnpm install -g @casualjim/pi-taskplane-planner\n```\n\nThen restart or `/reload` pi. Use `pi list` to confirm the package is registered.\n\n## Workflow\n\n### 1. Plan with OpenSpec\n\n```text\n/opsx:explore my-change\n/opsx:propose my-change\n```\n\nThis creates `openspec/changes/my-change/` with proposal, design, specs, and tasks.\n\n### 2. Stage into Taskplane packets\n\n```text\n/plan-stage my-change\n```\n\nThis validates the approved contract and compiles it into Taskplane packets under\n`taskplane-tasks/`. Generated packets use coarse-grained end-to-end steps \u2014\ntests, documentation, and repo gates are folded into the implementation step.\n\n### 3. Execute with Taskplane\n\n```text\n/orch taskplane-tasks/TP-001-.../PROMPT.md taskplane-tasks/TP-002-verify-.../PROMPT.md\n```\n\n### 4. Archive verified truth\n\nWhen conformance passes:\n\n```bash\nplanner archive my-change\n```\n\nThis syncs delta specs into cumulative truth and moves the change into the archive.\n\n## Development\n\nRun tests:\n\n```bash\nnpm test\n```\n\nRun the Node-based package gate used by CI/publishing:\n\n```bash\nnpm run typecheck\nnpm run check:pack\n```\n\n`npm run build` remains an alias for the typecheck gate.\n\nOptional runtime E2E (requires a working local Taskplane + pi runtime environment and model/API access):\n\n```bash\nnpm run test:runtime-e2e\n```\n\nThis executes a planner-generated implementation packet through real Taskplane runtime orchestration,\nproves the runtime worker reads `PHASE-IMPLEMENTATION.md`, then probes a planner-generated conformance\npacket and proves that the runtime worker reads `PHASE-CONFORMANCE.md` at the correct phase boundary.\nThe test then writes a deterministic `ARCHIVE_READY` conformance report from the harness and archives\nthe change.\n\n## Publishing\n\nPublishing is automated through GitHub Actions using the same main-branch publish flow as `../pi-heimdall`:\n\n- `CI` runs on pull requests and manual dispatch with `npm ci`, `npm run typecheck`, and `npm run check:pack`\n- `Publish` runs on pushes to `main` and manual dispatch\n- if the `package.json` version is not already on npm, the workflow publishes it with trusted publishing\n- after a successful publish, the workflow bumps the patch version on `main` with `[skip ci]` so the repo is ready for the next publish\n- npmjs needs a Trusted Publisher entry for this repo\n- npm trusted publishing means no long-lived npm token secret is needed in GitHub\n\n## Notes\n\n- OpenSpec handles all planning: exploration, proposal creation, design, and spec generation.\n- Taskplane handles all execution: worker orchestration, review, and merge.\n- This package only bridges the two \u2014 it compiles approved OpenSpec contracts into Taskplane packets, manages conformance, and archives results.\n",
+  "keywords": [
+    "pi-package",
+    "planner",
+    "taskplane",
+    "extension",
+    "specs"
+  ],
+  "author": {
+    "name": "casualjim"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/casualjim/pi-taskplane-planner#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/casualjim/pi-taskplane-planner.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/planner-extension.mjs"
+    ]
+  },
+  "time": {
+    "created": "2026-04-09T23:40:01.464Z",
+    "modified": "2026-04-15T19:24:55.983Z",
+    "0.1.0": "2026-04-09T23:40:01.715Z",
+    "0.1.1": "2026-04-15T00:20:23.724Z",
+    "0.2.0": "2026-04-15T05:45:26.955Z",
+    "0.2.1": "2026-04-15T19:24:55.722Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": null,
+  "download_trend": []
+}

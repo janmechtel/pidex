@@ -1,0 +1,56 @@
+{
+  "name": "pi-finder-subagent",
+  "latest_version": "1.5.8",
+  "description": "Read-only local workspace scout subagent package for pi agents (code + personal files)",
+  "readme": "# pi-finder\n\nRead-only local workspace scout subagent package for [pi](https://github.com/badlogic/pi-mono).\n\nFinder uses a single interface for both coding agents and personal AI assistants: perform one-shot reconnaissance, gather evidence, and return a compact cited map of the relevant locations.\n\n## Installation\n\nFrom npm (after publish):\n\n```bash\npi install npm:pi-finder-subagent\n```\n\nFrom git:\n\n```bash\npi install git:github.com/default-anton/pi-finder\n```\n\nOr run without installing:\n\n```bash\npi -e npm:pi-finder-subagent\n# or\npi -e git:github.com/default-anton/pi-finder\n```\n\n## What it does\n\n- Registers a `finder` tool.\n- Runs a dedicated subagent session for one-shot reconnaissance.\n- Uses only `bash` + `read` in the subagent.\n- Enforces read-only scouting behavior (`rg`/`fd`/`ls` + targeted reads).\n- Works across code and non-code files in local workspaces.\n- Returns structured Markdown output (`Summary`, `Locations`, optional `Evidence`/`Searched`/`Next steps`).\n- Returns a compact map, not raw search noise: likely entrypoints, core files, nearby config/tests/docs/examples, and key citations.\n- Selects subagent model via ordered `PI_FINDER_MODELS` failover with `ctx.model` fallback.\n- Emits compact selection diagnostics (`reason`) in tool details.\n\n## Tool interface\n\n```ts\nfinder({\n  query: string,\n})\n```\n\n- `query` (required): the end goal for reconnaissance, how to search, what deliverable you want back, what counts as enough found, and (if known) scope hints such as directories/roots to prioritize.\n\n## Example queries\n\nCode-oriented:\n\n```txt\nBefore I change authentication, map where it is implemented. Search under src/auth and src/api for login/auth/authenticate, and return the entrypoint, token/session handling, related config/tests, and line-cited anchors.\n```\n\nPersonal assistant-oriented:\n\n```txt\nIn Documents or Desktop, find my latest trip itinerary PDF and any adjacent booking files, and list the top candidate paths with evidence.\n```\n\n## Model selection policy\n\nFinder uses local deterministic model routing with ordered failover.\n\nConfigure candidates with `PI_FINDER_MODELS`:\n\n```bash\nPI_FINDER_MODELS=\"provider/model:thinking,provider/model:thinking,...\"\n```\n\nConcrete example:\n\n```bash\nexport PI_FINDER_MODELS=\"openai-codex/gpt-5.3-codex-spark:high,google-antigravity/gemini-3-flash:medium,anthropic/claude-sonnet-4-6:high\"\n```\n\nRules:\n\n- `thinking` must be one of: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`.\n- Tokens are parsed in order (comma-separated, trimmed, empty tokens ignored).\n- Each token is filtered by:\n  1. `ctx.modelRegistry.getAvailable()`\n  2. Finder's in-memory temporary-unavailable cache (reason-aware TTL)\n- Finder picks the first candidate passing both filters.\n- If `PI_FINDER_MODELS` is unset/blank, or no candidate passes filters, Finder tries `ctx.model` fallback using the same availability + temporary-unavailable filters.\n- On any final non-abort model failure, Finder fails over to the next available candidate.\n- Temporary-unavailable TTLs are:\n  - quota-like final failures: 30 minutes\n  - other final failures: 10 minutes\n- Finder does not add its own retry/backoff loop for transient errors; SDK retry behavior remains the first-line retry mechanism.\n- Selection diagnostics stay compact and expose only `subagentSelection.reason`.\n\n## Development\n\n```bash\nnpm run pack:check\n```\n\n## License\n\nApache-2.0\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "finder",
+    "subagent",
+    "workspace-search",
+    "code-search",
+    "personal-assistant"
+  ],
+  "author": {
+    "name": "Anton Kuzmenko"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/default-anton/pi-finder#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/default-anton/pi-finder.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-11T19:30:29.735Z",
+    "modified": "2026-05-07T16:50:04.417Z",
+    "1.0.0": "2026-02-11T19:30:30.005Z",
+    "1.0.1": "2026-02-11T20:14:52.988Z",
+    "1.0.2": "2026-02-11T20:54:46.514Z",
+    "1.1.0": "2026-02-12T05:33:02.079Z",
+    "1.1.1": "2026-02-12T06:06:46.415Z",
+    "1.1.2": "2026-02-12T22:07:48.523Z",
+    "1.1.3": "2026-02-12T22:50:07.245Z",
+    "1.1.4": "2026-02-12T22:58:34.591Z",
+    "1.2.0": "2026-02-13T06:41:07.241Z",
+    "1.2.1": "2026-02-13T23:18:43.212Z",
+    "1.2.2": "2026-02-17T21:05:26.327Z",
+    "1.3.0": "2026-02-19T03:17:43.928Z",
+    "1.4.0": "2026-02-20T19:04:39.472Z",
+    "1.5.0": "2026-03-13T17:17:23.347Z",
+    "1.5.1": "2026-03-19T19:33:44.438Z",
+    "1.5.2": "2026-03-19T19:54:49.487Z",
+    "1.5.4": "2026-03-27T17:03:48.450Z",
+    "1.5.6": "2026-04-21T16:27:38.435Z",
+    "1.5.7": "2026-04-23T05:45:48.843Z",
+    "1.5.8": "2026-05-07T16:50:04.083Z"
+  },
+  "versions_count": 20,
+  "downloads_last_week": 14,
+  "download_trend": []
+}

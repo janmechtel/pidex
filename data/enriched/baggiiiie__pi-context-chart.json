@@ -1,0 +1,30 @@
+{
+  "name": "@baggiiiie/pi-context-chart",
+  "latest_version": "0.0.5",
+  "description": "A pi package that visualises context usage two ways:",
+  "readme": "# @baggiiiie/pi-context-chart\n\nA pi package that visualises context usage two ways:\n\n- A live **chart** rendered in a Glimpse window.\n- A live **footer** showing the current context-window mix and totals.\n\nBoth surfaces share a single computation, so they stay consistent and only recompute once per session event.\n\n## Install\n\n```bash\npi install npm:@baggiiiie/pi-context-chart\n```\n\n## Usage\n\n```text\n/context-chart           Open the live context usage chart\n/context-chart close     Close the chart window\n/context-chart footer    Toggle the context footer on/off\n/context-chart refresh   Recompute context state (updates chart + footer)\n/context-chart help      Show the in-app help widget\n/context-chart clear     Hide the help widget\n```\n\nThe footer is on by default. Override the startup behavior with:\n\n```bash\nexport PI_CONTEXT_CHART_FOOTER=off   # disable footer on launch (default: on)\n```\n\n## How tokens are calculated\n\n### Estimation method\n\nToken counts are estimated locally \u2014 no tokenizer or API call is involved at estimation time. The primary method is `estimateTokens(message)` exported by `@mariozechner/pi-coding-agent`. If that throws (e.g. for an unrecognized message shape), the fallback is `Math.ceil(textContent.length / 4)` (a rough chars-to-tokens heuristic).\n\n### Message categorization\n\nEach message in the reconstructed context array is classified into one of five buckets based on its `role`:\n\n| Role | Category | Description |\n|------|----------|-------------|\n| `user` | **User input** | User prompts and follow-ups |\n| `assistant` | **Agent output** | Model responses, tool-call blocks, thinking |\n| `toolResult`, `bashExecution` | **Tools** | Tool/command outputs returned to the model |\n| `compactionSummary`, `branchSummary`, `custom` | **Memory** | Carried context from compaction or branch summaries |\n| *(system prompt)* | **System instructions** | Estimated separately from the resolved system prompt string |\n\nThe snapshot total is the sum of all five categories:\n\n```\ntotal = systemInstructions + userInput + agentOutput + tools + memory\n```\n\n### Reconciliation with actual usage\n\nWhen pi reports real token counts via `ctx.getContextUsage()` (returned by the provider after a request), the footer uses the **actual** `tokens` value as the authoritative total. The category breakdown is then **scaled proportionally** to match that real total using the largest-remainder method (each category keeps its relative share, with rounding residuals distributed to the largest fractional remainders). This avoids the breakdown summing to a different number than what the provider reported.\n\nIf `getContextUsage()` is unavailable (e.g. right after compaction, or for live in-flight snapshots), the local estimate is used and marked as \"approximate\" (`~` prefix in the footer).\n\n### Per-turn history\n\nFor the chart, each historical turn's snapshot is built by calling `buildSessionContext(entries, parentId, byId)` which reconstructs the full message array that was sent to the model for that specific turn. This means each data point reflects the **cumulative** context size at that moment, not just the incremental addition.\n\n### Cache hit rate\n\nThe footer displays a prompt cache hit rate after the context breakdown. It is calculated as:\n\n```\nhitRate = cacheRead / (input + cacheRead + cacheWrite)\n```\n\nValues are taken from the model's reported usage metadata accumulated across all assistant turns in the current branch. The rate is color-coded: green (\u226570%), yellow (\u226530%), or dim (<30%). Shows `--` if no prompt tokens have been reported yet.\n\n## Notes\n\n- Requires pi\n- The chart requires Glimpse to be installed where Node can resolve it, or `GLIMPSE_PATH` set to `.../glimpseui/src/glimpse.mjs`\n- Footer uses pi's `ctx.getContextUsage()` when available, with a local estimate fallback (e.g. right after compaction)\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-15T08:19:23.821Z",
+    "modified": "2026-05-26T16:39:01.457Z",
+    "0.0.1": "2026-04-15T08:19:24.097Z",
+    "0.0.2": "2026-04-15T19:05:03.984Z",
+    "0.0.3": "2026-05-04T04:36:29.645Z",
+    "0.0.4": "2026-05-22T12:09:48.407Z",
+    "0.0.5": "2026-05-26T16:39:01.043Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 15,
+  "download_trend": []
+}

@@ -1,0 +1,46 @@
+{
+  "name": "browse97",
+  "latest_version": "1.0.3",
+  "description": "Chrome browser automation for pi coding agent via CDP. Open tabs, snapshot, click, fill forms, upload files, evaluate JS.",
+  "readme": "# browse97\n\nChrome browser automation for [pi coding agent](https://pi.dev). Control Chrome via Chrome DevTools Protocol (CDP) \u2014 open tabs, snapshot pages, click elements, fill forms, upload files, evaluate JavaScript.\n\nNo external dependencies. Uses Node.js built-in WebSocket.\n\n## Setup\n\nLaunch Chrome with remote debugging:\n\n```bash\ngoogle-chrome-stable --remote-debugging-port=9222 --no-first-run --user-data-dir=data/chrome-profile &\n```\n\nCustom port via environment variable:\n\n```bash\nBROWSE97_PORT=9223 google-chrome-stable --remote-debugging-port=9223 ...\n```\n\n## Install\n\n```bash\npi install git:github.com/nerkn/browse97\n```\n\n## Tools\n\n| Tool | Description |\n|---|---|\n| `browse97_start` | Open a new browser tab and connect to it. Call this first. |\n| `browse97_alltabs` | List all open tabs (id, url, title) |\n| `browse97_switchtab` | Connect agent to an existing tab by id |\n| `browse97_navigate` | Navigate the owned tab to a URL |\n| `browse97_snapshot` | List interactive elements. Scope with `container`, filter with `filter` |\n| `browse97_click` | Click by CSS selector or visible text |\n| `browse97_fill` | Fill multiple form fields by fuzzy matching name/id/placeholder/label |\n| `browse97_upload` | Upload file to a file input (blob injection for HTTPS) |\n| `browse97_eval` | Evaluate JavaScript in the browser page context |\n| `browse97_wait` | Wait for an element or text to appear |\n\n## Ownership Model\n\n- `browse97_start` creates a **new tab** \u2192 your pi session owns it\n- All other tools operate only on your owned tab\n- Tab stays open in Chrome after session ends\n- Each pi session gets its own tab \u2014 safe for multi-project use\n\n## Usage Examples\n\n```\nOpen google.com and search:\n  \u2192 browse97_start({url: \"https://google.com\"})\n  \u2192 browse97_snapshot({filter: \"input,button\"})\n  \u2192 browse97_fill({fields: {\"q\": \"pi coding agent\"}})\n  \u2192 browse97_click({target: \"Google Search\"})\n\nFill a job application form:\n  \u2192 browse97_start({url: \"https://apply.example.com\"})\n  \u2192 browse97_snapshot({container: \".application-form\"})\n  \u2192 browse97_fill({fields: {\"first_name\": \"Erkin\", \"last_name\": \"Tek\", \"email\": \"me@example.com\"}})\n  \u2192 browse97_upload({selector: \"#cv\", file: \"assets/CV.pdf\"})\n  \u2192 browse97_click({target: \"Submit\"})\n\nExtract data from a page:\n  \u2192 browse97_eval({expression: \"[...document.querySelectorAll('.job-card')].map(c => c.textContent.trim()).join('\\\\n')\"})\n\nConnect to an already-open tab:\n  \u2192 browse97_alltabs({})\n  \u2192 browse97_switchtab({id: \"ABC123\"})\n  \u2192 browse97_snapshot({})\n\nWait for dynamic content:\n  \u2192 browse97_wait({target: \".results-loaded\", timeout: 5000})\n```\n\n## snapshot Parameters\n\n| Parameter | Example | Description |\n|---|---|---|\n| (none) | `{}` | All interactive elements on page |\n| `container` | `{container: \".main\"}` | Scope to elements inside `.main` |\n| `filter` | `{filter: \"a,button\"}` | Only show links and buttons |\n| both | `{container: \".form\", filter: \"input,select\"}` | Inputs and selects inside `.form` |\n\n## click Auto-Detection\n\n- Starts with `.` `#` `[` `(` \u2192 CSS selector\n- Contains `>` `+` `~` `*` \u2192 CSS selector\n- Otherwise \u2192 matches visible text of buttons, links, submit inputs\n\n## fill Fuzzy Matching\n\nField keys are matched case-insensitively against: `name`, `id`, `placeholder`, `aria-label`, associated `<label>` text.\n\n```\nbrowse97_fill({fields: {\"email\": \"x@y.com\"}})\n  \u2192 matches: name=\"email\", id=\"email\", placeholder=\"Email address\", label \"Email\"\n```\n\n## File Upload on HTTPS\n\n`DOM.setFileInputFiles` only works on `file://` pages. browse97 works around this by injecting files as blobs via `DataTransfer`.\n\n**Limitation:** Files set via blob don't survive native form submission (browser security).\n\n**Workaround:** Use `browse97_eval` with `FormData` + `fetch()` for form submission that includes files:\n\n```javascript\nconst form = document.querySelector('form');\nconst formData = new FormData(form);\n// blob already injected by browse97_upload\nconst response = await fetch(form.action, { method: 'POST', body: formData });\n```\n\n## Your Context is Safe\n\n`browse97_snapshot` and `browse97_eval` truncate results at **5000 characters** by default. When truncated, a message suggests scoping with `container`/`filter` or passing `allowWhole: true`.\n\n```snapshot({container: \".main\", filter: \"a\"})       // scoped \u2192 likely fits\nsnapshot({allowWhole: true})                          // no truncation\nbrowse97_eval({expression: \"...\", allowWhole: true})  // no truncation\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-browser",
+    "pi-chrome",
+    "browser",
+    "chrome",
+    "cdp",
+    "automation",
+    "web",
+    "scraping",
+    "form-fill",
+    "headless",
+    "puppeteer",
+    "playwright"
+  ],
+  "author": {
+    "name": "Erkin Tek"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/nerkn/browse97-no-mcp-browser#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nerkn/browse97-no-mcp-browser.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-14T12:32:00.929Z",
+    "modified": "2026-05-20T16:18:48.188Z",
+    "1.0.0": "2026-05-14T12:32:01.095Z",
+    "1.0.1": "2026-05-15T10:58:35.685Z",
+    "1.0.2": "2026-05-15T11:17:32.071Z",
+    "1.0.3": "2026-05-20T16:18:48.060Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 91,
+  "download_trend": []
+}

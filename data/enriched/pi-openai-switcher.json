@@ -1,0 +1,33 @@
+{
+  "name": "pi-openai-switcher",
+  "latest_version": "0.1.3",
+  "description": "pi extension that switches ChatGPT Codex accounts when 5h or 1w usage limits are exhausted",
+  "readme": "# pi-openai-switcher\n\nA pi extension that rotates the active `openai-codex` ChatGPT account before each prompt when the current account has exhausted either its 5h or 1w Codex usage window.\n\nIt uses the bundled Go tool at `vendor/ChatGPTCheckUsage` to:\n- inspect all configured ChatGPT accounts\n- refresh expired access tokens in memory\n- choose an account with remaining quota\n- hand pi a fresh runtime token for `openai-codex`\n\n## Files\n\n- `extensions/openai-codex-account-switcher.ts` \u2014 the pi extension\n- `package.json` \u2014 pi package manifest\n- `vendor/ChatGPTCheckUsage` \u2014 bundled usage checker used by the extension\n\n## Bundled CLI\n\nThe npm package includes:\n\n- prebuilt binaries in `bin/` for:\n  - Linux x64\n  - Linux arm64\n  - macOS x64\n  - macOS arm64\n  - Windows x64\n- the CLI source in `vendor/ChatGPTCheckUsage`\n\nThe extension uses the bundled binary by default, so users do **not** need Go installed on supported platforms.\n\nIf the current platform is unsupported, the extension can still fall back to `go run` when Go is available.\n\n## Go tool changes\n\nThe extension expects the usage checker to support:\n\n```bash\ngo run . --accounts-path ./accounts.json --json --include-usable-access-token\n```\n\nThat now returns structured JSON and includes the in-memory usable access token for each successfully refreshed account.\n\n## Account file\n\nBy default the extension reads:\n\n- `~/.pi/agent/pi-openai-switcher/accounts.json`\n\nThis keeps account tokens out of the installed npm package directory.\n\nYou can override paths with:\n\n- `PI_OPENAI_SWITCHER_BINARY_PATH`\n- `PI_OPENAI_SWITCHER_TOOL_DIR`\n- `PI_OPENAI_SWITCHER_ACCOUNTS_PATH`\n- `PI_OPENAI_SWITCHER_STATE_PATH`\n\n## Adding accounts\n\nUsers are expected to add accounts through the bundled usage CLI's OAuth flow.\n\n### Recommended way inside pi\n\nUse the extension command:\n\n```text\n/chatgpt-add-account <name>\n```\n\nExample:\n\n```text\n/chatgpt-add-account work\n```\n\nThat command:\n- launches the bundled usage CLI\n- starts the ChatGPT OAuth login flow\n- opens the browser\n- saves the account into `~/.pi/agent/pi-openai-switcher/accounts.json`\n\n### Manual way outside pi\n\nYou can also run the bundled binary directly from the installed package directory, or from the source checkout. The exact installed package path depends on how the package was installed, so the in-pi command is the recommended path.\n\nFrom the source checkout, if you have Go installed:\n\n```bash\ncd vendor/ChatGPTCheckUsage\ngo run . --accounts-path ~/.pi/agent/pi-openai-switcher/accounts.json --add-account --name work\n```\n\n## Usage\n\nFrom this repo:\n\n```bash\npi -e ./extensions/openai-codex-account-switcher.ts\n```\n\nOr install/load the package as a pi package.\n\n## Commands\n\n- `/chatgpt-accounts` \u2014 show account usage and which account is active\n- `/chatgpt-add-account <name>` \u2014 add an account through ChatGPT OAuth\n- `/chatgpt-switch <name>` \u2014 force-switch to a specific usable account and persist that preference across pi restarts\n\n## Behavior\n\nWhen the current model provider is `openai-codex`, the extension:\n\n1. runs the bundled usage checker before each prompt\n2. keeps the current account if it still has quota\n3. otherwise switches to the best remaining account\n4. installs the selected access token as a runtime override for `openai-codex`\n\nThe footer status line shows the active account plus its 5h and 1w usage percentages.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "chatgpt",
+    "codex",
+    "openai"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-04-15T10:23:07.795Z",
+    "modified": "2026-04-16T08:15:21.760Z",
+    "0.1.0": "2026-04-15T10:23:07.987Z",
+    "0.1.1": "2026-04-15T10:31:19.372Z",
+    "0.1.2": "2026-04-16T06:54:21.633Z",
+    "0.1.3": "2026-04-16T08:15:21.645Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 22,
+  "download_trend": []
+}

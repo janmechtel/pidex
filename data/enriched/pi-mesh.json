@@ -1,0 +1,48 @@
+{
+  "name": "pi-mesh",
+  "latest_version": "0.2.3",
+  "description": "Multi-agent coordination for Pi - presence, messaging, file reservations",
+  "readme": "# pi-mesh\n\n<a href=\"https://zerodha.tech\"><img src=\"https://zerodha.tech/static/images/github-badge.svg\" alt=\"Zerodha Tech\"></a>\n<a href=\"https://www.npmjs.com/package/pi-mesh\"><img src=\"https://img.shields.io/npm/v/pi-mesh\" alt=\"npm\"></a>\n\nCoordinate multiple [Pi](https://github.com/badlogic/pi-mono) agents working in the same project. See who's around, claim files so you don't step on each other, and send messages between sessions.\n\nNo daemon, no server. Just files on disk.\n\n## Install\n\n```bash\npi install npm:pi-mesh\n```\n\n## Setup\n\nAdd `.pi/pi-mesh.json` to your project:\n\n```json\n{\n  \"autoRegister\": true\n}\n```\n\nThat's it. Start two Pi sessions in the same project and they'll find each other.\n\n## What you get\n\n**Five tools** for agents to coordinate:\n\n| Tool | What it does |\n|------|-------------|\n| `mesh_peers` | List who's active, what they're working on, what model they're running |\n| `mesh_reserve` | Claim files before editing. Other agents get blocked and told who to talk to |\n| `mesh_release` | Let go of files when you're done |\n| `mesh_send` | Message another agent. Normal messages wait politely; urgent ones interrupt |\n| `mesh_manage` | Rename yourself, set status, check agent details, view the activity feed |\n\n**An overlay** you open with `/mesh` - three tabs showing agents, activity feed, and a chat with `@mention` tab-completion.\n\n**Automatic tracking** of edits, commits, and test runs. Status is derived from activity (\"just shipped\", \"debugging...\", \"on fire\").\n\n## Quick example\n\n```typescript\n// Who's here?\nmesh_peers({})\n\n// I'm going to work on auth\nmesh_reserve({ paths: [\"src/auth/\"], reason: \"Refactoring auth\" })\n\n// Let the other agent know\nmesh_send({ to: \"zero-2\", message: \"Auth refactor done, interfaces changed\" })\n\n// Something urgent\nmesh_send({ to: \"zero-2\", message: \"Stop! Don't touch config.ts\", urgent: true })\n\n// Done, release files\nmesh_release({})\n```\n\n## How it works\n\nEverything lives in `.pi/mesh/`:\n\n```\n.pi/mesh/\n\u251c\u2500\u2500 registry/          # One JSON file per agent\n\u251c\u2500\u2500 inbox/{name}/      # Messages as JSON files, watched with fs.watch\n\u2514\u2500\u2500 feed.jsonl         # Append-only activity log\n```\n\nAgents register when they start, unregister when they stop. If an agent crashes, stale entries get cleaned up on the next `mesh_peers` call via PID checking.\n\nMessages use Pi's delivery system - normal messages queue until the recipient finishes their current turn, urgent ones interrupt immediately. No polling needed.\n\nReservations are enforced by hooking Pi's `edit` and `write` tools. When an agent tries to edit a reserved file, the tool call gets blocked and the agent sees who reserved it and why.\n\nNon-interactive sessions (`--print` mode, daemon tasks) skip registration entirely so they don't spam interactive agents.\n\n## Overlay\n\nOpen with `/mesh`. Tab switches between panels, arrow keys scroll, Esc closes.\n\n| Tab | Shows |\n|-----|-------|\n| Agents | Live status of all peers - model, branch, current activity, reservations |\n| Feed | Scrollable timeline of joins, edits, commits, messages |\n| Chat | Type `@name message` to DM, or just type to broadcast. Tab-complete names |\n\n## Configuration\n\nFull config with defaults:\n\n```json\n{\n  \"autoRegister\": false,\n  \"autoRegisterPaths\": [],\n  \"contextMode\": \"full\",\n  \"feedRetention\": 50,\n  \"stuckThreshold\": 900,\n  \"autoStatus\": true\n}\n```\n\n| Setting | What it does | Default |\n|---------|-------------|---------|\n| autoRegister | Join mesh when Pi starts | false |\n| autoRegisterPaths | Only auto-join in these folders (trailing `*` wildcards) | [] |\n| contextMode | How much context to inject: \"full\", \"minimal\", \"none\" | \"full\" |\n| feedRetention | Max events kept in the activity feed | 50 |\n| stuckThreshold | Seconds idle before an agent is marked stuck | 900 |\n| autoStatus | Generate status from activity automatically | true |\n\nConfig is loaded from: project `.pi/pi-mesh.json` > user `~/.pi/agent/pi-mesh.json` > `~/.pi/agent/settings.json` \"mesh\" key > defaults.\n\nThe library defaults to `autoRegister: false`. Set it to `true` in your project config if you want all agents to coordinate.\n\n## Agent naming\n\nNames follow the pattern `{type}-{N}` where type comes from `PI_AGENT` env var (defaults to \"agent\") and N increments. So you get `zero-1`, `zero-2`, `lite-1`, etc.\n\nOverride with `PI_AGENT_NAME` env var, or rename at runtime:\n\n```typescript\nmesh_manage({ action: \"rename\", name: \"auth-worker\" })\n```\n\n## Lifecycle Hooks\n\npi-mesh supports lifecycle hooks for reacting to mesh events without forking the package. Specify a module path in your config:\n\n```json\n{\n  \"autoRegister\": true,\n  \"hooksModule\": \"./mesh-hooks.ts\"\n}\n```\n\nThe module should export a `createHooks` function:\n\n```typescript\nimport type { MeshConfig, MeshLifecycleHooks } from \"pi-mesh/types\";\n\nexport function createHooks(config: MeshConfig): MeshLifecycleHooks {\n  return {\n    onRegistered(state, ctx, actions) {\n      // Called after successful mesh registration.\n      // Use actions.rename(\"new-name\") to trigger a mesh rename.\n    },\n    onRenamed(state, ctx, result) {\n      // Called after a successful rename (from mesh_manage or actions.rename).\n    },\n    onPollTick(state, ctx, actions) {\n      // Called on an interval while registered (default 2s).\n      // Can call actions.rename() to sync external name changes into mesh.\n    },\n    onShutdown(state) {\n      // Called during session shutdown, before unregister.\n    },\n  };\n}\n```\n\nAll hooks are optional. The poll interval defaults to 2 seconds and can be customized by setting `state.hookState.pollIntervalMs` in `onRegistered` (read once when the timer starts; not dynamic at runtime).\n\nHooks receive `MeshState` which includes an optional `hookState: Record<string, unknown>` bag for storing custom state across calls.\n\n`onRegistered` and `onPollTick` receive a `HookActions` object with:\n- `actions.rename(newName)` \u2014 rename this agent in the mesh registry. Handles watcher cycling internally and fires `onRenamed` on success. Returns `RenameResult` so hooks can handle failures (e.g., revert a tmux window on collision).\n\n## Limitations\n\n- **`bash` bypasses reservations.** Only `edit` and `write` are hooked. A `sed -i` through bash won't be caught.\n- **Concurrent feed writes** can produce partial JSON lines. Malformed lines are skipped on read.\n- **PID checking** doesn't work across container boundaries.\n- **Crashed agents** leave stale registrations until the next `mesh_peers` cleans them up.\n\n## Documentation\n\nFull docs at [rhnvrm.github.io/pi-mesh](https://rhnvrm.github.io/pi-mesh/).\n\n## Credits\n\nInspired by [pi-messenger](https://github.com/nicobailon/pi-messenger) by Nico Bailon. pi-mesh focuses on coordination only - presence, messaging, reservations - without the crew/task layer.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "multi-agent",
+    "coordination",
+    "mesh",
+    "messaging",
+    "reservations"
+  ],
+  "author": {
+    "name": "rhnvrm"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/rhnvrm/pi-mesh#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rhnvrm/pi-mesh.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-06T08:47:25.057Z",
+    "modified": "2026-04-01T10:29:41.508Z",
+    "0.0.1": "2026-02-06T08:47:25.429Z",
+    "0.0.3": "2026-02-06T08:57:33.048Z",
+    "0.1.0": "2026-02-06T09:17:15.114Z",
+    "0.1.1": "2026-02-17T11:55:48.120Z",
+    "0.1.2": "2026-02-18T10:41:47.361Z",
+    "0.1.3": "2026-02-27T06:53:53.686Z",
+    "0.2.0": "2026-03-16T07:29:09.016Z",
+    "0.2.1": "2026-03-19T06:12:01.944Z",
+    "0.2.2": "2026-03-24T08:18:26.230Z",
+    "0.2.3": "2026-04-01T10:29:41.181Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": 23,
+  "download_trend": []
+}

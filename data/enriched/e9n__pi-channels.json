@@ -1,0 +1,35 @@
+{
+  "name": "@e9n/pi-channels",
+  "latest_version": "0.2.1",
+  "description": "Two-way channel extension for pi \u2014 route messages between agents and Telegram, webhooks, and custom adapters",
+  "readme": "# @e9n/pi-channels\n\nTwo-way channel extension for [pi](https://github.com/espennilsen/pi) \u2014 route messages between agents and Telegram, Slack, webhooks, or custom adapters.\n\n## Features\n\n- **Telegram adapter** \u2014 bidirectional via Bot API; polling, voice/audio transcription, `allowedChatIds` filtering\n- **Slack adapter** \u2014 bidirectional via Socket Mode + Web API\n- **Webhook adapter** \u2014 outgoing HTTP POST to any URL\n- **Chat bridge** \u2014 incoming messages are routed to the agent as prompts; responses sent back automatically; persistent (RPC) or stateless mode\n- **Event API** \u2014 `channel:send`, `channel:receive`, `channel:register` for inter-extension messaging\n- **Custom adapters** \u2014 register at runtime via `channel:register` event\n\n## Settings\n\nAdd to `~/.pi/agent/settings.json` or `.pi/settings.json`:\n\n```json\n{\n  \"pi-channels\": {\n    \"adapters\": {\n      \"telegram\": {\n        \"type\": \"telegram\",\n        \"botToken\": \"your-telegram-bot-token\",\n        \"polling\": true\n      },\n      \"alerts\": {\n        \"type\": \"webhook\",\n        \"headers\": { \"Authorization\": \"Bearer your-webhook-secret\" }\n      }\n    },\n    \"routes\": {\n      \"ops\": { \"adapter\": \"telegram\", \"recipient\": \"-100987654321\" }\n    },\n    \"bridge\": {\n      \"enabled\": false\n    }\n  }\n}\n```\n\n**Secrets:**\n- Set secret values (tokens, keys) directly in `settings.json`\n- Project settings override global ones\n\n### Adapter types\n\n| Type | Direction | Key config |\n|------|-----------|------------|\n| `telegram` | bidirectional | `botToken`, `polling`, `parseMode`, `allowedChatIds`, `transcription` |\n| `slack` | bidirectional | `botToken`, `appToken` |\n| `webhook` | outgoing | `method`, `contentType`, `payloadMode`, `headers` |\n\n> Webhook migration note: custom `Content-Type` should be set via `contentType`.\n> If both `contentType` and `headers[\"Content-Type\"]` are provided, `contentType` wins.\n\n### Transcription (Voice & Audio)\n\nThe Telegram adapter supports transcribing voice messages and audio files. Add to the telegram adapter config:\n\n```json\n{\n  \"telegram\": {\n    \"type\": \"telegram\",\n    \"botToken\": \"your-telegram-bot-token\",\n    \"transcription\": {\n      \"enabled\": true,\n      \"provider\": \"openai\"\n    }\n  }\n}\n```\n\n**Providers:**\n\n| Provider | Requirements | Notes |\n|----------|--------------|-------|\n| `apple` | macOS only | Free, offline, uses SFSpeechRecognizer. No API key needed. |\n| `openai` | OpenAI API key | **Automatically uses pi's built-in OpenAI authentication** if you've run `/login openai`. No explicit `apiKey` needed! Override with `apiKey` in config if you want to use a separate key. |\n| `elevenlabs` | ElevenLabs API key | Requires `apiKey` set directly in config. |\n\n**Transcription options:**\n- `enabled` \u2014 Enable transcription (default: `false`)\n- `provider` \u2014 `\"apple\"`, `\"openai\"`, or `\"elevenlabs\"` (required)\n- `apiKey` \u2014 For OpenAI: **optional** (uses pi's auth). For ElevenLabs: required (set directly in settings.json).\n- `model` \u2014 Model name, e.g. `\"whisper-1\"` (OpenAI), `\"scribe_v1\"` (ElevenLabs)\n- `language` \u2014 ISO 639-1 code, e.g. `\"en\"`, `\"no\"` (optional)\n\n### Bridge settings\n\n| Key | Default | Description |\n|-----|---------|-------------|\n| `enabled` | `false` | Enable on startup (also: `--chat-bridge` flag or `/chat-bridge on`) |\n| `sessionMode` | `\"persistent\"` | `\"persistent\"` = RPC subprocess with conversation memory; `\"stateless\"` = isolated per message |\n| `sessionRules` | `[]` | Per-sender mode overrides: `[{ \"match\": \"telegram:-100*\", \"mode\": \"stateless\" }]` |\n| `idleTimeoutMinutes` | `30` | Kill idle persistent sessions after N minutes |\n| `maxQueuePerSender` | `5` | Max queued messages per sender |\n| `timeoutMs` | `300000` | Per-prompt timeout (ms) |\n| `maxConcurrent` | `2` | Max senders processed in parallel |\n| `typingIndicators` | `true` | Send typing indicators while processing |\n\n## Tool: `notify`\n\n| Action | Required params | Description |\n|--------|----------------|-------------|\n| `send` | `adapter`, (`text` or `json`) | Send a message via an adapter name or route alias |\n| `list` | \u2014 | Show configured adapters and routes |\n| `test` | `adapter` | Send a test ping |\n\nFor webhook sends, `notify` supports:\n- `payloadMode`: `\"envelope\"` (default) or `\"raw\"`\n- `json`: raw request body (auto-enables raw mode if provided; required for body-carrying raw methods)\n- `method`: HTTP method override for raw mode (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`)\n- `contentType`: `Content-Type` override for raw mode (applies only when a request body is sent)\n- `GET`/`HEAD` raw requests are bodyless (do not provide `json`)\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/chat-bridge` | Show bridge status (sessions, queue, active prompts) |\n| `/chat-bridge on` | Start the chat bridge |\n| `/chat-bridge off` | Stop the chat bridge |\n\n## Install\n\n```bash\npi install npm:@e9n/pi-channels\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "Espen Nilsen",
+    "email": "hi@e9n.dev"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/espennilsen/pi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/espennilsen/pi.git",
+    "directory": "extensions/pi-channels"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-17T09:11:15.375Z",
+    "modified": "2026-04-26T19:52:30.264Z",
+    "0.1.0": "2026-02-17T09:11:15.697Z",
+    "0.2.0": "2026-03-07T12:02:25.294Z",
+    "0.2.1": "2026-04-26T19:52:30.158Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 15,
+  "download_trend": []
+}

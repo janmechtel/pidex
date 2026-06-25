@@ -1,0 +1,29 @@
+{
+  "name": "pi-compact-before-switch",
+  "latest_version": "0.1.0",
+  "description": "Compact context with the outgoing model before switching to a smaller-window model.",
+  "readme": "# pi-compact-before-switch\n\nA [pi](https://pi.dev) extension that prompts you to compact context using the **outgoing** model before switching to a smaller-window model via `/model`. Ctrl+P cycling and session restore pass through silently.\n\nWhen you switch from an Opus-1M to a Haiku-200K with a long conversation, you'll see:\n\n> **Compact before switching?**\n> Switching from claude-opus-4-5 (1,000,000 ctx) \u2192 claude-haiku-4-5 (200,000 ctx).\n> Current context: 320,000 tokens \u2014 exceeds target window minus reserve.\n> This will compact, then re-apply Haiku. Take a few seconds \u2014 no API key needed on Opus.\n> _(\u2190 confirm  \u2192 cancel)_\n\nIf you confirm, the extension reverts to Opus, runs pi's default compaction, then re-applies Haiku \u2014 all automatic. If you cancel, the switch is reverted and you stay on Opus.\n\n## Install\n\n```bash\npi install npm:pi-compact-before-switch\n```\n\nThat's it. The extension registers automatically on next session start.\n\n### Other install paths\n\n```bash\npi install /path/to/pi-compact-before-switch    # local path\npi install https://example.com/pi-compact-before-switch.tgz   # URL\npi install -l .                                  # project-local (commits .pi/npm/ path)\n```\n\n## When does it trigger?\n\nConditions **all** met:\n\n1. Source is `/model` (i.e. `source === \"set\"`, **not** Ctrl+P cycling and **not** session restore)\n2. There was a previous model\n3. Not re-selecting the same `(provider, id)`\n4. New model's `contextWindow` < previous model's `contextWindow` (any narrowing)\n5. `currentTokens > targetContextWindow \u2212 16,384` (target fits, current doesn't)\n\nIf any condition is false, the switch is silent and immediate.\n\n## Behavior\n\n| Scenario | Result |\n|---|---|\n| `/model` from large \u2192 small, doesn't fit | confirm \u2192 revert \u2192 compact on outgoing model \u2192 re-apply target |\n| `/model` from large \u2192 small, fits within reserve | silent, switch happens immediately |\n| Widening (`small \u2192 big`) | silent |\n| Same model re-selected | silent |\n| `Ctrl+P` cycling | silent |\n| Session restore | silent |\n| Old model has no API key (revert fails) | stay on target, error toast |\n| Compact mid-flight fails | stay on outgoing model, error toast |\n| Confirm canceled | revert to outgoing model, info toast |\n| 30 s timer elapses | warning toast, guard cleared, next press re-prompts |\n\n## Minimal configuration\n\nThere is none. Run-time differences:\n\n- **Reserve tokens** \u2014 16,384 hardcoded. At or below threshold: switch is silent.\n- **Guard timeout** \u2014 30 s after a successful revert, the extension stops swallowing model_select events. If a compact hangs, the next press of `/model` works again after that.\n\n## Why?\n\nWhen you `Ctrl+P` through models you can land on one whose window is far below your current context. Many providers truncate silently. Compaction first avoids that.\n\n## Development\n\n```bash\ngit clone https://github.com/erans/pi-compact-before-switch\ncd pi-compact-before-switch\nnpm test\n./scripts/smoke.sh   # launches `pi -e extensions/compact-before-switch.ts`\n```\n\nRun tests:\n\n```bash\n./scripts/test.sh  # or: npm test\n```\n\n31 tests cover the trigger filter (cycle/restore/no-previous/same-model/widening/overflow) and the orchestrator paths (cancel, revert failure, reentrancy guard, compact onError, guard recovery). Tests use Node 22+ built-in `node:test` with `--experimental-strip-types`. No transpile step.\n\n### Debug mode\n\nSet `PI_DEBUG_CBS=1` to make the extension emit a notification on every `model_select` event with the event shape and the trigger decision:\n\n```bash\nPI_DEBUG_CBS=1 pi\n```\n\nThe toast will say:\n\n```\nCBS DEBUG | source=set | prev=anthropic/claude-opus-4-5 (1000000) | next=anthropic/claude-haiku-4-5 (200000) | tokens=12345 | threshold (next - 16384)=183616 | trigger=true\n```\n\n## License\n\nMIT \u00a9 2026 Eran Sandler. See [LICENSE](./LICENSE).\n\n## Source layout\n\n```\npi-compact-before-switch/\n\u251c\u2500\u2500 extensions/\n\u2502   \u2514\u2500\u2500 compact-before-switch.ts    # the single extension file\n\u251c\u2500\u2500 tests/                          # node:test, 31 tests\n\u251c\u2500\u2500 scripts/\n\u2502   \u251c\u2500\u2500 smoke.sh                    # launch pi -e ...\n\u2502   \u2514\u2500\u2500 test.sh                     # npm test runner\n\u251c\u2500\u2500 verification/                   # per-scenario outcomes\n\u251c\u2500\u2500 docs/                           # spec + design + plan\n\u251c\u2500\u2500 package.json\n\u251c\u2500\u2500 README.md\n\u2514\u2500\u2500 LICENSE\n```\n\nWhen published, pi's convention auto-discovers `extensions/*.ts` and loads it as a single extension \u2014 no `pi` manifest needed.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "compact",
+    "context-window",
+    "model",
+    "session-management"
+  ],
+  "author": {
+    "name": "Eran Sandler"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {},
+  "time": {
+    "created": "2026-06-15T20:21:22.216Z",
+    "0.1.0": "2026-06-15T20:21:22.608Z",
+    "modified": "2026-06-15T20:21:22.837Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 16,
+  "download_trend": []
+}

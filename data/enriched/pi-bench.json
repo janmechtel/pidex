@@ -1,0 +1,359 @@
+{
+  "name": "pi-bench",
+  "latest_version": "0.2.5",
+  "description": "LLM benchmark toolkit for pi coding agent. Probes every available model with real streaming API calls and ranks by latency, cost, and output quality. Provides curated model chain and blacklist for smart model selection in pi-recap and other extensions.",
+  "readme": "# pi-bench\n\n![pi-bench banner](https://fcskjxapefiqdclrvbtw.supabase.co/storage/v1/object/public/assets/pi-packages/pi-bench-banner.jpg)\n\n**The LLM benchmark toolkit for [pi coding agent](https://github.com/badlogic/pi-mono).**\n\nFind the fastest, cheapest LLM models among all registered providers.\n\nProbes every available model with a real `stream()` call using a representative prompt, then ranks by latency, cost, and output quality. Designed to feed smart model selection into [pi-recap](https://github.com/fornace/pi-recap) and other pi extensions.\n\n## Features\n\n- **Universal provider loading** \u2014 discovers and loads all pi extensions (Alibaba, Kimi, etc.) the same way pi does\n- **Real probes** \u2014 fires actual streaming API calls, measures time-to-first-byte and completion\n- **Quality scoring** \u2014 classifies responses as ok / multi-sentence / refusal / question / empty\n- **Cost aware** \u2014 calculates per-call cost in USD using model pricing\n- **30s hard timeout** \u2014 if the full probe doesn't finish, the incremental CSV already contains every completed probe\n- **Per-provider concurrency** \u2014 8 parallel probes per provider to saturate throughput\n- **Standalone or extension** \u2014 runs as CLI script or as a pi slash command (`/bench`)\n\n## Usage\n\n### As a pi extension\n\nInstall into pi's extensions directory:\n\n```bash\ngit clone https://github.com/fornace/pi-bench.git ~/.pi/agent/extensions/pi-bench\n```\n\nThen run inside pi:\n\n```\n/bench\n```\n\nResults are saved to `bench-results-v6.csv` in the extension directory.\n\n### Standalone CLI\n\n```bash\ncd ~/.pi/agent/extensions/pi-bench\nnpx -y -p tsx tsx bench.mts\n```\n\nWith custom output directory:\n\n```bash\nnpx -y -p tsx tsx bench.mts --output-dir /tmp/bench-output\n```\n\n### Programmatic\n\n```typescript\nimport { runBench, printTable } from \"./bench.mts\";\n\nconst { results, csvPath, stats } = await runBench({\n  outputDir: \"/tmp/bench\",\n  timeoutMs: 30000,\n  concurrency: 8,\n});\n\nconsole.log(printTable(results));\nconsole.log(`Probed ${stats.final} models \u2192 ${csvPath}`);\n```\n\n## Output\n\n### CSV (`bench-results-v6.csv`)\n\n| Column | Description |\n|--------|-------------|\n| rank | Position in latency ranking (ok models only) |\n| id | Model ID |\n| provider | Provider name (alibaba-cloud, google-vertex, etc.) |\n| api | API type (anthropic-messages, google-vertex, etc.) |\n| family | Model family tag (flash, turbo, plus, max, pro, etc.) |\n| t_first_byte_ms | Time to first token in ms |\n| t_complete_ms | Time to completion in ms |\n| output_tokens | Tokens generated |\n| cost_usd | Estimated cost in USD |\n| status | ok / timeout / error:... / empty |\n| quality | ok / multi-sentence / refusal / question / empty |\n| sample | First 60 chars of response |\n\n### Candidates file (`bench-candidates.txt`)\n\nLists all models that passed the filter, plus dropped models with reasons.\n\n## Configuration\n\n### Tunables (in `bench.mts`)\n\n| Constant | Default | Description |\n|----------|---------|-------------|\n| `PER_CALL_TIMEOUT_MS` | 4000 | Max time per individual probe |\n| `TOTAL_RUN_TIMEOUT_MS` | 30000 | Hard cap for the entire bench run |\n| `CONCURRENCY_PER_PROVIDER` | 8 | Parallel probes per provider |\n| `BATCH_GAP_MS` | 200 | Delay between probe batches |\n\n### Filter\n\nModels are filtered to text-capable candidates only. Blocklisted fragments: `embed`, `audio`, `tts`, `whisper`, `transcribe`, `dall-e`, `dalle`, `imagen`, `stable-diffusion`, `midjourney`, `moderation`, `guard`.\n\n## Typical Results\n\n```\nRANK  FB      TOTAL   COST         FAMILY   PROVIDER           ID\n1     349ms   589ms   ~$0          plus     alibaba-cloud      qwen-vl-plus\n2     436ms   620ms   ~$0          plus     alibaba-cloud      qwen-plus-2025-09-11\n3     421ms   679ms   ~$0          flash    alibaba-cloud      qwen-flash\n4     427ms   717ms   ~$0          turbo    alibaba-cloud      qwen-turbo\n5     488ms   719ms   ~$0          plus     alibaba-cloud      qwen-vl-plus-2025-05-07\n```\n\nTop models are typically Alibaba Cloud Qwen variants at sub-700ms latency and ~$0 cost.\n\n## Headless mode \u2014 using pi-bench from other plugins\n\npi-bench is designed to be consumed by other pi extensions. There are three integration patterns:\n\n### Static imports (no runtime)\n\nImport curated data directly from the package \u2014 no benchmark run needed:\n\n```typescript\nimport { CURATED_CHAIN, BLACKLIST_SEED } from \"pi-bench\";\n\n// CURATED_CHAIN: ordered list of fast/cheap model IDs, ranked by latest bench\n// BLACKLIST_SEED: known-bad models (404s, refusals, empty responses)\n```\n\n[pi-recap](https://github.com/fornace/pi-recap) uses this for its model picker chain. When you run a new benchmark, pi-bench updates `CURATED_CHAIN` and pi-recap picks up the new winners automatically \u2014 no config changes needed.\n\n### Benchmark UI component\n\nReuse the interactive model selector from your own extension:\n\n```typescript\nimport { showBenchmarkUI } from \"pi-bench/ui.js\";\n\n// csvPath points to bench-results-v6.csv\nconst picked = await showBenchmarkUI(ctx, csvPath, \"Pick a model\");\n```\n\nThis renders a scrollable, filterable SelectList with all benched models ranked by latency. Returns the selected model ID. Used by pi-recap's `/recap \u2192 model: ...` menu.\n\n### Finding the benchmark data directory\n\nThe CSV lives in the pi-bench extension directory. Resolve it at runtime:\n\n```typescript\nimport { fileURLToPath } from \"node:url\";\nimport * as path from \"node:path\";\n\nconst benchDir = path.dirname(fileURLToPath(import.meta.resolve(\"pi-bench/package.json\")));\nconst csvPath = path.join(benchDir, \"bench-results-v6.csv\");\n```\n\n### Headless vs UI mode\n\nWhen pi-bench runs as a slash command (`/bench`), it detects whether a TUI is available via `ctx.hasUI`. Without a TUI (headless mode), results are printed to the console. With a TUI, the interactive selector is shown. The same benchmark subprocess runs in both cases \u2014 only the output display changes.\n\n## License\n\nMIT\n\n## From the same author\n\nBy [Francesco Frapporti](https://fornace.it) at [Fornace](https://fornace.it).\n\n- **[pi-recap](https://github.com/fornace/pi-recap)** \u2014 Always-visible session recap panel for pi. Uses pi-bench data to pick the fastest summarization model.\n- **[pi-banana](https://github.com/fornace/pi-banana)** \u2014 Generate and edit images inside pi using Google Nano Banana. Banner images for all these packages were created with pi-banana.\n- **[pi-alibaba-models](https://github.com/fornace/pi-alibaba-models)** \u2014 Complete Alibaba provider for pi: Qwen, DeepSeek, Kimi, GLM, MiniMax with native thinking levels.\n- **[pi-notte-theme](https://github.com/fornace/pi-notte-theme)** \u2014 Notte: a true-dark pi theme where darkness has color and text glows like terminal phosphor.\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "benchmark",
+    "llm",
+    "llm-benchmark",
+    "model-probe",
+    "latency",
+    "model-selection",
+    "fastest-model",
+    "cheapest-model",
+    "streaming",
+    "time-to-first-token",
+    "headless"
+  ],
+  "author": {
+    "name": "Francesco"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/fornace/pi-bench#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fornace/pi-bench.git"
+  },
+  "pi": {},
+  "time": {
+    "created": "2026-05-10T15:35:23.949Z",
+    "modified": "2026-05-13T20:48:23.638Z",
+    "0.1.0": "2026-05-10T15:35:24.105Z",
+    "0.2.0": "2026-05-10T15:39:13.598Z",
+    "0.2.1": "2026-05-10T15:51:15.580Z",
+    "0.2.2": "2026-05-10T16:20:21.849Z",
+    "0.2.4": "2026-05-11T17:18:34.547Z",
+    "0.2.5": "2026-05-13T20:48:23.516Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 28,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 650
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 217
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 56
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 34
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 43
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 39
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

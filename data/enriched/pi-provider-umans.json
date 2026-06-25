@@ -1,0 +1,41 @@
+{
+  "name": "pi-provider-umans",
+  "latest_version": "1.4.0",
+  "description": "Umans.ai provider for pi \u2014 Anthropic Messages-compatible endpoint with dynamic model discovery",
+  "readme": "# pi-provider-umans\n\n[Umans.ai](https://umans.ai) provider for [pi](https://shittycodingagent.ai) \u2014 speaks the **Anthropic Messages API** against the Umans Code gateway (`https://api.code.umans.ai`), with **dynamic model discovery** and **client-side vision handoff** for text-only models.\n\n## Install\n\n```bash\n# From npm (once published)\npi install npm:pi-provider-umans\n\n# From git\npi install git:github.com/user/pi-provider-umans\n\n# From local path (for development)\npi install ./pi-provider-umans\n\n# Or try without installing\npi -e ./pi-provider-umans\n```\n\n## Setup\n\n### Option 1: `/login` (recommended \u2014 persists in auth.json)\n\nIn pi, run:\n\n```\n/login umans\n```\n\nPaste your API key when prompted. It's stored securely in `~/.pi/agent/auth.json` \u2014 no env vars needed.\n\n### Option 2: Environment variable\n\n```bash\nexport UMANS_API_KEY=\"sk-your-key-here\"\n```\n\n## Anthropic Messages endpoint\n\nThis provider talks to Umans through its **Anthropic-compatible `/v1/messages` endpoint** and registers with pi as `api: \"anthropic-messages\"`. Requests use the standard Anthropic wire format \u2014 the `anthropic-version: 2023-06-01` header, message-block content, and Anthropic adaptive thinking (`thinking.type: \"adaptive\"`, surfaced as effort levels) \u2014 rather than the OpenAI Chat Completions format the extension used previously. That makes it a drop-in for pi's Anthropic provider stack.\n\nThe gateway base URL defaults to `https://api.code.umans.ai`; override it with `UMANS_BASE_URL` to point at a different environment.\n\n## Dynamic model discovery\n\nModels and capabilities are fetched live from `/v1/models/info` at load time, so new Umans models appear automatically \u2014 no extension update needed. If the gateway is unreachable, a built-in fallback catalog still lets the provider register.\n\nCurrent catalog:\n\n| ID | Name | Vision | Reasoning | Context |\n|---|---|---|---|---|\n| `umans-kimi-k2.6` | Umans Kimi K2.6 | native | \u2705 | 256K |\n| `umans-kimi-k2.7` | Umans Kimi K2.7 Code | native | \u2705 (always on) | 256K |\n| `umans-glm-5.2` | Umans GLM 5.2 | via-handoff | \u2705 | 406K |\n| `umans-coder` | Umans Coder | native | \u2705 (always on) | 256K |\n| `umans-flash` | Umans Flash | native | \u2705 | 256K |\n| `umans-qwen3.6-35b-a3b` | Umans Qwen3.6 35B A3B | native | \u2705 | 256K |\n\nNew models added by Umans appear automatically \u2014 no extension update needed.\n\n## Vision handoff\n\nText-only Umans models \u2014 currently the GLM 5.1 / 5.2 models, marked `supports_vision: \"via-handoff\"` \u2014 can't see images at the gateway. When you attach an image to a message headed for one of them, this extension intercepts it **client-side**: the image is analyzed by a native-vision Umans model and replaced in the message with an `[Image analysis (image:ID)]: \u2026` text block *before* the text model is called.\n\n- The analysis **persists in the conversation** (KV-cache friendly \u2014 it isn't re-analyzed on every turn).\n- The text model can call the **`umans_vision`** tool to ask targeted follow-up questions about an analyzed image \u2014 pass the image ID from the `[Image analysis (image:ID)]` block.\n- Native-vision models (Kimi K2.6 / K2.7, Coder, Flash, Qwen) see images directly \u2014 no handoff.\n\n### Vision model & toggle\n\nThe handoff model defaults to `umans-kimi-k2.7` (or the first available native-vision model). Control it live with `/umans-vision`:\n\n```\n/umans-vision                  # show status\n/umans-vision on | off         # enable / disable handoff (off falls back to the gateway)\n/umans-vision model <id>       # pick the vision model\n```\n\nOr seed at startup:\n\n```bash\nexport UMANS_VISION_MODEL=\"umans-kimi-k2.7\"   # vision model id\nexport UMANS_VISION_DISABLE=\"1\"               # start with handoff off\n```\n\n## Getting an API Key\n\n1. Log in to [app.umans.ai/billing](https://app.umans.ai/billing)\n2. Go to Dashboard \u2192 API Keys\n3. Generate a new key (shown only once \u2014 copy it immediately)\n",
+  "keywords": [
+    "pi-package",
+    "umans",
+    "provider",
+    "llm",
+    "pi",
+    "coding-agent"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/umans-ai/pi-provider-umans#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/umans-ai/pi-provider-umans.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-24T12:35:34.738Z",
+    "modified": "2026-06-25T02:48:21.530Z",
+    "1.0.0": "2026-04-24T12:35:35.010Z",
+    "1.1.0": "2026-04-24T13:51:31.829Z",
+    "1.2.0": "2026-04-27T16:04:11.395Z",
+    "1.2.4": "2026-04-27T18:47:47.795Z",
+    "1.2.5": "2026-05-08T17:21:21.213Z",
+    "1.2.7": "2026-06-25T00:06:10.415Z",
+    "1.3.0": "2026-06-25T01:49:16.098Z",
+    "1.4.0": "2026-06-25T02:48:21.267Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 35,
+  "download_trend": []
+}

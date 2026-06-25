@@ -1,0 +1,43 @@
+{
+  "name": "@davidorex/pi-custom-compactor",
+  "latest_version": "0.1.5",
+  "description": "Declarative YAML-driven structured compaction for pi coding agent \u2014 multi-pass extraction, artifact persistence, budget management, and work-mode-specific compaction specs",
+  "readme": "# pi-custom-compactor\n\nPi extension. Replaces built-in compaction with YAML-declared extraction passes. Multiple specs can coexist for different work modes.\n\n## Install\n\n```bash\npi install git:github.com/davidorex/pi-custom-compactor\n```\n\nProject-local:\n\n```bash\npi install git:github.com/davidorex/pi-custom-compactor -l\n```\n\nOn first `session_start`, if no `.pi/compaction/` directory exists, seed specs are copied there and `default` is set active.\n\n## Hooks\n\n**`session_before_compact`** \u2014 Resolves the active spec. For each declared extract, runs either mechanical (regex/tool-call inspection, no LLM) or LLM-based extraction (via `complete()` from `@mariozechner/pi-ai`). Writes JSON artifacts to disk. Composes a summary from artifacts and returns it as the compaction result. Falls back to built-in compaction if no spec exists or on error.\n\n**`context`** \u2014 Before each LLM call, reads artifacts from disk, enforces the token budget with priority-based trimming, and prepends them as synthetic user messages. Also injects a stats summary block. Nothing is persisted to the session.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/compaction-use [name]` | Switch active spec. No args shows current + available. Tab-completes spec names. |\n| `/compaction-stats` | Shows latest compaction token counts, per-artifact sizes, LLM extract costs, and growth trends. |\n| `/compaction-clean [--confirm]` | Lists orphaned artifact files not referenced by any spec. `--confirm` deletes them. |\n\n## Spec Format\n\nSpecs are YAML files in `.pi/compaction/`. Each declares extracts and reassembly rules.\n\n```yaml\nextracts:\n  user-corrections:\n    description: User corrections, redirects, and stated preferences\n    persist: .pi/session-state/corrections.json\n    format: |\n      Array of { timestamp: number, correction: string, context: string }\n    strategy: mechanical\n    maxEntries: 50\n    priority: high\n\n  task-state:\n    description: Current goal, progress, blockers, and next steps\n    persist: .pi/session-state/task.json\n    format: |\n      { goal: string, constraints: string[], done: string[], in_progress: string[], blocked: string[], next_steps: string[] }\n    strategy: llm\n    maxTokens: 2000\n    priority: critical\n\nreassemble:\n  budget: 12000\n  overflow: trim-lowest\n  sources:\n    - source: .pi/session-state/task.json\n      as: \"Task state:\"\n      wrap: task-state\n    - source: .pi/session-state/corrections.json\n      as: \"User corrections (must be honored):\"\n      wrap: user-corrections\n```\n\n### Extract fields\n\n| Field | Required | Description |\n|-------|----------|-------------|\n| `description` | yes | Used in LLM extraction prompts |\n| `persist` | yes | Artifact file path, relative to project root |\n| `format` | yes | JSON shape description, used in LLM extraction prompts |\n| `strategy` | yes | `mechanical` or `llm` |\n| `maxTokens` | no | Token cap. For mechanical: oldest array entries trimmed. For LLM: included as prompt constraint. |\n| `maxEntries` | no | Array length cap (mechanical only, keeps newest) |\n| `priority` | no | `critical` \\| `high` \\| `normal` (default) \\| `low` \u2014 used for budget enforcement |\n\n### Reassemble fields\n\n| Field | Required | Description |\n|-------|----------|-------------|\n| `budget` | no | Global token cap for all injected artifacts |\n| `overflow` | no | `trim-lowest` (default): drop lowest-priority artifacts. `truncate-all`: proportionally truncate non-critical. |\n| `sources` | yes | Ordered list of `{ source, as, wrap }`. `source` = artifact path, `as` = label prefix, `wrap` = XML tag name. |\n\n## Spec Resolution Order\n\nResolved fresh on every compaction and context event:\n\n1. `.pi/workflow-state.json` with `\"compactionSpec\": \"<name>\"` \u2192 `.pi/compaction/<name>.yaml`\n2. `.pi/compaction/active` (text file containing spec name) \u2192 `.pi/compaction/<name>.yaml`\n3. `.pi/compaction/default.yaml`\n4. `.pi/compaction.yaml`\n5. No spec found \u2192 built-in compaction proceeds\n\nInvalid specs at any step are skipped; resolution continues to the next step.\n\n## Seed Specs\n\nCopied to `.pi/compaction/` on first launch if the directory doesn't exist.\n\n| Name | Extracts |\n|------|----------|\n| `default` | user-corrections (mechanical), decisions (llm), file-awareness (mechanical), task-state (llm) |\n| `debugging` | error-observations (mechanical), hypotheses (llm), reproduction-steps (llm), file-awareness (mechanical) |\n| `implementing` | task-state (llm), decisions (llm), api-contracts (llm), user-corrections (mechanical), file-awareness (mechanical) |\n| `reviewing` | findings (llm), patterns (llm), file-awareness (mechanical) |\n\n## Artifacts\n\nMechanical extracts are append-only across compactions (arrays concatenated, object arrays deduplicated). LLM extracts are overwritten each compaction.\n\nArtifacts are JSON files at the `persist` paths declared in the spec. They exist independently of the session JSONL and can be read or edited directly.\n\n## Stats\n\nEach compaction appends a JSON line to `.pi/session-state/compaction-stats.jsonl` recording: tokens before/after, per-artifact token counts and byte sizes, LLM extract input/output token costs, active spec name, and context window size.\n\nThe `context` hook injects a `<compaction-stats>` block (~100 tokens) with the latest stats so the LLM has visibility into compaction behavior.\n\n## Workflow Integration\n\nReads `.pi/workflow-state.json` during spec resolution. If a workflow extension writes `{ \"compactionSpec\": \"debugging\" }` to that file, the compactor uses that spec. Also listens on pi's event bus for `workflow:compaction` events.\n\nNo import dependency between extensions.\n\n## Development\n\n```bash\nnpm install\nnpx tsx --test src/*.test.ts\npi -e ./src/index.ts\n```\n\n189 tests. See SPEC.md for design rationale and PLAN.md for implementation phases.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "compaction",
+    "context-management",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "David Ryan"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/davidorex/pi-custom-compactor",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/davidorex/pi-custom-compactor.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-03-26T11:11:25.142Z",
+    "modified": "2026-03-26T23:12:46.848Z",
+    "0.1.0": "2026-03-26T11:11:25.419Z",
+    "0.1.1": "2026-03-26T11:32:25.680Z",
+    "0.1.2": "2026-03-26T22:22:18.783Z",
+    "0.1.3": "2026-03-26T22:37:36.930Z",
+    "0.1.4": "2026-03-26T22:55:55.512Z",
+    "0.1.5": "2026-03-26T23:12:46.707Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 30,
+  "download_trend": []
+}

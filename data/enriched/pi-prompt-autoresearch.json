@@ -1,0 +1,34 @@
+{
+  "name": "pi-prompt-autoresearch",
+  "latest_version": "0.1.1",
+  "description": "A pi extension that iteratively improves prompts with execution-based evaluation and keep/discard decisions.",
+  "readme": "# pi prompt autoresearch\n\n[![npm version](https://img.shields.io/npm/v/pi-prompt-autoresearch)](https://www.npmjs.com/package/pi-prompt-autoresearch)\n[![license](https://img.shields.io/npm/l/pi-prompt-autoresearch)](./LICENSE)\n\nA [pi](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) extension that **iteratively improves prompts** using execution-based evaluation, blind A/B comparison, and keep/discard decisions.\n\n- Generates an eval suite from your goal\n- Runs each prompt candidate across the suite and scores actual outputs\n- Performs blind A/B comparisons between incumbent and candidate\n- Keeps or discards each iteration based on eval scores and comparator preference\n- Benchmarks repeated runs and reports variance\n\n## Install\n\n```bash\npi install npm:pi-prompt-autoresearch\n```\n\n<details>\n<summary>Alternative install methods</summary>\n\nFrom the public git repo:\n\n```bash\npi install git:github.com/NicoAvanzDev/pi-prompt-autoresearch\n```\n\nFrom a local clone:\n\n```bash\npi install .\n```\n\nLoad without installing:\n\n```bash\npi --no-extensions -e ./index.ts\n```\n\n</details>\n\n## Quick start\n\n```text\n/autoresearch Write a prompt that produces a concise, factual summary of a long technical article.\n```\n\nThat single command kicks off the full optimization loop. The extension will:\n\n1. Generate an initial prompt from your goal\n2. Build an eval suite tailored to the task\n3. Iterate \u2014 rewrite, evaluate, compare, keep or discard \u2014 for 10 rounds (configurable)\n4. Write the best prompt to `AUTORESEARCH_PROMPT.md` in your working directory\n\nA live progress widget shows iteration count, scores, elapsed time, and ETA while it runs. When a new best prompt is found you get a milestone update in chat.\n\n### Example session\n\n```text\n> /autoresearch Write a prompt that turns raw meeting transcripts into structured JSON notes with attendees, action items, and decisions.\n\n  Autoresearch \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501 100%  10/10 iterations\n  Goal    Turn meeting transcripts into structured JSON notes\n  Score   0.92 (best) \u2014 +38% vs baseline\n  Status  Completed in 4m 12s\n\n\u2713 Best prompt written to AUTORESEARCH_PROMPT.md\n```\n\nYou can also benchmark an existing prompt to measure consistency:\n\n```text\n> /autoresearch-benchmark --runs 5 Write a prompt that extracts structured meeting notes as JSON.\n\n  Benchmark complete \u2014 5 runs\n  Mean 0.88 \u00b7 Min 0.84 \u00b7 Max 0.91 \u00b7 StdDev 0.03\n```\n\n## How it works\n\n### Improve mode\n\nFor each `/autoresearch` run, the extension:\n\n1. generates an initial prompt from the user goal\n2. generates a small eval suite for the user goal\n3. runs the initial prompt on every eval case\n4. scores each case and computes an aggregate score\n5. generates a revised prompt candidate\n6. runs that candidate on every eval case\n7. evaluates the candidate across the full suite\n8. performs a blind **A/B comparison** between incumbent and candidate outputs\n9. keeps the candidate only if:\n   - the eval says `keep`\n   - the aggregate score beats the current best\n   - the blind comparator prefers the candidate\n\n### Benchmark mode\n\nThe benchmark workflow:\n\n1. generates an eval suite\n2. runs the prompt multiple times across that suite\n3. records per-run aggregate scores\n4. reports:\n   - mean score\n   - min/max score\n   - variance\n   - standard deviation\n\n## Commands\n\n### Run autoresearch\n\n```text\n/autoresearch <goal>\n```\n\nExample:\n\n```text\n/autoresearch Write a prompt that produces a concise, factual summary of a long technical article.\n```\n\nOverride iterations for one run:\n\n```text\n/autoresearch --iterations 20 Write a prompt that generates a JSON API migration checklist.\n```\n\n### Benchmark a prompt\n\n```text\n/autoresearch-benchmark <goal>\n```\n\nExample:\n\n```text\n/autoresearch-benchmark --runs 5 Write a prompt that extracts structured meeting notes as JSON.\n```\n\n### Change the default iteration count\n\n```text\n/autoresearch-iterations 20\n```\n\n### Control a running job\n\n```text\n/autoresearch-pause\n/autoresearch-resume\n/autoresearch-kill\n/autoresearch-status\n```\n\nThe interactive extension now shows:\n\n- a persistent progress widget above the editor\n- an AI-generated goal summary\n- iteration and case progress\n- elapsed time and ETA, refreshed live while a job is running\n- current score, best score, and percentage improvement vs baseline\n- milestone updates in chat when a new best prompt is found, or when the job is paused/resumed/completed\n\nDuring a run, the extension writes `AUTORESEARCH_PROMPT.md` in the current working directory with the raw best prompt text, updated at each iteration. Progress state is kept internal to the extension (pi session entries and the live UI widget).\n\nPause takes effect at the next safe checkpoint between long-running steps.\n\n## Tools\n\nThe extension exposes LLM-callable tools:\n\n- `run_prompt_autoresearch`\n- `benchmark_prompt_autoresearch`\n\n### `run_prompt_autoresearch`\n\nParameters:\n\n- `goal: string`\n- `iterations?: number`\n- `evalCases?: number`\n\n### `benchmark_prompt_autoresearch`\n\nParameters:\n\n- `goal: string`\n- `runs?: number`\n- `evalCases?: number`\n\n## Notes\n\n- default improve iterations: **10**\n- users can increase iterations up to **100**\n- default benchmark runs: **3**\n- benchmark runs can go up to **10**\n- default eval cases: **5**\n- eval cases can go up to **8**\n- in interactive mode, `/autoresearch` copies the best prompt into the editor when finished\n",
+  "keywords": [
+    "autoresearch",
+    "pi-extension",
+    "pi-package",
+    "prompt-engineering",
+    "prompt-optimization"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/NicoAvanzDev/pi-prompt-autoresearch#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NicoAvanzDev/pi-prompt-autoresearch.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-22T10:11:33.110Z",
+    "modified": "2026-03-23T13:42:57.292Z",
+    "0.1.0": "2026-03-22T10:11:33.332Z",
+    "0.1.1": "2026-03-23T13:42:56.976Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 9,
+  "download_trend": []
+}

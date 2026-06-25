@@ -1,0 +1,35 @@
+{
+  "name": "pi-budget-guard",
+  "latest_version": "0.2.1",
+  "description": "An extension for Pi coding agent that tracks session spend and enforces budget limits.",
+  "readme": "# Pi Budget Guard\n\nAn extension for Pi coding agent that tracks session spend and enforces budget limits.\n\n## Prerequisites\n\nPi coding agent must be installed:\n\n```bash\nnpm install -g @mariozechner/pi-coding-agent\n```\n\nThen install the extension:\n\n```bash\npi install npm:pi-budget-guard\n```\n\n## Quick Start\n\n```bash\n# 1. Create a config in your project directory\nmkdir -p .pi\necho '{\"maxCostUsd\": 1.00, \"mode\": \"enforce\"}' > .pi/budget.json\n\n# 2. Start pi \u2014 the status bar now shows your spend vs budget\npi\n```\n\nAfter pi starts, type `/budget` to confirm it loaded:\n```\nMode: enforce\nSpent: $0.000 / $1.00 (0%)\nThresholds: 70%, 90%\n```\n\n## Modes\n\n| Mode | Behavior |\n|------|----------|\n| `observe` | Tracks spend in the footer status bar. No warnings or blocking. |\n| `warn` | Tracks spend + injects budget pressure messages at configured thresholds. |\n| `enforce` | Tracks spend + pressure messages + blocks all tool calls when budget is exceeded. |\n\n## Configuration\n\nCreate `.pi/budget.json` in your project directory for per-project settings:\n\n```bash\nmkdir -p .pi\ncat > .pi/budget.json << 'EOF'\n{\n  \"maxCostUsd\": 1.00,\n  \"mode\": \"observe\",\n  \"warningThresholds\": [0.70, 0.90]\n}\nEOF\n```\n\nFor a global default that applies to every project:\n\n```bash\nmkdir -p ~/.pi/agent\ncat > ~/.pi/agent/budget.json << 'EOF'\n{\n  \"maxCostUsd\": 5.00,\n  \"mode\": \"warn\",\n  \"warningThresholds\": [0.70, 0.90]\n}\nEOF\n```\n\nConfig priority: project `.pi/budget.json` \u2192 global `~/.pi/agent/budget.json` \u2192 defaults.\n\n| Field | Type | Default | Description |\n|-------|------|---------|-------------|\n| `maxCostUsd` | number | `1.00` | Session budget in USD |\n| `mode` | string | `\"observe\"` | One of `observe`, `warn`, `enforce` |\n| `warningThresholds` | number[] | `[0.70, 0.90]` | Fractions of budget that trigger warnings |\n\n## The `/budget` Command\n\nType `/budget` to display current status:\n\n```\nMode: observe\nSpent: $0.042 / $1.00 (4%)\nThresholds: 70%, 90%\n```\n\nType `/budget 5.00` to update the limit at runtime without restarting pi.\n\n## Provider Compatibility\n\nPi Budget Guard tracks the cost reported by the LLM provider after each response.\nFree and preview models (e.g. `google/gemini-3-flash-preview` via OpenRouter) report\n`$0.00` per call \u2014 the extension loads and runs but spend never accumulates, so\nwarn and enforce modes have no effect.\n\nModels with real cost reporting (tested):\n- `google/gemini-2.0-flash` via OpenRouter\n- `openai/gpt-4o-mini` via OpenRouter\n- `anthropic/claude-3-5-haiku` via OpenRouter\n- Native Google, Anthropic, and OpenAI providers\n\n## How It Works\n\nPi Budget Guard hooks into four Pi extension events:\n\n- **`session_start`**: Loads config, resets or reconstructs cost (on resume).\n- **`message_end`**: Accumulates cost from each assistant response.\n- **`tool_call`** (enforce mode only): Blocks tool calls when budget is exceeded.\n- **`context`** (warn/enforce modes): Injects a budget pressure message when a warning threshold is first crossed.\n\n### Cross-Session Persistence\n\nPi Budget Guard persists the accumulated cost to the session file as a\ncustom entry after every assistant response. When pi restarts with the\nsame session file, the extension restores the last known cost so budget\nenforcement survives process boundaries. This also means:\n\n- Closing and reopening pi on the same session preserves the spend total\n- Compaction does not erase cost (custom entries are excluded from LLM context)\n- If the persisted snapshot is malformed, the extension falls back to zero silently\n\n## Limitations\n\n- **No daily/monthly tracking.** Per-session budget persists across process restarts (since 0.2.1). Daily/monthly limits are a v2 feature.\n- **No pre-call estimation.** Pi only exposes cost after the response completes. A single expensive call can exceed the limit before being blocked.\n- **Post-call bounded overrun.** In enforce mode, the final response that crosses the limit is allowed to complete; only subsequent tool calls are blocked.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "budget",
+    "cost",
+    "token-usage",
+    "guard"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/omkarrajmane/pi-budget-guard/main/docs/screenshot.png"
+  },
+  "time": {
+    "created": "2026-04-10T09:55:34.158Z",
+    "modified": "2026-04-24T08:24:16.248Z",
+    "0.2.0": "2026-04-10T09:55:34.480Z",
+    "0.2.1": "2026-04-24T08:24:16.152Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

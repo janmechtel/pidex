@@ -1,0 +1,38 @@
+{
+  "name": "@rhedbull/pi-permissions",
+  "latest_version": "1.1.0",
+  "description": "Claude Code-style permission modes for pi. Controls approval for file writes, edits, and bash commands with four modes: default, acceptEdits, fullAuto, and bypassPermissions.",
+  "readme": "# pi-permissions\n\nClaude Code-style permission modes for [pi](https://www.npmjs.com/package/@mariozechner/pi-coding-agent). Controls when the agent needs approval for file writes, edits, and bash commands.\n\n## Installation\n\n```bash\npi install npm:@rhedbull/pi-permissions\n```\n\nOr from git:\n\n```bash\npi install git:github.com/rHedBull/pi-permissions\n```\n\n## Permission Modes\n\n| Mode | Status | Write/Edit | Normal Bash | Dangerous Bash | Catastrophic |\n|------|--------|-----------|-------------|----------------|--------------|\n| `default` | `\u23f5 Default` | \u2753 Confirm | \u2753 Confirm | \u2753 Confirm | \ud83d\udeab Blocked |\n| `acceptEdits` | `\u23f5\u23f5 Accept Edits` | \u2705 Auto | \u2753 Confirm | \u2753 Confirm | \ud83d\udeab Blocked |\n| `fullAuto` | `\u23f5\u23f5\u23f5 Full Auto` | \u2705 Auto | \u2705 Auto | \u2753 Confirm | \ud83d\udeab Blocked |\n| `bypassPermissions` | `\u23f5\u23f5\u23f5\u23f5 Bypass Permissions` | \u2705 Auto | \u2705 Auto | \u2705 Auto | \ud83d\udeab Blocked |\n\n### Approval Options\n\nWhen prompted for confirmation, you can:\n\n- **Allow once** \u2014 approve this specific call only\n- **Allow for session** \u2014 auto-approve this tool (or exact bash command) for the rest of the session\n- **Deny** \u2014 block the operation\n\n## CLI Flags\n\n```bash\npi --default              # Confirm everything\npi --accept-edits         # Auto-approve file edits\npi --full-auto            # Auto-approve safe bash too\npi --bypass-permissions   # Allow everything (except catastrophic)\n```\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/permissions` | Interactive mode selector |\n| `/permissions <mode>` | Set mode directly (tab-completion supported) |\n| `/permissions:status` | Show current mode and session approvals |\n\n## Keyboard Shortcut\n\n**Ctrl+Shift+P** \u2014 Cycle through permission modes\n\n## Catastrophic Command Protection\n\nThese commands are **always blocked** in every mode, including `bypassPermissions`. They cannot be overridden:\n\n- `sudo rm -rf /`, `rm -rf /`, `rm -rf /*`\n- `mkfs.*`, `dd if=`, `sudo dd`\n- `:(){ :|:& };:` (fork bomb)\n- `sudo chmod -R 777 /`, `sudo chown -R`\n- `> /dev/sda`, `> /dev/nvme`\n\n## Protected Path Enforcement\n\nWrites and edits to sensitive paths are **always blocked** in every mode:\n\n- `~/.ssh` \u2014 SSH keys, authorized_keys, config\n- `~/.aws` \u2014 AWS credentials\n- `~/.gnupg`, `~/.gpg` \u2014 GPG keys\n- `~/.bashrc`, `~/.bash_profile`, `~/.profile`, `~/.zshrc`, `~/.zprofile` \u2014 Shell startup files\n- `~/.config/git/credentials` \u2014 Git credentials\n- `~/.netrc` \u2014 Network credentials\n- `~/.npmrc` \u2014 npm auth tokens\n- `~/.docker/config.json` \u2014 Docker registry auth\n- `~/.kube/config` \u2014 Kubernetes cluster access\n- `~/.pi/agent/auth.json` \u2014 Pi API keys\n\nThis covers both direct `write`/`edit` tool calls and bash commands referencing these paths.\n\n## Configuration\n\nConfiguration is loaded from two optional JSON files, merged in order (project overrides global):\n\n- **Global**: `~/.pi/agent/extensions/permissions.json`\n- **Project**: `.pi/extensions/permissions.json`\n\n### Example Configuration\n\n```json\n{\n  \"mode\": \"acceptEdits\",\n  \"dangerousPatterns\": [\n    { \"pattern\": \"rm -rf\", \"description\": \"recursive force delete\" },\n    { \"pattern\": \"docker system prune\", \"description\": \"docker cleanup\" }\n  ],\n  \"catastrophicPatterns\": [\n    { \"pattern\": \"sudo rm -rf /\", \"description\": \"sudo recursive delete root\" }\n  ],\n  \"protectedPaths\": [\n    \"~/.ssh\",\n    \"~/.aws\",\n    \"/etc/passwd\"\n  ]\n}\n```\n\n### Configuration Fields\n\n| Field | Default | Description |\n|-------|---------|-------------|\n| `mode` | `\"acceptEdits\"` | Default permission mode |\n| `dangerousPatterns` | See defaults | Commands requiring confirmation in fullAuto |\n| `catastrophicPatterns` | See defaults | Commands always blocked, all modes |\n| `protectedPaths` | See defaults | Paths where writes are always blocked |\n\n## Shell Trick Detection\n\nCommands containing shell constructs that can hide arbitrary execution are flagged as **\u26a0\ufe0f SHELL TRICK** and always require confirmation (except in `bypassPermissions` mode). These cannot be session-approved \u2014 each occurrence prompts individually.\n\nDetected patterns:\n- Command substitution: `$(cmd)`, `` `cmd` ``\n- Process substitution: `<(cmd)`, `>(cmd)`\n- Eval/exec: `eval \"...\"`, `exec ...`\n- Shell invocation: `bash -c \"...\"`, `sh -c \"...\"`\n- Pipe to shell: `... | bash`, `... | sh`\n- Source: `source script.sh`\n\n## Limitations\n\nPattern matching uses substring matching against the raw command string. This means:\n\n- Extra whitespace can bypass: `sudo  rm  -rf  /` won't match `sudo rm -rf /`\n- Path traversal can bypass: `rm -rf /tmp/../../../` resolves to root but won't match\n- Nested invocations can bypass: `bash -c \"rm -rf /\"` won't match\n\nThis is the same limitation Claude Code has with its built-in permission system. For AST-based structural matching that catches these edge cases, use [`@aliou/pi-guardrails`](https://www.npmjs.com/package/@aliou/pi-guardrails) alongside this extension \u2014 guardrails parses the shell command into an AST and matches against the parsed structure.\n\nProtected path checking for bash commands also uses substring matching, which may produce false positives if a protected path string appears in a non-file context (e.g. inside a string argument or comment).\n\n## Works With\n\nDesigned to work alongside [`@aliou/pi-guardrails`](https://www.npmjs.com/package/@aliou/pi-guardrails). Guardrails handles `.env` file protection and AST-based dangerous command detection, while this extension handles the broader permission mode workflow.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "permissions",
+    "security",
+    "guardrails"
+  ],
+  "author": {
+    "name": "Hendrik"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/rHedBull/pi-permissions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rHedBull/pi-permissions.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-02-27T08:26:55.338Z",
+    "modified": "2026-02-27T09:39:29.475Z",
+    "1.0.0": "2026-02-27T08:26:55.585Z",
+    "1.0.1": "2026-02-27T08:32:48.656Z",
+    "1.1.0": "2026-02-27T09:39:29.338Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

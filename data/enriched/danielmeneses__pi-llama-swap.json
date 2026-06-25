@@ -1,0 +1,34 @@
+{
+  "name": "@danielmeneses/pi-llama-swap",
+  "latest_version": "0.1.1",
+  "description": "Pi extension: llama-swap provider with dynamic model discovery",
+  "readme": "# pi-llama-swap\n\nPi coding agent extension that registers a **llama-swap** provider and discovers models from a running [llama-swap](https://github.com/mostlygeek/llama-swap) instance.\n\n## What it does\n\n- Injects provider `llama-swap` with models from `GET /v1/models`\n- Resolves per-model context from llama-swap APIs (`/v1/models`, `/running`) with 256K default \u2014 see [Context window](#context-window-per-model)\n- Uses OpenAI Chat Completions API (`openai-completions`) for streaming\n- Reads optional config from `~/.pi/agent/pi-llama-swap.json` to override defaults\n\n## Requirements\n\n- [pi](https://github.com/badlogic/pi-mono) coding agent (`@earendil-works/pi-coding-agent`)\n- [llama-swap](https://github.com/mostlygeek/llama-swap) running and reachable\n- Node.js 18+ (for `fetch`)\n\n## Quick start\n\n```bash\n# Terminal 1: start llama-swap (example)\nllama-swap --config ~/llama-swap/config.yaml --listen 127.0.0.1:8080\n\n# Terminal 2: load extension\ncd /path/to/pi-llama-swap\npi -e .\n```\n\nIn pi: `/model` \u2192 pick `llama-swap/your-model-id`.\n\n### Commands\n\n| Command | Args | Description |\n|---------|------|-------------|\n| `/llama-swap-set-context-length` | `<number>` or `auto` | Override context window for the current model (`auto` removes override and uses auto-detection) |\n\nVerify from CLI:\n\n```bash\npi -e . --list-models | grep llama-swap\ncurl http://127.0.0.1:8080/v1/models\n```\n\n## Configuration\n\n### Defaults\n\n| Setting | Default |\n|---------|---------|\n| Origin | `http://127.0.0.1` |\n| Port | `8080` |\n| Base URL | `http://127.0.0.1:8080/v1` |\n\nNo config file needed when llama-swap runs on the defaults above.\n\n### Config file\n\nCreate `~/.pi/agent/pi-llama-swap.json` to override defaults:\n\n```json\n{\n  \"origin\": \"http://127.0.0.1\",\n  \"port\": 8080,\n  \"apiKey\": \"optional-key\",\n  \"contextOverrides\": {\n    \"my-model\": 32768\n  }\n}\n```\n\n| Field | Description |\n|-------|-------------|\n| `origin` | Scheme + host (e.g. `http://192.168.1.10`) |\n| `port` | TCP port (1\u201365535) |\n| `basePath` | API path prefix (default `/v1`; normalized to end with `/v1`) |\n| `apiKey` | Bearer token when llama-swap uses `apiKeys` |\n| `contextOverrides` | Per-model context overrides (model id \u2192 tokens). Use `/llama-swap-set-context-length` instead of editing manually. |\n\nLoad order: **defaults \u2192 `~/.pi/agent/pi-llama-swap.json` \u2192 environment variables**.\n\n### Context window (per model)\n\nContext size is auto-detected from llama-swap's `/v1/models` and `/running` endpoints at startup, with a default of **256K** when nothing reports a value. User overrides set via `/llama-swap-set-context-length` take precedence over all auto-detected values.\n\n```bash\n# Restrict permissions when storing API keys\nchmod 600 ~/.pi/agent/pi-llama-swap.json\n```\n\n### Environment variables\n\nOptional runtime overrides (highest precedence):\n\n| Variable | Purpose |\n|----------|---------|\n| `LLAMA_SWAP_URL` | Origin URL (scheme + host, optional port/path) |\n| `LLAMA_SWAP_PORT` | Port override |\n| `LLAMA_SWAP_API_KEY` | API key override |\n\n## Auth\n\nIf llama-swap uses `apiKeys` in its config, set `\"apiKey\"` in `pi-llama-swap.json` or `LLAMA_SWAP_API_KEY`.\n\nWithout a key, extension uses placeholder `local-no-auth` so models appear in `/model`. Pi may send `Authorization: Bearer local-no-auth`; most unsecured local installs ignore it.\n\n## Troubleshooting\n\n| Symptom | What to try |\n|---------|-------------|\n| `Cannot reach llama-swap` | Start llama-swap; check `origin`/`port` in config file |\n| HTTP 401 | Set `apiKey` in config or `LLAMA_SWAP_API_KEY` |\n| 0 models | Ensure models in llama-swap config; `curl http://127.0.0.1:8080/v1/models` |\n| Extension loads but chat fails | Confirm model id; first request may load model (slow) |\n| Config ignored | File must be `~/.pi/agent/pi-llama-swap.json`; restart pi after edits |\n\n## Project layout\n\n```\npi-llama-swap/\n\u251c\u2500\u2500 index.ts          # Extension entry\n\u251c\u2500\u2500 lib/\n\u2502   \u251c\u2500\u2500 config.ts     # Load ~/.pi/agent/pi-llama-swap.json\n\u2502   \u251c\u2500\u2500 url.ts        # URL building\n\u2502   \u251c\u2500\u2500 client.ts     # GET /v1/models\n\u2502   \u251c\u2500\u2500 context.ts    # Context window from llama-swap APIs\n\u2502   \u251c\u2500\u2500 provider.ts   # registerProvider\n\u2502   \u2514\u2500\u2500 types.ts\n\u251c\u2500\u2500 package.json\n\u2514\u2500\u2500 README.md\n```\n\n## License\n\nMIT (see repository if published).\n",
+  "keywords": [
+    "pi-extension",
+    "pi-package",
+    "pi"
+  ],
+  "author": {
+    "name": "Daniel Meneses"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/danielmeneses/pi-llama-swap#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danielmeneses/pi-llama-swap.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-05T14:03:47.000Z",
+    "modified": "2026-06-22T12:04:21.617Z",
+    "0.1.0": "2026-06-05T14:03:47.302Z",
+    "0.1.1": "2026-06-22T12:04:21.494Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 227,
+  "download_trend": []
+}

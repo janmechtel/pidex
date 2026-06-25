@@ -1,0 +1,37 @@
+{
+  "name": "@edmundmiller/pi-dcp",
+  "latest_version": "0.1.1",
+  "description": "Dynamic Context Pruning extension for pi - intelligently removes obsolete messages to optimize token usage",
+  "readme": "# Pi-DCP: Dynamic Context Pruning Extension\n\n![Monolith logo](pi-dcp-banner.png)\n\nIntelligently prunes conversation context to optimize token usage while preserving conversation coherence.\n\n## Features\n\n- **Deduplication**: Removes duplicate tool outputs based on content hash\n- **Superseded Writes**: Removes older file writes when newer versions exist\n- **Error Purging**: Removes resolved errors from context\n- **Recency Protection**: Always preserves recent messages\n\n## Installation\n\nClone the repository into your pi agent extensions directory:\n\n```bash\ngit clone https://github.com/zenobi-us/pi-dcp.git ~/.pi/agent/extensions/pi-dcp\n```\n\n## Usage\n\nThe extension runs automatically on every LLM call. No manual intervention needed.\n\n### Commands\n\n- `/dcp-debug` - Toggle debug logging\n- `/dcp-stats` - Show pruning statistics for current session\n- `/dcp-toggle` - Enable/disable the extension\n- `/dcp-recent <number>` - Set how many recent messages to always keep (default: 10)\n\n### Flags\n\n- `--dcp-enabled=true/false` - Enable/disable extension at startup\n- `--dcp-debug=true/false` - Enable debug logging at startup\n\n## Architecture\n\n### Workflow\n\n1. **Prepare Phase**: Rules annotate message metadata\n2. **Process Phase**: Rules make pruning decisions based on metadata\n3. **Filter Phase**: Messages marked for pruning are removed\n\n### Built-in Rules\n\nLocated in `src/rules/`:\n\n1. **Deduplication** (`deduplication.ts`)\n   - Prepare: Hash message content\n   - Process: Mark duplicates for pruning\n\n2. **Superseded Writes** (`superseded-writes.ts`)\n   - Prepare: Extract file paths from write/edit operations\n   - Process: Mark older writes to the same file for pruning\n\n3. **Error Purging** (`error-purging.ts`)\n   - Prepare: Identify errors and check if resolved\n   - Process: Mark resolved errors for pruning\n\n4. **Recency** (`recency.ts`)\n   - Process: Protect last N messages from pruning (overrides other rules)\n\n### Configuration\n\nDefault configuration in `src/config.ts`:\n\n```typescript\n{\n  enabled: true,\n  debug: false,\n  rules: ['deduplication', 'superseded-writes', 'error-purging', 'recency'],\n  keepRecentCount: 10\n}\n```\n\n## Custom Rules\n\nCreate custom pruning rules by implementing the `PruneRule` interface:\n\n```typescript\nimport type { PruneRule } from \"./src/types\";\n\nconst myRule: PruneRule = {\n  name: \"my-custom-rule\",\n  description: \"My custom pruning logic\",\n\n  prepare(msg, ctx) {\n    // Annotate metadata during prepare phase\n    msg.metadata.myScore = calculateScore(msg.message);\n  },\n\n  process(msg, ctx) {\n    // Make pruning decision during process phase\n    if (msg.metadata.myScore < threshold) {\n      msg.metadata.shouldPrune = true;\n      msg.metadata.pruneReason = \"low score\";\n    }\n  },\n};\n```\n\nThen add to configuration: `rules: ['deduplication', myRule]`\n\n## Development\n\n### Type Checking\n\n```bash\nbun run typecheck\n```\n\n### Project Structure\n\n```\npi-dcp/\n\u251c\u2500\u2500 index.ts              # Main extension entry point\n\u251c\u2500\u2500 package.json          # Bun package config\n\u251c\u2500\u2500 tsconfig.json         # TypeScript config\n\u251c\u2500\u2500 src/\n\u2502   \u251c\u2500\u2500 types.ts          # Core type definitions\n\u2502   \u251c\u2500\u2500 config.ts         # Configuration management\n\u2502   \u251c\u2500\u2500 metadata.ts       # Message metadata utilities\n\u2502   \u251c\u2500\u2500 registry.ts       # Rule registration system\n\u2502   \u251c\u2500\u2500 workflow.ts       # Prepare > Process > Filter workflow\n\u2502   \u2514\u2500\u2500 rules/\n\u2502       \u251c\u2500\u2500 index.ts      # Export and register all rules\n\u2502       \u251c\u2500\u2500 deduplication.ts\n\u2502       \u251c\u2500\u2500 superseded-writes.ts\n\u2502       \u251c\u2500\u2500 error-purging.ts\n\u2502       \u2514\u2500\u2500 recency.ts\n\u2514\u2500\u2500 README.md\n```\n\n## How It Works\n\n1. **Context Event Hook**: The extension subscribes to the `context` event, which fires before each LLM call\n2. **Message Processing**: All messages are wrapped with metadata containers\n3. **Prepare Phase**: Each rule's `prepare` function annotates metadata (hashes, file paths, etc.)\n4. **Process Phase**: Each rule's `process` function makes pruning decisions based on metadata\n5. **Filter Phase**: Messages marked with `shouldPrune: true` are removed\n6. **Result**: Pruned message list is returned to pi and sent to the LLM\n\n## Benefits\n\n- **Token Savings**: Removes redundant and obsolete messages\n- **Cost Reduction**: Fewer tokens = lower API costs\n- **Preserved Coherence**: Smart rules keep important context\n- **Transparent**: No changes to user experience\n- **Configurable**: Adjust rules and thresholds as needed\n- **Extensible**: Easy to add custom rules\n\n## Example Output\n\n```\n[pi-dcp] Initialized with 4 rules: deduplication, superseded-writes, error-purging, recency\n[pi-dcp] Pruned 12 / 45 messages\n[pi-dcp] Pruned 8 / 52 messages\n```\n\nWith debug mode enabled (`/dcp-debug`):\n\n```\n[pi-dcp] Dedup: marking duplicate message at index 15 (hash: k2l9x)\n[pi-dcp] SupersededWrites: found file operation at index 23: src/index.ts\n[pi-dcp] SupersededWrites: marking superseded write at index 23: src/index.ts\n[pi-dcp] ErrorPurging: found resolved error at index 31\n[pi-dcp] Recency: protecting message at index 48 (distance from end: 3, threshold: 10)\n[pi-dcp] Filter phase complete: 12 pruned, 33 kept (45 total)\n[pi-dcp] Pruned messages:\n  [15] assistant: duplicate content\n  [23] toolResult: superseded by later write to src/index.ts\n  [31] toolResult: error resolved by later success\n  ...\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "context-pruning",
+    "token-optimization",
+    "pi-package"
+  ],
+  "author": {
+    "name": "Edmund Miller",
+    "email": "edmundmiller@hey.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/edmundmiller/dotfiles#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/edmundmiller/dotfiles.git",
+    "directory": "packages/pi-dcp"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-24T04:54:03.512Z",
+    "0.1.1": "2026-02-24T04:54:03.768Z",
+    "modified": "2026-02-24T04:54:03.950Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 13,
+  "download_trend": []
+}

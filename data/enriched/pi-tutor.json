@@ -1,0 +1,41 @@
+{
+  "name": "pi-tutor",
+  "latest_version": "0.1.1",
+  "description": "A stateful tutor package for pi that adds hint-first, track-aware teaching workflows.",
+  "readme": "# pi-tutor\n\n```bash\npi install npm:pi-tutor\n```\n\nPersonal coding tutor for pi.\n\n`pi-tutor` turns pi into a teaching-oriented coding assistant.\n\nIt adapts to how you like to learn, remembers what you're learning, resumes topics over time, and guides you with hint-first help instead of jumping straight to solutions.\n\n## What this is\n\n`pi-tutor` is a tutor package for pi. It is meant for learning while coding \u2014 not just getting answers, but building understanding, practicing in small steps, and keeping momentum across sessions.\n\n## What it does\n\n- adapts to your learning style and preferences\n- remembers what you're learning and resumes it later\n- keeps separate topic folders for different learning tracks\n- prefers hints, questions, and next steps before full solutions\n- helps you reflect on progress, blockers, and what to do next\n- supports learning through small projects, exercises, and repeated practice\n\n## Install\n\n### From npm\n\n```bash\npi install npm:pi-tutor\n```\n\n### From GitHub\n\n```bash\npi install https://github.com/denismrvoljak/pi-tutor\n```\n\n### Local path install\n\nUse this when developing on the package itself:\n\n```bash\npi install /absolute/path/to/pi-tutor\npi list\n```\n\n### Project-local install\n\nUse this when you want a clean temporary environment or project-scoped setup:\n\n```bash\npi install -l /absolute/path/to/pi-tutor\npi list\n```\n\n### One-off test\n\n```bash\npi -e npm:pi-tutor\n```\n\nThen open pi and enable tutor mode:\n\n```text\n/tutor on\n```\n\n## What it includes\n\n- `/tutor on`\n- `/tutor off`\n- `/tutor status`\n- conversational onboarding that creates `learner-profile.md`\n- topic tracks under `tracks/<topic-folder>/`\n- track-aware prompt templates:\n  - `/start_tutoring`\n  - `/hint`\n  - `/reflect`\n  - `/next_step`\n- track-aware skills for implementation mentoring and topic learning\n- guards that require tutor mode to be on before tutor workflows run\n\n## State layout\n\nAll tutor data lives under:\n\n```text\n${PI_CODING_AGENT_DIR:-~/.pi/agent}/pi-tutor/\n```\n\n### Global learner state\n\n- `learner-profile.md` \u2014 durable learner preferences, goals, topics, and tutoring style\n\n### Per-topic track state\n\nEach learning stream gets its own directory under `tracks/<topic-folder>/`:\n\n```text\n${PI_CODING_AGENT_DIR:-~/.pi/agent}/pi-tutor/\n\u251c\u2500\u2500 learner-profile.md\n\u2514\u2500\u2500 tracks/\n    \u2514\u2500\u2500 <topic-folder>/\n        \u251c\u2500\u2500 track.md\n        \u251c\u2500\u2500 project.md\n        \u251c\u2500\u2500 roadmap.md\n        \u2514\u2500\u2500 progress.md\n```\n\nThe folder name is just a short filesystem-safe topic name.\n\nFile roles:\n\n- `track.md` \u2014 what the track is about, keywords, learner-specific notes\n- `project.md` \u2014 concrete project brief (goal, scope, acceptance criteria, constraints, deliverables)\n- `roadmap.md` \u2014 milestones and checkbox todo tasks/exercises (`- [ ]` / `- [x]`)\n- `progress.md` \u2014 journey status (roadmap completion), current focus, completed work, reflections, blockers, next step\n\nThis package is intentionally markdown-first. There is **no hidden active-track state** to keep in sync.\n\n## Local development install\n\nRun `pnpm install` once in the package repo before installing it into pi.\n\n```bash\ncd /absolute/path/to/pi-tutor\npnpm install\n```\n\nFor a clean project-local dev check:\n\n```bash\ncd /absolute/path/to/pi-tutor\npnpm install\n\nexport PI_CODING_AGENT_DIR=\"$(mktemp -d)\"\ntmp_proj=\"$(mktemp -d)\"\ncd \"$tmp_proj\"\n\npi install -l /absolute/path/to/pi-tutor\npi list\npi\n```\n\n## Local development workflow with `/reload`\n\nAfter the first local install, keep editing files in `/absolute/path/to/pi-tutor` and use `/reload` inside pi instead of reinstalling every time.\n\nTypical loop:\n\n```bash\ncd /absolute/path/to/pi-tutor\npnpm test\n\nexport PI_CODING_AGENT_DIR=\"$(mktemp -d)\"\ntmp_proj=\"$(mktemp -d)\"\ncd \"$tmp_proj\"\n\npi install -l /absolute/path/to/pi-tutor\npi\n```\n\nInside pi:\n\n```text\n/tutor on\n/reload\n```\n\nWhat `/reload` should pick up:\n\n- extension changes\n- prompt template changes\n- skill changes\n- README / packaging changes are still verified by tests and smoke checks outside pi\n\n## Everyday usage examples\n\nAll tutor workflows below assume tutor mode is on.\n\n### 1. First-time onboarding\n\n```text\n/tutor on\nI want to learn SQL joins through small exercises. I'm intermediate and I prefer hints over full solutions.\n```\n\nExpected outcome:\n\n- pi asks only for missing onboarding details if needed\n- `learner-profile.md` is created\n- future tutoring turns use that profile\n\n### 2. Create a new track\n\n```text\n/tutor on\nI want to keep learning Redis caching patterns\n```\n\nExpected outcome:\n\n- if no matching track exists, pi creates `tracks/<topic-folder>/`\n- the new track gets `track.md`, `project.md`, `roadmap.md`, and `progress.md`\n- roadmap tasks are tracked as markdown checkboxes and mirrored into progress journey status\n\n### 3. Resume an existing track\n\n```text\n/tutor on\nI want to keep learning SQL joins\n```\n\nExpected outcome:\n\n- pi matches the saved track heuristically\n- pi injects the matching `track.md`, `project.md`, `roadmap.md`, and `progress.md`\n- tutoring resumes from the current focus or next step\n\n### 4. Ask for the next hint\n\n```text\n/hint LEFT JOIN filtering\n```\n\nExpected outcome:\n\n- pi gives the next hint level instead of jumping to the full solution\n- if you report meaningful progress or a blocker, `progress.md` can be updated\n\n### 5. Reflect on what happened\n\n```text\n/reflect I finished two exercises but still confuse WHERE vs ON\n```\n\nExpected outcome:\n\n- pi records the reflection in `progress.md`\n- blockers and completed items are adjusted if needed\n- `Next step` is refreshed\n\n### 6. Ask what to do next\n\n```text\n/next_step SQL joins\n```\n\nExpected outcome:\n\n- pi resumes the named track\n- pi reads the latest roadmap + progress context\n- pi refreshes `progress.md` if needed and returns one concrete next step\n\n## Development and verification commands\n\n```bash\ncd /absolute/path/to/pi-tutor\npnpm test\npnpm check\npnpm pack:smoke\n```\n\nUseful extra loop when you only want to test the extension file directly:\n\n```bash\npi --no-session -e /absolute/path/to/pi-tutor/extensions/pi-tutor/index.ts\n```\n\n## Known limitations\n\n- **Heuristic track matching.** Track selection is string-matching based, so overlapping topic names can still confuse it.\n- **Name the topic clearly.** Because state is markdown-first and there is no hidden active-track state, resume works best when the learner names the topic clearly.\n- **No active-track file.** The package does not keep hidden current-track state.\n- **Single-agent package.** No subagents are required or bundled.\n\n## Smoke-check expectations\n\nFor a clean-environment verification run, check that:\n\n- `pi list` shows the installed package source containing `pi-tutor`\n- the package works with a fresh `PI_CODING_AGENT_DIR`\n- no existing learner/profile state is required\n- `/start_tutoring`, `/hint`, `/reflect`, and `/next_step` are available after install\n- those tutor workflow commands refuse to run until `/tutor on` is enabled\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "tutor",
+    "typescript"
+  ],
+  "author": {
+    "name": "Denis Mrvoljak"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/denismrvoljak/pi-tutor",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/denismrvoljak/pi-tutor.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-19T18:59:53.170Z",
+    "modified": "2026-04-19T19:33:01.127Z",
+    "0.1.0": "2026-04-19T18:59:53.321Z",
+    "0.1.1": "2026-04-19T19:33:01.037Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

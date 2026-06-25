@@ -1,0 +1,36 @@
+{
+  "name": "@kreeger/pi-edit-split",
+  "latest_version": "0.1.0",
+  "description": "A side-by-side diff preview for the pi-coding-agent edit tool.",
+  "readme": "# pi-edit-split\n\nA side-by-side diff preview for the pi-coding-agent `edit` tool. It shows\nwhat changes will be made before they're applied, rendered as a split view\n(old vs new) when your terminal is wide enough, or falling back to unified\nand compact modes on narrower screens.\n\nIt uses fuzzy matching to handle typographic quotes, dashes, and spaces,\nand strips UTF-8 BOM characters before processing. The preview computation\nruns asynchronously and non-blocking.\n\n## How it looks\n\nThe edit tool preview replaces pi's default diff output with a side-by-side\ncomparison. Context lines appear on both sides, removed lines in red on\nthe left, added lines in green on the right, and line numbers are shown\nfor reference.\n\n![pi-edit-split preview](docs/preview.png)\n\n## How it works\n\n```mermaid\nflowchart LR\n    subgraph pi[\"pi-coding-agent\"]\n        EDIT[\"edit tool\"]\n        API[\"Extension API\"]\n    end\n\n    subgraph split[\"pi-edit-split extension\"]\n        PREVIEW[\"Preview renderer<br/>(async, non-blocking)\"]\n        PATCH[\"Unified patch parser\"]\n        PAIR[\"Line pairer<br/>(LCS diff)\"]\n        RENDER[\"DiffRenderer<br/>(split/unified/compact)\"]\n    end\n\n    API -- registerTool --> EDIT\n    EDIT -- renderCall --> PREVIEW\n    PREVIEW -- generate patch --> PATCH\n    PATCH -- parse hunks --> PAIR\n    PAIR -- pair lines --> RENDER\n    EDIT -- renderResult --> RENDER\n    RENDER -- render(width) --> pi\n```\n\nOn tool registration, pi-edit-split wraps pi's built-in `edit` tool.\nWhen the tool is called, it reads the target file, applies the edits\nin-memory to generate a diff, and renders a live preview. The actual\nfile modification is delegated to pi's original edit tool execution.\n\nTwo rendering modes adapt to terminal width:\n\n- **Split view** (width >= 120): Side-by-side old/new with a vertical\n  divider. Each cell shows line numbers and content.\n- **Unified diff** (narrower): Standard unified format, delegated to\n  pi's built-in `renderDiff`.\n\n## Features\n\n- **Side-by-side diff** \u2014 split view when terminal width >= 120 chars\n- **Unified diff** \u2014 standard unified format on narrower screens\n- **Fuzzy matching** \u2014 normalizes typographic quotes, dashes, and\n  spaces for more reliable text matching\n- **BOM handling** \u2014 strips UTF-8 BOM before processing\n- **Async preview** \u2014 preview computation runs non-blocking\n- **Collapsible hunks** \u2014 shows first change + context, hides the rest\n\n## Installation\n\nInstall from the git repository using `pi install`:\n\n```bash\npi install git@github.com:kreeger/pi-edit-split.git\n```\n\nPass the repository URL directly as a single argument.\n\nIf you've cloned the repository locally, you can also install from\nthe local path:\n\n```bash\npi install /path/to/pi-edit-split\n```\n\nAfter installation, restart your pi session. The edit preview appears\nautomatically \u2014 there's no activation step needed.\n\n### Verify it is installed\n\n```bash\nls ~/.pi/agent/extensions/pi-edit-split/\n```\n\nYou should see TypeScript source files. The pi agent loads extensions\nfrom this directory at startup.\n\n## Configuration\n\nNo configuration needed \u2014 pi-edit-split activates automatically as a\ndrop-in replacement for the built-in edit tool renderer.\n\n## Development\n\n### Setup\n\nClone the repository and install dependencies:\n\n```bash\ngit clone git@github.com:kreeger/pi-edit-split.git\ncd pi-edit-split\nnpm install\n```\n\n### Running tests\n\n```bash\nnpm test\n```\n\nTests live alongside source files (`.test.ts`). They run with Vitest.\nThere are tests for the patch parser, line pairing (LCS diff), the\npreview renderer, and the DiffRenderer component.\n\n### Deploying your changes\n\nThe `deploy` script copies the source files (minus test files) to\n`~/.pi/agent/extensions/pi-edit-split/`. Use it to push local changes\ninto pi without publishing to npm:\n\n```bash\nnpm run deploy\n```\n\nRestart your pi session to pick up changes.\n\n### Architecture notes\n\n- `index.ts` \u2014 Extension entry point. Wraps pi's `edit` tool, wires up\n  async preview computation, and renders the DiffRenderer component.\n- `preview.ts` \u2014 Reads the target file, applies edits in-memory,\n  generates a unified patch, and computes the preview result.\n  Includes fuzzy text matching and BOM handling.\n- `pairing.ts` \u2014 Lines the diff from two sides using LCS-based\n  alignment. Groups consecutive removes and adds into matched pairs.\n- `patch-parser.ts` \u2014 Parses unified diff hunks into structured\n  `ParsedHunk` objects with line numbers and types.\n- `diff-component.ts` \u2014 The TUI `Component` that renders the diff.\n  Chooses split/unified/compact mode based on available width.\n- `types.ts` \u2014 Shared TypeScript interfaces for hunks, lines, cells,\n  rows, and preview state.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "edit",
+    "diff",
+    "tui"
+  ],
+  "author": {
+    "name": "Ben Kreeger"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/kreeger/pi-edit-split#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kreeger/pi-edit-split.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-18T19:59:23.322Z",
+    "0.1.0": "2026-06-18T19:59:23.541Z",
+    "modified": "2026-06-18T19:59:23.687Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 71,
+  "download_trend": []
+}

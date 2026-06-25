@@ -1,0 +1,356 @@
+{
+  "name": "@coctostan/pi-exa-gh-web-tools",
+  "latest_version": "4.1.1",
+  "description": "Web search via Exa, content extraction, and GitHub repo cloning for Pi coding agent",
+  "readme": "# @coctostan/pi-exa-gh-web-tools\n\nWeb search, code search, content extraction, and GitHub repo cloning for the [Pi coding agent](https://github.com/earendil-works/pi-mono), powered by [Exa](https://exa.ai).\n\nThis package gives Pi four tools:\n\n- `web_search` \u2014 search the web and return compact results\n- `code_search` \u2014 find code examples from docs, GitHub, and Stack Overflow\n- `fetch_content` \u2014 fetch a URL, GitHub repo/file, or PDF and extract readable content\n- `get_search_content` \u2014 retrieve stored content from an earlier tool call\n\n## Why this exists\n\nMost web pages are too large and noisy to drop directly into an agent's context window. This extension is designed to keep Pi focused:\n\n- `web_search` returns short summaries by default\n- `fetch_content` can answer a specific question instead of returning a whole page\n- raw fetched content is written to a temp file instead of flooding context\n- previous results are stored and can be retrieved later\n\nIf you're new to Pi, the simplest mental model is:\n\n1. **Search** for a good source\n2. **Fetch** only the page you need\n3. **Ask a focused question** when possible\n4. **Read the saved file** only if you need the raw content\n\n## Requirements\n\n- Pi coding agent \u2265 `0.74.0` (npm scope `@earendil-works/*`)\n- Node.js \u2265 22\n\n`pi-web-tools` declares `peerDependencies` on `@earendil-works/pi-coding-agent ^0.74.0` and `@earendil-works/pi-tui ^0.74.0`. The legacy `@mariozechner/*` scope is no longer supported \u2014 if you are on pi `< 0.74`, stay on `pi-web-tools@3.x`.\n\n## Quick start\n\n### 1) Install the extension in Pi\n\nFrom npm:\n\n> Requires pi 0.74 or newer.\n\n```bash\npi install npm:@coctostan/pi-exa-gh-web-tools\n```\n\nOr directly from GitHub:\n\n> Requires pi 0.74 or newer.\n\n```bash\npi install github:coctostan/pi-web-tools\n```\n\n### 2) Configure your Exa API key\n\n`web_search` and `code_search` require an Exa API key.\n\nSet it as an environment variable:\n\n```bash\nexport EXA_API_KEY=\"your-key-here\"\n```\n\nOr put it in `~/.pi/web-tools.json`:\n\n```json\n{\n  \"exaApiKey\": \"your-key-here\"\n}\n```\n\nEnvironment variables take precedence over the config file.\n\n### 3) Start using the tools\n\nTypical beginner flow:\n\n```ts\nweb_search({ query: \"vitest mock fetch\" })\nfetch_content({\n  url: \"https://vitest.dev/guide/mocking.html\",\n  prompt: \"How do I mock a function in Vitest?\"\n})\n```\n\n## Standalone CLI\n\nThe package also ships a standalone `exa-tools` binary that works outside of Pi.\n\n### Install globally\n\n```bash\nnpm install -g @coctostan/pi-exa-gh-web-tools\n```\n\n### Set your API key\n\n`search` and `code` commands require an Exa API key:\n\n```bash\nexport EXA_API_KEY=\"your-key-here\"\n```\n\n### Commands\n\n**Web search:**\n\n```bash\nexa-tools search \"vitest mock fetch\" --n 3\n```\n\n**Code search:**\n\n```bash\nexa-tools code \"vitest mock fetch\" --tokens 800\n```\n\n**Fetch a page (raw markdown):**\n\n```bash\nexa-tools fetch \"https://vitest.dev/guide/mocking.html\"\n```\n\n**Fetch with a focused question:**\n\n```bash\nexa-tools fetch \"https://vitest.dev/guide/mocking.html\" --prompt \"How do I mock a function?\"\n```\n\n### Output behavior\n\n- Successful output goes to **stdout**\n- Errors and warnings go to **stderr**\n- When `--prompt` is used but no filter model is available, the CLI prints a warning to stderr and falls back to raw markdown on stdout\n## 30-second example\n\nIf you've never used Pi tools before, this is the shortest useful workflow:\n\n```ts\n// 1) Find a good source\nweb_search({ query: \"vitest retry failed test\" })\n\n// 2) Ask one page a focused question\nfetch_content({\n  url: \"https://vitest.dev/guide/\",\n  prompt: \"How do I retry a failed test?\"\n})\n```\n\nRule of thumb:\n\n- use `web_search` to **choose a source**\n- use `fetch_content({ prompt })` to **get an answer**\n- use `fetch_content({ url })` without `prompt` only when you really need the raw page\n\n## What each tool does\n\n## Which tool should I use?\n\n| If you want to... | Use this |\n|---|---|\n| Find a relevant page or article | `web_search` |\n| Find a working code snippet | `code_search` |\n| Ask one URL a specific question | `fetch_content({ url, prompt })` |\n| Read the full raw content of a page | `fetch_content({ url })` |\n| Re-open an earlier result without refetching | `get_search_content` |\n\nFor most Pi sessions, this is the best default path:\n\n1. `web_search`\n2. `fetch_content({ prompt })`\n3. `get_search_content` or `read` only if you need more detail\n\n### `web_search`\n\nSearch the web and return **1-line summaries** by default.\n\nUse it when you want to decide **which URL is worth reading next**.\n\n#### Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `query` | `string` | Single search query |\n| `queries` | `string[]` | Multiple search queries |\n| `numResults` | `number` | Results per query, default `5`, max `20` |\n| `type` | `string` | `\"auto\"` (default), `\"instant\"`, or `\"deep\"` |\n| `detail` | `string` | `\"summary\"` (default) or `\"highlights\"` |\n| `freshness` | `string` | `\"realtime\"` (last 1 hour), `\"day\"` (24h), `\"week\"` (168h), or `\"any\"` (no freshness filter) |\n| `category` | `string` | Content category filter |\n| `includeDomains` | `string[]` | Only include these domains |\n| `excludeDomains` | `string[]` | Exclude these domains |\n| `similarUrl` | `string` | Find pages similar to a URL |\n\n#### Examples\n\n```ts\n// Basic search\nweb_search({ query: \"vitest snapshot testing\" })\n\n// Get more detail before fetching\nweb_search({ query: \"rust async runtime comparison\", detail: \"highlights\" })\n\n// Restrict results to specific sites\nweb_search({ query: \"useEffect cleanup\", includeDomains: [\"react.dev\", \"github.com\"] })\n\n// Batch search\nweb_search({ queries: [\"vitest mocking\", \"vitest coverage\", \"vitest browser mode\"] })\n\n// Find related pages\nweb_search({ similarUrl: \"https://vitest.dev/guide/\" })\n```\n\n#### Smart search behavior\n\nThe tool automatically improves certain queries before sending them to Exa:\n\n- stack traces and error messages switch to keyword search\n- short vague coding queries may expand to include `docs example`\n- duplicate URLs are removed\n- snippet noise like breadcrumbs and tracking params is cleaned up\n\n### `fetch_content`\n\nFetch a page, GitHub repo/file, or PDF and return readable content.\n\nUse it when you already know **which source you want to inspect**.\n\n#### Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `url` | `string` | Single URL to fetch |\n| `urls` | `string[]` | Multiple URLs to fetch |\n| `prompt` | `string` | Ask a question about the content instead of returning the whole page |\n| `forceClone` | `boolean` | Force clone for large GitHub repos |\n| `noCache` | `boolean` | Skip research cache and fetch fresh (still updates cache) |\n\n#### Best practice for Pi beginners\n\nPrefer `prompt` whenever you can.\n\n```ts\nfetch_content({\n  url: \"https://vitest.dev/guide/\",\n  prompt: \"How do I run only one test file?\"\n})\n```\n\nThat returns a focused answer instead of dumping a large page into context.\n\n#### Raw fetch behavior\n\nWithout `prompt`, content is written to a temp file and the tool returns:\n\n- a short preview\n- the temp file path\n- the total content size\n\nThis keeps Pi's context smaller while preserving access to the full content.\n\n#### GitHub support\n\nGitHub URLs are detected automatically.\n\n```ts\n// Repo tree + README summary\nfetch_content({ url: \"https://github.com/facebook/react\" })\n\n// Specific file\nfetch_content({ url: \"https://github.com/facebook/react/blob/main/packages/react/src/React.js\" })\n```\n\nThe tool tries `gh repo clone` first, then falls back to `git clone`.\n\n#### PDF support\n\n```ts\nfetch_content({ url: \"https://arxiv.org/pdf/2312.00752\" })\n```\n\nPDF text is extracted with [`unpdf`](https://github.com/unjs/unpdf) (a serverless build of Mozilla `pdf.js`). Corrupt, encrypted, empty, or oversized PDFs return a clear error.\n\n### `code_search`\n\nSearch for working code examples from docs, GitHub repositories, and Stack Overflow.\n\nUse it when you want **code patterns**, not general web pages.\n\n#### Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `query` | `string` | Describe what code you want |\n| `tokensNum` | `number` | Response size in tokens |\n\n#### Examples\n\n```ts\ncode_search({ query: \"vitest mock fetch with MSW\" })\ncode_search({ query: \"React Server Components with Next.js app router\", tokensNum: 5000 })\n```\n\n### `get_search_content`\n\nRetrieve stored content from an earlier `web_search`, `fetch_content`, or `code_search` call.\n\nThis is useful when you want to revisit a result without repeating the network request.\n\n#### Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `responseId` | `string` | ID returned by an earlier tool call |\n| `query` | `string` | Retrieve a `web_search` result by query |\n| `queryIndex` | `number` | Retrieve a `web_search` result by position |\n| `url` | `string` | Retrieve a `fetch_content` result by URL |\n| `urlIndex` | `number` | Retrieve a `fetch_content` result by position |\n| `maxChars` | `number` | Maximum response size, default `30000`, max `100000` |\n\n#### Examples\n\n```ts\nget_search_content({ responseId: \"abc123\", queryIndex: 0 })\nget_search_content({ responseId: \"xyz789\", url: \"https://vitest.dev/api/\" })\n```\n\n## Configuration\n\nThe package reads config from `~/.pi/web-tools.json` and hot-reloads it every 30 seconds.\n\nTo choose the model used by `fetch_content({ prompt })`, add `filterModel` to that file using `provider/model-id` format:\n\n```json\n{\n  \"filterModel\": \"openai-codex/gpt-5.4-mini\"\n}\n```\n\nYou can point pi-web-tools at another config file with `PI_WEB_TOOLS_CONFIG=/path/to/web-tools.json`. If `filterModel` is omitted or malformed, pi-web-tools treats it as unset and uses auto-detection.\n\n### Full config example\n\n```json\n{\n  \"exaApiKey\": \"your-exa-key\",\n  \"filterModel\": \"openai-codex/gpt-5.4-mini\",\n  \"cacheTTLMinutes\": 1440,\n  \"github\": {\n    \"maxRepoSizeMB\": 350,\n    \"cloneTimeoutSeconds\": 30,\n    \"clonePath\": \"/tmp/pi-github-repos\"\n  },\n  \"tools\": {\n    \"web_search\": true,\n    \"code_search\": true,\n    \"fetch_content\": true,\n    \"get_search_content\": true\n  }\n}\n```\n\n### Config options\n\n| Setting | Description |\n|---------|-------------|\n| `exaApiKey` | Exa API key used by `web_search` and `code_search` |\n| `filterModel` | Summarization/filter model used by `fetch_content({ prompt })`, in `provider/model-id` format |\n| `github.maxRepoSizeMB` | Max GitHub repo size before refusing or requiring force clone |\n| `github.cloneTimeoutSeconds` | Clone timeout |\n| `github.clonePath` | Cache directory for cloned repos |\n| `tools.*` | Enable or disable individual tools |\n| `cacheTTLMinutes` | TTL in minutes for the persistent research cache (default: `1440` = 24h) |\n\nOmit `filterModel` to let pi-web-tools auto-detect an available cheap filter model from its built-in candidate list. The config field is intentionally named `filterModel`; there is no separate `summarizationModel` setting.\n\nTo use a different config path:\n\n```bash\nexport PI_WEB_TOOLS_CONFIG=\"$HOME/.pi/web-tools.json\"\n```\n\n## How this package protects context\n\nThis package is opinionated about token efficiency.\n\n### 1. Summary-first search\n\n`web_search` returns short summaries by default so the main model only sees enough to choose a source.\n\n### 2. Question-guided fetching\n\n`fetch_content({ prompt })` lets a cheaper model read the full page and return only the answer to your question.\n\n### 3. File-first raw content\n\nRaw fetched content is offloaded to a temp file instead of being pasted inline.\n\n### 4. Stored results\n\nSearch and fetch results stay available for the session through `get_search_content`.\n\n## Network resilience\n\nAll Exa API requests use retry logic for transient failures.\n\n- retries: max 2\n- backoff: `1s -> 2s`\n- retried: `429`, `500`, `502`, `503`, `504`, and network errors\n- not retried: `400`, `401`, `403`, `404`, and abort signals\n\nThe package also:\n\n- deduplicates repeated URL fetches within a session\n- runs multi-URL fetches with `p-limit(3)`\n- runs batch web searches with `p-limit(3)`\n\n## Development\n\nClone the repo:\n\n```bash\ngit clone git@github.com:coctostan/pi-web-tools.git\ncd pi-web-tools\nnpm install\n```\n\nRun tests:\n\n```bash\nnpm test\n```\n\nWatch tests while developing:\n\n```bash\nnpm run test:watch\n```\n\nLoad the extension in Pi for manual testing:\n\n```bash\npi -e ./index.ts\n```\n\n### Refresh the vendored pi snapshot\n\nThe repo vendors a minimal `node_modules/` snapshot under `.pi/npm/` so that\n`pi -e ./index.ts` runs against a pinned coding-agent build. To refresh it\nafter a pi release:\n\n    rm -rf .pi/npm/node_modules .pi/npm/package-lock.json\n    (cd .pi/npm && npm install)\n    npx tsx scripts/smoke-load-extension.mjs\n\nCommit the resulting `.pi/npm/package.json`, `.pi/npm/package-lock.json`, and\n`.pi/npm/node_modules/` tree.\n\nTests use mocked network calls, so they do not require an Exa API key.\n\n## Troubleshooting\n\n### `web_search` or `code_search` fails immediately\n\nUsually this means your Exa API key is missing or invalid.\n\nCheck:\n\n```bash\necho \"$EXA_API_KEY\"\n```\n\nOr verify `~/.pi/web-tools.json` contains:\n\n```json\n{\n  \"exaApiKey\": \"your-key-here\"\n}\n```\n\n### `fetch_content` returned a file path instead of an answer\n\nThat is expected when you do **not** provide `prompt`, or when no cheap filter model is available.\n\nUse:\n\n```ts\nfetch_content({\n  url: \"https://example.com\",\n  prompt: \"What does this page say about X?\"\n})\n```\n\n### I got too much text back\n\nTry this order:\n\n1. use `web_search` first\n2. use `fetch_content({ prompt })` instead of raw fetch\n3. only read the saved temp file if you need the original page\n\n### GitHub fetches are slow or fail on large repos\n\nTry:\n\n```ts\nfetch_content({\n  url: \"https://github.com/owner/repo\",\n  forceClone: true\n})\n```\n\nAlso make sure `gh` or `git` is available on your machine.\n\n## Maintainer release checklist\n\nThe repo is currently at package version `2.0.0`. If npm still shows an older version, use this checklist before publishing:\n\n```bash\nnpm test\nnpm pack --dry-run\nnpm publish --access public\n```\n\nBefore publishing, confirm:\n\n- `package.json` version is correct\n- repository, homepage, and bugs URLs point to the live repo\n- `README.md` reflects the current feature set\n- the dry-run tarball only contains the intended files\n\nCurrent package metadata points to this repo:\n\n- Repository: `https://github.com/coctostan/pi-web-tools`\n- Issues: `https://github.com/coctostan/pi-web-tools/issues`\n- README/Homepage: `https://github.com/coctostan/pi-web-tools#readme`\n\n## Project structure\n\n```text\nindex.ts           Pi extension entry point and tool registration\nexa-search.ts      Exa web search integration\nexa-context.ts     Exa code/context search integration\nextract.ts         HTML/PDF content extraction\ngithub-extract.ts  GitHub repo and file handling\nfilter.ts          Cheap-model filtering for focused answers\nresearch-cache.ts  Persistent TTL-based research cache\nstorage.ts         Session result storage\nconfig.ts          Config loading and hot reload\ntool-params.ts     Tool input normalization and validation\nretry.ts           Retry and backoff helpers\noffload.ts         Temp-file offload for raw content\nsmart-search.ts    Query enhancement and deduplication\ntruncation.ts      Response truncation helpers\nconstants.ts       Shared constants (timeouts, TTLs)\n```\n\n## Changelog\n\n## 4.1.0\n\n- **pi-native cancellation**: tool executors now forward the per-call `signal` directly to Exa/extract/filter calls; the manual `pendingFetches` Map and `abortAllPending` helper are gone (~30 lines removed per tool).\n- **Smarter `session_start` lifecycle**: branch on `event.reason` \u2014 `reload` preserves the URL cache and temp files, `new` starts clean, `fork` restores from `event.previousSessionFile` via the new `restoreFromSessionFile` helper.\n- **`prepareArguments` adoption**: all four tools (`web_search`, `fetch_content`, `code_search`, `get_search_content`) wire their `normalize*Input` functions into pi's `ToolDefinition.prepareArguments` hook. `numResults` is now a bounded integer in the visible schema.\n- **Compaction-safe result store**: `get_search_content` no longer fails after `/compact`. The session result store is mirrored to `~/.pi/cache/web-tools/results-<sessionId>.json` and rehydrated on `session_start`. Files older than 24h are pruned automatically.\n\n### 4.0.0\n\n- **Breaking:** requires pi `0.74.0+` and the `@earendil-works/*` npm scope. Users on older pi must stay on `pi-web-tools@3.x`.\n- migrated to `ModelRegistry.getApiKeyAndHeaders` and threads custom auth headers (Anthropic OAuth, Cloudflare AI Gateway, Xiaomi) through to the filter model\n- migrated session lifecycle to the consolidated `session_start{reason}` event; `reload` no longer wipes the URL cache or temp files\n- refreshed vendored `.pi/npm` extension snapshot to `@earendil-works/pi-coding-agent@^0.74.0`\n### 3.0.0\n\n- `fetch_content` gained persistent research cache \u2014 repeated prompt+URL lookups return instant cached answers\n- `fetch_content` gained `noCache` param to bypass cache\n- `cacheTTLMinutes` config option (default 24h)\n- `details.ptcValue` on all 4 tools for PTC interop\n- multi-URL+prompt ptcValue shape cleaned up\n\n### 2.0.0\n- `fetch_content` gained `prompt` for focused question answering\n- `web_search` now returns summary-first results by default\n- raw fetches are always offloaded to temp files\n- `web_search` gained `freshness`, `similarUrl`, and `detail`\n- smart query enhancement and result deduplication were added\n- retry logic, URL caching, and parallel batch processing were improved\n\n### 1.2.0\n\n- PDF extraction in `fetch_content`\n- `get_search_content.maxChars`\n- dynamic file offloading for large content\n\n### 1.1.0\n\n- initial release of `web_search`, `code_search`, `fetch_content`, and `get_search_content`\n\n## License\n\nThis project is licensed under the MIT License. See [LICENSE](LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "web-search",
+    "exa",
+    "fetch",
+    "github"
+  ],
+  "author": {
+    "name": "coctostan"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/coctostan/pi-web-tools#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coctostan/pi-web-tools.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-10T22:34:17.741Z",
+    "modified": "2026-05-16T21:32:47.132Z",
+    "1.0.0": "2026-02-10T22:34:18.040Z",
+    "1.1.0": "2026-02-17T01:10:47.431Z",
+    "2.0.0": "2026-03-16T02:24:34.433Z",
+    "3.0.0": "2026-03-25T15:15:09.961Z",
+    "4.0.0": "2026-05-13T21:26:49.042Z",
+    "4.1.1": "2026-05-16T21:32:47.026Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 22,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 79
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 114
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 119
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 27
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 124
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 20
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 28
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 213
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 46
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 37
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 3
+    }
+  ]
+}

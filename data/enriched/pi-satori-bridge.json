@@ -1,0 +1,34 @@
+{
+  "name": "pi-satori-bridge",
+  "latest_version": "0.2.0",
+  "description": "Pi extension package that proxies Satori MCP tools through satori-cli",
+  "readme": "# pi-satori-bridge\n\n`pi-satori-bridge` connects a PI agent to Satori by exposing Satori's MCP tools inside PI and proxying every call through `satori-cli`.\n\nRepository: https://github.com/ham-zax/satori\n\n## How this helps PI agents\n\nWithout this extension, PI does not have Satori tools registered in its tool surface.\n\nWith this extension:\n\n1. PI sees Satori tools as native extension tools.\n2. The extension forwards tool calls to `satori-cli`.\n3. `satori-cli` talks to Satori MCP and returns deterministic tool responses.\n\nConnection flow:\n\n```text\nPI Agent -> pi-satori-bridge -> satori-cli -> Satori MCP\n```\n\n## Exposed tools\n\n- `list_codebases`\n- `manage_index`\n- `search_codebase`\n- `call_graph`\n- `file_outline`\n- `read_file`\n\nForwarding command shape:\n\n```bash\nsatori-cli tool call <toolName> --args-json '<json>'\n```\n\n## Install and run\n\nInstall from npm:\n\n```bash\npi install npm:pi-satori-bridge\n```\n\nLoad local extension directly:\n\n```bash\npi --no-extensions -e /absolute/path/to/satori-bridge\n```\n\nHealth check inside PI:\n\n```text\n/satori-mcp\n```\n\nThis runs `satori-cli tools list` and confirms connectivity/reflection.\n\nDetailed diagnostics (resolved config/env/transport + quick health check):\n\n```text\n/satori-mcp-doctor\n```\n\n## Config resolution order\n\nThe bridge resolves config in this order:\n\n1. `SATORI_CLI_CONFIG` (explicit config path)\n2. `<cwd>/.pi/satori-bridge.json` (project local)\n3. `~/.pi/agent/satori-bridge.json` (global legacy shortcut)\n4. `~/.pi/agent/extensions/satori-bridge/config.json` (global extension path)\n\nIf `SATORI_CLI_CONFIG` is set to a missing file, the bridge now fails fast with a direct error that names the missing path.\n\n## CLI resolution order\n\nAfter config is loaded, the bridge resolves how to invoke `satori-cli` in this order:\n\n1. Explicit command (`SATORI_CLI_COMMAND` or config `command`)\n2. Local CLI path (`SATORI_CLI_LOCAL_PATH` / config `cliPath` / `localPath`, default `packages/mcp/dist/cli/index.js`)\n3. npm fallback (`npx -y --package <npmPackage> satori-cli`)\n\nStart from `config.example.json`:\n\n```json\n{\n  \"envFile\": \".env.satori\",\n  \"guardRecovery\": \"auto\",\n  \"forceNpx\": false,\n  \"npmPackage\": \"@zokizuan/satori-mcp@latest\",\n  \"startupTimeoutMs\": 180000,\n  \"callTimeoutMs\": 600000,\n  \"debug\": false\n}\n```\n\nFor source-checkout development, point to a local CLI command:\n\n```json\n{\n  \"command\": \"pnpm\",\n  \"args\": [\n    \"-C\",\n    \"/absolute/path/to/satori/packages/mcp\",\n    \"exec\",\n    \"tsx\",\n    \"src/cli/index.ts\"\n  ],\n  \"envFile\": \".env.satori\"\n}\n```\n\n## Runtime behavior\n\n- `path` tool arguments are absolute paths.\n- If a model prepends `@` to path-like arguments, the bridge strips the leading `@` before forwarding.\n- `file_outline.file` is repo-relative to the indexed codebase root.\n- Missing `envFile` is non-fatal (bridge warns and continues).\n- Bridge error messages include actionable hints (missing config path, command-not-found, likely missing env vars, stdout JSON guard hint), and redact likely secrets in diagnostics.\n- Auto-recovery retries once (guard-off) only for protocol/transport failures.\n- Valid tool-level non-ok responses (for example `not_ready` or `blocked`) are passed through, not retried.\n- If `manage_index` returns `status=\\\"blocked\\\"` with `reason=\\\"unnecessary_reindex_ignore_only\\\"`, use `manage_index {\\\"action\\\":\\\"sync\\\",\\\"path\\\":\\\"...\\\"}`. Override only when explicitly intended via `allowUnnecessaryReindex=true`.\n- Default timeouts are `startupTimeoutMs=180000` and `callTimeoutMs=600000`; `/satori-mcp` health check clamps both to `15000`.\n- For reproducible behavior across teams, pin `npmPackage` to a specific `@zokizuan/satori-mcp@<version>` instead of `@latest`.\n\n## Optional env vars\n\n- `SATORI_CLI_COMMAND`\n- `SATORI_CLI_ARGS_JSON`\n- `SATORI_CLI_CWD`\n- `SATORI_CLI_LOCAL_PATH`\n- `SATORI_CLI_FORCE_NPX`\n- `SATORI_CLI_NPM_PACKAGE`\n- `SATORI_CLI_STARTUP_TIMEOUT_MS`\n- `SATORI_CLI_CALL_TIMEOUT_MS`\n- `SATORI_CLI_DEBUG`\n- `SATORI_CLI_STDOUT_GUARD` (`drop` default, `redirect`, `off`)\n- `SATORI_CLI_GUARD_RECOVERY` (`auto` default, `never`)\n- `SATORI_CLI_CONFIG`\n\nSatori runtime variables (embedding/vector/API keys) can be set via shell env or `envFile`.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "satori",
+    "mcp",
+    "semantic-search"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-02-28T13:36:09.752Z",
+    "modified": "2026-02-28T15:25:51.325Z",
+    "0.1.0": "2026-02-28T13:36:10.057Z",
+    "0.2.0": "2026-02-28T15:25:51.213Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,34 @@
+{
+  "name": "pi-scheduler",
+  "latest_version": "0.3.2",
+  "description": "Simple scheduled loop/reminder extension for pi",
+  "readme": "# pi-scheduler\n\nSimple scheduler extension for [pi](https://www.npmjs.com/package/@mariozechner/pi-coding-agent).\n\nUse it to run recurring checks (`/loop`) and one-time reminders (`/remind`) while you work in an active pi session.\n\nIt also exposes an LLM-callable tool (`schedule_prompt`), so the agent can create/list/delete schedules directly when you ask in natural language.\n\n## Install\n\n```bash\npi install npm:pi-scheduler\n```\n\nThen restart pi or run:\n\n```text\n/reload\n```\n\n## Agent tool (`schedule_prompt`)\n\nThe agent can call this tool with actions:\n\n- `add` (supports `kind: recurring|once`, `prompt`, and either `duration` or `cron` for recurring)\n- `list` (includes state/run stats)\n- `enable` (`id`)\n- `disable` (`id`)\n- `delete` (`id`)\n- `clear`\n\nRecurring schedules can be interval-based (`duration`, e.g. `5m`) or cron-based (`cron`, e.g. `*/5 * * * *`).\n\n## Commands\n\n### `/loop`\nCreate a recurring scheduled prompt.\n\nExamples:\n\n```text\n/loop 5m check if CI is green\n/loop check deployment every 2h\n/loop cron */5 * * * * check build status\n/loop check build status\n```\n\nIf no interval is provided, default is every **10 minutes**.\n\n### `/remind`\nCreate a one-time reminder.\n\nExamples:\n\n```text\n/remind in 45m check integration tests\n/remind 2h follow up on release PR\n```\n\n### `/schedule`\nManage scheduled tasks.\n\n```text\n/schedule\n```\n\nWith no args, this opens an interactive TUI manager where you can:\n- select a task\n- change schedule/delay (interval or cron for recurring tasks)\n- run it now\n- delete it\n\nCLI subcommands also work:\n\n```text\n/schedule list\n/schedule enable <id>\n/schedule disable <id>\n/schedule delete <id>\n/schedule clear\n```\n\n### `/unschedule`\nAlias for deleting one task.\n\n```text\n/unschedule <id>\n```\n\n## Scheduling formats\n\n### Duration format\n\nAccepted units:\n\n- Short: `s`, `m`, `h`, `d` (e.g. `30s`, `5m`, `2h`, `1d`)\n- Word forms: `seconds`, `minutes`, `hours`, `days` (and common variants like `mins`, `hrs`)\n\nInterval scheduling uses minute granularity, so durations are rounded up to the nearest minute.\n\n### Cron format\n\nRecurring tasks also support cron expressions.\n\n- 5-field: `minute hour day-of-month month day-of-week` (Claude-style)\n- 6-field: `second minute hour day-of-month month day-of-week`\n\nExamples:\n\n- `*/5 * * * *` \u2192 every 5 minutes (normalized internally to `0 */5 * * * *`)\n- `0 0 9 * * 1-5` \u2192 weekdays at 9:00\n\n## Behavior\n\n- Tasks are checked every second.\n- Tasks are persisted to `.pi/scheduler.json` and reloaded on next session start.\n- Tasks run only when pi is idle (between turns).\n- If a task becomes due while busy, it runs once when pi is idle.\n- One-time tasks remove themselves after running.\n- Recurring tasks auto-expire after 3 days.\n- Tasks can be enabled/disabled without deleting.\n- List views include run stats (`runCount`, last run, last status).\n- Max 50 active tasks.\n\n## Limitations\n\n- Session-scoped execution only (tasks fire while pi is running).\n- No wall-clock parsing (`at 3pm`) yet.\n\n## Troubleshooting\n\n### Commands not available\n- Run `/reload`\n- Check install with `pi list`\n- Ensure package is enabled in pi settings\n\n### Tasks never fire\n- Keep pi running (tasks are not background jobs)\n- Tasks only fire when pi is idle\n- Check pending tasks with `/schedule list`\n- Ensure task is enabled (`/schedule enable <id>`)\n\n## Development\n\n```bash\nnpm run typecheck\nnpm test\nnpm run check\n```\n\n## Project structure\n\n- `index.ts` \u2014 thin package entrypoint\n- `src/index.ts` \u2014 extension wiring\n- `src/runtime.ts` \u2014 scheduler state/runtime + task manager UI flow\n- `src/commands.ts` \u2014 slash commands (`/loop`, `/remind`, `/schedule`, `/unschedule`)\n- `src/tools.ts` \u2014 `schedule_prompt` tool\n- `src/events.ts` \u2014 session lifecycle event handlers\n- `src/scheduling.ts` \u2014 parsing/validation helpers (duration + cron)\n- `src/types.ts` / `src/constants.ts` \u2014 shared types/constants\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "scheduler",
+    "loop",
+    "cron"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/manojlds/pi-scheduler#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/manojlds/pi-scheduler.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-07T13:54:34.615Z",
+    "modified": "2026-03-09T09:27:11.021Z",
+    "0.1.0": "2026-03-07T13:54:34.737Z",
+    "0.3.2": "2026-03-09T09:27:10.730Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

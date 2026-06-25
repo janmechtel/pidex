@@ -1,0 +1,341 @@
+{
+  "name": "pi-fxxk",
+  "latest_version": "0.3.1",
+  "description": "Pi extension that turns /fxxk into a two-stage handoff command.",
+  "readme": "# pi-fxxk\n\n<p align=\"center\">\n  <img src=\"./showcase.png\" alt=\"pi-fxxk showcase\" width=\"960\" />\n</p>\n\n[![npm version](https://img.shields.io/npm/v/pi-fxxk)](https://www.npmjs.com/package/pi-fxxk)\n[![npm downloads](https://img.shields.io/npm/dm/pi-fxxk)](https://www.npmjs.com/package/pi-fxxk)\n\n`pi-fxxk` is a Pi extension that turns `fxxk` into a two-stage handoff command.\n\n## Why this exists\n\nBecause this annoying handoff keeps happening:\n\n- Your task runs long, the context blows up, the model gets noticeably dumber, and now you have to open a fresh session and manually `@` files again just to explain where the work should continue.\n- A long task finishes a chunk, and then you still have to ask the model to write a little `compact` summary of what it already did, what is still pending, and where the next session should pick things up.\n- You already did the brainstorm, the planning, the workflow ceremony, maybe even used Superpowers or compound-engineering, the todos are still sitting right there unfinished, and the model still goes: \"Yes, I can continue. Anything else do you want me to do?\" Come on. Just continue.\n\n`pi-fxxk` exists to kill that handoff friction. Instead of re-explaining the situation like a human glue script, you generate the handoff while the current session still has the best context, then resume from that exact prompt in the next session.\n\n## What it does\n\n`pi-fxxk` now uses a two-stage workflow:\n\n1. run `/fxxk` in the source session to generate a copyable handoff prompt from the current session\n2. run `/new` manually\n3. run `/fxxk` in the new session to consume that exact staged prompt\n\nYou can also provide an explicit goal when generating the staged prompt:\n\n```text\n/fxxk finish the next test slice and run verification\n```\n\nIn the source session, `/fxxk`:\n- reads the current session's visible context\n- reuses an already explicit handoff prompt when one is present in transcript history\n- otherwise composes a fresh handoff prompt\n- extracts more than just the next action: it tries to preserve completed work, remaining work, key files, verification state, constraints, and completion criteria when that evidence exists\n- lets you review or copy it\n- stages it as a single-use prompt for the next session\n\nIn the next session, `/fxxk`:\n- looks for the staged prompt linked from the source session\n- only consumes it when the new session is running in the exact same working directory as the source session\n- sends that exact prompt as the next user message\n- clears it after successful use\n\nIf no staged prompt exists, `/fxxk` warns that the previous session did not generate a `/fxxk` prompt and sends nothing.\n\n## Inspired by\n\nInspired by [`thefuck`](https://github.com/nvbn/thefuck). Thanks to that project for the naming joke and the original spark behind turning `fxxk` into a fast recovery and continuation gesture.\n\n## Prompt file\n\nThe handoff system prompt lives in a separate file so it can be iterated independently:\n\n- `handoff-system-prompt.md`\n\n## Installation\n\nInstall from npm:\n\n```bash\npi install npm:pi-fxxk\n```\n\nOr from git:\n\n```bash\npi install git:github.com/vurihuang/pi-fxxk\n```\n\nRestart Pi after installation so the extension is loaded.\n\n### Load it for a single run\n\n```bash\npi -e npm:pi-fxxk\n```\n\n### Install from a local path\n\n```bash\npi install /absolute/path/to/pi-fxxk\n```\n\nYou can also install from the current directory while developing:\n\n```bash\npi install -l .\n```\n\n### Load from a local path for one session\n\n```bash\npi -e /absolute/path/to/pi-fxxk\n```\n\n## Verify installation\n\nAfter restarting Pi, open any session and run:\n\n```text\n/fxxk\n```\n\nIf the command is available and the extension stages or consumes a handoff prompt as expected, the installation is working.\n\n## Usage\n\n### 1. Generate the staged handoff prompt in the source session\n\nRun:\n\n```text\n/fxxk\n```\n\nIf you want to steer the handoff goal, pass it inline:\n\n```text\n/fxxk continue with a planning pass before implementation\n```\n\nThis generates a handoff prompt from the current session, opens it for review or copy, and stages it for the next session.\n\nThe target shape is closer to a continuation execution contract than a tiny recap: one clear next action, then only the progress, remaining work, files, checks, and constraints that materially help the next session continue without guessing.\n\n### 2. Open the next session manually\n\nRun:\n\n```text\n/new\n```\n\n### 3. Consume the staged prompt in the new session\n\nRun:\n\n```text\n/fxxk\n```\n\nThe slash command and the plain-text trigger behave the same way.\n\n### Example flow\n\n#### 1. Stage the next-session prompt from the current session\n\nPrevious session is still open and has the best context. Run:\n\n```text\n/fxxk\n```\n\nTypical result:\n\n- the extension reads the current session\n- it generates or reuses the best handoff prompt available\n- it opens that prompt for review or copy\n- it stages the prompt as a single-use handoff for the next session\n\n#### 2. Stage a verification-focused handoff\n\nIf the next session should focus on verification, run:\n\n```text\n/fxxk run the required checks, fix failures, then finish the task\n```\n\nThis biases the staged handoff prompt toward type-checking, linting, tests, and remaining fixes.\n\n#### 3. Resume from the staged prompt in the next session\n\nAfter `/new`, run:\n\n```text\n/fxxk\n```\n\nTypical result:\n\n- the extension finds the staged prompt linked from the source session\n- it only consumes it when the source session cwd exactly matches the current session cwd\n- it sends that exact prompt into the new session\n- it clears the staged prompt so it cannot be reused accidentally\n\n#### 4. Cache miss behavior\n\nIf the source session never generated a staged prompt, `/fxxk` in the child session:\n\n- warns that no staged `/fxxk` prompt was found\n- sends nothing\n\n## Notes\n\n- The slash command is `/fxxk`\n- Plain `fxxk` input is also intercepted and handled\n- `/fxxk` is session-aware: it stages in the source session, consumes in the child session only when both sessions use the exact same cwd, and warns on cache miss instead of falling back\n- Staged prompts are single-use and are cleared after successful consumption\n- If you run `/fxxk` multiple times in the source session, only the latest staged prompt remains active\n- `/fxxk` still prefers explicit workflow artifacts and compact recent evidence over summarizing an entire prior session when it has to synthesize a new prompt\n- when a recent assistant report already contains handoff structure like completed work, remaining tasks, verification, or execution constraints, `/fxxk` now tries to preserve those layers instead of collapsing everything into a one-line next step\n- If the session history already contains an explicit copy-paste handoff prompt, `/fxxk` reuses it directly\n- Workflow markdown is only treated as the source of truth when the preserved session evidence is thin or explicitly points back to that artifact\n- `/fxxk` now biases generation toward a richer continuation contract instead of a minimal next-step prompt\n- model-generated handoffs and deterministic fallback both try to follow the natural response language and structure implied by the preserved user context and evidence\n\n## Install as a pi package\n\nThis project is already structured as a pi package via the `pi` field in `package.json`:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./fxxk.js\"]\n  }\n}\n```\n\nThat means Pi can install it from a local path, npm, or git using the standard pi package flow.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./fxxk.js"
+    ]
+  },
+  "time": {
+    "created": "2026-04-21T08:18:09.554Z",
+    "modified": "2026-04-23T05:33:25.920Z",
+    "0.2.1": "2026-04-21T08:18:09.729Z",
+    "0.3.0": "2026-04-22T12:18:44.827Z",
+    "0.3.1": "2026-04-23T05:33:25.815Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 9,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 100
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 277
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "name": "pi-mono-context-guard",
+  "latest_version": "1.7.4",
+  "description": "Pi extension that guards context window growth by auto-limiting read and rg output",
+  "readme": "# context-guard extension\n\nKeeps pi sessions lean by preventing common context-window waste during tool use.\n\n## What it does\n\nThis extension intercepts tool calls and applies three safeguards:\n\n1. **Auto-limit `read` calls**  \n   If the model calls `read` without a `limit`, `context-guard` injects a default limit of `120` lines and shows a notification. The model can continue with `offset` to paginate.\n\n2. **Deduplicate unchanged `read` calls**  \n   If the same file is read again with the same `offset` and `limit`, and the file has not changed on disk, the extension blocks the duplicate read and returns a short stub instead of sending the file content again.\n\n3. **Bound raw `rg` output in `bash`**  \n   If a `bash` command uses `rg` without an output-bounding operator such as `head`, `tail`, or `wc`, the extension appends `| head -60` automatically.\n\n## Why it helps\n\nThese guards reduce unnecessary token usage and make it harder for long sessions to burn context on repeated or unbounded file output.\n\n## Current defaults\n\n- `read` auto-limit: `120`\n- `rg` head limit: `60`\n- read guard: enabled\n- read dedup guard: enabled\n- raw `rg` guard: enabled\n\n## Read dedup behavior\n\nThe dedup cache is scoped to the current session.\n\nA cached `read` entry is only reused when all of the following are true:\n\n- the same file path is requested\n- the same `offset` is requested\n- the same `limit` is requested\n- the file's modification time has not changed\n\nWhen a file changes, the cache entry is invalidated. The extension also listens for the `context-guard:file-modified` event so companion extensions such as `multi-edit` can evict stale cache entries immediately after writes.\n\n## Example behaviors\n\n### `read` without a limit\n\nInput:\n\n```json\n{ \"path\": \"src/index.ts\" }\n```\n\nEffective call:\n\n```json\n{ \"path\": \"src/index.ts\", \"limit\": 120 }\n```\n\n### Duplicate `read` of an unchanged file\n\nInstead of re-sending the file contents, the extension returns a short message telling the agent to reuse the earlier `read` result.\n\n### Raw `rg` inside `bash`\n\nInput:\n\n```bash\nrg \"TODO\" src\n```\n\nEffective command:\n\n```bash\nrg \"TODO\" src | head -60\n```\n\n## Files\n\n- `index.ts` \u2014 extension entry point\n- `package.json` \u2014 package metadata\n- `CHANGELOG.md` \u2014 release history\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/emanuelcasco/pi-mono-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emanuelcasco/pi-mono-extensions.git",
+    "directory": "extensions/context-guard"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-04T10:49:42.478Z",
+    "modified": "2026-06-04T13:07:32.583Z",
+    "1.1.0": "2026-04-04T10:49:42.715Z",
+    "1.1.1": "2026-04-04T12:11:20.557Z",
+    "1.3.0": "2026-04-04T17:05:11.325Z",
+    "1.4.0": "2026-04-07T08:46:47.867Z",
+    "1.5.0": "2026-04-12T09:38:35.581Z",
+    "1.5.1": "2026-04-12T15:21:33.004Z",
+    "1.6.0": "2026-04-12T21:14:47.502Z",
+    "1.7.0": "2026-04-16T22:28:44.423Z",
+    "1.7.2": "2026-04-23T12:45:23.057Z",
+    "1.7.3": "2026-05-08T22:43:21.724Z",
+    "1.7.4": "2026-06-04T13:07:32.478Z"
+  },
+  "versions_count": 11,
+  "downloads_last_week": null,
+  "download_trend": []
+}

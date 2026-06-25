@@ -1,0 +1,51 @@
+{
+  "name": "@ramarivera/pi-ts-aperture-provider",
+  "latest_version": "0.2.12",
+  "description": "Config-driven aperture provider extraction for Pi-compatible extensions.",
+  "readme": "# `@ramarivera/pi-ts-aperture-provider`\n\nShared Aperture provider runtime for Pi, published as both:\n\n- a reusable TypeScript runtime library\n- a Pi package with a bundled extension entrypoint in `extensions/index.ts`\n\n## What lives here\n\n- OpenAI-compatible `/models` gateway fetching\n- models.dev catalog indexing and metadata enrichment\n- provider-metadata-driven API resolution for Pi-style provider registrations\n- config-driven overrides for provider aliases and individual models\n- a packaged Pi extension that registers the provider directly inside Pi\n\n## What does not live here\n\n- hardcoded Aperture base URLs\n- hardcoded provider names\n- freeform heuristic capability inference from arbitrary model IDs\n\n## Quick start\n\n```bash\ncorepack yarn install\ncorepack yarn test\ncorepack yarn build\n```\n\n## Install as a Pi package\n\nThis package is now Pi-installable.\n\n### Super simple setup\n\n```bash\npi install npm:@ramarivera/pi-ts-aperture-provider@0.2.11\n```\n\nThat is enough for Pi to load the extension. Pi discovers the packaged extension from `package.json -> pi.extensions` and loads `extensions/index.ts` automatically. If you do not provide your own config yet, the extension falls back to the bundled [`aperture-provider.config.example.json`](./aperture-provider.config.example.json) as a bootstrap default; most installs should still copy and customize that file.\n\nIf you prefer to do it manually instead of `pi install`, add this to `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\n    \"npm:@ramarivera/pi-ts-aperture-provider@0.2.11\n  ]\n}\n```\n\n## Configuration\n\nCopy [`aperture-provider.config.example.json`](./aperture-provider.config.example.json) to one of these locations:\n\n1. `PI_APERTURE_PROVIDER_CONFIG=/absolute/path/to/file.json`\n2. `<project>/.pi/aperture-provider.config.json`\n3. `~/.pi/agent/aperture-provider.config.json`\n4. package-local `aperture-provider.config.json` next to the installed package (mainly useful for local development)\n5. bundled package fallback `aperture-provider.config.example.json` next to the installed package (used automatically when no higher-priority config exists)\n\nExample:\n\n```bash\nmkdir -p ~/.pi/agent\ncp aperture-provider.config.example.json ~/.pi/agent/aperture-provider.config.json\n```\n\nAdjust at least:\n\n- `providerName`\n- `baseUrl`\n- `apiKey`\n- `modelsDev.providerAliases`\n- `resolution.apiRules`\n- `fallbackMetadata`\n- `modelOverrides`\n\nFor Aperture, `baseUrl` should be the primary gateway root the extension uses everywhere. In Ramiro's current setup that is:\n\n```json\n{\n  \"baseUrl\": \"https://aperture-ai.xalda-procyon.ts.net/v1\"\n}\n```\n\n## Runtime behavior\n\nThis runtime resolves capabilities from multiple layers, in order:\n\n- API type from Aperture provider metadata such as `/v1/messages`, `/v1/responses`, or `/v1/chat/completions`\n- provider compatibility from `/aperture/config` when available\n- pricing from the Aperture `/models` payload when present\n- explicit `modelOverrides`\n- reasoning, modalities, and token limits from models.dev\n- `fallbackMetadata` from your JSON config\n- bundled conservative fallback metadata for a small set of well-known model families when upstream metadata is missing\n\nThe fallback layer is intentionally conservative. It is not freeform model-name guessing. You can edit `fallbackMetadata` in your `aperture-provider.config.json` without republishing the library, and those entries override the bundled defaults.\n\nIf a model still lacks required capability metadata after those layers, the runtime warns and skips that model by default instead of crashing the entire sync. If you want strict behavior, set `resolution.skipModelsMissingCapabilities` to `false`.\n\nProvider sync now uses a persisted registration cache. On startup it reads the cached provider registration first, returns quickly, and refreshes in the background when a cache entry exists. The default cache path is:\n\n```text\n~/.pi/agent/cache/aperture-provider/<provider-name>.json\n```\n\nIf you want warning output while debugging cache refreshes or missing metadata, set `PI_APERTURE_DEBUG=1`. In normal mode those warnings are returned in runtime state but not dumped to the console.\n\nSecurity note: as of `0.2.11`, the persisted cache excludes `apiKey`, and background refresh only updates the cache for future startups instead of re-registering live providers mid-session.\n\nExample config override:\n\n```json\n{\n  \"fallbackMetadata\": {\n    \"k2.5\": {\n      \"reasoning\": true,\n      \"input\": [\"text\"],\n      \"contextWindow\": 262144,\n      \"maxTokens\": 16384\n    }\n  }\n}\n```\n\n## Using the library directly\n\nIf you want your own custom Pi extension or another integration layer, use the runtime exports directly:\n\n```ts\nimport {\n  createApertureProviderRuntime,\n  loadResolvedApertureProviderConfig,\n} from \"@ramarivera/pi-ts-aperture-provider\";\n\nconst { config } = await loadResolvedApertureProviderConfig();\nconst runtime = createApertureProviderRuntime(config, {\n  cachePath: \"/tmp/aperture-provider-cache.json\", // optional\n  debug: process.env.PI_APERTURE_DEBUG === \"1\", // optional\n});\n```\n\n## Repository layout\n\n- [`src/config.ts`](./src/config.ts)\n- [`src/models-dev.ts`](./src/models-dev.ts)\n- [`src/provider.ts`](./src/provider.ts)\n- [`extensions/index.ts`](./extensions/index.ts)\n- [`test/provider.test.ts`](./test/provider.test.ts)\n\n## Publishing\n\nThe package is configured to publish to npm as `@ramarivera/pi-ts-aperture-provider`.\n\nBefore publishing:\n\n```bash\ncorepack yarn install\ncorepack yarn run check\ncorepack yarn test\ncorepack yarn typecheck\ncorepack yarn build\nnpm whoami\n```\n\nPublish with:\n\n```bash\nnpm publish\n```\n\nFor prereleases (for example `0.2.5-beta.0`), publish with:\n\n```bash\nnpm publish --tag beta\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "gateway",
+    "models.dev",
+    "aperture",
+    "extension"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/ramarivera/pi-ts-aperture-provider#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ramarivera/pi-ts-aperture-provider.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-04-07T04:59:28.133Z",
+    "modified": "2026-05-09T14:18:08.608Z",
+    "0.1.0": "2026-04-07T04:59:28.413Z",
+    "0.1.1": "2026-04-07T05:08:53.672Z",
+    "0.1.2": "2026-04-07T05:16:34.404Z",
+    "0.1.3": "2026-04-07T05:26:01.083Z",
+    "0.2.0": "2026-04-07T05:41:40.150Z",
+    "0.2.1": "2026-04-07T05:46:42.528Z",
+    "0.2.2": "2026-04-07T06:31:34.136Z",
+    "0.2.3": "2026-04-07T06:53:10.067Z",
+    "0.2.4-beta.0": "2026-04-07T08:55:14.286Z",
+    "0.2.4": "2026-04-07T09:01:07.997Z",
+    "0.2.5": "2026-04-09T17:40:56.301Z",
+    "0.2.6": "2026-04-10T16:08:51.223Z",
+    "0.2.7": "2026-04-10T16:54:57.958Z",
+    "0.2.8": "2026-04-14T11:12:10.705Z",
+    "0.2.9": "2026-04-15T12:41:03.285Z",
+    "0.2.10": "2026-04-15T13:54:25.800Z",
+    "0.2.11": "2026-04-15T14:11:26.206Z",
+    "0.2.12": "2026-05-09T14:18:08.322Z"
+  },
+  "versions_count": 18,
+  "downloads_last_week": 42,
+  "download_trend": []
+}

@@ -1,0 +1,50 @@
+{
+  "name": "@codersbrew/pi-tools",
+  "latest_version": "0.7.0",
+  "description": "A pi package bundling CodersBrew pi extensions and skills.",
+  "readme": "# @codersbrew/pi-tools\n\nA publishable [pi](https://github.com/badlogic/pi-mono) package that bundles CodersBrew pi extensions, skills, and prompt templates.\n\n## Included resources\n\n### Extensions\n\n#### `security`\nProtects common dangerous tool operations by:\n- warning or blocking risky `bash` commands such as `rm -rf`, `sudo`, and destructive disk operations\n- blocking writes to sensitive paths like `.env`, `.git`, `node_modules`, SSH keys, and common secrets files\n- prompting before lockfile edits such as `package-lock.json`, `yarn.lock`, and `pnpm-lock.yaml`\n\n#### `session-breakdown`\nAdds an interactive TUI for analyzing pi session history from `~/.pi/agent/sessions`, including:\n- sessions, messages, tokens, and cost over the last 7 / 30 / 90 days\n- model, cwd, day-of-week, and time-of-day breakdowns\n- contribution-style heatmap visualizations\n\n#### `update-pi`\nAdds a `/update-pi` slash command that upgrades `@mariozechner/pi-coding-agent` using your detected package manager (or configured `npmCommand`) and reminds you to restart pi afterward.\n\n#### `subagent`\nDelegates work to specialized subagents that run in isolated `pi` subprocesses.\n\nPrimary bundled agents:\n- `planner` - investigates the codebase and produces tracked plans\n- `executor` - materializes, executes, resumes, and updates tracked plans\n- `reviewer` - performs an independent read-only review pass\n\nInternal helper:\n- `worker` - delegated implementation helper used by the executor\n\nPrimary prompt templates:\n- `/plan`\n- `/execute-plan`\n- `/implement`\n- `/implement-and-review`\n- `/review`\n\nTracked markdown plans are written to `plan/*.md` with task IDs, status checkboxes, dependency metadata, and validation steps. Executors can fan out safe parallel worker batches, resume interrupted work, and update shared plan files as work completes.\n\nOverride behavior:\n- packaged agents act as defaults\n- `~/.pi/agent/agents/*.md` overrides packaged agents of the same name\n- `.pi/agents/*.md` overrides both packaged and user-level agents when `agentScope: \"project\"` or `\"both\"`\n\n### Skill: `github-workflow`\nAn opinionated GitHub workflow skill for branch creation, commits, pushes, PR creation, review, and merge work.\n\nIt prefers `gh` for GitHub-aware actions and uses plain `git` where local source-control operations are the better tool.\n\nInvoke it in pi with:\n\n```bash\n/skill:github-workflow\n```\n\n### Skill: `plan`\nA `/plan`-style planning skill that investigates the codebase and writes a tracked markdown plan under `plan/`, but does the work in the current conversation context instead of delegating to the bundled subagent workflow.\n\nIt is useful when you want the same planning output shape as `/plan` without spinning up a separate planner/executor process.\n\nInvoke it in pi with:\n\n```bash\n/skill:plan add Redis caching to the session store\n```\n\n## Install\n\nGlobal install:\n\n```bash\npi install npm:@codersbrew/pi-tools\n```\n\nProject-local install:\n\n```bash\npi install -l npm:@codersbrew/pi-tools\n```\n\nYou can also add it manually to pi settings:\n\n```json\n{\n  \"packages\": [\"npm:@codersbrew/pi-tools\"]\n}\n```\n\n## Using the bundled subagent workflows\n\nAfter installing the package, the prompt templates are available directly in pi:\n\n```bash\n/plan add Redis caching to the session store\n/execute-plan plan/add-redis-caching.md\n/implement add Redis caching to the session store\n/implement-and-review add input validation to API endpoints\n/review src/api/handlers.ts src/api/validation.ts\n```\n\nTracked plans are written to `plan/*.md`. New-plan workflows create or reuse a focused git branch before materializing the plan when the checkout is clean enough to do so safely. Tasks are checked off in place, blocked tasks are marked explicitly, and testing/type-checking is required before executors mark implementation tasks complete.\n\nIf you want the same tracked-plan output without subagent delegation, use the skill instead:\n\n```bash\n/skill:plan add Redis caching to the session store\n```\n\nTo customize or add agents, create markdown agent files in either:\n- `~/.pi/agent/agents/` for your personal defaults\n- `.pi/agents/` for project-local agents\n\n## Package structure\n\nThis package uses pi's standard package manifest and currently publishes:\n- `extensions/security.ts`\n- `extensions/session-breakdown.ts`\n- `extensions/update-pi.ts`\n- `extensions/subagent/index.ts`\n- `skills/github-workflow/SKILL.md`\n- `skills/plan/SKILL.md`\n- `extensions/subagent/prompts/*.md`\n\nThe root `package.json` exposes them through:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./extensions\"],\n    \"skills\": [\"./skills\"],\n    \"prompts\": [\"./extensions/subagent/prompts\"]\n  }\n}\n```\n\n## Local development\n\nInstall dependencies:\n\n```bash\nnpm install\n```\n\nRun local verification:\n\n```bash\nnpm run check\n```\n\nPreview the publish tarball:\n\n```bash\nnpm pack --dry-run\n```\n\n## Releasing\n\nThis repo includes `.github/workflows/release.yml`.\n\nOngoing release flow:\n\n1. Update the package version in `package.json`\n2. Commit and push the change\n3. Create and push a matching version tag such as `v0.3.0`\n4. GitHub Actions will run verification, publish to npm, and create a GitHub release\n\nThe workflow supports either:\n- npm trusted publishing via GitHub OIDC\n- `NPM_TOKEN` fallback publishing when the secret is present\n\nIf you use manual dispatch, ensure the version in `package.json` has not already been published.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "coding-agent",
+    "codersbrew"
+  ],
+  "author": {
+    "name": "CodersBrew"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/codersbrew/pi-tools#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codersbrew/pi-tools.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./extensions/subagent/prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-19T18:01:37.002Z",
+    "modified": "2026-04-05T04:31:33.938Z",
+    "0.1.0": "2026-03-19T18:01:37.249Z",
+    "0.1.1": "2026-03-19T19:33:27.289Z",
+    "0.2.0": "2026-03-19T21:30:52.040Z",
+    "0.3.0": "2026-03-20T22:35:02.669Z",
+    "0.3.1": "2026-03-20T23:00:56.029Z",
+    "0.3.2": "2026-03-21T00:12:02.433Z",
+    "0.4.0": "2026-03-21T05:48:39.362Z",
+    "0.5.0": "2026-03-23T15:46:17.369Z",
+    "0.5.1": "2026-03-23T21:52:16.927Z",
+    "0.7.0": "2026-04-05T04:31:33.531Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": 52,
+  "download_trend": []
+}

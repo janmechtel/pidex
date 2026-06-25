@@ -1,0 +1,42 @@
+{
+  "name": "pi-share-redacted-gist",
+  "latest_version": "0.7.0",
+  "description": "Pi package: publish a redacted pi session to GitHub gists and first-class Hugging Face datasets",
+  "readme": "# pi-share-redacted-gist\n\nPublish a redacted pi session as a public GitHub gist and/or Hugging Face dataset. Hugging Face support is first-class.\n\nInstalls one pi extension command:\n\n- `/share-redacted`\n\n## What it does\n\n- reads the current persisted pi session file, or `--session @path`\n- redacts common sensitive patterns plus a detect-secrets-inspired plugin stack for secrets/tokens\n- wholesale-redacts tool read/write/edit payloads plus obvious bash-read outputs for high-risk files like `.env`, SSH keys, cloud credentials, and kube/docker configs\n- opens a transcript-style review UI by default\n- asks for publication attestation unless `--yes`\n- publishes two files:\n  - `<session>.redacted.jsonl`\n  - `openagentsessions.json`\n- can publish to:\n  - a public GitHub gist\n  - a Hugging Face dataset\n  - both\n- stores Hugging Face uploads under timestamped paths like `sessions/2026-03-28T17-10-55Z-session.redacted/`\n- prints the published URL(s) and an openagentsessions submission hint when a gist was created\n\n## Install\n\n```bash\npi install npm:pi-share-redacted-gist\n```\n\nThen inside pi:\n\n```text\n/reload\n```\n\n## Usage\n\n```text\n/share-redacted\n/share-redacted --session @~/.pi/agent/sessions/your-session.jsonl\n/share-redacted --topic \"auth bugfix\" --language \"typescript\" --tags \"bugfix,auth\"\n/share-redacted --publisher huggingface --dataset lukaskawerau/openagentsessions\n/share-redacted --publisher both --desc \"Open agent session (CC0)\" --no-review --yes\n```\n\nReview UI:\n\n- transcript blocks instead of raw JSONL\n- highlights suspicious leftovers the automatic redactor did not catch\n- `r` redacts the current suspicious value everywhere\n- `s` marks the current suspicious value safe\n- `a` adds a literal global redaction\n- `x` adds a regex global redaction\n- `u` undoes the last manual action\n- `e` opens the raw editor as an escape hatch\n\nFlags:\n\n- `--session @path`\n- `--desc \"text\"`\n- `--topic \"text\"`\n- `--language \"text\"`\n- `--tags \"a,b,c\"`\n- `--publisher gist|huggingface|both`\n- `--dataset owner/name`\n- `--no-review`\n- `--yes`\n\n## Hugging Face config\n\nConfig files are merged, with project-local values overriding global ones:\n\n- `~/.pi/agent/pi-share-redacted-gist.json`\n- `<cwd>/.pi/pi-share-redacted-gist.json`\n\nExample:\n\n```json\n{\n  \"publishers\": {\n    \"gist\": {\n      \"enabled\": true\n    },\n    \"huggingface\": {\n      \"enabled\": true,\n      \"datasets\": [\n        \"lukaskawerau/openagentsessions\",\n        \"my-org/internal-agent-sessions\"\n      ],\n      \"defaultDataset\": \"lukaskawerau/openagentsessions\",\n      \"visibility\": \"public\",\n      \"pathPrefix\": \"sessions\"\n    }\n  },\n  \"redaction\": {\n    \"sensitiveFiles\": {\n      \"enabled\": true,\n      \"extraPatterns\": [\n        \"config/private.settings\",\n        \"/(^|\\\\/)secrets\\\\/[^/]+\\\\.txt$/i\"\n      ]\n    }\n  }\n}\n```\n\nRecommended setup:\n\n1. create or pick a dataset repo you can already write to\n2. add a Hugging Face access token via `HF_TOKEN` or pi `auth.json`\n3. configure that dataset in `pi-share-redacted-gist.json`\n4. run `/share-redacted --publisher huggingface` or `/share-redacted --publisher both`\n\n`redaction.sensitiveFiles.extraPatterns` accepts either exact basename/path-suffix matches or `/regex/flags` strings.\n\nAuth:\n\n- `HF_TOKEN` environment variable\n- or `~/.pi/agent/auth.json`:\n\n```json\n{\n  \"huggingface\": { \"type\": \"api_key\", \"key\": \"hf_...\" }\n}\n```\n\nThe `key` field can also use pi auth-file indirection such as shell commands (`\"!op read ...\"`) or env var names.\n\nNotes:\n\n- if your token can create repos, the extension will create the configured dataset when missing\n- if your token cannot create repos, point the config at an existing dataset you already control\n- Hugging Face uploads land under `sessions/<timestamp>-<session-name>/`\n\n## Requirements\n\n- for GitHub gist publishing: `gh` CLI installed and authenticated\n- for Hugging Face publishing: `HF_TOKEN` or `~/.pi/agent/auth.json` entry for `huggingface`\n- a persisted pi session file\n\n## Legal / warranty notice\n\nThis extension is provided **as-is**, with **no warranty** of any kind, express or implied.\n\nBy using it, you accept that:\n\n- you are solely responsible for reviewing anything before you publish it\n- you are solely responsible for any credentials, secrets, personal data, source code, or other information you choose to share\n- automatic redaction can reduce risk, but it cannot guarantee that every sensitive value or file will be caught\n- the authors and contributors are not liable for any loss, damages, claims, or other consequences arising from use of this extension or from any data you publish with it\n\nIf leaking a session would hurt, assume the redactor missed something and review it manually before publishing. Paranoia earns its keep.\n\n## Package notes\n\n- package code license: MIT\n- published session metadata license: `CC0-1.0`\n- secret scanning uses a detect-secrets-inspired plugin pipeline\n- built-in secret plugins also detect Hugging Face access tokens (`hf_...`)\n- built-in secret plugins:\n  - `PrivateKeyDetector`\n  - `GitHubTokenDetector`\n  - `AwsKeyDetector`\n  - `OpenAIDetector`\n  - `HuggingFaceTokenDetector`\n  - `GoogleApiKeyDetector`\n  - `SlackTokenDetector`\n  - `JwtDetector`\n  - `BearerTokenDetector`\n  - `KeywordDetector`\n  - `HexHighEntropyString`\n  - `Base64HighEntropyString`\n  - `OpaqueTokenDetector`\n\n## Development\n\n```bash\nbun test\nbun run check\nnpm pack --dry-run\n```",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "gist",
+    "github",
+    "huggingface",
+    "redaction",
+    "openagentsessions"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/lukaskawerau/pi-share-redacted-gist#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lukaskawerau/pi-share-redacted-gist.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/share-redacted-gist.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-28T10:36:29.386Z",
+    "modified": "2026-03-28T17:01:26.851Z",
+    "0.1.0": "2026-03-28T10:36:29.634Z",
+    "0.2.0": "2026-03-28T11:21:36.622Z",
+    "0.3.0": "2026-03-28T11:28:13.187Z",
+    "0.4.0": "2026-03-28T12:34:03.842Z",
+    "0.5.0": "2026-03-28T12:58:10.939Z",
+    "0.6.0": "2026-03-28T16:25:45.202Z",
+    "0.7.0": "2026-03-28T17:01:26.732Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": null,
+  "download_trend": []
+}

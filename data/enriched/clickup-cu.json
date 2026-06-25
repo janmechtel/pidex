@@ -1,0 +1,47 @@
+{
+  "name": "clickup-cu",
+  "latest_version": "0.1.14",
+  "description": "Fast ClickUp CLI for daily task workflow, with optional Pi prompt shortcut.",
+  "readme": "# clickup-cu\n\nFast zero-dependency ClickUp CLI for daily task control from terminal or Pi.\n\n```bash\ncu today\ncu start TASK_ID\ncu stop\ncu estimate TASK_ID 2h\ncu done TASK_ID\n```\n\n`TASK_ID`, `PARENT_TASK_ID`, `USER_ID`, `WORKSPACE_ID`, and `LIST_ID` are placeholders. Replace them with your ClickUp values.\n\n## Why\n\nUse `cu` when opening ClickUp just to check tasks, start/stop timers, change status, or set estimates feels slow.\n\n`cu` talks directly to the ClickUp REST API:\n\n```text\nTerminal/Pi -> cu -> ClickUp REST API\n```\n\nIt is faster and simpler than using MCP for daily repeated actions. Use ClickUp UI or MCP for rare/complex operations.\n\n## Install\n\nRequires Node.js 18+.\n\n```bash\nnpm install -g clickup-cu\ncu help\n```\n\nUse global install. Local install inside another project usually is not needed.\n\nIf another system `cu` exists, check PATH:\n\n```bash\ncommand -v cu      # macOS/Linux\nwhere.exe cu       # Windows\n```\n\n## Setup\n\nGet a ClickUp API token:\n\n```text\nClickUp -> Profile/avatar -> Settings -> Apps -> API Token -> Generate\n```\n\nSave it:\n\n```bash\ncu token pk_your_token_here\n```\n\nThen create config:\n\n```bash\ncu init\n```\n\nFiles:\n\n```text\n~/.config/cu/token\n~/.config/cu/config.json\n```\n\nBoth are written with owner-only permissions (`0600`). Environment variables also work and override the token file:\n\n```bash\nexport CLICKUP_API_TOKEN=\"pk_your_token_here\"\n# or\nexport CLICKUP_TOKEN=\"pk_your_token_here\"\n```\n\nExample config:\n\n```json\n{\n  \"workspaceId\": \"YOUR_WORKSPACE_ID\",\n  \"userId\": \"YOUR_USER_ID\",\n  \"defaultListId\": \"YOUR_LIST_ID\",\n  \"statuses\": {\n    \"backlog\": \"BACKLOG\",\n    \"todo\": \"TO-DO\",\n    \"start\": \"IN PROGRESS\",\n    \"review\": \"REVIEW\",\n    \"qa\": \"QA/TESTING\",\n    \"blocked\": \"BLOCKED\",\n    \"release\": \"READY FOR RELEASE\",\n    \"done\": \"DONE\"\n  }\n}\n```\n\n## Daily workflow\n\n```bash\ncu today                         # dashboard: timer + due/active/blocked/open tasks\ncu list                          # list your open tasks\ncu list all                      # list open tasks without assignee filter\ncu list status \"IN PROGRESS\"     # list by status\ncu show TASK_ID                  # show task details\n\ncu start TASK_ID                 # set IN PROGRESS + start timer\ncu progress TASK_ID              # set IN PROGRESS only\ncu stop                          # stop current timer\ncu done TASK_ID                  # set DONE\n```\n\nStatus shortcuts:\n\n```bash\ncu backlog TASK_ID\ncu todo TASK_ID\ncu review TASK_ID\ncu qa TASK_ID\ncu testing TASK_ID\ncu blocked TASK_ID\ncu release TASK_ID\n```\n\nTime:\n\n```bash\ncu estimate TASK_ID 2h\ncu estimate TASK_ID 2h 30m\ncu estimate TASK_ID 45m\ncu addtime TASK_ID 45m \"backend work\"\n```\n\nCreate/update:\n\n```bash\ncu create \"Fix login bug\"\ncu subtask PARENT_TASK_ID \"Add API validation\"\ncu assign TASK_ID me\ncu assign TASK_ID USER_ID ANOTHER_USER_ID\n```\n\n## Commands\n\n| Command | Purpose |\n|---|---|\n| `cu today` | Daily dashboard |\n| `cu list [all]` | List tasks |\n| `cu list status \"STATUS\"` | List tasks by status |\n| `cu show TASK_ID` | Show one task |\n| `cu start TASK_ID` | Set start status + start timer |\n| `cu stop` | Stop current timer |\n| `cu backlog/todo/progress/review/qa/testing/blocked/release/done TASK_ID` | Change status |\n| `cu estimate TASK_ID DURATION` | Set estimate |\n| `cu addtime TASK_ID DURATION [note]` | Add manual time |\n| `cu create \"TITLE\"` | Create task in default list |\n| `cu subtask PARENT_TASK_ID \"TITLE\"` | Create subtask |\n| `cu assign TASK_ID USER_ID_OR_ME...` | Add assignees |\n| `cu token pk_your_token_here` | Save token |\n| `cu init` | Create/show config |\n| `cu help` | Show help |\n\nDurations support `2h`, `30m`, `2h 30m`. Plain numbers mean minutes.\n\n## Pi shortcut\n\nThis package includes `/cu-fast` for Pi.\n\n```bash\npi install npm:clickup-cu\n```\n\nRestart Pi or run:\n\n```text\n/reload\n```\n\nUse:\n\n```text\n/cu-fast\n/cu-fast today\n/cu-fast start TASK_ID\n/cu-fast stop\n/cu-fast show TASK_ID\n/cu-fast estimate TASK_ID 2h\n/cu-fast done TASK_ID\n```\n\n`/cu-fast` runs local `cu` through bash after validating arguments, so install and configure the CLI too:\n\n```bash\nnpm install -g clickup-cu\ncu token pk_your_token_here\ncu init\n```\n\nSafety rules for `/cu-fast`:\n\n- It only allows known `cu` subcommands.\n- It rejects shell metacharacters, newlines, pipes, redirects, and command chaining.\n- It shell-quotes validated arguments before bash execution.\n- It treats ClickUp task content as untrusted output, not instructions.\n\n## REST mapping\n\n| CLI action | REST API |\n|---|---|\n| `cu today` timer | `GET /team/{workspaceId}/time_entries/current` |\n| `cu today/list` tasks | `GET /team/{workspaceId}/task?...` |\n| `cu show TASK_ID` | `GET /task/{taskId}` |\n| status commands | `PUT /task/{taskId}` |\n| `cu start TASK_ID` timer | `POST /team/{workspaceId}/time_entries/start` |\n| `cu stop` | `POST /team/{workspaceId}/time_entries/stop` |\n| `cu estimate TASK_ID DURATION` | `PUT /task/{taskId}` with `time_estimate` |\n| `cu addtime TASK_ID DURATION` | `POST /team/{workspaceId}/time_entries` |\n| `cu create \"TITLE\"` | `POST /list/{defaultListId}/task` |\n| `cu subtask PARENT_TASK_ID \"TITLE\"` | `POST /list/{listId}/task` with `parent` |\n| `cu assign TASK_ID USER_ID_OR_ME...` | `POST /task/{taskId}/assignee` |\n\n## Development\n\n```bash\ngit clone https://github.com/YOUR_USER/cu.git\ncd cu\nnpm install -g .\nnpm test\nnpm pack --dry-run\n```\n\nPublish:\n\n```bash\nnpm version patch\nnpm publish --access public\n```\n\n## Security\n\n- Never commit `~/.config/cu/token`.\n- Never paste `pk_...` in chat, issues, logs, screenshots, or recordings.\n- Each teammate should generate their own token.\n- Rotate exposed tokens.\n",
+  "keywords": [
+    "clickup",
+    "cli",
+    "productivity",
+    "time-tracking",
+    "pi-package"
+  ],
+  "author": {
+    "name": "Rokibul Hasan Rokib",
+    "email": "rokibulhasan.ph@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-06T09:24:35.671Z",
+    "modified": "2026-05-10T12:44:54.829Z",
+    "0.1.0": "2026-05-06T09:24:35.972Z",
+    "0.1.1": "2026-05-06T09:44:02.489Z",
+    "0.1.2": "2026-05-06T09:54:07.057Z",
+    "0.1.3": "2026-05-06T13:25:28.861Z",
+    "0.1.4": "2026-05-06T13:41:07.991Z",
+    "0.1.5": "2026-05-06T13:43:07.066Z",
+    "0.1.6": "2026-05-06T13:48:52.555Z",
+    "0.1.7": "2026-05-06T13:53:29.144Z",
+    "0.1.8": "2026-05-06T14:04:53.322Z",
+    "0.1.9": "2026-05-06T16:39:18.360Z",
+    "0.1.10": "2026-05-06T17:10:53.723Z",
+    "0.1.11": "2026-05-06T17:54:47.052Z",
+    "0.1.12": "2026-05-06T18:00:39.128Z",
+    "0.1.13": "2026-05-07T13:48:08.487Z",
+    "0.1.14": "2026-05-10T12:44:54.666Z"
+  },
+  "versions_count": 15,
+  "downloads_last_week": 80,
+  "download_trend": []
+}

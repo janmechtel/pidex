@@ -1,0 +1,346 @@
+{
+  "name": "@lalalic/project-manager",
+  "latest_version": "1.0.0",
+  "description": "Orchestrate work across pipeline stages. Live-discovered projects, isolated task folders, sync/async execution, and push notifications.",
+  "readme": "# Bullx Project Manager\n\n**Orchestrate work across pipeline stages with isolated task folders.** A pi extension that turns the current working directory into a live-discovered project workspace. Assign tasks, run commands (sync or async), and get automatic notifications when work completes.\n\n```bash\n# Install from local path\npi install ./packages/project-manager\n\n# Or from npm:\npi install npm:@lalalaic/project-manager\n```\n\n> **Requires:** pi 0.79+  \n> **Peer deps:** `@earendil-works/pi-coding-agent`, `typebox`\n\n---\n\n## Features\n\n- **No registry** \u2014 projects = folders on disk with `.pi/pipeline.md`. Add/remove by creating or deleting directories.\n- **2 tools only** \u2014 minimal tool surface; project management is guided via the bundled SKILL.md\n- **Sync or async execution** \u2014 run commands inline or spawn background processes\n- **Auto-notifications** \u2014 file watcher pushes proactive user messages when async tasks complete\n- **Configurable workspace root** \u2014 defaults to `cwd`, overridable via `projects.root` in settings\n- **Project context enforcement** \u2014 auto-creates a temp project when cwd is outside the workspace\n- **Per-project `.pi` isolation** \u2014 each project folder can have its own `.pi/settings.json` with packages, skills, tools, and model config\n\n---\n\n## Quick Start\n\n```bash\n# Install\npi install ./packages/project-manager\n\n# Restart pi \u2014 the extension loads automatically\npi\n\n# List pipeline stages\n> list_projects\n\n# Create a project (using bash)\n> mkdir -p ./my-stage/.pi\n> write ./my-stage/.pi/pipeline.md:\n  ---\n  name: My Stage\n  description: Build pipeline stage\n  ---\n  # My Stage\n\n# Assign a task and spawn a pi session to do it\n> assign_project_task(\n    projectName: \"my-stage\",\n    taskName: \"init\",\n    instructions: \"Initialize a TypeScript project with pnpm and vitest\",\n    mode: \"sync\"\n  )\n\n# Assign a task for interactive work (no mode)\n> assign_project_task(\n    projectName: \"my-stage\",\n    taskName: \"design-api\",\n    instructions: \"Design the API routes\"\n  )\n# Then cd into the task folder and work directly:\n> bash: cd ./my-stage/.tasks/design-api\n# ... work with bash/write/edit ...\n# When done:\n> write result.json \u2192 { \"finalResponse\": \"API design complete\" }\n> write status.json \u2192 { \"status\": \"completed\" }\n```\n\n---\n\n## Tools\n\n### `list_projects`\n\nScan the workspace root and show all pipeline stages. Only discovers folders with `.pi/pipeline.md`. Reads frontmatter for display name and description.\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `includeTasks` | boolean (optional) | Include task details for each project |\n\n### `assign_project_task`\n\nCreate an isolated task workspace and optionally spawn a pi child session.\n\n| Parameter | Type | Default | Description |\n|-----------|------|---------|-------------|\n| `projectName` | string | \u2014 | Project (pipeline stage) name |\n| `taskName` | string | \u2014 | Task identifier (used as folder name) |\n| `instructions` | string | \u2014 | Written to `instructions.md` in the task folder |\n| `timeout` | number | 300000 | Pi session timeout in ms (5 min) |\n| `mode` | `\"async\"` \\| `\"sync\"` | \u2014 | Execution mode |\n\n**Modes:**\n\n| Mode | Behavior |\n|------|----------|\n| *omit mode* | Creates task folder with `instructions.md`. `cd` there with `bash` and work interactively, then `write result.json` + `status.json` when done. |\n| `sync` | Spawns a pi child session in the task folder, waits for completion. Pi reads `instructions.md`, does the work, writes `result.json` + `status.json`. Returns exit code + output. |\n| `async` (default when set) | Spawns pi in background, returns immediately with PID. Pi writes `output.log` \u2192 `result.json` \u2192 `status.json` on its own. File watcher notifies the orchestrator on completion. |\n\n---\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/projects` | Interactive project browser |\n| `/project:new <name>` | Create a project folder |\n| `/project:link <path> [name]` | Symlink an existing folder as a project |\n| `/project:delete <name>` | Delete a project folder (with confirmation) |\n| `/project:task <project> <task> <instructions...>` | Assign a task |\n| `/project:run <project> <task> <instructions...>` | Assign task + spawn pi session (sync) |\n| `/project:adopt [name]` | Adopt a temp project into a permanent one |\n\n---\n\n## Configuration\n\n### Workspace root\n\nThe workspace root defaults to the **current working directory**. Set a custom root in settings (cascade: project \u2192 global \u2192 default):\n\n```json\n// .pi/settings.json or ~/.pi/agent/settings.json\n{\n  \"projects\": {\n    \"root\": \"./my-projects\"\n  }\n}\n```\n\nDefault: `cwd` (the directory where pi was started)\n\n### Per-project `.pi` setup\n\nEach project folder can have its own `.pi/settings.json` for isolated configuration:\n\nA project is **only recognized** if it has `.pi/pipeline.md`. Create one to register a folder as a project:\n\n```markdown\n<!-- ./my-project/.pi/pipeline.md -->\n---\nname: My Project\ndescription: What this pipeline stage does\n---\n\n# My Project\n\n## Purpose\n...\n```\n\nEach project folder can also have `.pi/settings.json` for isolated configuration:\n\n```json\n// ./my-project/.pi/settings.json\n{\n  \"packages\": [\"npm:some-skill-package\"],\n  \"skills\": [\"./custom-skills\"],\n  \"extensions\": [\"./extensions/my-tool.ts\"],\n  \"projects\": { \"root\": \".\" },\n  \"hermes-memory\": { \"localPath\": \".pi/memory\" },\n  \"defaultModel\": \"anthropic/claude-sonnet-4-20250514\"\n}\n```\n\n---\n\n### Pipeline definition (pipeline.md)\n\n`.pi/pipeline.md` is the **project marker** \u2014 only folders with it are discovered as projects.\nIt is **auto-injected into the system prompt** whenever the LLM works in that project.\nThe frontmatter (`name`, `description`) provides the project's display metadata:\n\n```markdown\n---\nname: My Pipeline\ndescription: Builds and packages the release artifacts\n---\n\n# My Pipeline\n\n## Purpose\nWhat this pipeline stage does.\n\n## Conventions\n- Code style, tools, expected input/output\n\n## Workflow\n1. First step\n2. Done when...\n\n## Learnings\n- Updated after each task to capture lessons learned\n```\n\n**Create on project setup, update after each task.** The LLM reads, follows, and refines\n`pipeline.md` \u2014 it self-improves over time as more work is done.\n\n---\n\n## How It Works\n\n### Task folder structure\n\n```\n./<project>/\n\u251c\u2500\u2500 .pi/\n\u2502   \u251c\u2500\u2500 pipeline.md          \u2190 REQUIRED \u2014 project marker + auto-injected into system prompt\n\u2502   \u2502                          Frontmatter: name, description\n\u2502   \u2514\u2500\u2500 settings.json        \u2190 project-specific config (optional)\n\u2514\u2500\u2500 .tasks/\n    \u2514\u2500\u2500 <task-name>/\n        \u251c\u2500\u2500 instructions.md  \u2190 task definition (written by assign_project_task)\n        \u251c\u2500\u2500 status.json      \u2190 current status (write on progress)\n        \u251c\u2500\u2500 result.json      \u2190 final output (write when done)\n        \u2514\u2500\u2500 output.log       \u2190 command stdout/stderr (written on run)\n```\n\n### File watcher & push notifications\n\nA recursive `fs.watch` on the workspace root detects changes to `result.json` and `status.json`:\n\n| Event | Behavior |\n|-------|----------|\n| Task completes (`result.json` written) | `pi.sendUserMessage()` triggers a new LLM turn \u2014 orchestrator sees: *\"Async task X completed. Check result.json.\"* |\n| Task fails (non-zero exit) | Same \u2014 proactive user message with \u274c |\n| Status update (in_progress) | Passive `sendMessage()` visible on next user prompt |\n\n### Async execution flow\n\n```\nassign_project_task(project, task, instructions, command, mode=\"async\")\n  \u2192 Creates task folder + instructions.md\n  \u2192 Spawns command in background (PID returned)\n  \u2192 Returns immediately\n\n  [background process runs]\n  \u2192 Writes output.log\n  \u2192 Writes result.json\n  \u2192 Writes status.json (completed/failed)\n\n  [file watcher detects change]\n  \u2192 Sends proactive user message to orchestrator\n  \u2192 Orchestrator decides next steps\n```\n\n### Project context enforcement\n\nWhen the extension loads, if the current working directory is **outside** the workspace root, a **temp project** is auto-created at `<root>/.tmp/<dirname>-<ts>/` with a minimal `.pi/settings.json`. Use `/project:adopt` to make it permanent.\n\n---\n\n## Skill\n\nThe package bundles a [pi skill](skills/project-manager/SKILL.md) that teaches the LLM how to:\n\n- Create, link, and delete projects\n- Set up `.pi/settings.json` with packages, skills, and tools\n- Use `assign_project_task` in sync, async, and interactive modes\n- Work directly in task folders using `bash`/`write`/`edit`\n\n---\n\n## Design\n\nSee [project-manager/DESIGN.md](project-manager/DESIGN.md) for the full architecture document.\n\n---\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "project-management",
+    "orchestrator",
+    "pipeline",
+    "tasks"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/lalalic/bullx/blob/main/packages/project-manager/README.md",
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./project-manager"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-17T14:31:34.608Z",
+    "1.0.0": "2026-06-17T14:31:35.173Z",
+    "modified": "2026-06-17T14:31:35.501Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 28,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 74
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

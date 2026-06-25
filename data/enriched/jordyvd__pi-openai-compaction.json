@@ -1,0 +1,346 @@
+{
+  "name": "@jordyvd/pi-openai-compaction",
+  "latest_version": "0.1.0",
+  "description": "OpenAI native standalone compaction replay for Pi.",
+  "readme": "# @jordyvd/pi-openai-compaction\n\nA distributable Pi extension package that replays **OpenAI native standalone compaction** windows without patching Pi core.\n\nThis package preserves the raw compacted window returned by OpenAI's compact endpoint, stores it in Pi compaction entry details, and rewrites later supported OpenAI Responses requests to:\n\n- fresh current prompt envelope\n- stored opaque compacted window\n- live post-compaction tail\n\n## Supported scope\n\nThis package is intentionally narrow.\n\n- **Providers:** `openai`, `openai-codex`\n- **APIs:** `openai-responses`, `openai-codex-responses`\n- **Failure mode:** fail open back to normal Pi behavior\n- **Persistence model:** store the raw compacted window in `CompactionEntry.details`\n\n## How it works\n\nThe extension uses two hooks:\n\n1. `session_before_compact`\n   - serialize the current Pi session into an OpenAI Responses-compatible compact request\n   - call the compact endpoint\n   - persist the returned compacted window in the compaction entry details\n2. `before_provider_request`\n   - intercept the next supported Responses request\n   - replace Pi's summary-oriented replay with native replay\n\n## Install\n\nFrom a checkout of this repo:\n\n```bash\ngit clone https://github.com/jordyvandomselaar/pi-codex-compaction.git\ncd pi-codex-compaction\npi install .\n```\n\nTry without installing from the repo root:\n\n```bash\npi -e .\n```\n\nAfter installation, run:\n\n```text\n/reload\n```\n\n## Configuration\n\nSettings resolve in this order, with later layers overriding earlier ones:\n\n1. package-local `settings.json`\n2. global `~/.pi/agent/settings.json` under `openaiNativeCompaction`\n3. project `<cwd>/.pi/settings.json` under `openaiNativeCompaction`\n4. environment variables with the `PI_OPENAI_NATIVE_COMPACTION_` prefix\n\nDefault package settings:\n\n```json\n{\n  \"enabled\": true,\n  \"debug\": false,\n  \"logProviderPayloads\": false,\n  \"logCompactResponses\": false,\n  \"redactSensitiveData\": true,\n  \"artifactRoot\": \"~/.pi/agent/artifacts/openai-native-compaction\",\n  \"supportedProviders\": [\"openai\", \"openai-codex\"],\n  \"supportedApis\": [\"openai-responses\", \"openai-codex-responses\"],\n  \"notifyOnLoad\": false\n}\n```\n\nUseful global override example:\n\n```json\n{\n  \"openaiNativeCompaction\": {\n    \"enabled\": true,\n    \"debug\": true,\n    \"logProviderPayloads\": true,\n    \"logCompactResponses\": true,\n    \"redactSensitiveData\": true\n  }\n}\n```\n\nAvailable environment overrides:\n\n- `PI_OPENAI_NATIVE_COMPACTION_ENABLED`\n- `PI_OPENAI_NATIVE_COMPACTION_DEBUG`\n- `PI_OPENAI_NATIVE_COMPACTION_LOG_PROVIDER_PAYLOADS`\n- `PI_OPENAI_NATIVE_COMPACTION_LOG_COMPACT_RESPONSES`\n- `PI_OPENAI_NATIVE_COMPACTION_REDACT_SENSITIVE_DATA`\n- `PI_OPENAI_NATIVE_COMPACTION_ARTIFACT_ROOT`\n- `PI_OPENAI_NATIVE_COMPACTION_SUPPORTED_PROVIDERS`\n- `PI_OPENAI_NATIVE_COMPACTION_SUPPORTED_APIS`\n- `PI_OPENAI_NATIVE_COMPACTION_NOTIFY_ON_LOAD`\n\n## Debug artifacts\n\nArtifacts are written per session under:\n\n```text\n~/.pi/agent/artifacts/openai-native-compaction/sessions/<session-id>/\n```\n\nSubdirectories:\n\n- `provider-requests/`\n- `compact-responses/`\n- `compaction-events/`\n- `lifecycle/`\n\nRecommended troubleshooting flow:\n\n1. enable `debug: true`\n2. enable `logProviderPayloads: true`\n3. keep `redactSensitiveData: true`\n4. `/reload`\n5. run `/compact` and then send a follow-up message\n6. inspect the newest artifact in the session directory\n\n## Package structure\n\n```text\npackage-root/\n\u251c\u2500\u2500 index.ts                    # package entrypoint declared in package.json\n\u251c\u2500\u2500 settings.json               # package-local defaults\n\u251c\u2500\u2500 src/\n\u2502   \u251c\u2500\u2500 extension-runtime.ts    # hook registration and top-level wiring\n\u2502   \u251c\u2500\u2500 settings.ts             # layered settings loader + env overrides\n\u2502   \u251c\u2500\u2500 debug.ts                # artifact writing + redaction helpers\n\u2502   \u251c\u2500\u2500 runtime.ts              # provider/api/model/baseUrl/apiKey resolution\n\u2502   \u251c\u2500\u2500 supported-environment.ts\n\u2502   \u251c\u2500\u2500 types.ts                # settings + persisted native-compaction types\n\u2502   \u251c\u2500\u2500 details-store.ts        # latest-valid native compaction lookup helpers\n\u2502   \u251c\u2500\u2500 serializer.ts           # compaction input serialization helpers\n\u2502   \u251c\u2500\u2500 compact-client.ts       # compact endpoint client\n\u2502   \u2514\u2500\u2500 payload-rewrite.ts      # native replay rewrite logic\n\u251c\u2500\u2500 src/unit.test.ts\n\u251c\u2500\u2500 src/validation.test.ts\n\u2514\u2500\u2500 test/pi-smoke.test.ts\n```\n\n## Tests\n\n```bash\ngit clone https://github.com/jordyvandomselaar/pi-codex-compaction.git\ncd pi-codex-compaction\nbun test\nbun test --coverage --coverage-reporter=text --coverage-reporter=lcov\nbun test ./test/pi-smoke.test.ts\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "openai",
+    "compaction",
+    "codex",
+    "responses"
+  ],
+  "author": {
+    "name": "Jordy Van Domselaar"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-21T02:29:35.845Z",
+    "0.1.0": "2026-03-21T02:29:36.107Z",
+    "modified": "2026-03-21T02:29:36.345Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 7,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 46
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 36
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 2
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

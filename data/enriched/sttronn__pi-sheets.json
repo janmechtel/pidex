@@ -1,0 +1,41 @@
+{
+  "name": "@sttronn/pi-sheets",
+  "latest_version": "0.1.2",
+  "description": "Spreadsheet-editing skill for agentic coding hosts (Claude Code, Codex, Pi). openpyxl + formualizer + a unified CLI; works as a portable skill bundle or as a pi extension.",
+  "readme": "# pi-sheets\n\nA spreadsheet-editing skill for agentic coding hosts \u2014 orient \u2192 edit via\n`openpyxl` \u2192 save via `xlsx_kit` \u2192 validate, preserving formulas and structure.\nWorks in **Pi coding-agent**, **Claude Code**, and **OpenAI Codex**.\n\nWraps two libraries:\n- **[openpyxl](https://openpyxl.readthedocs.io/)** for workbook IO\n- **[formualizer](https://pypi.org/project/formualizer/)** (Rust + Python bindings) for in-process formula recalc\n\n## Install\n\n### Pi coding-agent\n\n```bash\n# 1. Install the extension\npi install npm:@sttronn/pi-sheets\n\n# 2. One-shot setup \u2014 creates a venv at ~/.local/share/pi-sheets/.venv\n#    and installs python deps. Idempotent; safe to re-run.\npython3 $(find ~/.nvm ~/.pi/agent -name xlsx.py -path '*pi-sheets*' 2>/dev/null | head -1) doctor --install\n```\n\nDon't have python \u22653.10? Install one with [uv](https://docs.astral.sh/uv/):\n\n```bash\ncurl -LsSf https://astral.sh/uv/install.sh | sh && uv python install 3.13\n```\n\nPi runs the tiny extension in `src/index.ts`, which contributes `skills/` via\n`resources_discover`. The agent automatically loads `SKILL.md` and follows the\nworkflow.\n\n### Claude Code\n\n```bash\ngit clone https://github.com/StTronn/pi-sheets ~/code/pi-sheets\n\nmkdir -p ~/.claude/skills\nln -s ~/code/pi-sheets/skills/xlsx ~/.claude/skills/xlsx\n\npip install -r ~/code/pi-sheets/skills/xlsx/requirements.txt\n```\n\nFor project-local: symlink to `<your-project>/.claude/skills/xlsx`.\n\n### OpenAI Codex\n\n```bash\ngit clone https://github.com/StTronn/pi-sheets ~/code/pi-sheets\n\nmkdir -p ~/.codex/skills\nln -s ~/code/pi-sheets/skills/xlsx ~/.codex/skills/xlsx\n\npip install -r ~/code/pi-sheets/skills/xlsx/requirements.txt\n```\n\nFor project-local: symlink to `<your-project>/.codex/skills/xlsx`.\n\n### Manual / development install (any host)\n\n```bash\ngit clone https://github.com/StTronn/pi-sheets ~/code/pi-sheets\ncd ~/code/pi-sheets && npm install            # only needed for typechecking src/\npip install -r skills/xlsx/requirements.txt\n```\n\nSymlink `skills/xlsx/` into the host's skill discovery dir as shown above.\n\n## Repo layout\n\n```\npi-sheets/\n\u251c\u2500\u2500 skills/\n\u2502   \u2514\u2500\u2500 xlsx/     \u2190 host-agnostic skill bundle (Pi, Claude Code, Codex all use this)\n\u2502       \u251c\u2500\u2500 SKILL.md\n\u2502       \u251c\u2500\u2500 scripts/\n\u2502       \u2514\u2500\u2500 requirements.txt\n\u2514\u2500\u2500 src/          \u2190 16-LOC pi-extension shim (skill registration only)\n    \u2514\u2500\u2500 index.ts\n```\n\nThe `skills/xlsx/` directory is the canonical artifact. `src/index.ts` is a\ntiny pi extension whose only job is to register `skills/` as a skill path when\nthe package is installed via `pi install`. Claude Code and Codex ignore it and\nconsume `skills/xlsx/` directly via symlinks.\n\nWhy `skills/xlsx/` (not bare `skill/`)? Pi enforces the [Agent Skills\nspec](https://github.com/anthropics/skills): a skill's `SKILL.md` frontmatter\n`name:` must match its parent directory name. Our `name: xlsx` therefore lives\nin `xlsx/`, contained in `skills/` (the registered skill-path).\n\n## Usage\n\nOnce the skill is on the host's skill path, any prompt like \"edit this xlsx\"\nor \"create a budget spreadsheet\" will trigger the workflow:\n\n1. `python3 <skill>/scripts/xlsx.py inspect <file>` \u2014 orient (sheets, dims, formulas)\n2. Edit via `openpyxl` in a bash heredoc\n3. Save via `xlsx_kit.save(wb, path)` (writes xlsx + Univer JSON + emits a snapshot event)\n4. `python3 <skill>/scripts/xlsx.py validate <file>` \u2014 audit + recalc in one pass\n\nEach operation is also importable as a python function:\n\n```python\nimport sys\nsys.path.insert(0, '<skill-dir>/scripts')\nfrom inspect_xlsx import inspect\nfrom validate_xlsx import validate\n\ninfo = inspect(\"wb.xlsx\")\nreport = validate(\"wb.xlsx\")\n```\n\nSee [`skills/xlsx/SKILL.md`](skills/xlsx/SKILL.md) for the full agent-facing workflow and\n[`skills/xlsx/scripts/EVENTS.md`](skills/xlsx/scripts/EVENTS.md) for the optional event\nwire contract.\n\n## Optional: event wire\n\nThe skill emits structured events (`workbook_snapshot`, `script_event`) when\n`XLSX_EVENTS_PATH=<file>` is exported. Off by default. Export the env var\nbefore launching the host:\n\n```bash\nexport XLSX_EVENTS_PATH=/tmp/xlsx-events.ndjson\nclaude   # or: codex / pi\n\n# in another terminal:\ntail -F /tmp/xlsx-events.ndjson | jq .\n```\n\nUseful for live workbook viewers, progress dashboards, or post-hoc inspection.\nFull schema: [`skills/xlsx/scripts/EVENTS.md`](skills/xlsx/scripts/EVENTS.md).\n\n## What the skill itself ships\n\n```\nskills/xlsx/\n\u251c\u2500\u2500 SKILL.md\n\u251c\u2500\u2500 README.md\n\u251c\u2500\u2500 requirements.txt\n\u2514\u2500\u2500 scripts/\n    \u251c\u2500\u2500 xlsx.py                # unified CLI\n    \u251c\u2500\u2500 inspect_xlsx.py        # pure function + per-script CLI\n    \u251c\u2500\u2500 audit_xlsx.py\n    \u251c\u2500\u2500 recalc_xlsx.py\n    \u251c\u2500\u2500 validate_xlsx.py\n    \u251c\u2500\u2500 extend_formula.py\n    \u251c\u2500\u2500 doctor.py\n    \u251c\u2500\u2500 event_emit.py\n    \u251c\u2500\u2500 EVENTS.md\n    \u2514\u2500\u2500 xlsx_kit/__init__.py\n```\n\nEach operation script exposes a pure function plus a CLI shim, so the agent\ncan either invoke subprocesses (`python3 xlsx.py validate ...`) or compose\noperations in a single python heredoc \u2014 both flow through bash from the\nagent's perspective and work identically in all three hosts.\n\n## Requirements\n\n- Python 3.10+\n- `openpyxl >= 3.1`, `formualizer >= 0.5.8` (in `skills/xlsx/requirements.txt`)\n- For `pi install` use: `@earendil-works/pi-coding-agent` \u2265 0.74.0 (peer dependency, host-provided)\n\n## Troubleshooting\n\nIf a script fails with `ModuleNotFoundError`:\n\n```bash\npython3 skills/xlsx/scripts/xlsx.py doctor\n```\n\nPrints the exact python interpreter the host picked up plus a copy-pasteable\n`pip install` command for any missing deps. Most issues come from the host\nlaunching from a shell whose `PATH` doesn't include the venv that has the\ndeps installed.\n\n### `python3` itself is broken\n\nIf `python3 -m venv` fails \u2014 usually a packaging issue with whichever python is\nfirst on your PATH \u2014 install a known-good python and re-run `doctor --install`:\n\n```bash\ncurl -LsSf https://astral.sh/uv/install.sh | sh\nuv python install --default --force\n```\n\n`uv` ships standalone python builds that bundle their own stdlib dependencies,\navoiding most distro-packaging issues.\n\n## License\n\nMIT \u2014 see [LICENSE](LICENSE).\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "claude-code",
+    "codex",
+    "skill",
+    "xlsx",
+    "spreadsheet",
+    "openpyxl",
+    "formualizer"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/StTronn/pi-sheets#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StTronn/pi-sheets.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-14T11:25:59.214Z",
+    "modified": "2026-05-14T20:59:36.959Z",
+    "0.1.0": "2026-05-14T11:25:59.461Z",
+    "0.1.1": "2026-05-14T12:00:31.846Z",
+    "0.1.2": "2026-05-14T20:59:36.854Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,354 @@
+{
+  "name": "@noahsaso/pi-remote",
+  "latest_version": "0.3.1",
+  "description": "Remote terminal access for pi via WebSocket and browser, with Tailscale integration",
+  "readme": "# @noahsaso/pi-remote\n\nRemote terminal access for pi via WebSocket with Tailscale integration. Connect to your pi session from mobile browsers over LAN or your tailnet.\n\n## Features\n\n- **PTY-based remote access** - Wraps pi in a pseudo-terminal for optimal performance\n- **WebSocket bridge** - Real-time bidirectional terminal I/O with auto-reconnect and output replay buffer\n- **Mobile-first** - Touch scroll with momentum, virtual keybar (arrows, Ctrl+C, etc.)\n- **Token authentication** - All connections require token auth (HTTP, WebSocket, API)\n- **Auth modal** - Browser prompts for token if missing/invalid, with error feedback on retry\n- **QR code** - Scan to connect instantly from mobile\n- **`/remote` command** - Restart pi in remote mode from within a running session\n- **Tailscale integration** - Automatically serves over HTTPS on your tailnet with a unique session subpath\n- **Discovery service** - Lists all active remote sessions at `/pi/` with a card UI; auto-starts on first session, auto-shuts down on last\n- **TUI widget** - Shows Tailscale URL, LAN URL, token, and all-sessions link in a bordered card above the editor\n- **Session ended overlay** - Browser shows a modal when the remote session exits\n- **Scroll-to-bottom button** - Appears in the header when scrolled up\n- **Styled error pages** - Dark themed 403/404 pages matching the app style\n\n## Screenshots\n\n### Browser \u2014 Remote access modal\n<img src=\"https://raw.githubusercontent.com/noahsaso/pi-remote/main/packages/remote/docs/remote-access-modal.png\" width=\"360\" alt=\"Remote access modal\" />\n\n### TUI \u2014 Widget with Tailscale, LAN, and Token\n![TUI widget](https://raw.githubusercontent.com/noahsaso/pi-remote/main/packages/remote/docs/tui-widget.png)\n\n## Usage as a pi Extension\n\nThis package is primarily used as a [pi coding agent](https://github.com/badlogic/pi-mono) extension. The extension registers a `/remote` command that lets you switch your current pi session into remote access mode without losing context.\n\n### Global (all projects)\n\nAdd to `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"extensions\": [\n    \"~/path/to/pi-remote/packages/remote\"\n  ]\n}\n```\n\nOr install from npm:\n\n```bash\npi install npm:@noahsaso/pi-remote\n```\n\n### Project-local\n\nAdd to `.pi/settings.json` in your project root:\n\n```json\n{\n  \"extensions\": [\n    \"~/path/to/pi-remote/packages/remote\"\n  ]\n}\n```\n\n### Temporary (one-off)\n\n```bash\npi -e ~/path/to/pi-remote/packages/remote/extension/index.ts\n```\n\n### Using `/remote` inside pi\n\nOnce the extension is loaded, run `/remote` in pi:\n\n```\n/remote\n```\n\nThis will:\n1. Save your current session\n2. Shut down the current pi process\n3. Restart pi wrapped in a PTY with a WebSocket server\n4. Display a QR code and URL \u2014 scan from mobile or open in a browser\n\nWhen running inside a remote session, a persistent widget above the editor shows the remote URL.\n\n---\n\n## Usage as a CLI Tool\n\nYou can also launch remote mode directly from the terminal without a running pi session:\n\n```bash\nnpm install -g @noahsaso/pi-remote\npi-remote\n```\n\n### Options\n\n```bash\n# Specify a custom pi binary path\npi-remote --pi-path /path/to/pi\n\n# Pass extra arguments to pi\npi-remote -- --continue\n\n# Custom port (default: 7009)\nPORT=8080 pi-remote\n```\n\n---\n\n## Architecture\n\n```\n                        \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n                        \u2502  Discovery Svc   \u2502  port 7008\n                        \u2502  /pi/ (session   \u2502  Tailscale: /pi/\n                        \u2502   list + links)  \u2502\n                        \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n                               \u25b2\n              register/deregister via localhost API\n                               \u2502\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510         \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502   Browser   \u2502  WS     \u2502 HTTP Server \u2502  port 7009+\n\u2502  (xterm.js) \u2502\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25b6\u2502   + WS      \u2502  Tailscale: /pi/{id}/\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518         \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n                               \u2502\n                        \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n                        \u2502     PTY     \u2502\n                        \u2502   (pi CLI)  \u2502\n                        \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\n### Source Layout\n\n| Path | Description |\n|------|-------------|\n| `extension/index.ts` | Pi extension entry \u2014 registers `/remote` command and bordered TUI widget (Tailscale, LAN, Token, All sessions) |\n| `src/cli.ts` | `pi-remote` binary entry point |\n| `src/discovery.ts` | Discovery service \u2014 session registry, card-based web UI, auto-shutdown |\n| `src/discovery-main.ts` | Entry point for the detached discovery process |\n| `src/tailscale.ts` | Shared Tailscale helpers (find binary, hostname, serve, serve off) |\n| `src/pty.ts` | PTY management (node-pty), stdin/stdout attachment |\n| `src/ws.ts` | WebSocket bridge, mobile-priority resize logic |\n| `src/server.ts` | HTTP server with token auth, `/api/local-url` endpoint, styled error pages |\n| `web/` | Browser frontend (xterm.js, touch scroll, virtual keybar, auth modal, session ended overlay) |\n\n---\n\n## API\n\n### `startRemote(options)`\n\n```typescript\nimport { startRemote } from \"@noahsaso/pi-remote\";\n\nconst cleanup = await startRemote({\n  piPath: \"/usr/local/bin/pi\",  // optional, auto-detected\n  args: [\"--continue\"],          // optional, passed to pi\n  cwd: process.cwd(),            // optional\n  env: process.env,              // optional\n});\n\n// Stop the server and kill the PTY process\ncleanup();\n```\n\n### Environment Variables\n\n| Variable | Description |\n|----------|-------------|\n| `PORT` | HTTP server port (default: `7009`) |\n| `PI_REMOTE_URL` | Set automatically when running inside `pi-remote`; the extension uses this to show the URL widget |\n| `PI_REMOTE_TAILSCALE_URL` | Set automatically when Tailscale serve is active; shown in the TUI widget |\n| `PI_REMOTE_DISCOVERY_URL` | Set automatically when the discovery service is running; links to the all-sessions page |\n\n---\n\n## Tailscale Integration\n\nWhen [Tailscale](https://tailscale.com) is installed and running, pi-remote automatically:\n\n1. Detects the Tailscale binary (checks PATH, then known locations for macOS/Linux)\n2. Gets the machine's Tailscale hostname via `tailscale status --json`\n3. Runs `tailscale serve --bg --https 443 --set-path /pi/{session-id}/ http://localhost:{port}`\n4. Displays the full URL with auth token: `https://your-host.tailnet.ts.net/pi/abc123/?token=...`\n5. Shows the Tailscale URL in the QR code modal (with LAN URL as fallback)\n6. Cleans up the specific serve route on exit (without affecting other `tailscale serve` routes)\n\n**Graceful fallback:** If Tailscale is not installed, not running, or the serve command fails, pi-remote continues normally with just the LAN URL. No errors are shown.\n\n**Multiple sessions:** Each session gets a unique `/pi/{8-hex-chars}/` subpath, so multiple remote sessions can coexist on the same machine.\n\n## Discovery Service\n\nWhen multiple remote sessions run on the same machine, the discovery service provides a central landing page listing all active sessions.\n\n- **Auto-start**: The first pi-remote session spawns the discovery service as a detached background process on port `7008`\n- **Shared token**: The discovery service generates the auth token; all sessions use the same token\n- **Session registry**: Sessions register on startup and deregister on exit via localhost API\n- **Web UI**: Card layout at `/pi/` showing each session's working directory and start time, with clickable links\n- **Tailscale route**: Served at `https://your-host.tailnet.ts.net/pi/?token=...`\n- **Auto-shutdown**: When the last session deregisters, the discovery service cleans up its Tailscale route and exits\n\n**URL structure on tailnet:**\n- `https://host.ts.net/pi/?token=...` \u2192 discovery service (all sessions)\n- `https://host.ts.net/pi/abc12345/?token=...` \u2192 individual session\n\n## Security\n\n- **Shared token** \u2014 Single random 16-byte token generated by the discovery service, shared across all sessions. Required for all connections (HTTP API, WebSocket, pages). Static assets and the SPA shell are exempt so the auth modal can load.\n- **No localhost exemption** \u2014 Even connections from `127.0.0.1` (including Tailscale proxy) require a valid token\n- **Auth modal** \u2014 If the browser doesn't have a valid token, a login modal prompts for one\n- **Styled error pages** \u2014 Invalid tokens show a dark-themed \"Access denied\" page; bad paths show \"No session found\"\n- **Tailscale** \u2014 When using Tailscale, traffic is encrypted end-to-end within your tailnet using auto-provisioned TLS certificates\n\n---\n\n## Development\n\n```bash\n# Install dependencies (from monorepo root)\nnpm install\n\n# Build TypeScript\nnpm run build:ts\n\n# Build web UI\nnpm run build:web\n\n# Full build\nnpm run build\n\n# Watch mode (TypeScript only)\nnpm run dev\n\n# Link globally for testing\nnpm link\n```\n\n---\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "remote",
+    "terminal",
+    "pty",
+    "websocket",
+    "tailscale"
+  ],
+  "author": {
+    "name": "Noah Saso"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/noahsaso/pi-remote#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/noahsaso/pi-remote.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extension/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-10T16:25:49.041Z",
+    "modified": "2026-03-11T03:35:23.915Z",
+    "0.2.0": "2026-03-10T16:25:49.372Z",
+    "0.2.1": "2026-03-10T16:27:39.599Z",
+    "0.2.2": "2026-03-10T16:29:36.048Z",
+    "0.3.0": "2026-03-11T03:26:09.243Z",
+    "0.3.1": "2026-03-11T03:35:23.801Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 15,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 158
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 600
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 495
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 50
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 47
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 59
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 119
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 27
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 42
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 65
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 33
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 27
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 35
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 17
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 17
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

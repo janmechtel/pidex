@@ -1,0 +1,38 @@
+{
+  "name": "pi-theme-sync",
+  "latest_version": "0.3.1",
+  "description": "Sync Pi theme with terminal appearance \u2014 works locally and over SSH via OSC 11 terminal queries",
+  "readme": "# pi-theme-sync\n\nSync Pi theme with terminal appearance \u2014 works both **locally** and **over SSH**.\n\nTerminal-first theme sync for Pi, with robust SSH support.\n\n## How it works\n\nThe extension uses a three-layer detection strategy (in priority order):\n\n| Priority | Strategy | When it helps |\n|----------|----------|---------------|\n| 1 | **Override file** (`~/.pi/agent/theme-sync-override.json`) | Manual push from another machine |\n| 2 | **Terminal query** (OSC 11 background-color) | Preferred in interactive terminal sessions (local/SSH/tmux) for fast theme detection |\n| 3 | **OS-level detection** (optional fallback) | Disabled by default; can be enabled explicitly |\n\n### Why it works over SSH\n\nWhen you SSH into a remote machine, your local terminal (Ghostty) is still rendering everything. The extension sends an [OSC 11](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands) query (`\\033]11;?\\033\\\\`) to stdout. This travels through the SSH tunnel to Ghostty, which replies with the current background RGB. The extension parses the luminance to determine dark or light.\n\nThis means: **when Ghostty switches `theme = auto` on your Laptop, the remote pi detects it within seconds \u2014 no push scripts needed.**\n\nThe OSC 11 query runs in a short-lived subprocess that opens `/dev/tty` directly, so it doesn't interfere with pi's own terminal I/O.\n\n## Install\n\n```bash\npi install npm:pi-theme-sync\n```\n\n> **Important:** Remove `pi-system-theme` first to avoid two extensions fighting over `setTheme`:\n> ```bash\n> pi remove npm:pi-system-theme\n> ```\n\n## Package rename migration\n\nThis package was renamed from `pi-system-theme-ssh-bridge` / `pi-sync-system-theme` to `pi-theme-sync`.\n\nIf you installed the old package name, run:\n\n```bash\npi remove npm:pi-system-theme-ssh-bridge\npi install npm:pi-theme-sync\n```\n\n## Configuration\n\nUse the `/system-theme` command inside pi to configure:\n\n1. **Dark theme** name (default: `dark`)\n2. **Light theme** name (default: `light`)\n3. **Poll interval** in ms (default: `4000`)\n\nSettings are saved to `~/.pi/agent/theme-sync-config.json`.\n\n### Runtime commands\n\n- `/system-theme` \u2014 configure dark/light theme mapping and poll interval\n- `/system-theme-refresh` \u2014 manually re-run detection and apply mapped theme (**best-effort**)\n- `/system-theme-debug` \u2014 print detection trace (override / OSC11 / OS fallback) for troubleshooting\n- `/system-theme-push dark|light|auto` \u2014 write override appearance manually on the current machine\n\n### Reliable-first behavior (default)\n\nTo reduce input lag and TTY contention in long-running remote sessions:\n\n- Startup and `/resume`: performs an immediate OSC11 reconciliation attempt\n- Background polling:\n  - **Local sessions**: OSC11 polling is enabled (with min-interval throttling)\n  - **Likely remote SSH sessions**: OSC11 polling is disabled by default, preferring override + OS fallback\n- Manual fallback: `/system-theme-refresh` forces a one-shot OSC11 probe (may still fail in some remote TTY setups)\n\nThis restores local auto-switch behavior while keeping remote sessions stable by default.\n\n### Recommended remote workflow (stable)\n\nWhen Pi runs on a remote host, the most reliable setup is:\n\n1. Run Pi remotely (SSH/tmux as usual)\n2. Push override updates from your **local machine** when local appearance changes\n3. Let remote Pi apply the override on next tick (or immediately on startup/resume)\n\nExample local push:\n\n```bash\n./push-theme-override.sh user@remote-host\n```\n\nIn practice, local push + remote reconcile is more stable than relying on continuous OSC11 probing during an active remote session.\n\n## Override file (optional)\n\nFor environments where neither OSC 11 nor OS detection works, you can push an override file manually:\n\n```bash\n# On your Laptop, push current appearance to Desktop:\n./push-theme-override.sh user@desktop\n\n# Or inside pi on any machine:\n/system-theme-push dark\n/system-theme-push light\n/system-theme-push auto    # clears override, falls back to detection\n```\n\n### Override file format\n\n```json\n{\n  \"appearance\": \"dark\",\n  \"updatedAt\": \"2026-02-22T07:00:00Z\",\n  \"source\": \"my-laptop\"\n}\n```\n\n## \u26a0\ufe0f Performance tuning notes (important)\n\nThis extension queries terminal background color (OSC 11) in interactive sessions (local/SSH/tmux). Aggressive polling can cause terminal artifacts (garbled startup output) or input lag on some terminal/SSH combinations.\n\nRecommended ranges:\n\n- `pollMs`: **3000\u20138000** (default `4000`)\n- `PI_THEME_SYNC_OSC11_MIN_INTERVAL_MS`: **4000\u201312000** (default `4000`)\n\nAvoid overly aggressive values unless you have tested your environment thoroughly:\n\n- `pollMs < 2000`\n- `PI_THEME_SYNC_OSC11_MIN_INTERVAL_MS < 3000`\n\nIf you notice lag, slash-command stutter, or startup artifacts:\n\n1. Increase `pollMs`\n2. Increase `PI_THEME_SYNC_OSC11_MIN_INTERVAL_MS`\n3. Temporarily disable OSC11 probing with:\n\n```bash\nexport PI_THEME_SYNC_OSC11_ENABLED=0\n```\n\n## Environment variables\n\n| Variable | Default | Description |\n|----------|---------|-------------|\n| `PI_THEME_SYNC_OVERRIDE_FILE` | `~/.pi/agent/theme-sync-override.json` | Override file path |\n| `PI_THEME_SYNC_OVERRIDE_MAX_AGE_MS` | `60000` | Max age before override is considered stale |\n| `PI_THEME_SYNC_OSC11_ENABLED` | `1` | Enable/disable OSC 11 terminal query (`0` to disable) |\n| `PI_THEME_SYNC_OSC11_MIN_INTERVAL_MS` | `4000` | Minimum interval between OSC 11 probes in interactive sessions |\n| `PI_THEME_SYNC_BACKGROUND_OSC11` | `auto` | Background OSC11 policy: `auto` = local on / likely SSH off, `1` force on, `0` force off |\n| `PI_THEME_SYNC_OS_FALLBACK` | `auto` | OS fallback policy: `auto` = local on / likely SSH off, `1` force on, `0` force off |\n\n## Compatibility\n\n- **Terminals:** Any terminal supporting OSC 11 color queries (Ghostty, iTerm2, kitty, foot, WezTerm, xterm, etc.)\n- **OS detection fallback:** macOS, Linux (GNOME gsettings), Windows (`PI_THEME_SYNC_OS_FALLBACK=auto` locally by default; can force with `1`)\n- **SSH:** Works transparently \u2014 no special setup required\n- **tmux:** Supported (including long-lived sessions where `SSH_*` env vars may be missing)\n- **Ghostty `theme = auto`:** Fully supported. When Ghostty switches colors, the next poll detects it.\n- **Session resume:** On `/resume`, the extension immediately re-checks appearance and reconciles the active theme.\n\n## Migrating from pi-system-theme\n\n1. `pi remove npm:pi-system-theme`\n2. `pi install npm:pi-theme-sync`\n3. Configure `/system-theme` as needed.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "theme",
+    "ssh",
+    "dark-mode",
+    "ghostty"
+  ],
+  "author": {
+    "name": "mise42"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/mise42/pi-theme-sync#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mise42/pi-theme-sync.git"
+  },
+  "pi": {
+    "extensions": [
+      "index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-23T04:42:48.146Z",
+    "modified": "2026-03-03T01:35:03.593Z",
+    "0.3.0": "2026-02-23T04:42:48.300Z",
+    "0.3.1": "2026-03-03T01:35:03.449Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 6,
+  "download_trend": []
+}

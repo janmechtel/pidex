@@ -1,0 +1,32 @@
+{
+  "name": "@d3ara1n/pi-peek",
+  "latest_version": "0.1.1",
+  "description": "Cross-instance peek for pi \u2014 glimpse what another pi instance is doing, or ask it a question without disturbing its main conversation (read-after-burn ephemeral side-channel)",
+  "readme": "# @d3ara1n/pi-peek\n\nCore capability library for [pi](https://github.com/earendil-works/pi) \u2014 serialize the main conversation and answer questions about it via the utility model, read-after-burn.\n\n**Pure library**: registers tracker hooks but **no tools, no commands**. It is consumed by [`pi-peek-user`](../pi-peek-user) (local `/peek` overlay) and [`pi-peek-agent`](../pi-peek-agent) (cross-instance mesh). Installing this alone does nothing user-visible.\n\n## What it does\n\n- **Serialize** the current main conversation branch into compact reference text (turns + tool calls, truncated)\n- **Investigate**: stream a consult to the `utility` model role with the record as background context and the question as the standalone user message\n- **Tracker**: live snapshot of the local main agent's activity (tool name, turn index), hook-driven\n- **Read-after-burn**: nothing is persisted, no session file is touched, the main agent is never disturbed\n\nDepends on [`@d3ara1n/pi-model-roles`](../pi-model-roles) for the `utility` role resolution.\n\n## Configuration\n\nOptional tuning in `~/.pi/agent/settings.json` under `peek`:\n\n```jsonc\n{\n  \"peek\": {\n    \"recentTurns\": 10,        // keep the most recent N user-initiated turns\n    \"maxChars\": 50000,        // hard cap on total serialized characters\n    \"toolResultLimit\": 500    // truncate a single tool result longer than this\n  }\n}\n```\n\n## API (for extension authors)\n\n```typescript\nimport { getPeekAPI } from \"@d3ara1n/pi-peek\";\n\nconst api = getPeekAPI();\n\n// One-shot consult: serialize + stream to the utility model\nconst result = await api.investigate(\"How is debounce implemented here?\", {\n  onToken: (delta) => { /* stream chunks */ },\n  onStage: (stage) => { /* \"investigating\" | \"done\" | \"error\" */ },\n});\n// result.answer / result.model / result.usage\n\n// Current main-agent activity (driven by agent_start/tool_execution_*/turn_end hooks)\napi.getMainAgentStatus();   // { activity, toolName, toolIndex, turn, lastUpdated }\n```\n\n`investigate()` is entry-point-agnostic (pure function over reference text + question): both the local overlay and the cross-instance IPC server call it directly.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/d3ara1n/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/d3ara1n/pi-extensions.git",
+    "directory": "packages/pi-peek"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-23T00:20:36.090Z",
+    "modified": "2026-06-23T15:32:06.019Z",
+    "0.1.0": "2026-06-23T00:20:36.392Z",
+    "0.1.1": "2026-06-23T15:32:05.602Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,354 @@
+{
+  "name": "@smoose/pi-vision",
+  "latest_version": "0.1.2",
+  "description": "Pi image recognition tool: lets text-only models see images via local CLI providers (Codex or Agy).",
+  "readme": "# pi-vision\n\nA [pi](https://github.com/earendil-works/pi-mono) extension that lets plain-text models \"see\" images.\n\nWhen the current model doesn't support image input, it automatically mounts the `image_vision` tool, which delegates image understanding to a local **codex** or **agy** CLI (their models support multimodal input) and returns a textual description to the main model. When you switch back to a multimodal model, the tool disappears \u2014 zero token waste, zero accidental calls.\n\n## How it works\n\nThe core mechanism is **toggling the tool based on model capabilities**, not relying on prompts to tell the model \"don't use it\":\n\n- At registration, the tool is always present but not in the active list by default\n- On `session_start` and `model_select`, it checks whether `ctx.model.input` contains `\"image\"`\n- Models without image support \u2192 add `image_vision` to the active list (so the main model can see and invoke it)\n- Models with image support \u2192 remove `image_vision` from the active list (the main model reads images directly, no relay needed)\n\n```ts\nfunction syncVisionTool(pi, model) {\n  const override = getEffectiveOverride();\n  const enable = override === \"on\" ? true\n               : override === \"off\" ? false\n               : !modelSupportsImage(model);   // auto: mount only when images aren't supported\n  // incrementally add/remove from the active list without touching the user's other tools\n}\n```\n\n## Installation\n\n```bash\npi install npm:@smoose/pi-vision\n```\n\nOr for local development: drop the repo under `~/.pi/agent/extensions/`, or load it temporarily with `pi -e ./index.ts`.\n\nRequires `codex` or `agy` (at least one) in your PATH.\n\n## Usage\n\nWhen the main model is a text-only model, it will call the tool automatically:\n\n```\nimage_vision({ images: [\"/tmp/screenshot.png\"], prompt: \"OCR all the text\" })\n```\n\nReturns a plain-text description. Multiple images in one call are merged into a single description.\n\n## Commands\n\n| Command | Effect |\n|------|------|\n| `/vision` | Show current status (enabled or not, whether the model can see images, override, provider) |\n| `/vision on` | Force enable (even if the current model supports images) |\n| `/vision off` | Force disable |\n| `/vision auto` | Restore automatic detection (default) |\n| `/vision-provider codex\\|agy\\|auto` | Switch the vision provider |\n\nThe override and provider choice are **persisted globally** to `~/.pi/agent/image-vision.json`, applying across all sessions, restarts, and resumes. Priority: command setting > environment variable > default.\n\n## Configuration (environment variables)\n\n| Variable | Default | Description |\n|------|------|------|\n| `PI_VISION_PROVIDER` | `codex` | Default provider: `auto` / `codex` / `agy`. `auto` probes the PATH |\n| `PI_VISION_CODEX_TIMEOUT_MS` | `600000` | codex execution timeout (10 minutes) |\n| `PI_VISION_AGY_TIMEOUT_MS` | `600000` | agy execution timeout |\n| `PI_VISION_AGY_MODEL` | - | Model used by agy for image understanding |\n| `PI_VISION_MAX_CONCURRENCY` | `5` | Maximum concurrent image recognitions |\n| `PI_VISION_FORCE` | `auto` | Force override of automatic detection: `on` / `off` / `auto` |\n\n> Settings in `image-vision.json` override the matching environment variables; delete the file or the corresponding field to fall back to environment variables / defaults.\n\n## Provider invocation\n\n**codex** \u2014 `codex exec --output-last-message`, passing `--image`, with a prompt asking it to describe the image; the result file contains the description text.\n\n**agy** \u2014 `agy --print`, granting read access to the image's directory via `--add-dir`; stdout is the description text.\n\nBoth share the same prompt: by default, a comprehensive description (scene, OCR text, objects, colors, layout); use the `prompt` parameter to focus on a specific aspect. The response language follows the user's request (Chinese by default).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "codex",
+    "agy",
+    "image-recognition",
+    "vision",
+    "ocr",
+    "multimodal"
+  ],
+  "author": {
+    "name": "\u58eb\u5fc3"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/smoosex/pi-vision",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smoosex/pi-vision.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-23T09:13:35.823Z",
+    "modified": "2026-06-24T02:02:08.500Z",
+    "0.1.0": "2026-06-23T09:13:36.134Z",
+    "0.1.1": "2026-06-23T09:15:40.539Z",
+    "0.1.2": "2026-06-24T02:02:08.362Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 306,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 120
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 186
+    }
+  ]
+}

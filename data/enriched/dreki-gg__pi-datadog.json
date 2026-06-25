@@ -1,0 +1,39 @@
+{
+  "name": "@dreki-gg/pi-datadog",
+  "latest_version": "0.3.0",
+  "description": "Datadog log search tools for pi \u2014 query production logs with project-aware context",
+  "readme": "# @dreki-gg/pi-datadog\n\nDatadog log and RUM search tools for [pi](https://github.com/earendil-works/pi) \u2014 query production logs and Real User Monitoring sessions with project-aware context.\n\n## Setup\n\n### 1. Install\n\n```bash\npi install npm:@dreki-gg/pi-datadog\n```\n\n### 2. Set credentials\n\nExport your Datadog API and Application keys as environment variables:\n\n```bash\nexport DD_API_KEY=\"your-datadog-api-key\"\nexport DD_APP_KEY=\"your-datadog-app-key\"\n```\n\n> **Tip:** Add these to your shell profile (`~/.zshrc`, `~/.bashrc`) or use a `.env` manager. Never commit credentials to version control.\n\nYou need an **Application Key** (not just an API key) because log search uses Datadog's read endpoints.\n\n### 3. Configure your project (optional)\n\nCreate `.pi/datadog.json` in your project root to set defaults:\n\n```json\n{\n  \"service\": \"my-api\",\n  \"env\": \"production\",\n  \"site\": \"datadoghq.com\",\n  \"defaultTags\": [\"team:backend\"],\n  \"defaultTimeRange\": \"1h\",\n  \"rumApplicationId\": \"abcd-1234\",\n  \"rumService\": \"web-frontend\"\n}\n```\n\n| Field | Description | Default |\n|-------|-------------|---------|\n| `service` | Default service name for queries | _(none)_ |\n| `env` | Default environment | _(none)_ |\n| `site` | Datadog site | `datadoghq.com` |\n| `defaultTags` | Tags auto-appended to every query | `[]` |\n| `defaultTimeRange` | Default lookback window | `1h` |\n| `rumApplicationId` | Default RUM application id (`@application.id`) for RUM searches | _(none)_ |\n| `rumService` | Default service for RUM searches (falls back to `service`) | _(none)_ |\n\n**Supported sites:** `datadoghq.com` (US1), `us3.datadoghq.com`, `us5.datadoghq.com`, `datadoghq.eu` (EU).\n\n## Usage\n\n### Natural language\n\nJust ask pi to search your logs:\n\n```\n> Show me the errors in production from the last 30 minutes\n> What's causing the 500 errors on the payments service?\n> Find logs with \"timeout\" in staging from the past 24 hours\n```\n\nThe agent uses your `.pi/datadog.json` defaults automatically \u2014 you don't need to specify service or environment unless you want to override them.\n\nYou can also ask about front-end / RUM sessions:\n\n```\n> Show me RUM sessions from the last hour\n> Find RUM errors on the checkout view in production\n> What views did users hit in the last 30 minutes?\n```\n\n### Tool: `datadog_logs_search`\n\nThe agent calls this tool with [Datadog query syntax](https://docs.datadoghq.com/logs/explorer/search_syntax/):\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `query` | `string` | **Required.** Datadog log query (e.g. `status:error`, `@http.status_code:500`) |\n| `from` | `string` | Start time \u2014 relative (`15m`, `1h`, `7d`) or ISO 8601 |\n| `to` | `string` | End time \u2014 relative, ISO 8601, or `now` |\n| `limit` | `number` | Max results (1\u2013100, default 25) |\n| `sort` | `string` | `newest` or `oldest` |\n| `service` | `string` | Override project default service |\n| `env` | `string` | Override project default environment |\n\nThe agent receives a compact inline digest (counts, status breakdown, services). The full, untruncated log entries are written to a temp file whose path is in the response \u2014 the agent reads that file with the `read` tool to inspect actual content.\n\n### Tool: `datadog_rum_search`\n\nSearches Datadog RUM events (sessions, views, actions, front-end errors) with [RUM query syntax](https://docs.datadoghq.com/real_user_monitoring/explorer/search_syntax/). Defaults to **session** events (`@type:session`) when the query omits `@type`.\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `query` | `string` | **Required.** RUM query (e.g. `@type:session`, `@type:error`, `@view.url_path:/checkout`). Leave empty to list recent sessions |\n| `from` | `string` | Start time \u2014 relative (`15m`, `1h`, `7d`) or ISO 8601 |\n| `to` | `string` | End time \u2014 relative, ISO 8601, or `now` |\n| `limit` | `number` | Max results (1\u2013100, default 25) |\n| `sort` | `string` | `newest` or `oldest` |\n| `service` | `string` | Override project default RUM service |\n| `env` | `string` | Override project default environment |\n| `applicationId` | `string` | Override project default RUM application id (`@application.id`) |\n\nLike the logs tool, it returns a compact digest inline (counts, event-type breakdown, services) and writes the full events to a `rum-*.md` temp file the agent can `read`.\n\n### Command: `/datadog`\n\nCheck your configuration and connection status:\n\n```\n/datadog\n```\n\nShows: credential status (set/missing), project config (service, env, site, tags, RUM application, RUM service).\n\n## Query Syntax Examples\n\n```\nstatus:error                          # All errors\nservice:my-api status:error           # Errors for a specific service\n@http.status_code:500                 # 500 errors\n\"connection refused\"                  # Full-text search\nservice:my-api env:production @duration:>5000  # Slow requests\n```\n\nSee the [Datadog Log Search Syntax docs](https://docs.datadoghq.com/logs/explorer/search_syntax/) for the full reference.\n\n### RUM query examples\n\n```\n@type:session                          # User sessions (the default)\n@type:error                            # Front-end errors\n@type:view @view.url_path:/checkout    # Views on the checkout page\n@type:session @session.type:user       # Real user sessions (exclude synthetics)\n@application.id:abcd-1234 @type:action # Actions in a specific RUM application\n```\n\nSee the [RUM Search Syntax docs](https://docs.datadoghq.com/real_user_monitoring/explorer/search_syntax/) for the full reference.\n\n## How It Works\n\n1. The extension loads `.pi/datadog.json` from your project on session start\n2. When the agent calls `datadog_logs_search`, it merges your query with project defaults (service, env, tags)\n3. Results are formatted as markdown with status icons, truncated messages, and key attributes\n4. The agent receives structured metadata (status breakdown, services found) to summarize intelligently\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "datadog",
+    "logs",
+    "observability"
+  ],
+  "author": {
+    "name": "Juan Albarran",
+    "email": "jalbarrandev@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/dreki-gg/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dreki-gg/pi-extensions.git",
+    "directory": "packages/datadog"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/datadog"
+    ]
+  },
+  "time": {
+    "created": "2026-05-30T06:02:44.066Z",
+    "modified": "2026-06-05T03:50:12.208Z",
+    "0.2.0": "2026-05-30T06:02:44.376Z",
+    "0.2.4": "2026-06-04T00:18:05.976Z",
+    "0.3.0": "2026-06-05T03:50:11.944Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

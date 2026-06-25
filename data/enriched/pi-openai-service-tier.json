@@ -1,0 +1,40 @@
+{
+  "name": "pi-openai-service-tier",
+  "latest_version": "0.1.4",
+  "description": "Cost-correct OpenAI service tier / fast mode extension for pi",
+  "readme": "# pi-openai-service-tier\n\n[![CI](https://github.com/anirudhmehra/pi-openai-service-tier/actions/workflows/ci.yml/badge.svg)](https://github.com/anirudhmehra/pi-openai-service-tier/actions/workflows/ci.yml)\n[![GitHub release](https://img.shields.io/github/v/release/anirudhmehra/pi-openai-service-tier?include_prereleases&sort=semver)](https://github.com/anirudhmehra/pi-openai-service-tier/releases)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)\n\nCost-correct OpenAI service tier / fast mode for [pi](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent).\n\nMost fast-mode extensions only patch the outgoing JSON payload:\n\n```ts\n{ service_tier: \"priority\" }\n```\n\nThat can route the request correctly, but Pi's displayed cost accounting uses its internal provider option named `serviceTier`. This extension wraps Pi's built-in OpenAI provider calls and passes:\n\n```ts\n{ ...options, serviceTier: \"priority\" }\n```\n\nSo Pi gets both the OpenAI request field and the matching Pi-side service-tier cost multiplier.\n\n## Features\n\n- `/fast` toggles cost-correct `priority` tier.\n- `/openai-tier` selects `priority`, `flex`, `default`, `auto`, or `scale`.\n- Works with Pi's OpenAI Responses and OpenAI Codex Responses providers.\n- Avoids sending tiers that a provider does not support.\n- Includes `gpt-5.4` and `gpt-5.5` OpenAI/Codex models by default.\n- Does **not** change model, reasoning level, prompts, tools, or `text.verbosity`.\n- Does **not** make network calls of its own.\n- Stores simple JSON config with project-over-global precedence.\n\n## Install\n\n```bash\npi install npm:pi-openai-service-tier\n```\n\nGitHub install also works:\n\n```bash\npi install https://github.com/anirudhmehra/pi-openai-service-tier\n```\n\nThen start Pi normally:\n\n```bash\npi --provider openai-codex --model gpt-5.5\n```\n\nEnable priority tier at startup:\n\n```bash\npi --provider openai-codex --model gpt-5.5 --fast\n```\n\nTry without installing:\n\n```bash\npi -e npm:pi-openai-service-tier --provider openai-codex --model gpt-5.5 --fast\n```\n\n## Commands\n\n### Fast mode\n\n```text\n/fast\n/fast on\n/fast off\n/fast status\n```\n\n`/fast` toggles `priority` service tier on/off.\n\n### Explicit service tier\n\n```text\n/openai-tier priority\n/openai-tier flex\n/openai-tier default\n/openai-tier auto\n/openai-tier scale\n/openai-tier off\n/openai-tier status\n```\n\n`/openai-tier <tier>` enables that tier for supported models.\n\n## Configuration\n\nThe extension uses project-over-global config:\n\n```text\n<repo>/.pi/extensions/pi-openai-service-tier.json\n~/.pi/agent/extensions/pi-openai-service-tier.json\n```\n\nIf neither file exists, the extension creates this global default on session start:\n\n```json\n{\n  \"persistState\": true,\n  \"active\": false,\n  \"serviceTier\": \"priority\",\n  \"supportedModels\": [\n    \"openai/gpt-5.4\",\n    \"openai/gpt-5.5\",\n    \"openai-codex/gpt-5.4\",\n    \"openai-codex/gpt-5.5\"\n  ]\n}\n```\n\n### Config fields\n\n| Field | Type | Default | Description |\n| --- | --- | --- | --- |\n| `persistState` | boolean | `true` | Whether `/fast` and `/openai-tier` persist state across sessions. |\n| `active` | boolean | `false` | Whether a service tier is active. |\n| `serviceTier` | `priority` \\| `flex` \\| `default` \\| `auto` \\| `scale` | `priority` | Service tier passed to Pi's OpenAI provider option when supported by the current provider. |\n| `supportedModels` | string[] | see above | Allow-list of `provider/model-id` pairs that should receive `serviceTier`. |\n\nAdd/remove allow-listed models by editing `supportedModels`.\n\n## Supported providers/APIs\n\nThe extension applies tiers only when all of these are true:\n\n1. the model appears in `supportedModels`,\n2. the model uses one of these Pi APIs:\n   - `openai-responses`\n   - `openai-codex-responses`, and\n3. the selected tier is supported by that API.\n\nProvider-specific tier support:\n\n| Pi API | Supported tiers |\n| --- | --- |\n| `openai-responses` | `priority`, `flex`, `default`, `auto`, `scale` |\n| `openai-codex-responses` | `priority` |\n\nIf a tier is configured but unsupported by the current model/provider, the extension leaves `serviceTier` unset for that request instead of sending an invalid value.\n\n## Compatibility notes\n\nThis extension overrides Pi's API stream handlers for:\n\n- `openai-responses`\n- `openai-codex-responses`\n\nIt delegates back to Pi's built-in OpenAI implementations, adding `serviceTier` only for configured/supported OpenAI models. If another extension also overrides those API handlers, whichever extension loads last wins.\n\nRequires Pi / `@mariozechner/pi-ai` `>=0.72.1` and Node.js `>=22`.\n\n## Updating\n\nFor npm installs:\n\n```bash\npi update npm:pi-openai-service-tier\n```\n\nFor git installs, re-run:\n\n```bash\npi install https://github.com/anirudhmehra/pi-openai-service-tier\n```\n\n## Uninstall\n\n```bash\npi remove npm:pi-openai-service-tier\n```\n\nor, if installed from git:\n\n```bash\npi remove https://github.com/anirudhmehra/pi-openai-service-tier\n```\n\nIf desired, remove config files manually:\n\n```bash\nrm -f ~/.pi/agent/extensions/pi-openai-service-tier.json\nrm -f .pi/extensions/pi-openai-service-tier.json\n```\n\n## Development\n\n```bash\ngit clone https://github.com/anirudhmehra/pi-openai-service-tier.git\ncd pi-openai-service-tier\nnpm install\nnpm run check\n```\n\nLocal Pi smoke test:\n\n```bash\npi -e ./index.ts --list-models\npi -e ./index.ts --provider openai-codex --model gpt-5.5 --fast\n```\n\n## Security\n\nPi extensions run with your local user permissions. This extension only reads/writes its config JSON files and delegates LLM calls to Pi's built-in OpenAI providers; it does not perform independent network requests.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "openai",
+    "codex",
+    "fast",
+    "priority",
+    "service-tier"
+  ],
+  "author": {
+    "name": "Anirudh Mehra"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/anirudhmehra/pi-openai-service-tier#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anirudhmehra/pi-openai-service-tier.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/anirudhmehra/pi-openai-service-tier/main/assets/social-preview.png"
+  },
+  "time": {
+    "created": "2026-05-03T11:33:12.036Z",
+    "modified": "2026-05-03T11:44:24.321Z",
+    "0.1.3": "2026-05-03T11:33:12.251Z",
+    "0.1.4": "2026-05-03T11:44:24.206Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 37,
+  "download_trend": []
+}

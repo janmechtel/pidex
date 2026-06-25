@@ -1,0 +1,33 @@
+{
+  "name": "pi-sync-config",
+  "latest_version": "1.0.0",
+  "description": "Sync your pi config (settings, extensions, themes, skills, prompts) to a remote git repository",
+  "readme": "# pi-sync-config\n\nA [pi](https://pi.dev) extension that keeps your pi configuration\nin sync across machines via a remote git repository.\n\n## What gets synced\n\n| Item             | Path                                                      |\n| ---------------- | --------------------------------------------------------- |\n| Settings         | `~/.pi/agent/settings.json` (machine-local keys stripped) |\n| Keybindings      | `~/.pi/agent/keybindings.json`                            |\n| Extensions       | `~/.pi/agent/extensions/`                                 |\n| Themes           | `~/.pi/agent/themes/`                                     |\n| Skills           | `~/.pi/agent/skills/`                                     |\n| Prompt templates | `~/.pi/agent/prompts/`                                    |\n\n**Never synced (secrets & sensitive files):**\n\n| Item                      | Reason                                                                                |\n| ------------------------- | ------------------------------------------------------------------------------------- |\n| `auth.json`               | API keys and OAuth tokens                                                             |\n| `AGENTS.md` / `CLAUDE.md` | User context files \u2014 may contain sensitive business logic or proprietary instructions |\n| `sessions/`               | Local session history                                                                 |\n| `git/`, `npm/`, `bin/`    | Installed packages \u2014 reinstalled automatically via `packages` in settings.json        |\n\n### settings.json handling\n\n`settings.json` is safe to sync \u2014 pi stores secrets in `auth.json` and\nenvironment variables, never in settings. Before committing, pi-sync strips\nmachine-local runtime keys (e.g. `lastChangelogVersion`). On pull, incoming\nportable config is merged into the local file so machine-specific values\n(e.g. `shellPath`) set on this machine are preserved.\n\n## Installation\n\n```bash\npi install npm:pi-sync-config\n```\n\n## Setup\n\nRun once after installation:\n\n```\n/sync-setup <ssh-repo-url>\n```\n\nOptionally set a custom pull interval (default 1 day):\n\n```\n/sync-setup git@github.com:you/pi-config.git 60\n```\n\n> **SSH only** \u2014 HTTPS URLs are rejected. Make sure your SSH key is added to\n> your Git host (e.g. `~/.ssh/id_ed25519.pub` \u2192 GitHub \u2192 Settings \u2192 SSH keys).\n\npi-sync will:\n\n1. Clone (or push to) the remote repo.\n2. Watch `settings.json` for changes \u2014 every `pi install` automatically\n   triggers a push.\n3. Pull from the remote every N minutes in the background (default: once a day).\n\n## Commands\n\n| Command                        | Description                             |\n| ------------------------------ | --------------------------------------- |\n| `/sync-setup <url> [interval]` | First-time setup with a remote git URL  |\n| `/sync`                        | Manually push current config to remote  |\n| `/sync-pull`                   | Manually pull latest config from remote |\n| `/sync-status`                 | Show current config and last sync time  |\n\n## How it works\n\n```\nsession_start\n  \u2514\u2500 pull latest from remote (fast-forward only)\n  \u2514\u2500 start periodic pull timer (default every 1440 min / 1 day)\n  \u2514\u2500 watch ~/.pi/agent/settings.json for changes\n\nsettings.json changes (e.g. after `pi install`)\n  \u2514\u2500 debounced 2 s \u2192 push to remote\n\nperiodic pull timer\n  \u2514\u2500 git fetch \u2192 check for new commits \u2192 pull + apply\n\nsession_shutdown\n  \u2514\u2500 cancel timer + file watcher\n```\n\nConfig is stored in `~/.pi/agent/pi-sync.json` (never committed to the repo).\nThe local git clone lives at `~/.pi/agent/sync-repo/`.\n\n## Conflict handling\n\nPulls use `--ff-only`. If histories diverge (e.g. two machines pushed\nindependently), the pull is skipped with an error notification. Fix manually\nin `~/.pi/agent/sync-repo/` and run `/sync-pull` again.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension"
+  ],
+  "author": {
+    "name": "Pouya Mozaffar Moghadam"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/pouyamozaffarmagham/pi-sync-config#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pouyamozaffarmagham/pi-sync-config.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-07T05:25:04.424Z",
+    "1.0.0": "2026-04-07T05:25:04.568Z",
+    "modified": "2026-04-07T05:25:04.735Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 12,
+  "download_trend": []
+}

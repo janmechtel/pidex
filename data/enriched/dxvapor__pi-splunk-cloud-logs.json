@@ -1,0 +1,349 @@
+{
+  "name": "@dxvapor/pi-splunk-cloud-logs",
+  "latest_version": "1.0.0",
+  "description": "Pi coding agent extension for querying Splunk Cloud logs via REST API. Supports OAuth2 client credentials and bearer token auth.",
+  "readme": "# pi-splunk-cloud-logs\n\n[![npm](https://img.shields.io/npm/v/@dxvapor/pi-splunk-cloud-logs?style=flat-square)](https://www.npmjs.com/package/@dxvapor/pi-splunk-cloud-logs)\n[![pi-package](https://img.shields.io/badge/pi-package-blue?style=flat-square)](https://shittycodingagent.ai/packages)\n[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)\n\nA [pi coding agent](https://github.com/badlogic/pi-mono) extension that gives the LLM direct access to **Splunk Cloud** logs via the Splunk REST API.\n\n## Features\n\n- \ud83d\udd0d **`splunk_search`** \u2014 Async SPL search with live progress polling\n- \u26a1 **`splunk_oneshot`** \u2014 Fast synchronous search for quick/narrow queries\n- \ud83d\udccb **`splunk_list_indexes`** \u2014 Discover available indexes before writing queries\n- \ud83d\uddc2\ufe0f **`splunk_list_jobs`** \u2014 Inspect recent search jobs\n- \ud83d\udd10 **OAuth 2 client credentials** (preferred) or **static bearer token**\n- \ud83d\udda5\ufe0f `/splunk-config` \u2014 Interactive TUI setup\n- \ud83e\ude7a `/splunk-test` \u2014 One-command connectivity check\n\n## Installation\n\n```bash\npi install npm:@dxvapor/pi-splunk-cloud-logs\n```\n\nOr try it without installing:\n\n```bash\npi -e npm:@dxvapor/pi-splunk-cloud-logs\n```\n\n## Authentication\n\n### Option 1 \u2014 OAuth 2 client credentials (recommended)\n\nCreate an OAuth 2.1 client in your Splunk Cloud instance\n(**Settings \u2192 Identity Provider \u2192 Manage OAuth 2.0 Clients**), then:\n\n```bash\nexport SPLUNK_HOST=myorg.splunkcloud.com\nexport SPLUNK_CLIENT_ID=your-client-id\nexport SPLUNK_CLIENT_SECRET=your-client-secret\n```\n\nThe extension automatically obtains and refreshes access tokens.\n\n### Option 2 \u2014 Bearer token\n\nGenerate a token in Splunk Web (**Settings \u2192 Tokens**), then:\n\n```bash\nexport SPLUNK_HOST=myorg.splunkcloud.com\nexport SPLUNK_TOKEN=eyJ...\n```\n\n### Optional\n\n```bash\nexport SPLUNK_PORT=8089   # Default: 8089\n```\n\n### Interactive setup\n\nAlternatively, configure inside pi at runtime:\n\n```\n/splunk-config\n```\n\nCredentials entered via `/splunk-config` are **stored in memory only** and are\nnever written to disk or the session file.\n\n## Usage\n\nAfter starting pi with the extension loaded, just describe what you need:\n\n```\nSearch Splunk for HTTP 5xx errors in the last hour across all hosts.\n```\n\n```\nList all Splunk indexes and show me which ones have data from today.\n```\n\n```\nShow me the top 10 hosts by error count in the past 24 hours.\n```\n\nThe LLM uses the registered tools to run SPL queries automatically.\n\n### Manual tool calls (for testing)\n\n```\nRun: splunk_list_indexes\nRun: splunk_oneshot { \"query\": \"index=main error | head 5\", \"earliestTime\": \"-15m\" }\n```\n\n### Commands\n\n| Command | Description |\n|---------|-------------|\n| `/splunk-config` | Interactive connection setup |\n| `/splunk-test` | Test connectivity and show server info |\n\n## How it works\n\n```\nUser prompt\n    \u2502\n    \u25bc\nLLM decides to call splunk_search\n    \u2502\n    \u251c\u2500\u2500 POST /services/search/jobs        (create job)\n    \u251c\u2500\u2500 GET  /services/search/jobs/{sid}  (poll status)  \u2190 repeats\n    \u2514\u2500\u2500 GET  /services/search/jobs/{sid}/results (fetch)\n    \u2502\n    \u25bc\nFormatted results returned to LLM \u2192 answer\n```\n\nFor `splunk_oneshot`, the export endpoint is used instead for a single\nround-trip response.\n\n## Environment Variables\n\n| Variable | Required | Description |\n|----------|----------|-------------|\n| `SPLUNK_HOST` | \u2705 | Splunk Cloud hostname (e.g. `myorg.splunkcloud.com`) |\n| `SPLUNK_PORT` | \u274c | Management port. Default: `8089` |\n| `SPLUNK_CLIENT_ID` | \u2705 (OAuth) | OAuth 2 client ID |\n| `SPLUNK_CLIENT_SECRET` | \u2705 (OAuth) | OAuth 2 client secret |\n| `SPLUNK_TOKEN` | \u2705 (token) | Static bearer token |\n\n## Requirements\n\n- Node.js \u2265 18 (for native `fetch`)\n- pi coding agent installed globally\n- Splunk Cloud Platform instance with REST API access on port 8089\n\n## Security notes\n\n- Credentials entered via `/splunk-config` are **in-memory only**.\n- OAuth tokens are cached in-process and refreshed automatically before expiry.\n- TLS is always used (Splunk Cloud enforces it).\n- Store long-lived secrets in environment variables, not in code or config files.\n\n## Contributing\n\nIssues and PRs welcome at\n[github.com/dxvapor/pi-splunk-cloud-logs](https://github.com/dxvapor/pi-splunk-cloud-logs).\n\n## License\n\nMIT \u2014 see [LICENSE](LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "splunk",
+    "splunk-cloud",
+    "logs",
+    "observability"
+  ],
+  "author": {
+    "name": "dxvapor"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/dxvapor/pi-splunk-cloud-logs#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dxvapor/pi-splunk-cloud-logs.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-04-22T05:11:27.397Z",
+    "1.0.0": "2026-04-22T05:11:27.661Z",
+    "modified": "2026-04-22T05:11:27.932Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 13,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 52
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

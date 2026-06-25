@@ -1,0 +1,42 @@
+{
+  "name": "@marcfargas/pi-powershell",
+  "latest_version": "1.0.0",
+  "description": "PowerShell tool for pi agents - Windows system integration and background processes",
+  "readme": "# @marcfargas/pi-powershell\n\n[![npm](https://img.shields.io/npm/v/@marcfargas/pi-powershell)](https://www.npmjs.com/package/@marcfargas/pi-powershell)\n\nPowerShell tools for [pi](https://github.com/mariozechner/pi-coding-agent) agents on Windows \u2014 background processes, system operations, and remote management.\n\n## Problem\n\nWindows Git Bash hangs when running background processes (`npm run dev &`), freezing the entire agent session. There's no reliable way to start a dev server, run tests, or manage processes in the background from a pi agent on Windows.\n\n## Solution\n\nA pi package bundling an **extension** (8 tools) and a **skill** (teaches agents when and how to use them).\n\n| Tool | Purpose |\n|------|---------|\n| `powershell` | Execute PowerShell commands (stateless, like `bash`) |\n| `pwsh-start-job` | Start background processes as real OS processes |\n| `pwsh-get-job` | Check job status (by name or list all) |\n| `pwsh-stop-job` | Stop a running job |\n| `pwsh-remove-job` | Remove job and clean up log files |\n| `pwsh-get-job-output` | Read captured stdout/stderr from a job |\n| `pwsh-create-session` | Create PSSession to a remote machine |\n| `pwsh-close-session` | Close a remote PSSession |\n\n## Installation\n\n```bash\npi install npm:@marcfargas/pi-powershell\n```\n\nThe package registers both the extension (tools) and skill (agent documentation).\n\n## Background Processes\n\nThe main reason this extension exists. Jobs are real OS processes (via `Start-Process -WindowStyle Hidden`), not PowerShell jobs \u2014 they persist across tool calls.\n\n```javascript\nawait tools['pwsh-start-job']({\n  name: 'dev-server',\n  command: 'npm run dev',\n  workingDirectory: 'C:/dev/myapp'\n});\n\nawait tools['pwsh-get-job']({ name: 'dev-server' });\nawait tools['pwsh-get-job-output']({ name: 'dev-server' });\n\nawait tools['pwsh-stop-job']({ name: 'dev-server' });\nawait tools['pwsh-remove-job']({ name: 'dev-server' });\n```\n\n### Output Capture\n\nBy default, all PowerShell streams are merged into one temp log file (`*>`). Control with `stdout` and `stderr` params:\n\n```javascript\n// Separate files\nawait tools['pwsh-start-job']({ name: 's', command: 'npm run dev', stdout: 'C:/logs/out.log', stderr: 'C:/logs/err.log' });\n\n// Discard stderr\nawait tools['pwsh-start-job']({ name: 's', command: 'npm run dev', stderr: 'null' });\n\n// Fire and forget\nawait tools['pwsh-start-job']({ name: 's', command: 'npm run dev', stdout: 'null', stderr: 'null' });\n```\n\n## PowerShell Commands\n\nEach `powershell` call spawns a fresh `pwsh` process that dies after execution \u2014 stateless, like `bash`.\n\n- **UTF-8 output** \u2014 non-ASCII characters render correctly on any locale\n- **Batch file auto-retry** \u2014 `.cmd`/`.bat` failures automatically retry with `cmd /c`\n- **Output streaming** \u2014 partial output streams to the TUI as it arrives\n\n## PSSessions (Remote Management)\n\nPSSessions are persistent connections to **remote** Windows machines. They maintain state (variables, imported modules) across commands on the remote machine.\n\n```javascript\nawait tools['pwsh-create-session']({\n  name: 'prod', computerName: 'server.company.com',\n  credential: 'domain\\\\admin', authentication: 'Kerberos'\n});\nawait tools.powershell({ command: 'Get-Service IIS', session: 'prod' });\nawait tools['pwsh-close-session']({ name: 'prod' });\n```\n\n**Never** use PSSessions as a local persistent shell \u2014 breaks pi's `/tree` and `/fork` behavior.\n\n## Design Decisions\n\n- **OS processes, not PS jobs**: `Start-Job` dies when the `pwsh` process exits. `Start-Process -WindowStyle Hidden` creates real detached processes tracked by PID in extension memory.\n- **`*>` redirection**: Merges all PowerShell streams into one file by default. See [about_Redirection](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_redirection).\n- **Extension + Skill**: Tools provide the capability; the bundled skill teaches agents when and how to use them (including advanced topics like PSSessions via progressive disclosure).\n- **UTF-8 forced**: Every command prefixed with `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`.\n- **Cross-instance safe**: Each pi instance gets a unique suffix on temp log files.\n\n## Development\n\nPart of [pi-mf-extensions](https://github.com/marcfargas/pi-mf-extensions).\n\n```bash\nnpm test        # 50 tests\nnpm run typecheck\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "agent",
+    "powershell",
+    "windows",
+    "background-processes",
+    "system-integration"
+  ],
+  "author": {
+    "name": "Marc Fargas"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/marcfargas/pi-mf-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marcfargas/pi-mf-extensions.git",
+    "directory": "packages/pi-powershell"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-02-19T13:52:58.569Z",
+    "modified": "2026-02-20T20:07:28.190Z",
+    "0.1.0": "2026-02-19T13:52:58.765Z",
+    "1.0.0": "2026-02-20T20:07:27.765Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

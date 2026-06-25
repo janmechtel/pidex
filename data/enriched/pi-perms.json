@@ -1,0 +1,48 @@
+{
+  "name": "pi-perms",
+  "latest_version": "2.1.0",
+  "description": "Pi CLI extension \u2014 configurable permission policy from .agents/permissions.json and native agent configs",
+  "readme": "# pi-perms\n\n[![npm version](https://img.shields.io/npm/v/pi-perms.svg)](https://www.npmjs.com/package/pi-perms)\n[![License](https://img.shields.io/badge/License-Apache--2.0-lightgrey.svg)](LICENSE)\n[![CI](https://img.shields.io/github/actions/workflow/status/Mearman/pi-perms/ci.yml?branch=main)](https://github.com/Mearman/pi-perms/actions)\n\nPi CLI extension that enforces a cross-agent permission policy from `.agents/permissions.json`.\n\nUses [agent-perms](https://www.npmjs.com/package/agent-perms) for evaluation and policy loading. See the [agent-perms README](https://github.com/Mearman/agent-permissions#readme) for the full schema, rule syntax, and codec documentation.\n\n## Install\n\n```bash\npnpm add pi-perms\n```\n\nPi loads the extension automatically via the `pi.extensions` field in `package.json` \u2014 no additional configuration needed.\n\n## How it works\n\n1. Subscribes to `tool_call` events from Pi\n2. Loads the merged permission policy from `.agents/permissions.json` + `.agents/permissions.local.json`\n3. Evaluates the tool call against the policy (deny-first)\n4. Blocks denied calls, passes `ask` calls through Pi's default confirmation, and allows everything else\n\n## Policy file\n\nCreate `.agents/permissions.json` in your project root:\n\n```json\n{\n  \"rules\": [\n    { \"tool\": \"Bash\", \"pattern\": \"git status\", \"tier\": \"allow\" },\n    { \"tool\": \"Bash\", \"pattern\": \"npm run test:*\", \"tier\": \"allow\" },\n    { \"tool\": \"Read\", \"tier\": \"allow\" },\n    { \"tool\": \"Grep\", \"tier\": \"allow\" },\n    { \"tool\": \"Bash\", \"pattern\": \"sudo:*\", \"tier\": \"deny\" },\n    { \"tool\": \"Bash\", \"pattern\": \"rm -rf /\", \"tier\": \"deny\" },\n    { \"tool\": \"Bash\", \"pattern\": \"git push:*\", \"tier\": \"ask\" },\n    { \"tool\": \"Bash\", \"pattern\": \"npm publish:*\", \"tier\": \"ask\" }\n  ]\n}\n```\n\nClaude Code's `permissions.allow/deny/ask` arrays are also accepted \u2014 the loader normalises them into `rules`.\n\n| File | Purpose | Git |\n|---|---|---|\n| `.agents/permissions.json` | Team-shared policy | Committed |\n| `.agents/permissions.local.json` | Personal overrides | Gitignored |\n\n## Rule syntax\n\nRules use structured objects with `tool`, optional `pattern`, and `tier`. In `permissions` compat arrays, they use `Tool(pattern)` strings:\n\n| Pattern | Matches |\n|---|---|\n| `Read` | All file reads |\n| `Bash(git status)` | Exactly `git status` |\n| `Bash(npm:*)` | Commands starting with `npm ` |\n| `Bash(git commit *)` | `git commit` followed by anything |\n| `Bash(domain:evil.com)` | Commands containing `evil.com` |\n\nEvaluation order: **deny \u2192 ask \u2192 allow**. Deny short-circuits before all other tiers.\n\n## Dependencies\n\n- [agent-perms](https://www.npmjs.com/package/agent-perms) \u2014 evaluator, loader, Zod schemas\n- [@earendil-works/pi-coding-agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) \u2014 Pi extension API (peer dependency, \u22650.74)\n\n## Development\n\n```bash\npnpm install\npnpm test             # 20 tests (unit + e2e)\npnpm typecheck\npnpm lint\n```\n\n### Source structure\n\n```\nsrc/\n  extension.ts        # Pi extension factory \u2014 subscribes to tool_call events\n  test/\n    e2e.test.ts       # End-to-end tests with mock ExtensionAPI\n    evaluate.test.ts  # Unit tests for extractInput()\n```\n\nThe evaluator and loader live in `agent-perms` \u2014 pi-perms is a thin wiring layer that connects them to Pi's extension API.\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "permissions",
+    "agents",
+    "coding-agent",
+    "claude-code",
+    "codex",
+    "opencode"
+  ],
+  "author": {
+    "name": "Joseph Mearman"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/Mearman/pi-perms#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mearman/pi-perms.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/extension.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-10T09:00:22.707Z",
+    "modified": "2026-05-12T09:31:32.123Z",
+    "1.0.0": "2026-05-10T09:00:22.871Z",
+    "1.0.1": "2026-05-10T15:48:45.796Z",
+    "1.0.2": "2026-05-10T16:09:21.034Z",
+    "1.1.0": "2026-05-10T16:37:10.748Z",
+    "1.1.1": "2026-05-10T16:46:25.539Z",
+    "1.2.0": "2026-05-10T18:53:27.485Z",
+    "1.2.1": "2026-05-10T21:36:55.606Z",
+    "1.2.2": "2026-05-10T22:39:32.189Z",
+    "1.2.3": "2026-05-10T22:42:12.825Z",
+    "2.0.0": "2026-05-10T23:20:02.420Z",
+    "2.1.0": "2026-05-12T09:31:31.803Z"
+  },
+  "versions_count": 11,
+  "downloads_last_week": 12,
+  "download_trend": []
+}

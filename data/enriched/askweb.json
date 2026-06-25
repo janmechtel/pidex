@@ -1,0 +1,354 @@
+{
+  "name": "askweb",
+  "latest_version": "0.2.0",
+  "description": "Unified web search and read provider for agents and CLI.",
+  "readme": "# askweb\n\n[![npm version](https://img.shields.io/npm/v/askweb?style=flat&colorA=130f40&colorB=474787)](https://npmjs.com/package/askweb)\n[![npm downloads](https://img.shields.io/npm/dm/askweb?style=flat&colorA=130f40&colorB=474787)](https://npm.chart.dev/askweb)\n[![license](https://img.shields.io/github/license/oritwoen/askweb?style=flat&colorA=130f40&colorB=474787)](https://github.com/oritwoen/askweb/blob/main/LICENSE)\n[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/oritwoen/askweb)\n\nOne API for Brave, Exa, Jina, Tavily, SerpAPI, SerpBase, and SearXNG. Write your search logic once, swap the provider string, done.\n\nIf you're building an AI agent or a CLI tool that needs web search, you don't want to hardcode a single provider's API. They all return roughly the same thing, a list of URLs with titles and snippets, but the auth, endpoints, and response shapes are all different. Exa uses POST with `x-api-key`, Brave uses GET with `X-Subscription-Token`, Jina uses Bearer auth, Tavily puts the key in the request body. And so on.\n\n`askweb` normalizes all of that behind a single interface. It also ships an [AI SDK](https://ai-sdk.dev/) tool and a CLI. Search is query-to-results; read is URL-to-content.\n\n> [!WARNING]\n> `askweb` is experimental. The package name, public API, provider model, CLI flags, and tool surfaces may change before the first stable release. Pin exact versions if you build on it now.\n\n## Pi extension\n\n`askweb` ships with a [pi](https://pi.dev) extension that registers three tools and two commands. Install the package straight from GitHub:\n\n```bash\npi install git:github.com/oritwoen/askweb\n```\n\nProvided tools:\n\n- `askweb` - search the web with a single provider, or `provider=\"all\"` to fan out across every configured/reachable provider in parallel\n- `askweb_read` - read a URL into normalized content with a read-capable provider (currently Jina Reader)\n- `askweb_providers` - list built-in providers, env-var configuration, and reachability status\n\nProvided slash commands:\n\n- `/web [query]` - quick search from the TUI; results are shown as a selector and the chosen URL is pasted into the editor\n- `/web-providers` - show provider configuration and reachability status\n\nThe extension reuses the same env vars as the library (`EXA_API_KEY`, `BRAVE_API_KEY`, `JINA_API_KEY`, `TAVILY_API_KEY`, `SERPAPI_API_KEY`, `SERPBASE_API_KEY`, or a self-hosted SearXNG). Pi bundles `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, and `typebox`, so no extra installs are needed.\n\n## Install\n\n```bash\npnpm add askweb\n```\n\nFor the AI SDK tool (`askweb/ai` subpath), you also need `ai` and `zod` as peer dependencies:\n\n```bash\npnpm add ai zod\n```\n\n## Usage\n\nSet your API key as an environment variable and create a provider:\n\n```typescript\nimport { create } from 'askweb'\n\n// Reads EXA_API_KEY from process.env\nconst exa = create('exa')\n\nconst results = await exa.search('typescript runtime benchmarks', { maxResults: 5 })\n\nfor (const result of results) {\n  console.log(result.title, result.url)\n}\n```\n\nSwap the provider string, same code:\n\n```typescript\nconst brave = create('brave')   // reads BRAVE_API_KEY\nconst jina = create('jina')     // reads JINA_API_KEY\nconst tavily = create('tavily') // reads TAVILY_API_KEY\n```\n\nYou can also pass the key explicitly:\n\n```typescript\nconst exa = create('exa', { apiKey: 'your-key-here' })\n```\n\n### Search all providers\n\nQuery all available providers in parallel and get deduplicated results:\n\n```typescript\nimport { searchAll } from 'askweb'\n\n// Detects providers from env vars, queries them in parallel\nconst results = await searchAll('latest node.js release')\n\nfor (const result of results) {\n  console.log(`[${result.provider}]`, result.title, result.url)\n}\n```\n\n`searchAll` uses `Promise.allSettled` internally, so if one provider fails, the others still return. Results are deduplicated by URL (normalized, UTM params stripped). When duplicates exist, the result with the higher score wins.\n\nYou can also specify which providers to query:\n\n```typescript\nconst results = await searchAll('query', {\n  providers: ['exa', 'brave'],\n  maxResults: 5,\n})\n```\n\n### Read a URL\n\nUse `readUrl` when you already have a URL and want normalized page content:\n\n```typescript\nimport { readUrl } from 'askweb'\n\nconst page = await readUrl('https://example.com/article', {\n  provider: 'jina',\n  format: 'markdown',\n  maxTokens: 4000,\n})\n\nconsole.log(page.title, page.content)\n```\n\nJina read uses `r.jina.ai` and does not require an API key for basic reads; if `JINA_API_KEY` is present it is sent as Bearer auth.\n\n### AI SDK tool\n\nThe `askweb/ai` subpath exports ready-made tools compatible with [Vercel AI SDK](https://ai-sdk.dev/docs/foundations/tools):\n\n```typescript\nimport { generateText } from 'ai'\nimport { readTool, searchTool } from 'askweb/ai'\n\nconst { text } = await generateText({\n  model: yourModel,\n  tools: { webSearch: searchTool, webRead: readTool },\n  prompt: 'Find the latest TypeScript release notes',\n})\n```\n\n`searchTool` accepts an optional `provider` parameter. Set it to `\"all\"` to query all available providers in parallel. `readTool` accepts a URL and reads page content with a read-capable provider:\n\n```typescript\n// The AI can choose: a specific provider, or \"all\" for parallel search\ntools: { webSearch: searchTool, webRead: readTool }\n// searchTool input: { query: string, provider?: \"brave\" | \"exa\" | ... | \"all\", maxResults?: number }\n// readTool input: { url: string, provider?: \"jina\", format?: \"markdown\" | \"text\" | \"html\" }\n```\n\nFor `searchTool`, when no provider is specified, the tool auto-detects the first available one from environment variables. `readTool` defaults to Jina Reader.\n\n## CLI\n\n```bash\naskweb \"your query\"\naskweb --provider brave \"your query\" --max-results 5\naskweb search \"your query\" --json\naskweb read https://example.com --format markdown --json\naskweb providers\n```\n\n| Command | Description |\n|---------|-------------|\n| `askweb <query>` | Search the web using the default provider |\n| `askweb search <query>` | Search the web using a provider |\n| `askweb read <url>` | Read a URL into normalized content |\n| `askweb providers` | List built-in providers |\n\n| Flag | Description |\n|------|-------------|\n| `--provider <name>` | Provider to use (search default: first configured; read default: `jina`) |\n| `--max-results <n>` | Maximum search results to return (default: `10`) |\n| `--format <markdown\\|text\\|html>` | Preferred read format |\n| `--max-tokens <n>` | Maximum read tokens when supported |\n| `--json` | Output as JSON |\n\n## Providers\n\n| Provider | Env var | Auth | Free tier |\n|----------|---------|------|-----------|\n| Brave | `BRAVE_API_KEY` | Header | 2k queries/mo |\n| Exa | `EXA_API_KEY` | Header | 1k queries/mo |\n| Jina | `JINA_API_KEY` | Bearer header | Required for search; optional for read |\n| SearXNG | - | None | Self-hosted |\n| SerpAPI | `SERPAPI_API_KEY` | Query param | 100 queries/mo |\n| SerpBase | `SERPBASE_API_KEY` | `X-API-Key` header | 100 searches to start |\n| Tavily | `TAVILY_API_KEY` | Body | 1k queries/mo |\n\n### Result shape\n\nAll search providers always return `{ url, title, snippet }`. Optional fields depend on what each provider's native API exposes \u2014 `askweb` passes them through without flattening:\n\n| Provider | Optional fields populated |\n|----------|---------------------------|\n| Exa     | `text` (full page), `highlights[]`, `summary` (AI), `score`, `publishedDate`, `author`, `image`, `favicon` |\n| Jina    | `text` (`content`/`text`), `publishedDate`, `image`, `metadata` |\n| Tavily  | `text` (raw_content, full HTML/markdown), `score`, `publishedDate` |\n| Brave   | `text` (joined `extra_snippets`), `favicon` |\n| SerpAPI | `image` (thumbnail), `publishedDate`, `favicon`, `metadata.{position, source, displayedLink}` |\n| SerpBase | `image` (SERP thumbnail/image), `publishedDate`, `favicon`, `metadata.{position, rank, searchType, requestId, elapsedMs, creditsCharged}` |\n| SearXNG | `image`, `score`, `publishedDate`, `metadata.{engine, engines, category}` |\n\nPick the provider that fits the shape you want. Exa is closest to \"AI search\" (summary + highlights + full text on request). Jina uses Jina Search Foundation and can return result content plus metadata. Tavily is best when you want the raw page content. Brave/SerpAPI/SerpBase/SearXNG are classic SERP-style metadata.\n\nSerpBase uses Google SERP endpoints. `category: \"images\"`, `\"news\"`, or `\"videos\"` selects the matching SerpBase endpoint; `maxResults` is applied client-side to the returned page.\n\nSearXNG requires no API key. It's a self-hosted metasearch engine. By default askweb connects to `http://localhost:8080`. Override with `baseURL`:\n\n```typescript\nconst searx = create('searxng', { baseURL: 'https://searx.example.com' })\n```\n\n## Errors\n\nAll providers throw the same error types:\n\n```typescript\nimport { AuthError, RateLimitError, HTTPError, UnknownProviderError } from 'askweb'\n\ntry {\n  const results = await provider.search('query')\n} catch (err) {\n  if (err instanceof AuthError) {\n    // Missing or invalid API key\n  }\n  if (err instanceof RateLimitError) {\n    console.log(`Retry after ${err.retryAfter}s`)\n  }\n  if (err instanceof UnknownProviderError) {\n    // Provider name not recognized\n  }\n}\n```\n\nA 401 from any provider becomes `AuthError`. A 429 from any provider becomes `RateLimitError` with a `retryAfter` value. Everything else is `HTTPError` or the base `AskwebError`.\n\nFor safety, `HTTPError.url` redacts sensitive query params and URL userinfo credentials before surfacing the URL in error messages.\n\n## Data model\n\nEvery search provider returns the same normalized type:\n\n```typescript\ninterface SearchResult {\n  url: string\n  title: string\n  snippet: string\n  score?: number\n  publishedDate?: string\n  author?: string\n  image?: string\n  favicon?: string\n  text?: string\n  highlights?: string[]\n  summary?: string\n  metadata?: Record<string, unknown>\n}\n```\n\nOptional fields depend on what the provider returns. Exa provides `score`, `text`, and `highlights`. Jina provides result `text`/metadata when available. Brave provides `favicon`. Not all providers populate all fields.\n\nRead results use the same naming for URL-to-content:\n\n```typescript\ninterface ReadResult {\n  url: string\n  title?: string\n  description?: string\n  content: string\n  text?: string\n  html?: string\n  publishedDate?: string\n  image?: string\n  links?: string[]\n  images?: string[]\n  metadata?: Record<string, unknown>\n}\n```\n\nSearch options you can pass to `.search()` or `searchAll`:\n\n```typescript\ninterface SearchOptions {\n  maxResults?: number\n  includeDomains?: string[]\n  excludeDomains?: string[]\n  startPublishedDate?: string\n  endPublishedDate?: string\n  category?: string\n}\n```\n\n`maxResults` works with every search provider. Domain filtering is supported by Exa, Tavily, and Jina include filters (`site`). Date ranges are currently Exa-specific. `category` is supported by Exa, Jina (`web`, `images`, `news`), and SearXNG.\n\nRead options you can pass to `readUrl`:\n\n```typescript\ninterface ReadUrlOptions {\n  provider?: 'jina' // custom registered provider names are also accepted at runtime\n  format?: 'markdown' | 'text' | 'html'\n  maxTokens?: number\n  targetSelector?: string\n  removeSelector?: string\n  timeout?: number\n  noCache?: boolean\n}\n```\n\n## Development\n\n```bash\npnpm install\npnpm typecheck   # tsc --noEmit\npnpm build       # obuild\npnpm test        # vitest (watch mode)\npnpm test:run    # vitest --run\n```\n\n## License\n\n[MIT](./LICENSE)\n",
+  "keywords": [
+    "web-search",
+    "search",
+    "cli",
+    "agents",
+    "provider",
+    "unified",
+    "typescript",
+    "pi-extension",
+    "pi-package"
+  ],
+  "author": {
+    "name": "oritwoen",
+    "url": "https://github.com/oritwoen"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/oritwoen/askweb#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oritwoen/askweb.git"
+  },
+  "pi": {
+    "extensions": [
+      "./packages/pi/extensions/*.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-16T18:11:39.824Z",
+    "modified": "2026-05-22T17:56:57.774Z",
+    "0.1.2": "2026-05-16T18:11:40.162Z",
+    "0.2.0": "2026-05-22T17:56:57.652Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 18,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 148
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 164
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 3
+    }
+  ]
+}

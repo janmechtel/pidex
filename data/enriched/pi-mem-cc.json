@@ -1,0 +1,31 @@
+{
+  "name": "pi-mem-cc",
+  "latest_version": "0.1.0",
+  "description": "Automatic observer-based memory for pi \u2014 silently compresses every tool call into searchable structured observations, injects relevant past context at session start.",
+  "readme": "# pi-mem-cc\n\n**Automatic observer-based memory for [pi](https://github.com/badlogic/pi-mono) coding agent.**\n\nInspired by [claude-mem](https://github.com/thedotmack/claude-mem) for Claude Code, but built natively for pi's extension API. Silently watches every tool call, compresses it into a structured observation, stores it in SQLite, and re-injects relevant past context at session start.\n\n## What's different from `pi-memory` (jayzeng)?\n\n| | `pi-memory` | `pi-mem-cc` |\n|---|---|---|\n| Memory capture | **Manual** \u2014 agent/user calls `memory_write` | **Automatic** \u2014 every tool call observed |\n| Storage | Plain markdown files | SQLite + FTS5 |\n| Search | Optional qmd (external dep) | Built-in hybrid (keyword + recency) |\n| Injection | Agent must call `memory_read` | Auto-injected at session start |\n| Use case | Personal knowledge book | Cross-session continuity |\n\nUse both. They cover different needs.\n\n## Install\n\n```bash\npi install npm:pi-mem-cc\n```\n\nThen `/reload`.\n\n## Tools registered\n\n| Tool | Purpose | Token cost |\n|---|---|---|\n| `mem_search` | Get compact index of matching observations | ~50-100 tok/result |\n| `mem_timeline` | Get chronological context around an observation id | variable |\n| `mem_get` | Fetch full observation details by IDs | ~500-1000 tok/each |\n\n**3-layer progressive disclosure** \u2014 `search` first, `timeline` for context, `get` only for filtered IDs.\n\n## Storage\n\n```\n~/.pi/agent/memory/pi-mem-cc.db   # SQLite (observations, summaries, FTS5)\n```\n\n## How it works\n\n1. **session_start** \u2192 register session in DB\n2. **before_agent_start** \u2192 query top-K relevant past observations (recency \u00d7 project match), append markdown to system prompt\n3. **tool_result** \u2192 fire-and-forget compress into `<observation>` via observer LLM, write to DB\n4. **agent_end** \u2192 fire-and-forget compress turn into `<summary>` via observer LLM, write to DB\n\nThe observer LLM uses the **same model as the active session** \u2014 no extra API key needed.\n\n## Configuration\n\nNo configuration. Uses your active session model.\n\n## License\n\nApache-2.0\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "memory",
+    "observer",
+    "agent"
+  ],
+  "author": null,
+  "license": "Apache-2.0",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-20T13:55:59.845Z",
+    "0.1.0": "2026-06-20T13:56:00.023Z",
+    "modified": "2026-06-20T13:56:00.270Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@spider-cloud/pi-spider-tools",
+  "latest_version": "0.1.0",
+  "description": "Pi extension that exposes Spider Cloud scraping, crawling, search, and browser automation tools.",
+  "readme": "# pi-spider-tools\n\nNative [Pi coding agent](https://pi.dev) tools that expose [Spider Cloud](https://spider.cloud)\nscraping, crawling, search, screenshot, and browser-automation capabilities.\n\nIt ships **two tool sets**, registered from separate entry files:\n\n- **Core tier** (`src/spider.ts`) \u2014 stateless tools that call the Spider Cloud REST API directly.\n- **Browser tier** (`src/browser.ts`) \u2014 stateful remote-browser automation backed by the\n  [`spider-browser`](https://www.npmjs.com/package/spider-browser) package (WebSocket to Spider's\n  pre-warmed browser fleet).\n\n## Core tools\n\n| Tool | Endpoint | Description |\n| --- | --- | --- |\n| `spider_scrape` | `POST /scrape` | Scrape a single URL; faster/cheaper than crawling. |\n| `spider_crawl` | `POST /crawl` | Crawl a site following links up to a `limit`/`depth`. |\n| `spider_search` | `POST /search` | Web search, optionally fetching each result's content. |\n| `spider_links` | `POST /links` | Collect links without returning page content. |\n| `spider_screenshot` | `POST /screenshot` | Capture a page screenshot (base64 PNG in the payload). |\n| `spider_unblocker` | `POST /unblocker` | Fetch anti-bot-protected pages via the stealth unblocker. |\n| `spider_transform` | `POST /transform` | Convert raw HTML to markdown/text (no web request). |\n| `spider_get_credits` | `GET /data/credits` | Check remaining credit balance (free). |\n\n## Browser tools\n\nStateful: `spider_browser_open` returns a `session_id` that the other tools take, and\n`spider_browser_close` releases it. **Open sessions bill until closed** \u2014 they auto-close after\n5 minutes of inactivity and on pi shutdown/reload, and at most 5 may be open at once.\n\n| Tool | Description |\n| --- | --- |\n| `spider_browser_open` | Open a remote browser session; returns a `session_id`. |\n| `spider_browser_navigate` | Navigate the session to a URL and wait for load. |\n| `spider_browser_click` | Click an element by CSS selector. |\n| `spider_browser_fill` | Fill a form field by CSS selector. |\n| `spider_browser_screenshot` | Capture a screenshot (returned as an inline image). |\n| `spider_browser_content` | Get the page HTML or visible text. |\n| `spider_browser_evaluate` | Execute JavaScript in the page and return the result. |\n| `spider_browser_wait_for` | Wait for a selector, navigation, or network idle. |\n| `spider_browser_close` | Close the session and stop billing. |\n\n## Result display\n\nCore tools cap processing to the first **10 results** (the model is told when more were\navailable, e.g. `processed first 10 of 31 results`) and render a compact summary in the TUI\ninstead of dumping raw JSON \u2014 a one-line `N results` row that expands to a `title \u2014 url` list.\nThe full (capped) JSON is still sent to the model.\n\n## Configuration\n\nThe extension reads `SPIDER_API_KEY` from the environment (pi does not load `.env` itself).\nGet a key at <https://spider.cloud/api-keys>. Optional overrides:\n`SPIDER_API_URL` (core REST base) and `SPIDER_BROWSER_URL` (browser fleet WebSocket).\n\n### Primary: pass the key inline\n\nPrefix the command with the key \u2014 the simplest way to run a one-off (works whether the\nextension is installed or loaded with `-e`):\n\n```bash\nSPIDER_API_KEY=sk-... pi\n```\n\n### Optional: auto-load with direnv\n\nTo avoid typing the key each time, keep it in a gitignored `.env` at the workspace root and let\n[direnv](https://direnv.net) load it whenever you enter the directory:\n\n```bash\nbrew install direnv                          # once\necho 'eval \"$(direnv hook zsh)\"' >> ~/.zshrc # once (then open a new terminal)\n\necho 'SPIDER_API_KEY=sk-...' > .env          # gitignored\nprintf 'dotenv\\n' > .envrc                    # loads .env\ndirenv allow\n```\n\nPi started from this directory then sees the key automatically. (Or, always on:\n`echo 'export SPIDER_API_KEY=\"sk-...\"' >> ~/.zshrc`.)\n\n## Install\n\n```bash\n# install from npm (registers both tiers from package.json)\npi install npm:@spider-cloud/pi-spider-tools\npi list\n\n# or try it for a single session without installing\npi -e npm:@spider-cloud/pi-spider-tools\n```\n\n### From a local clone (development)\n\n```bash\n# install by path (both tiers, from package.json)\npi install ./extensions/pi-spider-tools\n\n# or load a single tier ad-hoc; /reload picks up edits\npi -e ./src/spider.ts          # core tools only\npi -e ./src/browser.ts         # browser tools only\npi -e ./src/spider.ts -e ./src/browser.ts   # both\n```\n\n## Commands\n\n```\n/spider           open the menu\n/spider status    show API key status and which core tools are enabled\n/spider tools     interactively toggle which core Spider tools are active\n/spider enable     enable all core Spider tools\n/spider disable    disable all core Spider tools\n/spider help      show help\n\n/spider-browser status   show API key status and open browser sessions\n/spider-browser close    close all open browser sessions\n/spider-browser help     show browser help\n```\n\nCore tool selection is persisted to `pi-spider-tools-settings.json` in your Pi agent directory\n(`$PI_CODING_AGENT_DIR`, defaulting to `~/.pi/agent`).\n\n## Development\n\n```bash\nnpm install\nnpm run typecheck   # tsc --noEmit\nnpm run check       # biome + typecheck\n```\n\nSee parameter details for each endpoint at <https://spider.cloud/docs/api>.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "spider",
+    "spider-cloud",
+    "scrape",
+    "crawl"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://spider.cloud",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spider-rs/pi-extensions.git",
+    "directory": "extensions/pi-spider-tools"
+  },
+  "pi": {
+    "extensions": [
+      "./src/spider.ts",
+      "./src/browser.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-19T17:53:45.718Z",
+    "0.1.0": "2026-06-19T17:53:46.039Z",
+    "modified": "2026-06-19T17:53:46.291Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@fadouse/pi-permission",
+  "latest_version": "0.1.2",
+  "description": "Native permission and sandbox extension for pi.",
+  "readme": "# pi-permission\n\nNative permission and sandbox extension for pi.\n\n## What it implements\n\n- Sandbox modes: `read-only`, `workspace-write`, `danger-full-access`.\n- Approval policies: `untrusted`, `on-failure`, `on-request`, `never`.\n- Approval reviewers: `user`, `auto_review`.\n- Bash tool escalation fields:\n  - `sandbox_permissions: \"require_escalated\"`\n  - `escalation_reason` (optional, <=80 chars; use only for a very short why)\n  - `justification` (backward-compatible alias)\n  - `prefix_rule`\n- Native sandbox backend implemented by this plugin (Linux `bubblewrap`; macOS `sandbox-exec`/Seatbelt when available; unsupported platforms fail closed unless `danger-full-access`).\n- Path gating for pi `write`/`edit` matching sandbox mode.\n- `/permission`, `/permissions`, and `/permissions-rules` commands.\n- Audit log at `.pi/permissions-audit.jsonl` by default.\n\n## Install\n\n```bash\npi install npm:@fadouse/pi-permission\n```\n\n## Usage\n\n```bash\npi -e ./src/index.js --sandbox workspace-write --ask-for-approval on-request\npi -e . --sandbox read-only --ask-for-approval never\npi -e . --dangerously-bypass-approvals-and-sandbox\npi -e . --auto-review\npi -e . --sandbox workspace-write --ask-for-approval on-request --approvals-reviewer auto_review\n```\n\n`--add-dir` accepts comma/colon-separated writable roots for `workspace-write`.\n\n## Config\n\nGlobal: `~/.pi/agent/permissions.json`\nProject: `.pi/permissions.json`\n\n```json\n{\n  \"sandbox_mode\": \"workspace-write\",\n  \"approval_policy\": \"on-request\",\n  \"approvals_reviewer\": \"auto_review\",\n  \"auto_review_model\": \"openai/gpt-4.1-mini\",\n  \"auto_review_timeout_ms\": 45000,\n  \"add_dir\": [\"../shared\"],\n  \"network_access\": false,\n  \"allow_tmp_write\": true,\n  \"status_line\": false,\n  \"bubblewrap_command\": \"bwrap\",\n  \"approved_prefixes\": [\n    { \"rule\": [\"cargo\", \"test\"], \"scope\": \"project\" }\n  ]\n}\n```\n\nProject config overrides global config; CLI flags override both. Use `/permission` (or `/permissions`) to persist project settings without editing JSON manually:\n\n```text\n/permission                         # show current settings\n/permission auto-review             # persist workspace-write + on-request + auto_review\n/permission auto-review openai/gpt-4.1-mini\n/permission user                    # persist interactive user approvals\n/permission sandbox read-only\n/permission approval never\n/permission model clear             # use current session model for auto_review\n/permission add-dir ../shared\n/permission set network=false auto_review_timeout_ms=45000\n/permission set status_line=true      # opt in to footer status display\n```\n\n## Auto Review Mode\n\n`auto_review` uses `workspace-write`, `on-request`, restricted network, and a model reviewer for approval requests. Low-risk requests can be approved automatically; higher-risk or uncertain reviews include risk level, complexity, and refusal reason, then prompt the user for the final allow/deny decision when an interactive UI is available. Without an interactive UI, non-allow reviews and reviewer failures remain fail-closed.\n\nEnable it with `--auto-review`, `--approvals-reviewer auto_review`, `/permission auto-review`, or `/permissions auto-review`. By default the reviewer uses the active pi model; set `auto_review_model`, `--auto-review-model provider/model-id`, or `/permission model provider/model-id` to use a dedicated reviewer model. The reviewer must return strict JSON with `outcome`, `risk_level`, `complexity`, `rationale`, and optional `refusal_reason`.\n\n## Native sandbox behavior\n\nThis package enforces the permission model directly in pi:\n\n- Linux: `bubblewrap` with read-only root, writable cwd/`add_dir` roots (and temp when `allow_tmp_write` is true) in `workspace-write`, and network namespace isolation unless `network_access` is true.\n- macOS: `sandbox-exec` Seatbelt profile when available.\n- Windows/unsupported: fail closed unless the user explicitly selects `danger-full-access`.\n\nNon-bash pi tools cannot be placed inside the process sandbox by pi today, so `write` and `edit` are preflight-gated with the same read-only/workspace-write root policy, including temp writes when `allow_tmp_write` is enabled.\n\n## Acknowledgements\n\nThanks to OpenAI Codex CLI for inspiring the permission-model design and portions of the implementation approach. Codex CLI GitHub repository: https://github.com/openai/codex\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "permission",
+    "sandbox"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./src/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-05-18T09:12:33.428Z",
+    "modified": "2026-05-19T07:23:18.762Z",
+    "0.1.0": "2026-05-18T09:12:33.690Z",
+    "0.1.1": "2026-05-18T09:23:12.619Z",
+    "0.1.2": "2026-05-19T07:23:18.258Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

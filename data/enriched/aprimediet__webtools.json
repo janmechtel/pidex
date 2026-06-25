@@ -1,0 +1,26 @@
+{
+  "name": "@aprimediet/webtools",
+  "latest_version": "1.0.0",
+  "description": "Self-hosted web fetch / extract / search / crawl tools for the pi coding agent (Playwright + Readability, no MCP).",
+  "readme": "# @aprimediet/webtools\n\nSelf-hosted **web tools** for the [pi coding agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent): fetch, extract, search, and crawl \u2014 using only npm/npx/docker backends. **No MCP, no hosted scraping APIs.** The engine is **Playwright**; extraction is **Mozilla Readability + Turndown**; search drives the browser over a public engine's HTML.\n\n## Tools\n\n| Tool | Params | Returns |\n|---|---|---|\n| `web_fetch` | `url`, `render?`(auto/static/browser), `format?`(markdown/text/html), `timeoutMs?`, `maxBytes?` | page content as markdown/text/html + `{finalUrl,status,title,bytes,renderUsed,truncated}` |\n| `web_extract` | `url`, `html?`, `render?`, `format?`(markdown/text), `includeMetadata?`, `selectors?`(name\u2192CSS) | main article markdown + `{title,byline,siteName,publishedTime,lang,excerpt,fields}` |\n| `web_search` | `query`, `limit?`, `engine?`(duckduckgo/bing/brave) | `[{title,url,snippet}]` scraped from the engine's HTML |\n| `web_crawl` | `startUrl`, `maxPages?`(20, cap 100), `maxDepth?`(2), `sameOrigin?`, `include?`/`exclude?`, `render?`, `format?`, `concurrency?`(3, cap 5) | combined per-page markdown + `{pageCount,pages[]}` (streams progress) |\n\n`render:auto` fetches statically and **escalates to the headless browser** if the page looks like a JS shell. The browser is launched **once** and reused, then closed on session shutdown.\n\n## Setup (self-hosted backends)\n\nThird-party libs (`playwright`, `@mozilla/readability`, `jsdom`, `turndown`, `turndown-plugin-gfm`) install automatically with the package. **Playwright browser binaries do not** \u2014 install them once:\n\n```bash\nnpx playwright install --with-deps chromium\n```\n\nOr point at a **Docker / remote browser** (zero local install) and set:\n\n```bash\nexport PLAYWRIGHT_CDP=http://localhost:9222         # Chrome DevTools Protocol endpoint\n# or\nexport PLAYWRIGHT_WS_ENDPOINT=ws://localhost:3000   # a Playwright server / browserless container\n```\n\n## Configuration (env + flags)\n\n| Env | Flag | Meaning |\n|---|---|---|\n| `WEBTOOLS_RENDER` | `--render-default` | default render mode (`auto`) |\n| `WEBTOOLS_SEARCH_ENGINE` | `--search-engine` | default engine (`duckduckgo`) |\n| `WEBTOOLS_USER_AGENT` | `--user-agent` | UA string |\n| `WEBTOOLS_ALLOW_PRIVATE` | `--allow-private` | allow private/loopback hosts (off by default) |\n| `WEBTOOLS_IGNORE_ROBOTS` | \u2014 | crawl ignores robots.txt (off by default) |\n| `PLAYWRIGHT_CDP` / `PLAYWRIGHT_WS_ENDPOINT` | \u2014 | connect to a remote/Docker browser |\n\n`/webtools` prints the current config and chosen browser backend.\n\n## Safety\n\n- **SSRF guard:** `web_fetch`/`web_extract`/`web_crawl` resolve the host and **block loopback/private/link-local ranges** (`127/8`, `10/8`, `172.16/12`, `192.168/16`, `169.254/16`, `::1`, `fc00::/7`, `*.local`) unless `WEBTOOLS_ALLOW_PRIVATE=1`.\n- **Caps:** per-request timeout (30s) and `maxBytes` (~5 MB); crawl caps per-page (30 KB) and total output (200 KB), honors robots.txt, rate-limits, and a concurrency cap.\n- **Search** scrapes a public engine's HTML, so it's best-effort: on a consent/captcha/changed page it **throws** a clear error (try another `engine`).\n\n## Install / run\n\n```bash\npi install npm:@aprimediet/webtools\npi list\n\n# Quick try without installing\npi -e ./extensions/webtools/index.ts\n\n# Hot-reload during dev\n/reload\n```\n\n## Layout\n\n```\nwebtools/                 # @aprimediet/webtools\n\u251c\u2500\u2500 package.json          # pi manifest + deps\n\u251c\u2500\u2500 index.ts              # factory: 4 tools + flags + /webtools + cleanup\n\u251c\u2500\u2500 browser.ts            # SSRF guard + shared Playwright + fetchHtml\n\u251c\u2500\u2500 extract.ts            # Readability + selectors\n\u251c\u2500\u2500 search.ts             # Playwright SERP scraping (ddg/bing/brave)\n\u251c\u2500\u2500 crawl.ts              # BFS crawler\n\u251c\u2500\u2500 markdown.ts           # Turndown/jsdom HTML\u2192markdown/text helpers\n\u2514\u2500\u2500 config.ts             # env/flag-driven config\n```\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-25T15:33:53.191Z",
+    "1.0.0": "2026-06-25T15:33:53.493Z",
+    "modified": "2026-06-25T15:33:53.701Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

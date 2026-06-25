@@ -1,0 +1,38 @@
+{
+  "name": "pi-session-switch",
+  "latest_version": "0.3.0",
+  "description": "Preview each session before switching in a mirror of Pi's native `/resume`-picker UI",
+  "readme": "# Session Switch for Pi (`pi-session-switch`)\n\nSwitch between Pi sessions with `/switch-session`, or open the same picker after interactive startup with `pi --switch-session`, using the same layout and affordances as Pi's native `/resume` picker plus a live preview of the currently highlighted session beneath the picker.\n\n![`/switch-session` demo](https://raw.githubusercontent.com/w-winter/dot314/main/assets/switch-session-demo.gif)\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:pi-session-switch\n```\n\nFrom the dot314 git bundle (filtered install):\n\n```json\n{\n  \"packages\": [\n    {\n      \"source\": \"git:github.com/w-winter/dot314\",\n      \"extensions\": [\"extensions/session-switch/index.ts\"],\n      \"skills\": [],\n      \"themes\": [],\n      \"prompts\": []\n    }\n  ]\n}\n```\n\n## Command\n\n```text\n/switch-session\n```\n\n## Startup flag\n\n```bash\npi --switch-session\n```\n\nOpens the same picker after interactive startup, then relaunches Pi into the selected session.\n\nThis is an extension-only workaround for startup switching. Unlike native `pi --resume`, it does not provide missing-cwd recovery for sessions whose recorded cwd no longer exists, and it does not reuse Pi's normal in-process session-switch lifecycle or guarantee the same shutdown-hook cleanup semantics.\n\n## Behavior\n\n- `/switch-session` stays on Pi's native in-process session switch path\n- `pi --switch-session` reuses the same picker UI, then relaunches Pi into the selected session\n- Mirrors the native `/resume` picker layout, behaviors, and keybindings for the command path\n- Shows a live preview of the highlighted session below the picker\n- Shows the selected session's latest message time at the right edge of the preview\n- `Shift+Up` / `Shift+Down` scroll the preview by line\n- `Shift+PageUp` / `Shift+PageDown` page the preview\n- Preserves the native inline rename and delete-confirmation flows\n\n## Optionally replacing native `--resume`\n\nIf you want `pi -r` and `pi --resume` to use this extension's picker instead of Pi's built-in resume, add this wrapper to your `.bashrc` or `.zshrc`:\n\n```sh\npi() {\n  local -a args=()\n\n  while (($#)); do\n    case \"$1\" in\n      --)\n        args+=(\"$@\")\n        break\n        ;;\n      -r|--resume)\n        if (($# > 1)) && [[ \"$2\" != -* ]]; then\n          args+=(--session \"$2\")\n          shift 2\n        else\n          args+=(--switch-session)\n          shift\n        fi\n        ;;\n      --resume=*)\n        args+=(--session \"${1#--resume=}\")\n        shift\n        ;;\n      *)\n        args+=(\"$1\")\n        shift\n        ;;\n    esac\n  done\n\n  command pi \"${args[@]}\"\n}\n```\n\nThis rewrites:\n- `pi -r` / `pi --resume` to `pi --switch-session` (opens the picker)\n- `pi -r <path>` / `pi --resume <path>` to `pi --session <path>` (opens that session directly)\n\n## Compared with upstream\n\nDerived from Damian Pedroza's [`pi-thread-switcher`](https://github.com/damianpdr/pi-thread-switcher).  This version has a few additions that I found helpful for readability: the session preview lives in a dedicated pane below the picker with syntax-highlighted Markdown rendering, and `Shift+PageUp` / `Shift+PageDown` are also offered for paging through the preview.  The picker itself uses Pi's native `SessionSelectorComponent`, matching the `/resume` interaction model.\n\nSee [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for full attribution.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "session"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/w-winter/dot314#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/w-winter/dot314.git",
+    "directory": "packages/pi-session-switch"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/session-switch/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/w-winter/dot314/main/assets/switch-session-demo.gif"
+  },
+  "time": {
+    "created": "2026-03-29T02:13:33.007Z",
+    "modified": "2026-05-15T16:01:07.777Z",
+    "0.1.0": "2026-03-29T02:13:33.165Z",
+    "0.1.1": "2026-04-06T23:50:38.717Z",
+    "0.2.0": "2026-04-07T00:51:36.843Z",
+    "0.2.1": "2026-05-07T17:06:31.523Z",
+    "0.3.0": "2026-05-15T16:01:07.667Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": null,
+  "download_trend": []
+}

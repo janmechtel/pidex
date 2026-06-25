@@ -1,0 +1,354 @@
+{
+  "name": "@pborck/pi-de",
+  "latest_version": "0.1.6",
+  "description": "IDE integration for pi coding agent - shows current file/selection from VS Code, JetBrains, etc.",
+  "readme": "# pide - IDE Integration for Pi\n\nShows your current IDE file/selection in [pi](https://github.com/badlogic/pi-mono) and lets you quickly reference it with `Ctrl+;`.\n\n![screenshot](screenshot-v2.png)\n\n## Setup\n\n```bash\npi install npm:@pborck/pi-de\n```\n\nThen run `/ide-setup` in pi to install your IDE plugin:\n\n![setup](screenshot-setup.png)\n\n## Usage\n\nSelect code in your IDE, then press `Ctrl+;` in pi to reference it:\n\n![usage](screenshot-usage.png)\n\n## Installation\n\n### Pi Extension\n\n```bash\n# Install from npm\npi install npm:@pborck/pi-de\n\n# Or from git\npi install github.com/pierre-borckmans/pide\n```\n\n### IDE Plugins\n\n> **Note:** `/ide-setup` handles plugin installation automatically. The instructions below are for manual installation only.\n\n**Currently supported IDEs:**\n- VS Code / Cursor / VSCodium\n- Neovim\n- IntelliJ IDEA\n- GoLand\n- WebStorm\n- PyCharm\n- CLion\n- Rider\n- RubyMine\n- PhpStorm\n- DataGrip\n- Android Studio\n- RustRover\n\n**VS Code / Cursor / VSCodium:**\n```bash\ncode --install-extension ./vscode-plugin/pide-vscode-0.1.0.vsix\n```\n\n**Neovim (lazy.nvim):**\n```lua\n{\n  \"pierre-borckmans/pide\",\n  config = function()\n    require(\"pide\").setup()\n  end,\n}\n```\n\n**Neovim (packer.nvim):**\n```lua\nuse {\n  \"pierre-borckmans/pide\",\n  config = function()\n    require(\"pide\").setup()\n  end,\n}\n```\n\n**JetBrains (IntelliJ, GoLand, WebStorm, PyCharm, etc.):**\n1. Build: `cd jetbrains-plugin && ./gradlew buildPlugin`\n2. Install: Settings \u2192 Plugins \u2192 \u2699\ufe0f \u2192 Install from Disk \u2192 select `build/distributions/pide-jetbrains-0.1.0.zip`\n\n## Commands\n\n![commands](screenshot-commands.png)\n\n| Command | Description |\n|---------|-------------|\n| `/ide` | Insert file reference into editor |\n| `/ide-clear` | Clear the current selection |\n| `/ide-setup` | Install IDE plugin |\n\n## How It Works\n\n```\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                      \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502    IDE      \u2502 \u2500\u2500\u2500\u2500\u2500 writes to \u2500\u2500\u2500\u2500\u25b6\u2502 ~/.pi/ide-selection.json \u2502\n\u2502             \u2502                      \u2502                          \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518                      \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n                                                 \u2502\n                           \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n                           \u2502 file watch          \u2502 file watch          \u2502\n                           \u25bc                     \u25bc                     \u25bc\n                    \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510       \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510       \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n                    \u2502  pi (term1) \u2502       \u2502  pi (term2) \u2502       \u2502  pi (term3) \u2502\n                    \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518       \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518       \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\nAll pi instances see the selection via file-based communication. No port conflicts!\n\n## JSON Format\n\nIDEs write to `~/.pi/ide-selection.json`:\n\n```json\n{\n  \"file\": \"/absolute/path/to/file.ts\",\n  \"selection\": \"selected text (optional)\",\n  \"startLine\": 10,\n  \"endLine\": 15,\n  \"ide\": \"vscode\",\n  \"timestamp\": 1707570000000\n}\n```\n\n## Building IDE Plugins\n\n### VS Code\n\n```bash\ncd vscode-plugin\nnpm install\nnpm run compile\nnpm run package\n```\n\n### Neovim\n\nNo build step required! The plugin is pure Lua. For development:\n\n```bash\n# Symlink to your nvim config for testing\nln -s $(pwd)/nvim-plugin ~/.local/share/nvim/site/pack/pide/start/pide\n```\n\n### JetBrains\n\n```bash\ncd jetbrains-plugin\n./gradlew buildPlugin\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "ide",
+    "vscode",
+    "jetbrains",
+    "goland",
+    "intellij"
+  ],
+  "author": {
+    "name": "Pierre Borckmans"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/pierre-borckmans/pide#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pierre-borckmans/pide.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/pierre-borckmans/pide/main/screenshot-v2.png"
+  },
+  "time": {
+    "created": "2026-02-10T15:32:48.301Z",
+    "modified": "2026-02-19T23:53:24.046Z",
+    "0.1.2": "2026-02-10T15:32:48.580Z",
+    "0.1.3": "2026-02-10T15:35:36.094Z",
+    "0.1.4": "2026-02-11T13:35:13.161Z",
+    "0.1.5": "2026-02-12T15:42:36.449Z",
+    "0.1.6": "2026-02-19T23:53:23.940Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 12,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 67
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 259
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 134
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 51
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 38
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 40
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

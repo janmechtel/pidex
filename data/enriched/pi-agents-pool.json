@@ -1,0 +1,37 @@
+{
+  "name": "pi-agents-pool",
+  "latest_version": "0.2.0",
+  "description": "Codex-style multi-agent orchestration for pi \u2014 spawn, communicate with, and coordinate sub-agents via LLM tool calls",
+  "readme": "# pi-subagents\n\nCodex-style multi-agent orchestration for [pi](https://github.com/badlogic/pi-mono). Spawn, communicate with, and coordinate sub-agents via LLM tool calls.\n\nSub-agents are invisible child `pi --mode rpc` processes. No terminal multiplexer required, no TUI overlay. The LLM orchestrates everything through 5 tools.\n\n## Install\n\n```bash\npi install npm:pi-agents-pool\n```\n\nOr from git:\n\n```bash\npi install git:github.com/minghinmatthewlam/pi-subagents\n```\n\n## Tools\n\n| Tool | Description |\n|------|-------------|\n| `spawn_agent` | Spawn a sub-agent with a task. Returns immediately with an agent ID; the agent runs in the background and notifies the main session when done. |\n| `send_input` | Send a follow-up message to an existing agent. Supports `interrupt` to redirect work. |\n| `wait_agent` | Block until one or more agents finish. Use only when the main session is blocked on the result right now. |\n| `close_agent` | Shut down an agent. Can be resumed later. |\n| `resume_agent` | Resume a previously closed agent from its saved session. |\n\n## How It Works\n\nRecommended flow:\n\n```\n1. LLM calls spawn_agent(\"Analyze the auth module\")  -> returns agent ID immediately\n2. LLM calls spawn_agent(\"Analyze the DB module\")    -> returns another agent ID\n3. LLM keeps doing local non-overlapping work\n4. Finished agents steer results back automatically via <subagent_notification>\n5. LLM reads results, integrates, continues\n```\n\n`wait_agent` is the exception path, not the default path. Use it only when the main session is blocked on a result and must pause.\n\nWhen an agent finishes, the extension injects a `<subagent_notification>...</subagent_notification>` message and triggers a new turn automatically. That notification is an agent result, not a user message.\n\nEach agent is a persistent `pi --mode rpc` child process with full bidirectional communication. The LLM can send follow-up messages, interrupt ongoing work, and reuse agents for related questions.\n\nA widget above the input shows live progress:\n\n```\n2 agents (2 running)\n\u251c\u2500 Analyze the auth module (explorer) \u00b7 3 tool uses \u00b7 12.4k tokens \u00b7 0:23\n\u2502  \u2514 Read: src/auth/index.ts\n\u251c\u2500 Analyze the DB module (explorer) \u00b7 1 tool use \u00b7 4.1k tokens \u00b7 0:15\n\u2502  \u2514 thinking\u2026\n```\n\n## Agent Types\n\nAgent types are purely advisory \u2014 they guide the LLM on when and how to use each role. There is no mechanical difference between types.\n\n| Type | Guidance |\n|------|----------|\n| `explorer` | Fast codebase questions. Spawn multiple in parallel for independent questions. Trust results. Reuse via `send_input`. |\n| `worker` | Implementation tasks. Assign explicit file ownership. Tell workers they are not alone in the codebase. |\n\n```\nspawn_agent({ message: \"What does the auth module do?\", agent_type: \"explorer\" })\nspawn_agent({ message: \"Implement the login endpoint\", agent_type: \"worker\" })\n```\n\n## Depth Limiting\n\nSub-agents can themselves spawn further sub-agents, limited by depth:\n\n- `PI_SUBAGENT_MAX_DEPTH` (default: 2) \u2014 maximum nesting depth\n- Main session (depth 0) can spawn agents (depth 1), which can spawn sub-agents (depth 2), which cannot spawn further\n\nOverride:\n\n```bash\nexport PI_SUBAGENT_MAX_DEPTH=3   # allow deeper nesting\nexport PI_SUBAGENT_MAX_DEPTH=1   # only one level of agents\n```\n\n## Parameters\n\n### spawn_agent\n\n| Param | Type | Required | Description |\n|-------|------|----------|-------------|\n| `message` | string | yes | Task prompt for the agent |\n| `agent_type` | string | no | Role hint: \"explorer\" or \"worker\" |\n| `model` | string | no | Override model (e.g. \"anthropic/claude-haiku-4-5\") |\n\n### send_input\n\n| Param | Type | Required | Description |\n|-------|------|----------|-------------|\n| `id` | string | yes | Agent ID from spawn_agent |\n| `message` | string | yes | Message to send |\n| `interrupt` | boolean | no | Abort current work before sending |\n\n### wait_agent\n\nUse only when you are blocked on a dependency and need to pause the main session until an agent finishes. On timeout, the agents keep running in the background.\n\n| Param | Type | Required | Description |\n|-------|------|----------|-------------|\n| `ids` | string[] | yes | Agent IDs to wait for |\n| `timeout_ms` | number | no | Timeout (default: 30s, min: 10s, max: 1h) |\n\n### close_agent / resume_agent\n\n| Param | Type | Required | Description |\n|-------|------|----------|-------------|\n| `id` | string | yes | Agent ID |\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "subagents",
+    "agents",
+    "multi-agent"
+  ],
+  "author": {
+    "name": "minghinmatthewlam"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/minghinmatthewlam/pi-subagents#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/minghinmatthewlam/pi-subagents.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extension/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-25T17:28:59.317Z",
+    "modified": "2026-03-25T20:25:55.564Z",
+    "0.1.0": "2026-03-25T17:28:59.569Z",
+    "0.2.0": "2026-03-25T20:25:55.438Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 12,
+  "download_trend": []
+}

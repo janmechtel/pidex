@@ -1,0 +1,35 @@
+{
+  "name": "@lnittman/pi-tools",
+  "latest_version": "0.3.0",
+  "description": "Tool-pack contract for pi-mono SDK consumers \u2014 composable extension factories for code, HIL, orchestration, and annotation capabilities, consumable by any product that uses @mariozechner/pi-coding-agent",
+  "readme": "# @creative-int/pi-tools\n\nTool-pack contract for pi-mono SDK consumers.\n\n## What it is\n\n`@creative-int/pi-tools` defines the factory shape that products built on `@mariozechner/pi-coding-agent` use to compose capabilities into a `createAgentSession()` without source-forking pi-coding-agent.\n\nThe package itself is **thin on runtime code** \u2014 it re-exports the pi-mono extension-runtime types under a stable import surface and provides composition helpers. Concrete packs (code, hil, orchestration, annotation) will land here as subpath exports. Existing pi packages (`pi-steer`, `pi-pad`, `pi-outline`) remain separately versioned and export their own factory creators.\n\n## Why it exists\n\nBefore `pi-tools`, products that wanted to consume pi extensions had two bad options:\n\n1. **Source-fork pi-coding-agent** \u2014 carries the whole upstream tree, version-locks to a specific release, duplicates maintenance burden.\n2. **Register tools via `customTools`** \u2014 only gets you tool definitions; loses lifecycle hooks, commands, shortcuts, message renderers, state persistence.\n\n`pi-tools` documents the third path: consume pi's public SDK + extension factory API, load extensions programmatically via `DefaultResourceLoader({ extensionFactories: [...] })`, and keep the product boundary clean.\n\n## Install\n\n```bash\npnpm add @creative-int/pi-tools @mariozechner/pi-coding-agent\n```\n\n`@mariozechner/pi-coding-agent` is a peer dependency.\n\n## Usage\n\n### Compose factories from pi extensions\n\n```ts\nimport { DefaultResourceLoader, createAgentSession } from \"@mariozechner/pi-coding-agent\";\nimport { composePackFactories } from \"@creative-int/pi-tools\";\nimport { createSteerFactory } from \"@creative-int/pi-steer\";\nimport { createPadFactory } from \"@creative-int/pi-pad\";\nimport { createOutlineFactory } from \"@creative-int/pi-outline\";\n\nconst resourceLoader = new DefaultResourceLoader({\n  // No filesystem extension discovery \u2014 products control their extension set.\n  additionalExtensionPaths: [],\n  extensionFactories: [\n    createSteerFactory(),\n    createPadFactory(),\n    createOutlineFactory(),\n  ],\n});\n\nconst { session } = await createAgentSession({\n  resourceLoader,\n});\n```\n\n### Conditional composition\n\n```ts\nimport { composePackFactories, whenEnabled } from \"@creative-int/pi-tools\";\nimport { createSteerFactory } from \"@creative-int/pi-steer\";\n\nconst factory = composePackFactories(\n  createSteerFactory(),\n  whenEnabled(structuredMode, () => createHilFactory()),\n);\n```\n\n### Authoring a pack\n\n```ts\nimport type { PiToolPackFactory } from \"@creative-int/pi-tools\";\n\nexport interface MyPackOptions {\n  enabled?: boolean;\n  label?: string;\n  // product-specific options...\n}\n\nexport const createMyPackFactory: PiToolPackFactory<MyPackOptions> = (options = {}) => {\n  return (pi) => {\n    pi.registerTool({ /* ... */ });\n    pi.on(\"session_start\", (_ev, ctx) => { /* ... */ });\n  };\n};\n```\n\n## Exports\n\n| specifier | purpose |\n|---|---|\n| `\"@creative-int/pi-tools\"` | root \u2014 contract types + compose re-exports |\n| `\"@creative-int/pi-tools/contract\"` | `PiToolPackFactory`, `PiToolPackOptions`, `PiToolPackManifest`, and re-exports of `ExtensionFactory`, `ExtensionAPI`, `ExtensionContext`, `Extension`, `ToolDefinition`, `defineTool` |\n| `\"@creative-int/pi-tools/compose\"` | `composePackFactories()`, `whenEnabled()` |\n\n## Design\n\n- **Thin re-export layer.** We do not redefine pi-mono types; we give them a stable home under `@creative-int/pi-tools/contract` so factory authors have a consistent import surface.\n- **Separate packaging from siblings.** `pi-steer`, `pi-pad`, `pi-outline` stay separately versioned. `pi-tools` is their composition substrate, not their umbrella.\n- **Subpath-ready.** Concrete packs (`./code`, `./hil`, `./orchestration`, `./annotation`) will land as subpath exports as they're extracted from existing product code.\n\n## Related\n\n- `@mariozechner/pi-coding-agent` \u2014 the upstream pi SDK\n- `@creative-int/pi-steer` \u2014 steering compiler (interviews + handoff synthesis)\n- `@creative-int/pi-pad` \u2014 persistent execution memory\n- `@creative-int/pi-outline` \u2014 AST-based code structure extension (private lane)\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-coding-agent",
+    "pi-extension",
+    "tool-pack",
+    "factory",
+    "sdk",
+    "developer-tools",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "Luke Nittmann"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/creative-int/packages#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/creative-int/packages.git",
+    "directory": "pi/pi-tools"
+  },
+  "pi": {},
+  "time": {
+    "created": "2026-04-19T01:20:42.040Z",
+    "0.3.0": "2026-04-19T01:20:42.257Z",
+    "modified": "2026-04-19T01:20:42.459Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 8,
+  "download_trend": []
+}

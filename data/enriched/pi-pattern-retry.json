@@ -1,0 +1,354 @@
+{
+  "name": "pi-pattern-retry",
+  "latest_version": "0.1.0",
+  "description": "Pi extension: keep agent sessions alive across provider rate-limits, quota exhaustion, and transient auth failures by re-injecting continuation messages on an escalating retry schedule.",
+  "readme": "# pi-pattern-retry\n\n[![npm version](https://img.shields.io/npm/v/pi-pattern-retry.svg)](https://www.npmjs.com/package/pi-pattern-retry)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)\n\nKeep your [Pi Agent](https://github.com/badlogic/pi-mono) session alive across provider rate-limits, quota exhaustion, and transient auth failures. `pi-pattern-retry` watches provider responses and agent errors, matches them against configurable patterns (regex / substring), and re-injects a continuation message at escalating intervals \u2014 `30s \u2192 1m \u2192 5m \u2192 15m \u2192 30m \u2192 1h \u2192 4h \u2192 5h \u2192 12h \u2192 24h` by default \u2014 so the agent picks up where it left off.\n\nDesigned alongside [`todo-enforcer`](https://github.com/buihongduc132/pi-plugins/tree/main/profile/extensions/todo-enforcer): same retry-scheduler idea, separate package, ships independently.\n\n## Install\n\n```bash\npi install npm:pi-pattern-retry\n```\n\nThen restart your Pi session. The plugin ships with sensible defaults \u2014 no config file is required to get started.\n\n## What it does\n\nTwo trigger sources feed one matcher:\n\n| Event                     | What it inspects                                                 |\n|---------------------------|------------------------------------------------------------------|\n| `after_provider_response` | HTTP `status` \u2014 catches `401` / `403` / `429` / `5xx`            |\n| `agent_end`               | last assistant message's `errorMessage` \u2014 catches transport text |\n\nA match schedules **one timer per `(sessionId, patternName)`**. When the timer fires:\n\n1. If the conversation has progressed (branch grew, excluding our own injections), reset attempt counter and stop.\n2. Otherwise inject `pi.sendUserMessage(<your template>)` so the agent retries.\n3. Advance to the next delay in the schedule. When the schedule is exhausted, the pattern stays inert until `/pattern-retry-reset`.\n\nDuplicate triggers (e.g. both events firing for the same failure) are debounced \u2014 the already-live timer wins.\n\n## Default patterns\n\nShipped with three patterns pre-seeded. Override or replace via config file.\n\n| Name                   | Trigger              | Schedule (seconds)                                                     |\n|------------------------|----------------------|------------------------------------------------------------------------|\n| `llm-429-quota`        | HTTP `429`           | `30, 60, 300, 900, 1800, 3600, 14400, 18000, 43200, 86400` (10 steps)  |\n| `llm-401-403-auth`     | HTTP `401` / `403`   | `60, 300, 1800` (3 steps)                                              |\n| `litellm-weekly-limit` | `errorMessage` contains `\"Weekly/Monthly Limit Exhausted\"` | `3600, 14400, 43200, 86400` |\n\n## Configuration\n\nGlobal file: `~/.pattern-retry.json`. Project override: `<cwd>/.pattern-retry.json`. Project keys override global; **arrays replace, they do not merge**.\n\n```json\n{\n  \"enabled\": true,\n  \"patterns\": [\n    {\n      \"name\": \"llm-429-quota\",\n      \"match\": { \"source\": \"providerStatus\", \"kind\": \"regex\", \"value\": \"^429$\" },\n      \"scheduleSec\": [30, 60, 300, 900, 1800, 3600, 14400, 18000, 43200, 86400],\n      \"message\": \"Provider returned {{status}} (attempt {{attempt}}/{{maxAttempts}}). Retrying after {{lastDelaySec}}s.\",\n      \"stopOnProgress\": true,\n      \"notify\": [\"webhook\", \"dashboard\"]\n    },\n    {\n      \"name\": \"litellm-weekly-limit\",\n      \"match\": {\n        \"source\": \"errorMessage\",\n        \"kind\": \"contains\",\n        \"value\": \"Weekly/Monthly Limit Exhausted\"\n      },\n      \"scheduleSec\": [3600, 14400, 43200, 86400],\n      \"message\": \"Hit weekly LLM quota. Resuming attempt {{attempt}}.\"\n    }\n  ],\n  \"notifyTargets\": {\n    \"webhook\":   { \"enabled\": false, \"url\": \"\", \"headers\": {}, \"timeoutMs\": 10000 },\n    \"dashboard\": { \"enabled\": false, \"endpoint\": \"\" }\n  }\n}\n```\n\n### Match semantics\n\n- `kind: \"contains\"` \u2014 case-**sensitive** substring match.\n- `kind: \"regex\"` \u2014 compiled with `new RegExp(value)`; no implicit flags. For case-insensitive, encode flags in the pattern itself.\n- `source: \"providerStatus\"` \u2014 matched against the **decimal status string** (e.g. `\"429\"`).\n- `source: \"errorMessage\"` \u2014 matched against the assistant message's `errorMessage` string. If absent/empty, the pattern does not match.\n\nA malformed regex degrades to a logged warning \u2014 other patterns continue to work.\n\n### Template variables\n\n| Variable           | Value                                                          |\n|--------------------|----------------------------------------------------------------|\n| `{{status}}`       | HTTP status from `providerStatus`, or `0`                      |\n| `{{statusText}}`   | Human label (e.g. `\"Too Many Requests\"`)                       |\n| `{{reason}}`       | Match-source snippet                                           |\n| `{{patternName}}`  | The matched pattern's `name`                                   |\n| `{{attempt}}`      | 1-indexed current attempt                                      |\n| `{{maxAttempts}}`  | `scheduleSec.length`                                           |\n| `{{lastDelaySec}}` | Delay that elapsed before this fire                            |\n| `{{nextDelaySec}}` | Next delay if any, else `0`                                    |\n\nMissing variables interpolate to empty string.\n\n## Commands\n\n- **`/pattern-retry-status`** \u2014 show each pattern's `attempt/max`, `exhausted`, and `scheduled` flags.\n- **`/pattern-retry-reset [patternName|all]`** \u2014 cancel timer(s) and reset attempt counter.\n- **`/pattern-retry-toggle`** \u2014 flip the global `enabled` flag.\n- **`/pattern-retry-log [N]`** \u2014 tail the last `N` lines (default 50, max 500) of the central log file straight into the session.\n\n## Troubleshooting / Logs\n\nEvery meaningful decision is appended to a single central log file:\n\n```\n~/.pi/logs/extensions/pattern-retry.log\n```\n\nThis is the shared convention across all pi extensions \u2014 written via the rotated, size-capped (25 MB, 80% trim) `createPluginLogger`. Each line is:\n\n```\n<iso-timestamp> [pattern-retry] <LEVEL> <event> <json-details>\n```\n\nEvents you can grep for:\n\n| Event                          | Means                                                                  |\n|--------------------------------|------------------------------------------------------------------------|\n| `session-start`                | Session bound to pattern-retry; `sessionId` + `cwd` recorded           |\n| `config-loaded` / `config-load failed` | Result of merging `~/.pattern-retry.json` + project override   |\n| `trigger:matched`              | A provider/error trigger arrived; lists matched pattern names          |\n| `trigger:skipped-disabled` / `trigger:skipped-no-session` | Trigger dropped \u2014 explains why                |\n| `schedule:armed`               | Timer set; `attempt`, `delaySec`, trigger metadata                     |\n| `schedule:skip-idempotent`     | Duplicate trigger dropped because a live timer already exists          |\n| `schedule:skip-exhausted` / `schedule:exhausted` | All attempts used up                                  |\n| `timer:elapsed`                | Scheduled delay elapsed; about to fire                                 |\n| `fire:injected`                | Continuation message sent via `pi.sendUserMessage`                     |\n| `fire:reset-on-progress`       | Agent advanced before timer fired \u2192 attempt counter reset, no send     |\n| `cancel:pattern` / `cancel:session` | `/pattern-retry-reset` or session shutdown                        |\n| `command:toggle` / `command:reset` / `command:reset-all` | Audit trail for user commands                |\n| `notify:<event>:<target>`      | A configured notify target fired (V1: log-only)                        |\n\nWhen something looks wrong:\n\n```bash\ntail -f ~/.pi/logs/extensions/pattern-retry.log\n# or from inside a session:\n/pattern-retry-log 200\n```\n\nThe file is the source of truth \u2014 every fire, skip, reset, and exhaustion is there with the `sessionId` and `pattern` name attached, so you can reconstruct exactly what happened and why.\n\n## Notify hooks (V1: no-op)\n\nEach pattern may carry `notify?: (\"webhook\" | \"dashboard\")[]`. V1 logs one line per enabled target \u2014 real HTTP/WebSocket senders ship in V2 (see `flow/plans/pattern-retry-future.md` upstream).\n\nThe `notifyHooks()` signature **is** the public contract \u2014 V2 swaps the implementation without changing callers.\n\n## How it differs from `todo-enforcer`\n\n| Plugin              | Trigger                          | Use case                                        |\n|---------------------|----------------------------------|-------------------------------------------------|\n| `todo-enforcer`     | Idle agent with pending todos    | Nudge the agent to keep working on its list     |\n| `pi-pattern-retry`  | Provider error / quota signal    | Resume after an external rate-limit or outage   |\n\nThey share the retry-scheduler **pattern** (copy-adapted), not code \u2014 install one without the other.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "retry",
+    "rate-limit",
+    "backoff",
+    "litellm",
+    "429",
+    "quota"
+  ],
+  "author": {
+    "name": "buihongduc132",
+    "email": "duc.bui@beetroot.se"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/buihongduc132/pi-plugins/tree/main/profile/extensions/pattern-retry",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/buihongduc132/pi-plugins.git",
+    "directory": "profile/extensions/pattern-retry"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-20T19:33:13.753Z",
+    "0.1.0": "2026-05-20T19:33:14.054Z",
+    "modified": "2026-05-20T19:33:14.214Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 10,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 130
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

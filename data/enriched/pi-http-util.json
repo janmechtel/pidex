@@ -1,0 +1,32 @@
+{
+  "name": "pi-http-util",
+  "latest_version": "2.0.5",
+  "description": "HTTP utility functions for Pi Coding Agent",
+  "readme": "# HTTP Utility Extension\n\nA PI Agent extension for fetching web content, transforming HTML into clean output, and making raw HTTP requests.\nIt's main functionality http_fetch is designed to save tokens on LLM converting html to md or other compact shapes \nbefore passing it to the LLM.\n\n## Usage\n\nJust tell the LLM to do something related to http, if your model has tool usage knowledge everything else is automatic.\n\nExamples:\n```\nGive me an overview of the project at https://github.com/kulminaator/pi-http-util\n```\nor (your LLM most likely knows the addresses of news pages anyway)\n```\nFind me the first 5 headlines from the news today\n```\nor\n```\nUsing our tools, make a http post request with json content {\"question\": \"who is there\"} against the server listening on localhost on port 9000\n```\n\nNB! llm might also invoke this on it's own when it feels the need to look something up.\nIf you ask it something like this:\n```\nWhat are the latest changes that were done to threejs?\n```\n\n## Installation\n\n### Via `pi install` (recommended)\n\nInstall directly from the GitHub repository:\n\n```bash\npi install git:github.com/kulminaator/pi-http-util\n```\nor from npm:\n```bash\npi install npm:pi-http-util\n```\n\nThis writes the package to your user settings (`~/.pi/agent/settings.json`) so it is available for all projects.\nUse `-l` to install project-locally (`.pi/settings.json`) instead:\n\n```bash\npi install -l git:github.com/kulminaator/pi-http-util\n```\n\nPin to a specific tag or branch:\n\n```bash\npi install git:github.com/kulminaator/pi-http-util@v2.0.0\n```\n\n### Via `settings.json`\n\nAdd the package manually to your settings:\n\n```json\n{\n  \"packages\": [\n    \"git:github.com/kulminaator/pi-http-util\"\n  ]\n}\n```\n\n### Manual installation\n\nClone the repository and place it in pi's extension directory:\n\n```bash\ngit clone https://github.com/kulminaator/pi-http-util.git ~/.pi/agent/extensions/pi-http-util\n```\n\nOr for project-local use:\n\n```bash\ngit clone https://github.com/kulminaator/pi-http-util.git .pi/extensions/pi-http-util\n```\n\n### Try it without installing\n\nTest the extension for a single session:\n\n```bash\npi -e git:github.com/kulminaator/pi-http-util\n```\n\n## What tools get added and What It Does\n\n\n### Tools Registered\n\n| Tool | Description |\n|------|-------------|\n| `http_fetch` | Fetch a URL with configurable HTTP method, headers, body, redirects, strip mode, truncation limits, and strategy |\n| `in_page_search` | Search a webpage for text with configurable strip mode (`html2md`, `tags`, `attributes`, `whitespace`, `none`), return matching snippets with surrounding context |\n| `raw_http_request` | Send raw HTTP requests with no content stripping, file I/O, and size limits |\n\n\n## Architecture\n\n### The design of http_fetch\nWe download original html and pass it through a converter, the most complex converter is html2md\n\nThe HTML-to-Markdown converter uses a **SAX-style event-driven pipeline**:\n\n```\ntokenize(html)  \u2192  emitEvents(html)  \u2192  processEvents(events)  \u2192  markdown\n   tokenizer       md_emitter            md_handler\n```\n\nThe other methods like strip attributes and strip tags just remove tag attributes or whole tags from the content (with the aim to reduce the ingested size on llm).\n\n#### Content-Type Safety\n\nThe `resolveStripMethod(requested, contentType)` function checks whether the response `Content-Type` contains `text/html`. If not, it returns `\"none\"` regardless of the requested mode (unless `\"none\"` was already requested). This prevents HTML-specific transformations from corrupting JSON, plain text, or other non-HTML payloads.\n\n## File Layout\n\nSource code in `src/`\nTests in `tests`\n\n## Running the Tests\n\nRequires **Node.js \u2265 22** (for `--experimental-strip-types` to run TypeScript without compilation).\n\n```bash\n# Run all tests (recommended)\nnode --experimental-strip-types tests/pi-http-util/run-tests.ts\n\n# Or run a single test file standalone\nnode --experimental-strip-types tests/pi-http-util/tokenizer.test.ts\nnode --experimental-strip-types tests/pi-http-util/integration.test.ts\n```\n\n### Test writing guidelines:\n\nTests are split into logical files, each independently runnable:\n\n- **Unit tests** \u2014 pure functions from the extension modules, no I/O\n- **Integration tests** \u2014 spin up a local `http.Server` on a random port, exercise fetch + strip against real HTTP routes, tear down after\n- **Shared harness** \u2014 `test-harness.ts` provides `describe`, `test`, counters, and `runSummary()` used by all files\n- **Timeouts** \u2014 each test has a 5-second timeout to prevent hangs\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/kulminaator/pi-http-util#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kulminaator/pi-http-util.git"
+  },
+  "pi": {
+    "extensions": [
+      "src"
+    ]
+  },
+  "time": {
+    "created": "2026-05-19T07:50:37.251Z",
+    "modified": "2026-05-20T06:28:51.889Z",
+    "2.0.2": "2026-05-19T07:50:37.414Z",
+    "2.0.3": "2026-05-19T08:14:25.854Z",
+    "2.0.4": "2026-05-19T15:24:40.607Z",
+    "2.0.5": "2026-05-20T06:28:51.790Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 5,
+  "download_trend": []
+}

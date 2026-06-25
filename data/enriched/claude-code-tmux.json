@@ -1,0 +1,50 @@
+{
+  "name": "claude-code-tmux",
+  "latest_version": "0.6.0",
+  "description": "Durable tmux controller for interactive Claude Code sessions, with a Pi extension and skill.",
+  "readme": "# claude-code-tmux\n\nDurable tmux control for interactive Claude Code sessions, plus a Pi extension that can delegate work to those sessions.\n\nThis does not call Claude Code `--print` and it does not use the Anthropic API directly. It starts the official `claude` interactive CLI inside tmux, pastes tasks into that terminal, captures logs, and optionally waits for a completion marker.\n\n## Why\n\nIf non-interactive Claude Code usage becomes a paid programmatic path, a local agent can still coordinate the interactive Claude Code app you are already logged into. `ccmux` makes that setup durable and scriptable:\n\n- Claude Code keeps running in tmux if the parent agent dies.\n- Any process can attach, steer, or inspect the session.\n- Pi can call Claude Code as a delegated subagent via tools.\n- The package can be installed from npm or GitHub as a Pi package.\n\n## Install\n\nRequirements:\n\n- `tmux` on PATH\n- `claude` on PATH\n- a normal Claude Code login or configured Claude Code auth\n- Pi, if you want the provider or extension tools\n\n### Clean Pi provider setup\n\nInstall the package into Pi:\n\n```bash\npi install npm:claude-code-tmux\n```\n\nRestart or reload Pi, then pick the provider from `/model`:\n\n```text\nclaude-code-tmux/opus\n```\n\nor:\n\n```text\nclaude-code-tmux/sonnet\n```\n\nYou can verify the provider is installed with:\n\n```bash\npi -e npm:claude-code-tmux --list-models claude-code-tmux\n```\n\nThen use Pi normally. When Pi calls the provider, `ccmux` starts or reuses an interactive Claude Code session in tmux, relays the turn to it, and returns the final response to Pi.\n\n### CLI install\n\n```bash\nnpm install -g claude-code-tmux\nccmux --help\n```\n\nOne-off CLI usage without global install:\n\n```bash\nnpx -y -p claude-code-tmux ccmux --help\n```\n\nLocal development:\n\n```bash\ngit clone https://github.com/Mahir-Isikli/claude-code-tmux.git\ncd claude-code-tmux\nnpm install\nnpm link\n```\n\n## CLI usage\n\nStart a session:\n\n```bash\nccmux start --name demo --cwd .\n```\n\nBy default, `ccmux start` launches Claude Code with:\n\n```bash\nclaude --model opus --effort high --dangerously-skip-permissions\n```\n\nClaude Code resolves `opus` to the latest Opus model, currently Opus 4.7. You can override model and effort:\n\n```bash\nccmux start --name demo --cwd . --model sonnet --effort xhigh\nccmux start --name demo --cwd . --model claude-opus-4-7 --effort max\n```\n\nFor a safer interactive session, opt out of bypass mode:\n\n```bash\nccmux start --name demo --cwd . --safe-permissions\n```\n\nSend work and wait for the completion protocol:\n\n```bash\nccmux send --session demo --wait \"Inspect this repo and summarize the architecture.\"\n```\n\nSend live steering:\n\n```bash\nccmux steer --session demo \"Keep the scope tiny and do not edit files yet.\"\n```\n\nInspect or attach:\n\n```bash\nccmux status\nccmux capture --session demo --lines 120\ntmux attach -t ccmux-demo\n```\n\nKill a session:\n\n```bash\nccmux kill --session demo\n```\n\n## Pi usage\n\nInstall the package into Pi from npm:\n\n```bash\npi install npm:claude-code-tmux\n```\n\nFor local development, use the checkout path instead:\n\n```bash\npi -e /absolute/path/to/claude-code-tmux --list-models claude-code-tmux\n```\n\nThe extension registers a native Pi provider:\n\n- provider: `claude-code-tmux`\n- models: `opus`, `sonnet`\n\nSelect it in Pi with `/model`, or start Pi with model filters that include `claude-code-tmux/*`.\n\nThe provider relays Pi model requests into an interactive Claude Code session in tmux. It starts a ccmux session for the current workspace, sends Pi's recent context to Claude Code, streams Claude Code hook lifecycle/tool progress as hidden thinking/progress, and returns Claude Code's final response to Pi. This is still best-effort terminal automation, but it behaves like a normal Pi provider from the model picker.\n\nThe extension also registers these tools:\n\n- `ccmux_start`\n- `ccmux_send`\n- `ccmux_steer`\n- `ccmux_status`\n- `ccmux_capture`\n\nProvider mode also injects temporary Claude Code hook settings. Hook events are recorded under `~/.pi/ccmux/events/` and can be inspected with:\n\n```bash\nccmux events --session <session-name>\nccmux events --job <job-id>\n```\n\nThe package also bundles a skill:\n\n- `/skill:claude-code-tmux`\n\nUse the skill when an agent needs the ccmux workflow, CLI fallback commands, AGENTS.md behavior, troubleshooting notes, or public packaging guidance.\n\nTypical tool flow inside Pi:\n\n1. Start a Claude Code session for the repo with `ccmux_start`.\n2. The default model is `opus`, the default effort is `high`, and permission prompts are bypassed.\n3. Send a task with `ccmux_send`.\n4. If the task runs long, use `ccmux_capture` or attach to the tmux session.\n5. Use `ccmux_steer` for corrections while Claude Code is running.\n\nTypical provider flow inside Pi:\n\n1. Install with `pi install npm:claude-code-tmux`.\n2. Select `claude-code-tmux/opus` from `/model`.\n3. Send a normal Pi prompt.\n4. Pi calls the provider, which relays the turn into Claude Code running in tmux.\n\n## AGENTS.md support\n\nClaude Code already reads `CLAUDE.md`. Many agent projects use `AGENTS.md` instead. On start, `ccmux` auto-discovers `AGENTS.md` files from the working directory upward to your home directory, combines them, and passes them to Claude Code with `--append-system-prompt-file`.\n\nThis means users do not need to symlink `AGENTS.md` to `CLAUDE.md`. If both files exist, Claude Code sees its normal `CLAUDE.md` context plus the imported `AGENTS.md` instructions.\n\nDisable this behavior if needed:\n\n```bash\nccmux start --name demo --cwd . --no-agents-md\n```\n\nUse an explicit file if you want:\n\n```bash\nccmux start --name demo --cwd . --agents-md ./AGENTS.md\n```\n\n## Completion detection\n\nFor each sent task, `ccmux` appends a protocol asking Claude Code to include:\n\n```text\nCCMUX_DONE:<job-id>\n```\n\nIt also asks Claude Code to write a JSON done file under `.ccmux/jobs/` in the target workspace. The runner treats either the marker or the done file as completion.\n\nThis is intentionally best-effort. Interactive terminal UIs are not stable APIs. If the marker is not seen, the tmux session may still have completed. Use `ccmux capture` or attach to check.\n\n## Testing\n\nFast unit checks:\n\n```bash\nnpm run check\n```\n\nDeterministic CI-safe package smoke. This does not need Claude Code auth, Pi, or tmux:\n\n```bash\nnpm run test:ci\n```\n\nFull local provider matrix. This starts real Claude Code tmux sessions and can take a few minutes:\n\n```bash\nnpm run test:provider\n```\n\nPublished npm matrix, useful after a release:\n\n```bash\nnpm run test:provider:npm\n```\n\nThe deterministic CI suite covers:\n\n- package manifest and tarball contents\n- CLI bin smoke\n- bundled skill frontmatter\n- hook event broker\n- hook CLI recorder\n- native Pi tool request/response broker\n\nThe real provider matrix covers:\n\n- provider registration\n- fresh workspace trust prompt handling\n- reused provider sessions\n- file edits through Claude Code\n- native Pi tool calls through the `ccmux-pi-tool` bridge\n- `AGENTS.md` import\n- `opus` and `sonnet` provider models\n- hook event recording through `ccmux events`\n- shadow replay events and native Pi tool bridge events\n\n## Remote Control\n\n`ccmux start --remote-control` passes `--remote-control` to Claude Code. That makes the session visible to Claude Code Remote Control if your Claude account supports it. `ccmux` itself still controls the local terminal through tmux.\n\n## Safety and policy notes\n\nThis package is a terminal automation layer around the official interactive Claude Code CLI. It is not a hidden API client and does not impersonate a third-party integration. Users should only run it with Claude Code installations and accounts they are allowed to use. For public distribution, avoid language about bypassing billing or access controls.\n\n## Current limitations\n\n- Terminal completion detection is heuristic.\n- `ccmux` starts Claude Code with `--dangerously-skip-permissions` by default. Use `--safe-permissions` if you want Claude Code prompts.\n- The Pi provider is best-effort terminal automation behind a normal provider entry.\n- Claude Code uses its own tools inside tmux, so Pi does not receive structured Pi tool calls from this provider.\n- File edits can happen through Claude Code, outside Pi's normal tool transcript.\n- Streaming is currently final-response oriented. Use `ccmux_capture` or `ccmux capture` for terminal inspection.\n",
+  "keywords": [
+    "pi-package",
+    "claude-code",
+    "tmux",
+    "coding-agent",
+    "pi-extension",
+    "pi-provider"
+  ],
+  "author": {
+    "name": "Mahir Isikli"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Mahir-Isikli/claude-code-tmux#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mahir-Isikli/claude-code-tmux.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/pi.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-14T10:30:26.157Z",
+    "modified": "2026-05-16T11:27:46.651Z",
+    "0.1.0": "2026-05-14T10:30:26.420Z",
+    "0.1.1": "2026-05-14T10:32:13.283Z",
+    "0.1.2": "2026-05-14T10:33:45.314Z",
+    "0.2.0": "2026-05-15T10:07:15.353Z",
+    "0.2.1": "2026-05-15T13:35:56.993Z",
+    "0.2.2": "2026-05-16T09:39:58.025Z",
+    "0.3.0": "2026-05-16T10:12:48.468Z",
+    "0.4.0": "2026-05-16T10:36:07.363Z",
+    "0.5.0": "2026-05-16T10:52:28.654Z",
+    "0.5.1": "2026-05-16T10:59:09.444Z",
+    "0.5.2": "2026-05-16T11:14:27.753Z",
+    "0.6.0": "2026-05-16T11:27:46.545Z"
+  },
+  "versions_count": 12,
+  "downloads_last_week": 59,
+  "download_trend": []
+}

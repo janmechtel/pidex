@@ -1,0 +1,37 @@
+{
+  "name": "pi-openai-codex-fast",
+  "latest_version": "0.0.4",
+  "description": "Pi package that adds an openai-codex-fast provider backed by openai-codex with priority service tier",
+  "readme": "# pi-openai-codex-fast\n\nPi package that adds an `openai-codex-fast` provider backed by built-in `openai-codex` with `serviceTier: \"priority\"`.\n\n## Behavior\n\n`openai-codex-fast` is a separate selectable provider that delegates to Pi's built-in `openai-codex` implementation with the same model id and `serviceTier: \"priority\"`. Normal `openai-codex/<modelId>` selections are left on the normal/default-tier path.\n\nCurrently exposed fast models:\n\n- `gpt-5.5`\n- `gpt-5.4`\n- `gpt-5.4-mini`\n\nRuntime behavior when `openai-codex-fast/<modelId>` is selected:\n\n- Reuses existing `openai-codex` auth from Pi auth storage.\n- Sends Codex requests through the built-in Codex response API with `serviceTier: \"priority\"`.\n- Stores all generated assistant messages canonically as built-in Codex, including normal replies, tool-calling replies, and setup/error/aborted replies:\n  - `provider: \"openai-codex\"`\n  - `api: \"openai-codex-responses\"`\n- Does not rewrite stored assistant history back to `openai-codex-fast` or `openai-codex-fast-responses`.\n\nFast-mode recovery:\n\n- No custom fast-mode session state is persisted.\n- On any `session_start` reason (`startup`, `reload`, `new`, `resume`, or `fork`), the extension scans the current branch backward for the latest overall `model_change`.\n- If that latest `model_change` is `openai-codex-fast/<modelId>`, it selects `openai-codex-fast/<modelId>` again.\n- If the latest `model_change` is anything else, it does nothing and lets Pi's normal model recovery handle it.\n- The extension does not handle `session_tree`, so branch switches do not trigger model reconciliation.\n\n## Install\n\n### Local path\n\n```bash\npi install .\n```\n\n### Temporary use\n\n```bash\npi -e .\n```\n\nAfter install, log in to built-in Codex if needed:\n\n```text\n/login openai-codex\n```\n\nThen select a fast model with `/model`, for example:\n\n```text\nopenai-codex-fast/gpt-5.5\n```\n\n## Local development\n\n```bash\nnpm install\nnpm test # typecheck + integration tests for both direct TS loading and built JS\nnpm run check\nnpm run build\nnpm run test:ts\nnpm run test:js\nnpm run lint\nnpm run fmt\nnpm run benchmark\n```\n\n## Packaging\n\nThis package publishes the TypeScript extension entrypoint and these project files explicitly:\n\n- `index.ts`\n- `README.md`\n- `CHANGELOG.md`\n- `LICENSE`\n\nThe build output is a local test artifact for verifying the extension also works as native JavaScript; it is not published.\n\nRelease helper:\n\n```bash\nnpm run release:publish\nnpm run release:publish -- --execute\n```\n\n`npm run release:publish` runs `npm test` first, then defaults to an npm dry-run. Pass `--execute` to perform the real publish.\n\nThe publish helper does not create commits or tags. A real publish requires a clean Git worktree, the release commit pushed to the branch upstream, and a pushed `vX.Y.Z` tag pointing at the release commit.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "Kaan Ozdokmeci",
+    "email": "kaan@2h2d.co",
+    "url": "https://www.2h2d.co"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/2h2d-co/pi-openai-codex-fast#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/2h2d-co/pi-openai-codex-fast.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-16T15:36:46.072Z",
+    "modified": "2026-06-22T04:04:44.628Z",
+    "0.0.1-alpha.0": "2026-05-16T15:36:46.211Z",
+    "0.0.1": "2026-05-17T00:49:13.429Z",
+    "0.0.2": "2026-05-17T01:25:25.602Z",
+    "0.0.3": "2026-06-10T15:45:10.650Z",
+    "0.0.4": "2026-06-22T04:04:44.483Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 164,
+  "download_trend": []
+}

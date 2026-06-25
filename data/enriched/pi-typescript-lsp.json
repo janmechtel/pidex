@@ -1,0 +1,350 @@
+{
+  "name": "pi-typescript-lsp",
+  "latest_version": "1.0.1",
+  "description": "Pi package adding TypeScript LSP navigation, diagnostics, import fixes, and rename tools for coding agents.",
+  "readme": "# pi TypeScript LSP extension\n\nTypeScript language-server tools designed for coding agents, not human editor UIs.\n\nTraditional LSP APIs expose many small operations (`hover`, `definition`, `references`) at exact line/character positions. That shape works for humans because editors already know cursor position and render results interactively. Coding agents are different: they reason in files, symbols, tasks, and edits. Exact UTF-16 offsets and many tiny tools add distraction, token cost, and failure modes.\n\nThis extension therefore exposes a small set of high-level, intent-shaped tools:\n\n- find or understand a symbol\n- check TypeScript errors\n- fix/import-organize safely\n- rename safely\n\nIt keeps native filesystem tools (`read`, `edit`, `bash`/`rg`/`find`) useful for file discovery and text search, while using LSP only where semantic TypeScript knowledge matters.\n\n## Installation\n\nInstall as a pi package from npm:\n\n```bash\npi install npm:pi-typescript-lsp\n```\n\nOr install from GitHub:\n\n```bash\npi install git:git@github.com:IbrahimMohammed47/pi-typescript-lsp.git\n```\n\nFor manual development installs:\n\n```bash\nmkdir -p ~/.pi/agent/extensions\ncd ~/.pi/agent/extensions\ngit clone git@github.com:IbrahimMohammed47/pi-typescript-lsp.git pi-typescript-lsp\ncd pi-typescript-lsp\nnpm install\n```\n\nPi auto-discovers extensions on startup. In a running pi session, reload after install/update:\n\n```text\n/reload\n```\n\n## Why this design\n\n### Less tools beats many low-level tools\n\nAgents receive tool descriptions in context. Too many tools increase choice noise and make models over-tool or pick wrong primitives. A small tool set is easier to learn and easier to steer.\n\n### High-level tools beat line/character LSP calls\n\nRaw LSP is cursor-oriented. Agents usually do not know exact line/character positions without reading files, counting offsets, and risking UTF-16 mistakes. Symbol/query targeting is more natural:\n\n```json\n{ \"target\": { \"file\": \"src/auth.ts\", \"symbol\": \"getAccessToken\" } }\n```\n\ninstead of:\n\n```json\n{ \"path\": \"src/auth.ts\", \"line\": 42, \"character\": 17 }\n```\n\n### Use LSP for semantics, native tools for text\n\nUse native tools for:\n\n- finding files\n- broad text search\n- reading known code\n- surgical edits\n- config/docs/JSON/CSS\n\nUse LSP tools for:\n\n- symbol definitions and type info\n- semantic references/usages\n- implementations and call hierarchy\n- TypeScript diagnostics and project typecheck\n- missing-import fixes / organize imports\n- safe cross-file rename\n\n## Tools\n\n### `ts_symbol_context`\n\nUnderstand one known TypeScript/JavaScript symbol.\n\nDefault output is low-noise: hover/type info + definition. Request references, implementations, type definition, or call hierarchy only when needed. For TypeScript 5.9+, hover detail is automatically expanded when server says more detail is available.\n\nExamples:\n\n```json\n{\n  \"target\": { \"file\": \"src/auth.ts\", \"symbol\": \"getAccessToken\" }\n}\n```\n\n```json\n{\n  \"target\": { \"file\": \"src/auth.ts\", \"symbol\": \"getAccessToken\" },\n  \"include\": { \"references\": true, \"hover\": false, \"definition\": false }\n}\n```\n\n```json\n{\n  \"target\": { \"query\": \"CacheStore\" },\n  \"include\": { \"implementation\": true }\n}\n```\n\nIf multiple candidates are returned, retry with `selectIndex`.\n\n### `ts_find_symbols`\n\nLanguage-aware symbol search or file outline.\n\nUse `query` when symbol name is known but file is unknown:\n\n```json\n{ \"query\": \"SessionManager\", \"limit\": 20 }\n```\n\nUse `file` to outline classes/functions/methods/exports in one file:\n\n```json\n{ \"file\": \"src/router.ts\" }\n```\n\nNot for filename or plain text search; use filesystem tools/`rg` for that.\n\n### `ts_errors_check`\n\nCheck TypeScript errors. Pass `file` when checking a recent change or known problem file; omit it when no file is known.\n\n```json\n{ \"file\": \"src/session.ts\" }\n```\n\n```json\n{ \"maxErrors\": 50 }\n```\n\nWhen `file` is provided, the extension first checks that file with LSP diagnostics. If the file has no errors, it runs project typecheck to catch downstream breakage. When `file` is omitted, it runs project typecheck directly.\n\nProject typecheck uses `npm run typecheck` when present, otherwise bundled `typescript` via `tsc --noEmit --pretty false`. Output shows TypeScript errors only and is capped by `maxErrors` (default `20`).\n\n### `ts_import_fix`\n\nFix imports in one TS/JS file using LSP code actions.\n\nAuto-import for a diagnostic:\n\n```json\n{ \"file\": \"src/session.ts\", \"diagnosticIndex\": 0 }\n```\n\nPreview selected import fix:\n\n```json\n{ \"file\": \"src/session.ts\", \"diagnosticIndex\": 0, \"applyIndex\": 0 }\n```\n\nApply selected import fix:\n\n```json\n{ \"file\": \"src/session.ts\", \"diagnosticIndex\": 0, \"applyIndex\": 0, \"apply\": true }\n```\n\nOrganize imports by omitting `diagnosticIndex`:\n\n```json\n{ \"file\": \"src/session.ts\", \"apply\": true }\n```\n\nPreviews by default; writes only with `apply: true`.\n\n### `ts_rename`\n\nSafely rename a symbol across files using TypeScript LSP.\n\n```json\n{\n  \"target\": { \"file\": \"src/auth.ts\", \"symbol\": \"getAccessToken\" },\n  \"newName\": \"readAccessToken\"\n}\n```\n\nApply after preview/user intent:\n\n```json\n{\n  \"target\": { \"file\": \"src/auth.ts\", \"symbol\": \"getAccessToken\" },\n  \"newName\": \"readAccessToken\",\n  \"apply\": true\n}\n```\n\nPrefer this over manual search/replace for symbol renames.\n\n## Automatic diagnostics after edits\n\nAfter successful native `write` or `edit` calls on TS/JS source files, extension runs the same TypeScript check as `ts_errors_check` with the changed file.\n\nThat means it checks the edited file first, then runs project typecheck if the file itself is clean. This catches downstream errors caused by signature/type/export changes.\n\nAutomatic diagnostics are controlled by config.\n\n## `/lsp` command and config\n\n`/lsp` is read-only. It shows:\n\n- current config values\n- built-in defaults\n- where current defaults came from\n- descriptions for each option\n- example override file\n\nProject override file:\n\n```text\n.pi/typescript-lsp.json\n```\n\nDefaults are derived on session start from:\n\n1. built-in defaults\n2. current directory `tsconfig.json`, `jsconfig.json`, or `tsconfig.*.json` (`exclude` only)\n3. project-local `node_modules/.bin/typescript-language-server` when found\n4. `.pi/typescript-lsp.json` override, if present\n\nExample:\n\n```json\n{\n  \"enabled\": true,\n  \"autoDiagnostics\": true,\n  \"autoDiagnosticsWaitMs\": 800,\n  \"maxFileSizeBytes\": 2097152,\n  \"serverPath\": \"auto\",\n  \"exclude\": [\"node_modules\", \"dist\", \"build\", \"coverage\"]\n}\n```\n\nSame example is available at `examples/typescript-lsp.json`.\n\n### Config options\n\n- `enabled` (`boolean`, default `true`)\n  - Master switch for all TypeScript LSP tools and automatic diagnostics.\n\n- `autoDiagnostics` (`boolean`, default `true`)\n  - Append TypeScript diagnostics after successful native `write`/`edit` calls.\n\n- `autoDiagnosticsWaitMs` (`number`, default `800`)\n  - Wait time for edited-file LSP diagnostics before project typecheck fallback.\n\n- `maxFileSizeBytes` (`number`, default `2097152`)\n  - Maximum file size opened by LSP client. Prevents huge/generated files from hurting performance.\n\n- `serverPath` (`string`, default `\"auto\"`)\n  - `\"auto\"` uses bundled `typescript-language-server`. Relative or absolute path can override.\n\n- `exclude` (`string[]`, default common build/vendor dirs plus `tsconfig`/`jsconfig` exclude)\n  - Paths/globs ignored by extension file discovery and automatic diagnostics. Project override replaces current `exclude`.\n\n## Dependencies\n\nUses local extension dependencies:\n\n- `typescript-language-server`\n- `typescript`\n\nIf dependencies vanish, reinstall:\n\n```bash\ncd ~/.pi/agent/extensions/pi-typescript-lsp\nnpm install\n```\n\n## Development checks\n\n```bash\nnpm run typecheck\nnpm test\nnpm run pack:dry-run\n```\n\n## Operational notes\n\n- Server starts lazily on first LSP tool call.\n- Server root is current pi working directory.\n- File paths can be absolute or relative to pi cwd.\n- Documents are synced from disk before each symbol/file request.\n- Files larger than `maxFileSizeBytes` are rejected before read.\n- Extension shuts server down on pi session shutdown/reload with kill fallback.\n\n## Known limitations\n\n- Workspace symbol search depends on TypeScript server indexing/warmup; fallback scan opens likely source files.\n- Project typecheck can be slow on large repositories.\n- Huge/generated files are skipped by `maxFileSizeBytes`.\n- JavaScript projects work best with `jsconfig.json`.\n- Text search is intentionally out of scope; use `rg`/filesystem tools.\n\n## License\n\nMIT. See `LICENSE`.\n\n## Good agent behavior\n\nGood:\n\n```text\nUse ts_symbol_context for getAccessToken in src/auth.ts to understand type/definition.\n```\n\n```text\nUse ts_symbol_context include.references=true to find semantic usages before changing behavior.\n```\n\n```text\nUse ts_errors_check with changed file after TS edits to catch local and downstream errors.\n```\n\nAvoid:\n\n```text\nUse LSP to search all files containing \"token\".\n```\n\nUse `rg`/filesystem tools for broad text search instead.\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "typescript",
+    "lsp",
+    "language-server",
+    "coding-agent",
+    "extension"
+  ],
+  "author": {
+    "name": "Ibrahim Mohammed"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/IbrahimMohammed47/pi-typescript-lsp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IbrahimMohammed47/pi-typescript-lsp.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-24T17:17:46.278Z",
+    "1.0.1": "2026-05-24T17:17:46.500Z",
+    "modified": "2026-05-24T17:17:46.654Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 6,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 119
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

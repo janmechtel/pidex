@@ -1,0 +1,38 @@
+{
+  "name": "pi-rtk-noemoji",
+  "latest_version": "0.1.6",
+  "description": "Fork of pi-rtk with all emoji removed from output. Same token reduction, plain text only.",
+  "readme": "# pi-rtk-noemoji\n\nFork of [pi-rtk](https://github.com/mcowger/pi-rtk) by Matt Cowger. **Identical functionality, all emoji removed from output.** Plain text markers only (`[OK]`, `[ERROR]`, `[WARN]`, `PASS:`, `FAIL:`, `SKIP:`, etc.).\n\nEverything else \u2014 config, commands, techniques, `rtk_configure` tool \u2014 is unchanged from upstream.\n\n## Why\n\nEmoji in tool output wastes tokens (multi-byte), renders inconsistently across terminals, and adds no information over plain text markers.\n\n## Installation\n\n```\npi install npm:pi-rtk-noemoji\n```\n\nOr in `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\n    \"npm:pi-rtk-noemoji\"\n  ]\n}\n```\n\n## Configuration\n\nSame as upstream. Create `~/.pi/agent/rtk-config.json`:\n\n```json\n{\n  \"enabled\": true,\n  \"techniques\": {\n    \"ansiStripping\": true,\n    \"truncation\": { \"enabled\": false },\n    \"sourceCodeFiltering\": { \"enabled\": false },\n    \"smartTruncation\": { \"enabled\": false },\n    \"testOutputAggregation\": true,\n    \"buildOutputFiltering\": true,\n    \"gitCompaction\": false,\n    \"searchResultGrouping\": false,\n    \"linterAggregation\": true\n  }\n}\n```\n\n**Recommended safe config above**: only techniques that cannot break `edit` exact-match are enabled. Source code filtering is off \u2014 it strips comments/whitespace, causing the model to see different text than what's on disk.\n\n## Commands\n\n- `/rtk-stats` \u2014 token savings statistics\n- `/rtk-on` / `/rtk-off` \u2014 enable/disable\n- `/rtk-what` \u2014 show current config\n- `/rtk-toggle-<technique>` \u2014 toggle individual techniques\n\n## Output examples\n\nBuild success:\n```\n[OK] Build successful (12 units compiled)\n```\n\nBuild errors:\n```\n[ERROR] 2 error(s):\nerror[E0308]: mismatched types\n  --> src/main.rs:5:12\n\n[WARN] 3 warning(s)\n```\n\nTest results:\n```\nTest Results:\n   PASS: 42 passed\n   FAIL: 2 failed\n   SKIP: 1 skipped\n\n   Failures:\n   - FAIL test_something\n     expected 1, got 2\n```\n\n## Known issues fixed in this fork\n\n### Command detection was too broad (upstream bug)\n\nSeveral `is*Command` functions used `command.includes(\"keyword\")` to detect whether a bash command was a build/test/search/linter invocation. This caused false positives:\n\n- **`isSearchCommand`**: `includes(\"ag\")` matched \"agent\", \"package\", \"manage\". `includes(\"find\")` matched \"findall\", paths containing \"find\". Any command accidentally classified as a search command had its output reformatted and truncated to 50 results.\n- **`isLinterCommand`**: `includes(\"black\")` matched \"blacklist\". `includes(\"ruff\")` matched any command with \"ruff\" as a substring.\n- **`isTestCommand`**: bare `\"test\"` in TEST_COMMANDS matched any command containing the word \"test\", replacing the entire output with a test summary. This silently destroyed Python script output whenever a line contained the word \"ok\" (counted as a passed test).\n\n**Fix**: removed bare `\"test\"` from TEST_COMMANDS. Changed `isSearchCommand` and `isLinterCommand` to match command names only at command position (start of line or after `|`, `&&`, `;`), not as substrings.\n\n### Source code filtering breaks `edit` tool\n\nThe `sourceCodeFiltering` technique strips comments and normalizes whitespace when reading files. The agent then sees modified text, but the `edit` tool requires exact match against the real file content. Edits fail silently or target the wrong text. **Recommendation: keep `sourceCodeFiltering` disabled.**\n\n### Truncation hides scan/data output\n\nDefault `truncation.maxChars: 10000` (10KB) and `smartTruncation.maxLines: 200` are too aggressive for projects that read large JSON files, scan results, or verbose script output. Findings get silently dropped. **Recommendation: disable both for data-heavy projects.**\n\n## Changes from upstream\n\nAll changes are in `techniques/*.ts` \u2014 emoji in generated output strings replaced with plain text. Regex detection patterns (for parsing test/build output) are untouched.\n\n| Upstream | This fork |\n|---|---|\n| `\u2713` | `[OK]` |\n| `\u274c` | `[ERROR]` |\n| `\u26a0\ufe0f` | `[WARN]` |\n| `\ud83d\udccb Test Results:` | `Test Results:` |\n| `\u2705 N passed` | `PASS: N passed` |\n| `\u274c N failed` | `FAIL: N failed` |\n| `\u23ed\ufe0f N skipped` | `SKIP: N skipped` |\n| `\u2022 failure` | `- failure` |\n| `\ud83d\udcc4 file` | `> file` |\n| `\ud83d\udccc branch` | `Branch: branch` |\n| `\ud83d\udd0d N matches` | `N matches` |\n\n## License\n\nMIT \u2014 same as upstream.\n\n## Credits\n\nAll credit to [Matt Cowger](https://github.com/mcowger) for the original [pi-rtk](https://github.com/mcowger/pi-rtk).\n",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-package",
+    "extension",
+    "token-reduction",
+    "rtk",
+    "ai"
+  ],
+  "author": {
+    "name": "Matt Cowger"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/superresistant/pi-rtk-noemoji#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/superresistant/pi-rtk-noemoji.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-07T17:23:05.077Z",
+    "modified": "2026-03-16T09:28:59.136Z",
+    "0.1.5": "2026-03-07T17:23:05.287Z",
+    "0.1.6": "2026-03-16T09:28:59.037Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

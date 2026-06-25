@@ -1,0 +1,39 @@
+{
+  "name": "pi-mnemosyne",
+  "latest_version": "0.1.0",
+  "description": "Pi extension for local persistent memory using Mnemosyne \u2014 offline semantic search, no cloud required",
+  "readme": "# pi-mnemosyne\n\nPi extension for **local persistent memory** using [Mnemosyne](https://github.com/gandazgul/mnemosyne). Gives your AI coding agent memory that persists across sessions \u2014 entirely offline, no cloud APIs.\n\n## Prerequisites\n\nInstall the mnemosyne binary first:\n\n```bash\n# From source (requires Go 1.21+, GCC, Task)\ngit clone https://github.com/gandazgul/mnemosyne.git\ncd mnemosyne\ntask install\n```\n\nSee the [mnemosyne README](https://github.com/gandazgul/mnemosyne#quick-start) for detailed setup instructions. On first use, mnemosyne will automatically download its ML models (~500 MB one-time).\n\n## Install\n\n```bash\n# From npm (when published)\npi install npm:pi-mnemosyne\n\n# From local path (for development)\npi install ./pi-mnemosyne\n```\n\n## What it does\n\n### Core Memories\n\nCore memories are tagged with `core` and **automatically injected into the system prompt** at the start of every session (and after compaction). They work like `AGENTS.md` \u2014 always-available context that the agent can reference without explicitly searching.\n\nUse core memories for:\n- Project architecture and key conventions\n- Important user preferences\n- Critical decisions that should never be forgotten\n\n**Keep core memories lean** \u2014 they're injected into every prompt and consume context tokens.\n\n### Tools\n\nThe extension registers five tools available to the AI agent:\n\n| Tool | Description |\n|------|-------------|\n| `memory_recall` | Search project memory for relevant context and past decisions |\n| `memory_recall_global` | Search global memory for cross-project preferences |\n| `memory_store` | Store a project-scoped memory (optionally as `core`) |\n| `memory_store_global` | Store a cross-project memory (optionally as `core`) |\n| `memory_delete` | Delete an outdated memory by its document ID |\n\n### Memory Scoping\n\n| Scope | Collection | Persists across |\n|-------|-----------|-----------------|\n| Project | `<directory-name>` | Sessions in the same project |\n| Global | `global` | All projects |\n| Core (project) | `<directory-name>` (tagged `core`) | Sessions + injected into system prompt |\n| Core (global) | `global` (tagged `core`) | All projects + injected into system prompt |\n\nThe project collection is auto-initialized when the extension loads. The global collection is created on first use of `memory_store_global`.\n\n## How it works\n\nMnemosyne is a local document store with hybrid search:\n- **Full-text search** (SQLite FTS5, BM25 ranking)\n- **Vector search** (sqlite-vec, cosine similarity with snowflake-arctic-embed-m-v1.5)\n- **Reciprocal Rank Fusion** combines both for best results\n\nAll ML inference runs locally via ONNX Runtime. Your memories never leave your machine.\n\n### Architecture\n\n```\nSession start\n  \u2502\n  \u251c\u2500\u25ba Auto-init project collection (mnemosyne init)\n  \u2514\u2500\u25ba Fetch core memories (local + global, tagged \"core\")\n      \u2502\n      \u25bc\n  Cached in memory\n      \u2502\nEach turn (before_agent_start)\n  \u2502\n  \u2514\u2500\u25ba Append cached core memories to system prompt\n      (provider-cached, survives compaction)\n\nAgent uses tools\n  \u2502\n  \u251c\u2500\u25ba memory_recall / memory_recall_global \u2192 mnemosyne search\n  \u251c\u2500\u25ba memory_store / memory_store_global \u2192 mnemosyne add [--tag core]\n  \u2502     \u2514\u2500\u25ba If core=true \u2192 invalidate cache (re-fetched next turn)\n  \u2514\u2500\u25ba memory_delete \u2192 mnemosyne delete\n        \u2514\u2500\u25ba Invalidate cache (re-fetched next turn)\n```\n\n## Development\n\n```bash\n# Link locally for development\npi install ./pi-mnemosyne\n\n# Check it's installed\npi list\n\n# Start pi \u2014 the extension loads automatically\npi\n```\n\nThe extension uses TypeScript with pi's built-in jiti loader \u2014 no build step required.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "mnemosyne",
+    "memory",
+    "local",
+    "offline",
+    "semantic-search",
+    "ai",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "gandazgul"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/gandazgul/mnemosyne#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gandazgul/mnemosyne.git",
+    "directory": "pi-mnemosyne"
+  },
+  "pi": {
+    "extensions": [
+      "./"
+    ]
+  },
+  "time": {
+    "created": "2026-04-04T22:20:43.306Z",
+    "0.1.0": "2026-04-04T22:20:43.457Z",
+    "modified": "2026-04-04T22:20:43.769Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

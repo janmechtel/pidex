@@ -1,0 +1,45 @@
+{
+  "name": "pi-crawl4ai",
+  "latest_version": "0.1.2",
+  "description": "Crawl4AI extension for pi \u2014 web crawling and structured extraction",
+  "readme": "# pi-crawl4ai\n\n[![npm](https://img.shields.io/npm/v/pi-crawl4ai)](https://www.npmjs.com/package/pi-crawl4ai)\n[![GitHub](https://img.shields.io/github/license/romek-rozen/pi-crawl4ai)](https://github.com/romek-rozen/pi-crawl4ai)\n[![Built with Crawl4AI](https://img.shields.io/badge/Built%20with-Crawl4AI-blue)](https://github.com/unclecode/crawl4ai)\n[![Built for pi](https://img.shields.io/badge/Built%20for-pi-green)](https://github.com/mariozechner/pi)\n\nA production-ready [pi](https://github.com/mariozechner/pi) package that integrates [Crawl4AI](https://github.com/unclecode/crawl4ai) \u2014 an open-source LLM-friendly web crawler \u2014 as a custom tool and agent prompt.\n\n## Install\n\n```bash\npi install npm:pi-crawl4ai\n```\n\nOr from git:\n\n```bash\npi install git:github.com/romek-rozen/pi-crawl4ai\n```\n\n## What's included\n\n- `extensions/crawl4ai/` \u2014 the full extension source (tool, commands, renderers)\n- `agents/` \u2014 specialized agent definitions for use with subagent/run\n- `prompts/crawler.md` \u2014 a dedicated Crawler prompt template\n- MIT license\n\n## Quick start\n\n1. **Install Crawl4AI** (inside pi):\n   ```\n   /crawl4ai-install\n   ```\n   This creates a Python venv and installs `crawl4ai` locally.\n\n2. **Verify**:\n   ```\n   /crawl4ai-status\n   /crawl4ai-test\n   ```\n\n3. **Set up agents** (optional, for subagent workflows):\n   ```\n   /crawl4ai-setup-agents\n   ```\n\n4. **Crawl**:\n   ```\n   Crawl https://example.com and give me the markdown.\n   ```\n\n## Usage\n\n### Direct tool usage\n\nThe `crawl4ai` tool is available to the LLM in any pi session. Just ask:\n\n```\nCrawl https://example.com and give me the markdown.\nCrawl https://docs.example.com deeply using BFS, max 10 pages.\nExtract all product names and prices from https://shop.example.com as JSON.\n```\n\n### Prompt templates\n\nThree prompt templates are available:\n\n```\n/crawl4ai https://example.com                       # general \u2014 scrape, crawl, or extract\n/crawl4ai-scrape https://example.com                 # single page \u2192 clean markdown\n/crawl4ai-extract https://example.com product prices # single page \u2192 structured JSON\n```\n\n### Subagent workflows\n\nAfter running `/crawl4ai-setup-agents`, three agents become available for the [subagent tool](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/examples/extensions/subagent):\n\n**Single agent:**\n```\nUse crawl4ai-scrape to get the content of https://example.com\nUse crawl4ai-crawl to explore https://docs.example.com with max 10 pages\nUse crawl4ai-extract to get all product prices from https://shop.example.com\n```\n\n**Parallel execution:**\n```\nRun 3 crawl4ai-scrape agents in parallel: one for https://example.com, one for https://docs.example.com, one for https://blog.example.com\n```\n\n**Chained workflow:**\n```\nUse a chain: first have crawl4ai-scrape get the page at https://shop.example.com, then have crawl4ai-extract pull structured product data from {previous}\n```\n\n## Tool parameters\n\n| Parameter | Description |\n|-----------|-------------|\n| `url` *(required)* | Target URL |\n| `output_format` | `markdown` (default), `markdown-fit`, `md`, `md-fit`, `json`, `all` |\n| `deep_crawl` | `bfs`, `dfs`, or `best-first` |\n| `max_pages` | Limit for deep crawl |\n| `question` | Natural-language question about the page |\n| `json_extract` | LLM extraction prompt *(requires LLM provider configured in crawl4ai)* |\n| `schema_path` | JSON schema file for structured extraction *(requires extraction_config)* |\n| `extraction_config` | Extraction strategy config file (YAML/JSON) *(required with schema_path)* |\n| `browser_config` / `crawler_config` | Key=value pairs |\n| `bypass_cache` | Force fresh crawl |\n| `output_file` | Save directly to a custom path |\n| `timeout` | Seconds, default 60 |\n\n## Commands\n\n| Command | Purpose |\n|---------|---------|\n| `/crawl4ai-install` | Create local venv and install `crawl4ai` |\n| `/crawl4ai-test` | Run a smoke test crawl on example.com |\n| `/crawl4ai-status` | Show resolved binary path and version |\n| `/crawl4ai-clear-cache` | Remove local `.crawl4ai/cache` and `.crawl4ai/robots` |\n| `/crawl4ai-setup-agents` | Symlink agents to `~/.pi/agent/agents/` for use with subagent/run |\n\n## Agents\n\nThree specialized agents are included for use with the subagent tool:\n\n| Agent | Purpose | Model |\n|-------|---------|-------|\n| `crawl4ai-scrape` | Scrape a single page, extract clean markdown | Sonnet |\n| `crawl4ai-crawl` | Crawl multiple linked pages (BFS/DFS/best-first) | Sonnet |\n| `crawl4ai-extract` | Extract structured data as JSON (LLM or CSS/XPath) | Sonnet |\n\nTo set up agents, run inside pi:\n\n```\n/crawl4ai-setup-agents\n```\n\nThis symlinks the agent definitions to `~/.pi/agent/agents/`. After setup, you can use them with the subagent tool:\n\n```\nUse crawl4ai-scrape to get the content of https://example.com\nUse crawl4ai-crawl to explore https://docs.example.com with max 10 pages\nUse crawl4ai-extract to get all product prices from https://shop.example.com\n```\n\n## JSON extraction requirements\n\n`output_format=json` **requires** an extraction strategy:\n- **LLM extraction**: pass `json_extract` (e.g. `\"Extract all product prices\"`). Requires a configured LLM provider in Crawl4AI (run `crwl` once interactively or set up `~/.crawl4ai/global.yml`).\n- **CSS/XPath extraction**: pass `schema_path` + `extraction_config`. Example extraction config YAML:\n  ```yaml\n  type: json-css\n  params:\n    verbose: true\n  ```\n\n\u26a0\ufe0f `json` output with `deep_crawl` is **not supported** by Crawl4AI. Use `markdown` for deep crawls.\n\n## Architecture\n\n| File | Responsibility |\n|------|----------------|\n| `index.ts` | Entry point \u2014 wires everything into `ExtensionAPI` |\n| `types.ts` | Typebox schemas + TypeScript interfaces |\n| `tool.ts` | Tool definition, validation, and execution logic |\n| `args.ts` | Maps friendly params to CLI flags |\n| `resolve.ts` | Binary discovery, env vars, output path helpers |\n| `runner.ts` | Spawns `crwl` with timeout, abort, and streaming |\n| `render.ts` | Custom TUI rendering |\n| `commands.ts` | Slash commands (`/crawl4ai-*`) |\n| `format.ts` | Legacy truncation helper |\n\n## Development\n\nThe extension runs inside pi\u2019s extension loader. After modifying source, reload pi and use `/crawl4ai-status` or `/crawl4ai-test` to verify.\n\n## Troubleshooting\n\n- **\"Binary not found\"** \u2192 run `/crawl4ai-install` or set `CRAWL4AI_VENV=/path/to/venv`\n- **\"No default LLM provider configured\"** \u2192 configure a provider in Crawl4AI before using `json_extract`\n- **\"the JSON object must be str, bytes or bytearray, not NoneType\"** \u2192 usually missing `extraction_config` when using `schema_path`, or the page has no matching content\n- **Stale cache** \u2192 run `/crawl4ai-clear-cache`\n- **Timeouts** \u2192 increase `timeout` param for slow sites\n\n## Links\n\n- **npm**: https://www.npmjs.com/package/pi-crawl4ai\n- **GitHub**: https://github.com/romek-rozen/pi-crawl4ai\n\n## License\n\nMIT \u2014 see [LICENSE](./LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "crawl4ai",
+    "web-crawling",
+    "data-extraction",
+    "scraping",
+    "markdown"
+  ],
+  "author": {
+    "name": "Roman",
+    "url": "https://rozenberger.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/romek-rozen/pi-crawl4ai#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/romek-rozen/pi-crawl4ai.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/crawl4ai"
+    ],
+    "agents": [
+      "./agents"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-24T07:21:15.315Z",
+    "modified": "2026-04-24T08:39:46.956Z",
+    "0.1.0": "2026-04-24T07:21:15.448Z",
+    "0.1.1": "2026-04-24T07:54:44.603Z",
+    "0.1.2": "2026-04-24T08:39:46.868Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

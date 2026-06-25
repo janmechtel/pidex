@@ -1,0 +1,348 @@
+{
+  "name": "pi-extension-observational-memory",
+  "latest_version": "0.1.3",
+  "description": "Observational-memory compaction strategy for pi with observer/reflector token thresholds",
+  "readme": "# Observational Memory Extension\n\nExtension-only custom compaction for pi, inspired by observational-memory systems.\n\nSee [DESIGN.md](./DESIGN.md) for architecture notes and next milestones.\n\nThis implementation follows pi's extension style:\n- directory extension with `index.ts`\n- top-level JSDoc usage/behavior comments\n- explicit command registration\n- fallback-safe hooks (default compaction remains available)\n\n## What it does now\n\nOn `session_before_compact`:\n1. Uses pi's prepared compaction input (`messagesToSummarize`, `turnPrefixMessages`, `previousSummary`)\n2. Uses the **current active model** (same model as your session)\n3. Generates a structured summary with sections:\n   - `## Observations`\n   - `## Open Threads`\n   - `## Next Action Bias`\n4. Runs reflector GC when observation block token estimate crosses threshold (default: 40k) or when forced via command\n5. Preserves pi's kept-tail behavior by reusing `preparation.firstKeptEntryId`\n6. Appends cumulative `<read-files>` and `<modified-files>` tags (merged with prior checkpoint tags)\n7. Stores extension metadata in `compaction.details`\n\nOn `session_before_tree`:\n- Replaces default branch summary with the same observational format.\n\nOn `agent_end` (buffered mode):\n- Estimates raw-tail tokens (messages since latest compaction) and triggers observer compaction at threshold (default: 30k + 8k retain buffer).\n\nObserver modes:\n- `buffered` (default): auto observer checks in background after agent turns.\n- `blocking`: background observer trigger is disabled; regular/manual compaction still works.\n\nIf generation fails or API key/model is unavailable, it returns nothing so pi falls back to default compaction/tree summarization.\n\n## Commands\n\n- `/obs-memory-status` \u2014 show latest compaction + branch summary metadata and OM token block estimates\n- `/obs-auto-compact [on|off] [mode] [observerTokens] [reflectorTokens] [retainTokens]` \u2014 show/set thresholds and mode\n  - keyed form: `/obs-auto-compact mode=buffered observer=30k reflector=40k retain=8k`\n- `/obs-mode [buffered|blocking]` \u2014 show/set observer auto-compaction mode\n- `/obs-view [obs] [raw] [maxLines]` \u2014 inspect latest observation summary quickly in-terminal\n- `/obs-reflect [extra focus]` \u2014 force aggressive reflection on next compaction and trigger compaction now\n\nOptional startup flags:\n- `--obs-auto-compact=true|false`\n- `--obs-mode=buffered|blocking`\n- `--obs-observer-threshold=30000` (or `30k`)\n- `--obs-reflector-threshold=40000` (or `40k`)\n- `--obs-retain-raw-tail=8000` (or `8k`, `0` to disable retain buffer)\n\n## Install\n\nFrom npm (recommended):\n\n```bash\npi install npm:pi-extension-observational-memory\n```\n\nOr add to settings directly:\n\n```json\n{\n  \"packages\": [\"npm:pi-extension-observational-memory\"]\n}\n```\n\nFor local development, you can still load from disk:\n\n- global: `~/.pi/agent/extensions/observational-memory/index.ts`\n- project: `.pi/extensions/observational-memory/index.ts`\n\nOr run one-off:\n\n```bash\npi -e ./index.ts\n```\n\n## Linting / formatting\n\nThis folder includes a local `package.json` + `biome.json` so it can be checked independently.\n\n```bash\ncd path/to/pi-extension-observational-memory\nnpm install\nnpm run lint\nnpm run format\n```\n\n## Current scope vs target design\n\nImplemented now:\n- Observer-style compaction summary override\n- Prior-summary carry forward\n- Reflector/GC pass (threshold + forced mode)\n- Branch-aware observational summaries via `session_before_tree`\n- Extension-managed two-threshold OM flow: observer trigger (default 30k) + reflector trigger (default 40k)\n- Buffered/background observer mode by default, with optional blocking mode\n- Partial activation support via raw-tail retain buffer (default 8k)\n- Commands: `/obs-memory-status`, `/obs-auto-compact`, `/obs-mode`, `/obs-view`, `/obs-reflect`\n\nPlanned next:\n- Additional maintenance commands (`/obs-rebuild`, `/obs-dump`)\n\n## Notes\n\n- This extension intentionally does **not** change pi core internals.\n- It composes with pi's existing session tree and compaction lifecycle.\n- Model choice is currently the active session model; can be changed later if desired.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "memory",
+    "compaction",
+    "observational-memory"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-13T15:23:04.534Z",
+    "modified": "2026-02-15T06:11:41.388Z",
+    "0.1.0": "2026-02-13T15:23:04.784Z",
+    "0.1.1": "2026-02-14T03:26:13.831Z",
+    "0.1.2": "2026-02-14T04:18:21.404Z",
+    "0.1.3": "2026-02-15T06:11:41.245Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 6,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 437
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 40
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 26
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 50
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 20
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

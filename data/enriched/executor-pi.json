@@ -1,0 +1,35 @@
+{
+  "name": "executor-pi",
+  "latest_version": "0.2.0",
+  "description": "`executor-pi` is a first-class Pi extension for running Executor from inside Pi with native approval, elicitation, rendering, and project-aware Executor configuration.",
+  "readme": "# executor-pi\n\n`executor-pi` is a first-class Pi extension for running Executor from inside Pi\nwith native approval, elicitation, rendering, and project-aware Executor\nconfiguration.\n\nIt is not a generic MCP adapter. Pi exposes a small Executor-specific surface,\nwhile Executor remains responsible for tools, sources, secrets, policies,\nplugins, and execution semantics.\n\n## Features\n\n### Executor-Native Execution\n\n- Run Executor TypeScript snippets directly from Pi.\n- Use Executor SDK semantics instead of shelling out to a daemon.\n- Keep two primary tools: `search` for discovery and `execute` for execution.\n- Use the active project cwd as the Executor scope.\n\n### Local Executor Config Semantics\n\n- Load Executor's static plugin defaults.\n- Load project-level `executor.jsonc`.\n- Preserve Executor plugin merge behavior.\n- Use stable cwd-derived scope IDs.\n- Reuse local Executor storage semantics.\n\n### Pi-Native Elicitation\n\n- Render approval prompts as Pi confirmations.\n- Render form elicitation as Pi form UI or a structured editor fallback.\n- Render URL elicitation with clear domain and action context.\n- Treat accept, decline, and cancel as explicit outcomes.\n- Fail loudly for unsupported elicitation shapes.\n\n### Rich Rendering\n\n- Syntax-highlight Executor code before execution.\n- Render Executor search results with paths, descriptions, and pagination hints.\n- Render structured JSON cleanly.\n- Separate summaries, logs, errors, and outputs.\n- Show paused or elicitation states clearly.\n- Keep large results readable inside Pi.\n\n### Commands And Guidance\n\n- Provide `/executor` status and diagnostics.\n- Add focused settings and help commands for Executor workflows.\n- Include Executor usage guidance directly in the `search` and `execute` tool\n  prompts.\n- Avoid generic MCP search, describe, and invoke tool sprawl.\n\n## Architecture\n\n```mermaid\nflowchart TB\n  Pi[\"Pi ExtensionAPI\"] --> Runtime[\"Effect ManagedRuntime\"]\n  Runtime --> Tools[\"Pi search + execute tools\"]\n  Runtime --> Commands[\"/executor commands\"]\n  Runtime --> UX[\"Pi elicitation UI\"]\n  Runtime --> Host[\"ExecutorHostService\"]\n\n  Host --> LocalHost[\"Executor local host\"]\n  LocalHost --> SDK[\"Executor SDK\"]\n  LocalHost --> Engine[\"Execution Engine + QuickJS\"]\n  LocalHost --> Config[\"static plugins + executor.jsonc\"]\n  LocalHost --> Storage[\"~/.executor storage\"]\n\n  SDK --> Sources[\"Executor sources/plugins/secrets\"]\n  Engine --> UX\n```\n\nPi owns the interaction surface. Executor owns execution, configuration, tools,\nsources, secrets, and policy.\n\n## Usage\n\nInstall the extension into Pi, then use the Executor tool from a project with\nthe desired `executor.jsonc` configuration.\n\n```ts\nawait tools.search({\n  query: \"github issues\",\n  includeDetails: true,\n});\n\nawait tools.execute({\n  code: `\n    const { items } = await tools.search({ query: \"github issues\", limit: 5 });\n    return items;\n  `,\n});\n```\n\nUse `/executor` inside Pi to inspect extension status, active scope, loaded\nconfiguration, and available diagnostics.\n\n## Configuration\n\n`executor-pi` follows Executor's local project configuration model:\n\n- Project config: `executor.jsonc` in the active project.\n- Storage: local Executor storage under `~/.executor`.\n- Scope: derived from the active project cwd.\n- Plugins: Executor defaults merged with project plugins.\n\nPi-specific settings only control the Pi extension experience, such as rendering\npreferences and command behavior. Tool sources, secrets, policies, and plugin\nconfiguration stay in Executor.\n\nPi Executor settings files:\n\n- Global: `~/.pi/agent/executor-pi.json`\n- Project override: `.pi/executor-pi.json`\n\nUse `/executor config` in the Pi TUI to adjust display density (`concise`,\n`balanced`, `verbose`, or `custom`), search defaults, and render limits.\n`/executor settings` is accepted as an alias for `config`.\n\n## Development\n\nThis package uses Bun, Effect v4, `tsgo`, `oxlint`, and `oxfmt`.\n\n```bash\nbun install\nbun run typecheck\nbun run lint\nbun run format:check\nbun run test\nbun run verify:host\nbun run check\n```\n\nFormatting:\n\n```bash\nbun run format\n```\n\nThe TypeScript config is local to this package. There is no shared tsconfig\npackage.\n\nEffect services use `Context.Service`, `Layer`, scoped resources, and typed\nerrors. Pi callbacks are thin Promise adapters around the Effect runtime.\n\nHost contract and local package notes live in:\n\n- `docs/executor-host.md`\n- `docs/local-fumadb.md`\n\n## Non-Goals\n\n- Building a generic MCP adapter for Pi.\n- Running Executor's Bun server inside the extension.\n- Serving Executor's React web UI from this package.\n- Reimplementing Executor sources, plugins, secrets, or policy in Pi.\n- Exposing every upstream MCP tool directly to the agent context.\n",
+  "keywords": [
+    "executor",
+    "pi-extension",
+    "pi-package"
+  ],
+  "author": {
+    "name": "Saatvik Arya",
+    "email": "aryasaatvik@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/aryasaatvik/executor-pi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aryasaatvik/executor-pi.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-23T15:52:19.314Z",
+    "modified": "2026-05-23T19:16:00.872Z",
+    "0.1.0": "2026-05-23T15:52:19.646Z",
+    "0.2.0": "2026-05-23T19:16:00.762Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 10,
+  "download_trend": []
+}

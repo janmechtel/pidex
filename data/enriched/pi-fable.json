@@ -1,0 +1,39 @@
+{
+  "name": "pi-fable",
+  "latest_version": "1.0.2",
+  "description": "Fable-style disciplined workflow for pi \u2014 goal ledger, findings gate, evidence-based verification",
+  "readme": "# pi-fable\n\n> Fable-style disciplined workflow for [pi](https://pi.dev) \u2014 goal ledger, findings gate, evidence-based verification.\n\nAdapted from [FableCodex](https://github.com/baskduf/FableCodex) for the pi coding agent.\n\n## What it does\n\npi-fable enforces a structured, evidence-based workflow when you're tackling multi-step, risky, or review-sensitive tasks. It adds:\n\n- **Goal ledger** \u2014 break tasks into trackable goals with evidence checkpoints\n- **Findings gate** \u2014 track review issues and block completion until they're resolved\n- **Verification enforcement** \u2014 final goals require proof (tests, lint, screenshots, etc.)\n- **State persistence** \u2014 workflow state survives across turns in `.fablecodex/`\n\n## Installation\n\n### npm (recommended)\n\n```bash\npi install npm:pi-fable\n```\n\n### Git\n\n```bash\npi install git:github.com/user/pi-fable\n```\n\n### Local\n\n```bash\npi install /path/to/pi-fable\n```\n\n### Quick test\n\n```bash\npi -e ./extensions/fable.ts\n```\n\n## Usage\n\n### Start a workflow\n\nType `/fable` followed by a description of your task:\n\n```\n/fable Add CSV import to the data pipeline\n```\n\nThis auto-creates a 3-goal starter plan:\n\n```\nG001 [active] inspect\n  Objective: Explore the workspace, understand current state...\nG002 [pending] implement\n  Objective: Make the necessary changes to complete...\nG003 [pending] verify\n  Objective: Run tests, lint, typecheck... Provide verification command and output as evidence.\n```\n\nG001 activates immediately \u2014 the agent starts inspecting your workspace.\n\n### Manual goal management\n\nUse the `fable_goals` tool for full control:\n\n```\nfable_goals action=create brief=\"Add CSV import\" goals=[\n  { title: \"inspect\", objective: \"Find current import flow and tests\" },\n  { title: \"implement\", objective: \"Add CSV parser and UI path\" },\n  { title: \"verify\", objective: \"Run tests and a sample import\" }\n]\n```\n\nAdvance to the next goal:\n```\nfable_goals action=next\n```\n\nComplete a goal with evidence:\n```\nfable_goals action=checkpoint goalId=G001 status=complete evidence=\"Read importer.ts and import.test.ts\"\n```\n\nFinal goal requires verification:\n```\nfable_goals action=checkpoint goalId=G003 status=complete evidence=\"Ran full test suite\" verifyCmd=\"npm test\" verifyEvidence=\"all tests passed\"\n```\n\nCheck progress:\n```\nfable_goals action=status\n```\n\n### Track findings\n\nUse the `fable_findings` tool to track issues found during work:\n\n```\nfable_findings action=add title=\"Missing error handling for empty CSV\" severity=high evidence=\"importer.ts doesn't handle empty files\"\n```\n\nReview open findings:\n```\nfable_findings action=next\n```\n\nResolve a finding with verification:\n```\nfable_findings action=resolve findingId=F001 evidence=\"Added empty file check in importer.ts\" verifyEvidence=\"import empty.csv returns graceful error\"\n```\n\nRun the findings gate (blocks final goal if issues remain):\n```\nfable_findings action=gate\n```\n\n### Reset\n\nClear all state and start fresh:\n```\nfable_reset\n```\n\n## How it works\n\n### Command\n\n| Command | Description |\n|---------|-------------|\n| `/fable [brief]` | Activate workflow and auto-create a starter plan |\n\n### Tools\n\n| Tool | Description |\n|------|-------------|\n| `fable_goals` | Create, advance, checkpoint, and status-check the goal ledger |\n| `fable_findings` | Add, list, advance, resolve, reject, gate-check, and status-check findings |\n| `fable_reset` | Clear all workflow state |\n\n### Workflow loop\n\n```\n/fable <task>\n    \u2502\n    \u25bc\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502   Inspect   \u2502 \u2190 Explore workspace, understand current state\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n       \u2502\n       \u25bc\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502  Implement  \u2502 \u2190 Make changes, track findings\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n       \u2502\n       \u25bc\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502   Verify    \u2502 \u2190 Run tests, lint, typecheck \u2192 provide evidence\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n       \u2502\n       \u25bc\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 Findings    \u2502 \u2190 Gate: no blocking findings allowed\n\u2502 Gate        \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n       \u2502\n       \u25bc\n     Done\n```\n\n### State storage\n\nAll workflow state is stored in `.fablecodex/` in your project root:\n\n| File | Purpose |\n|------|---------|\n| `goals.json` | Current goal plan and progress |\n| `findings.json` | Review findings ledger |\n| `ledger.jsonl` | Append-only event history |\n\nDo not commit `.fablecodex/` unless you explicitly want to.\n\n## Features\n\n- **Auto-create starter plans** \u2014 `/fable <brief>` generates inspect \u2192 implement \u2192 verify goals\n- **Evidence-based checkpoints** \u2014 every goal completion requires concrete evidence\n- **Findings gate** \u2014 final goal cannot complete while blocking findings remain\n- **Severity-sorted findings** \u2014 critical issues surface first\n- **State persistence** \u2014 resume workflows across turns\n- **Status bar** \u2014 footer shows active Fable workflow\n- **System prompt injection** \u2014 agent receives Fable workflow instructions when active\n\n## License\n\nAGPL-3.0-or-later \u2014 same as [FableCodex](https://github.com/baskduf/FableCodex).\n",
+  "keywords": [
+    "pi-package",
+    "fable",
+    "workflow",
+    "goals",
+    "findings",
+    "verification"
+  ],
+  "author": null,
+  "license": "AGPL-3.0-or-later",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions/fable.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-19T07:58:25.072Z",
+    "modified": "2026-06-19T08:04:23.584Z",
+    "1.0.0": "2026-06-19T07:58:25.271Z",
+    "1.0.1": "2026-06-19T08:02:30.825Z",
+    "1.0.2": "2026-06-19T08:04:23.455Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 385,
+  "download_trend": []
+}

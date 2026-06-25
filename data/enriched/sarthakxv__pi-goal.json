@@ -1,0 +1,37 @@
+{
+  "name": "@sarthakxv/pi-goal",
+  "latest_version": "0.1.0",
+  "description": "Durable goals for Pi \u2014 keeps the agent working toward an objective across turns.",
+  "readme": "# pi-goal\n\n**Durable goals for [Pi](https://pi.dev).** Give Pi a persistent objective and it keeps working toward it across turns \u2014 running checkpoint after checkpoint \u2014 instead of stopping after one.\n\n```\n/goal Migrate the build from webpack to vite and keep `npm test` green\n```\n\nPi plans a few checkpoints, does the first one, reports a one-line progress note, and keeps going on its own until it can say `[GOAL COMPLETE]` \u2014 or `[GOAL BLOCKED: \u2026]` if it genuinely needs you. A footer badge and a widget above the editor show live status. `/goal pause` is the kill switch.\n\n---\n\n## Install\n\n```bash\n# from a local checkout (works today; great for hacking on it)\npi install ~/pi-goal\n\n# or just try it for one run, no install:\npi -e ~/pi-goal/index.ts\n\n# once published / pushed:\npi install npm:@sarthakxv/pi-goal            # after `npm publish`\npi install git:github.com/sarthakxv/pi-goal  # after a push to GitHub\n```\n\nThen start Pi and run `/goal`.\n\n## Usage\n\n| Command | What it does |\n| --- | --- |\n| `/goal <objective>` | Set the goal and start working toward it. State a clear stopping condition. |\n| `/goal` | Show the current goal, status, iteration count, and last checkpoint. |\n| `/goal status` | Same as `/goal`. |\n| `/goal pause` | Stop the auto-continue loop. The goal and progress are kept. |\n| `/goal resume` | Resume the loop. If the iteration budget was hit, this also extends it. |\n| `/goal clear` | Drop the goal entirely. (`/goal stop` is an alias.) |\n\n### Writing a good objective\n\nA good goal is bigger than one prompt but smaller than an open-ended backlog. Name **one objective** and **one verifiable stopping condition**, and point Pi at what it should read or run:\n\n```\n/goal Implement everything in PLAN.md. After each milestone run `npm test`;\nstop when all milestones are done and the suite is green.\n\n/goal Optimize the prompts in ./prompts until `npm run eval` reports >= 0.9.\nAfter each change, run the eval, inspect failures, keep edits minimal.\nStop at the target or when further changes would need product guidance.\n```\n\nPi self-reports progress. When it's confident the stopping condition is met it emits `[GOAL COMPLETE]` and the loop ends. If it hits something it can't resolve alone, it emits `[GOAL BLOCKED: <reason>]`, the goal goes to a *blocked* state, and you get a notification \u2014 fix the blocker, then `/goal resume`.\n\n## How it works\n\n- **The loop.** The extension listens for `agent_end` (fired whenever Pi's agent loop goes idle). If a goal is `active`, it sends Pi a hidden continuation message \u2014 re-stating the goal and asking for the next small *verified* checkpoint plus a 2\u20133 line progress note \u2014 with `triggerTurn: true`. That starts a new turn, which ends, which fires `agent_end` again. That's the loop.\n- **Stopping.** Each iteration the extension scans the last assistant message for an anchored `[GOAL COMPLETE]` (\u2192 done) or `[GOAL BLOCKED: \u2026]` (\u2192 paused, notify). It also checks: is the goal still `active`? are there queued user messages (\u2192 yield)? is the per-goal iteration budget (default **50**) used up (\u2192 pause, ask to extend)? did Pi produce no output twice in a row (\u2192 pause)?\n- **Staying on track.** On every `before_agent_start` while active, a short hidden `[GOAL ACTIVE] \u2026` reminder is injected so the objective survives compaction and stays in view even if you chat mid-goal.\n- **Persistence.** State (objective, status, iteration count) is written to the session via `appendEntry`, so it survives `--continue` / `--resume`. A restored goal comes back **paused** \u2014 pi-goal never silently re-arms an autonomous loop; you opt back in with `/goal resume`.\n- **You're always in control.** Type any message while a goal runs and it's treated as steering \u2014 your turn runs, then the goal picks back up. `/goal pause` stops it cold.\n\nNothing here patches Pi internals \u2014 it's all public extension API (`registerCommand`, `on(\"agent_end\" | \"before_agent_start\" | \"turn_end\" | \"session_start\")`, `sendMessage`, `appendEntry`, `setStatus`, `setWidget`).\n\n## Configuration\n\nThe iteration budget is the constant `ITERATION_BUDGET` (50) at the top of `index.ts`. Codex frames `/goal` as \"many hours\" of autonomous work, so don't crank it down out of caution \u2014 `/goal pause` is the safety, not the cap. When the budget runs out the loop pauses and `/goal resume` grants another batch.\n\n## Known limitations\n\n- **Aborting a turn (Esc) mid-goal.** Because the loop keys off `agent_end`, an aborted turn looks like a finished one and the loop may try to continue on the next idle tick. If you Esc to stop the agent, also run `/goal pause`.\n- **Print / RPC mode.** The UI bits (footer badge, widget, notifications, the replace-goal confirm) are skipped when there's no interactive UI; the loop logic still runs.\n- **One goal at a time.** Setting a new objective replaces the current one (with a confirm in interactive mode).\n\n## Development\n\n```bash\ncd ~/pi-goal\nnpm install          # pulls the @earendil-works/* types for local tooling\nnpm run typecheck    # tsc --noEmit\npi -e ./index.ts     # run Pi with this extension only; try /goal hello world\n```\n\nThe `@earendil-works/*` packages and `typebox` are `peerDependencies` with a `*` range \u2014 Pi bundles them at runtime, so this package must **not** bundle them (per the [Pi package docs](https://pi.dev/docs/latest/packages#dependencies)). They're also listed in `devDependencies` purely so `tsc` and your editor can resolve the types locally.\n\n## License\n\nMIT \u2014 see [LICENSE](./LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-agent",
+    "coding-agent",
+    "goal",
+    "autonomous"
+  ],
+  "author": {
+    "name": "Sarthak Verma",
+    "email": "sarthakvdev@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/sarthakxv/pi-goal#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sarthakxv/pi-goal.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-12T19:56:59.811Z",
+    "0.1.0": "2026-05-12T19:57:00.262Z",
+    "modified": "2026-05-12T19:57:00.513Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 12,
+  "download_trend": []
+}

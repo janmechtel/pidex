@@ -1,0 +1,349 @@
+{
+  "name": "pi-web-tools",
+  "latest_version": "0.1.0",
+  "description": "Web search via Exa, content extraction, and GitHub repo cloning for Pi coding agent",
+  "readme": "# pi-web-tools\n\nWeb search, content extraction, and GitHub repo cloning for the [Pi coding agent](https://github.com/mariozechner/pi-coding-agent).\n\nA lightweight extension providing three tools:\n\n- **`web_search`** \u2014 Search the web via [Exa](https://exa.ai) with snippet extraction\n- **`fetch_content`** \u2014 Fetch any URL and extract clean markdown (HTML via Readability, Jina Reader fallback, GitHub via clone)\n- **`get_search_content`** \u2014 Retrieve stored results from previous searches/fetches\n\n## Install\n\n```bash\npi install npm:pi-web-tools\n```\n\nOr install from git:\n\n```bash\npi install github:coctostan/pi-web-tools\n```\n\n## Setup\n\n### Exa API Key (required for web_search)\n\nGet a key at [exa.ai](https://exa.ai) and set it via environment variable:\n\n```bash\nexport EXA_API_KEY=\"your-key-here\"\n```\n\nOr add it to the config file `~/.pi/web-tools.json`:\n\n```json\n{\n  \"exaApiKey\": \"your-key-here\"\n}\n```\n\nThe environment variable takes precedence over the config file.\n\n### GitHub CLI (recommended for fetch_content)\n\nFor GitHub repo cloning, install the [GitHub CLI](https://cli.github.com/):\n\n```bash\n# Debian/Ubuntu\nsudo apt install gh\n\n# Or via conda, brew, etc.\ngh auth login\n```\n\nWithout `gh`, the extension falls back to `git clone` (works for public repos).\n\n## Configuration\n\nConfig file: `~/.pi/web-tools.json` (auto-reloaded every 30 seconds)\n\n```json\n{\n  \"exaApiKey\": \"your-exa-key\",\n  \"github\": {\n    \"maxRepoSizeMB\": 350,\n    \"cloneTimeoutSeconds\": 30,\n    \"clonePath\": \"/tmp/pi-github-repos\"\n  }\n}\n```\n\n| Option | Default | Description |\n|--------|---------|-------------|\n| `exaApiKey` | `null` | Exa API key (env `EXA_API_KEY` overrides) |\n| `github.maxRepoSizeMB` | `350` | Skip cloning repos larger than this |\n| `github.cloneTimeoutSeconds` | `30` | Abort clone after this many seconds |\n| `github.clonePath` | `/tmp/pi-github-repos` | Where to store cloned repos |\n\n## Tools\n\n### `web_search`\n\nSearch the web using Exa. Returns results with snippets and source URLs.\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `query` | `string` | Single search query |\n| `queries` | `string[]` | Multiple queries (batch) |\n| `numResults` | `number` | Results per query (default: 5, max: 20) |\n\n**Example:**\n```\nSearch for \"TypeScript 5.8 new features\"\n```\n\n### `fetch_content`\n\nFetch URL(s) and extract readable content as markdown.\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `url` | `string` | Single URL to fetch |\n| `urls` | `string[]` | Multiple URLs (parallel, max 3 concurrent) |\n| `forceClone` | `boolean` | Force cloning large GitHub repos |\n\n**Content extraction pipeline:**\n\n1. **GitHub URLs** \u2192 Clone repo (shallow, depth 1), generate tree + README\n2. **HTML pages** \u2192 Readability extraction \u2192 Markdown conversion\n3. **Readability fails** \u2192 Jina Reader fallback (`r.jina.ai`)\n4. **Non-HTML** \u2192 Return raw text\n\nContent over 30,000 characters is truncated with a pointer to `get_search_content`.\n\n### `get_search_content`\n\nRetrieve full content from a previous `web_search` or `fetch_content` result.\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `responseId` | `string` | ID from a previous tool result |\n| `query` | `string` | Filter by query text |\n| `queryIndex` | `number` | Filter by query index |\n| `url` | `string` | Filter by URL |\n| `urlIndex` | `number` | Filter by URL index |\n\n## How GitHub Cloning Works\n\nWhen `fetch_content` receives a GitHub URL:\n\n1. **Parse** \u2014 Extracts owner, repo, ref, path, type (root/blob/tree)\n2. **Size check** \u2014 Queries repo size via `gh api`. Skips if over threshold (default 350MB)\n3. **Clone** \u2014 Shallow clone (`--depth 1`) to temp directory, cached for the session\n4. **Generate** \u2014 Based on URL type:\n   - **Root**: Full directory tree + README content\n   - **Tree**: Directory listing for the specified path\n   - **Blob**: File content (with binary detection and 100K truncation)\n\nNon-code GitHub URLs (issues, PRs, discussions, etc.) are fetched as normal web pages.\n\n## Architecture\n\n```\nindex.ts          \u2014 Extension entry point, 3 tools, session management\n\u251c\u2500\u2500 config.ts     \u2014 Config with 30s TTL cache, env var overrides\n\u251c\u2500\u2500 storage.ts    \u2014 LRU storage (max 50 entries, session restore)\n\u251c\u2500\u2500 exa-search.ts \u2014 Exa API client\n\u251c\u2500\u2500 extract.ts    \u2014 Readability + Jina Reader content extraction\n\u2514\u2500\u2500 github-extract.ts \u2014 GitHub URL parsing, clone, tree/content generation\n```\n\n## Development\n\n```bash\n# Install dependencies\nnpm install\n\n# Run tests\nnpx vitest run\n\n# Run tests in watch mode\nnpx vitest\n\n# Load in pi for testing\npi -e ./index.ts\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "web-search",
+    "exa",
+    "fetch",
+    "github"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/coctostan/pi-web-tools#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coctostan/pi-web-tools.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-06T14:17:09.391Z",
+    "0.1.0": "2026-02-06T14:17:09.611Z",
+    "modified": "2026-02-06T14:17:09.797Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 19,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 85
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 25
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 25
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

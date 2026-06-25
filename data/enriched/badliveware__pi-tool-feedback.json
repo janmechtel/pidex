@@ -1,0 +1,350 @@
+{
+  "name": "@badliveware/pi-tool-feedback",
+  "latest_version": "0.2.0",
+  "description": "Generic watched-tool feedback prompts and passive summaries for Pi.",
+  "readme": "# Pi Tool Feedback\n\nGeneric watched-tool feedback for Pi. It records passive per-turn summaries when selected tools are used, and can optionally queue a non-user feedback task for the agent at the end of a prompt.\n\nUse it when you are dogfooding a tool, extension, MCP server, or workflow and want low-friction subjective signals such as \u201cdid this feel useful?\u201d, \u201cdid output feel incomplete or noisy?\u201d, and \u201cwould the agent use it again?\u201d. Objective trace facts such as truncation and follow-up tool categories stay in passive summaries.\n\n> Caveat: this is an experiment I am trying on my own Pi setup. I do not yet know whether agent self-feedback is broadly useful or reliable; treat the results as noisy design signals, not proof that a tool works better.\n\n## How it works\n\nConfigure tool names or prefixes to watch. The extension listens to Pi tool events, records sanitized turn summaries, and exposes a `tool_feedback` tool that the agent can call when prompted. Active feedback requests are delivered as Pi custom messages with `triggerTurn`, not as user messages. The request names the watched tools but does not include trace-derived facts, so the agent's self-report is less anchored by telemetry the extension already knows.\n\nIt does not record raw tool inputs, raw outputs, prompts, file contents, or shell commands in its JSONL log. Optional free-form notes are stored in session entries, while logs keep only note length/hash.\n\n## What feedback can and cannot tell you\n\nAgent self-feedback is useful as noisy operational feedback, not as a faithful explanation of the model's hidden reasoning. Treat it like a lightweight post-task survey and compare it with trace data.\n\nGood questions ask about the agent's observable experience:\n\n- Was the output useful, incomplete, noisy, or too slow?\n- Would you use this tool again in a similar situation?\n- Was follow-up work routine or did it feel compensatory?\n- What one missing capability or improvement would help most?\n- How confident are you in this report?\n\nWeak questions ask the agent to reconstruct why its internal reasoning happened:\n\n- What was the real causal contribution of this tool to your final answer?\n- Which hidden prompt feature or bias changed your reasoning?\n- Did your chain-of-thought faithfully describe the reason you chose an action?\n- Exactly how much would the outcome have changed without this tool?\n\nThe extension therefore keeps objective trace facts in passive summaries and asks active prompts for subjective/counterfactual judgments. Use self-reports as candidate design signals, not ground truth.\n\n## Install\n\nFrom a published package:\n\n```bash\npi install @badliveware/pi-tool-feedback\n```\n\nFrom this repository workspace:\n\n```bash\npi install ./agent/extensions/public/tool-feedback\n```\n\n## Configure\n\nCreate `~/.pi/agent/tool-feedback.json` for user-wide settings or `.pi/tool-feedback.json` in a project. Project config overlays user config.\n\nMinimal example:\n\n```json\n{\n  \"mode\": \"both\",\n  \"watch\": [\n    { \"prefix\": \"code_intel_\" },\n    { \"name\": \"process\" }\n  ]\n}\n```\n\nModes:\n\n| Mode | Behavior |\n| --- | --- |\n| `off` | Disable summaries and feedback prompts. |\n| `passive` | Record turn summaries only. |\n| `ask-agent` | Ask for structured feedback after a prompt that used watched tools. |\n| `both` | Record summaries and ask for feedback. |\n\nOther options:\n\n```json\n{\n  \"excludeTools\": [\"tool_feedback\", \"tool_feedback_state\"],\n  \"cooldownTurns\": 0,\n  \"skipWhenPendingMessages\": true,\n  \"appendSessionEntries\": true,\n  \"log\": true\n}\n```\n\n### Extra feedback fields\n\nThe built-in feedback schema stays stable, but you can add project- or user-specific fields. The active prompt lists these fields and agents answer them inside `fieldResponses`. Set `required: true` for fields you want every feedback prompt to answer; invalid or missing required answers are logged in `fieldResponseErrors`.\n\n```json\n{\n  \"mode\": \"both\",\n  \"watch\": [{ \"prefix\": \"code_intel_\" }],\n  \"feedbackFields\": [\n    {\n      \"name\": \"rankingQuality\",\n      \"type\": \"enum\",\n      \"values\": [\"good\", \"mixed\", \"poor\", \"unknown\"],\n      \"required\": true,\n      \"description\": \"How good was result ranking?\"\n    },\n    {\n      \"name\": \"latencyAcceptable\",\n      \"type\": \"yes_no_unknown\"\n    }\n  ]\n}\n```\n\nSupported field types:\n\n| Type | Accepted values |\n| --- | --- |\n| `enum` | one of the configured `values` |\n| `yes_no_unknown` | `yes`, `no`, or `unknown` |\n| `boolean` | JSON boolean |\n| `number` | finite JSON number |\n\nField names must match `/^[a-zA-Z][a-zA-Z0-9_]*$/`. Invalid, unknown, or missing required field responses are recorded in `fieldResponseErrors`; invalid values are not stored in `fieldResponses`.\n\nSet `PI_TOOL_FEEDBACK_CONFIG` to load an additional config file, `PI_TOOL_FEEDBACK_DIR` to change the JSONL log directory, or `PI_TOOL_FEEDBACK_LOG` to force one log file.\n\nDefault log directory:\n\n```text\n~/.cache/pi-tool-feedback/<session-id>.jsonl\n```\n\n## Tools and command\n\n### `tool_feedback_state`\n\nRead-only state/config inspection. Use it to see the loaded mode, watch rules, config paths, diagnostics, and current prompt usage.\n\n### `tool_feedback`\n\nRecords one structured feedback entry. When several watched tools were used and the experience differed by tool, agents can set `primaryWatchedTool` and optional `perToolResponses` keyed by tool name. Typical agent response after a feedback prompt:\n\n```json\n{\n  \"watchedTools\": [\"code_intel_impact_map\"],\n  \"primaryWatchedTool\": \"code_intel_impact_map\",\n  \"perceivedUsefulness\": \"medium\",\n  \"wouldUseAgainSameSituation\": \"yes\",\n  \"followupWasRoutine\": \"yes\",\n  \"followupNeededBecauseToolWasInsufficient\": \"unknown\",\n  \"outputSeemedTooNoisy\": \"no\",\n  \"outputSeemedIncomplete\": \"yes\",\n  \"missedImportantContext\": \"unknown\",\n  \"confidence\": \"medium\",\n  \"improvement\": \"better_summary\",\n  \"fieldResponses\": {\n    \"rankingQuality\": \"mixed\"\n  },\n  \"perToolResponses\": {\n    \"code_intel_impact_map\": {\n      \"outputSeemedTooNoisy\": \"yes\",\n      \"fieldResponses\": { \"rankingQuality\": \"mixed\" }\n    }\n  }\n}\n```\n\n### `/tool-feedback`\n\nShow runtime status or set the runtime mode until reload:\n\n```text\n/tool-feedback\n/tool-feedback off\n/tool-feedback passive\n/tool-feedback ask-agent\n/tool-feedback both\n```\n\n## Loop prevention\n\nThe extension avoids the common feedback-loop traps:\n\n- `tool_feedback` and `tool_feedback_state` are excluded by default.\n- The active prompt is asked at most once.\n- Feedback prompts are skipped when Pi already has pending messages if `skipWhenPendingMessages` is true.\n- If the agent already called `tool_feedback`, no follow-up prompt is sent.\n\nIf the feedback prompt is annoying, run:\n\n```text\n/tool-feedback passive\n```\n\nor set:\n\n```json\n{ \"mode\": \"off\" }\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "feedback",
+    "telemetry"
+  ],
+  "author": {
+    "name": "BadLiveware"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/BadLiveware/pi/tree/main/agent/extensions/public/tool-feedback#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BadLiveware/pi.git",
+    "directory": "agent/extensions/public/tool-feedback"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-01T23:01:06.693Z",
+    "modified": "2026-05-16T21:22:33.026Z",
+    "0.1.0": "2026-05-01T23:01:07.089Z",
+    "0.1.1": "2026-05-06T14:56:33.291Z",
+    "0.2.0": "2026-05-16T21:22:32.720Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 5,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 59
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 174
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 140
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 23
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 27
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

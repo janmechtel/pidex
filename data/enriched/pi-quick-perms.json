@@ -1,0 +1,43 @@
+{
+  "name": "pi-quick-perms",
+  "latest_version": "1.0.3",
+  "description": "Permission enforcement and quick policy commands for the Pi coding agent.",
+  "readme": "# pi-quick-perms\n\n[![npm version](https://img.shields.io/npm/v/pi-quick-perms?style=flat&logo=npm&logoColor=white)](https://www.npmjs.com/package/pi-quick-perms) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat)](https://opensource.org/licenses/MIT) [![TypeScript](https://img.shields.io/badge/TypeScript-6.x-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Pi Package](https://img.shields.io/badge/Pi-Package-6366F1?style=flat)](https://pi.mariozechner.at/)\n\nPermission enforcement extension for the [Pi](https://pi.mariozechner.at/) coding agent that provides centralized, deterministic permission gates over tool, bash, MCP, skill, and special operations plus quick policy commands.\n\n> **Fork notice:** This project is a fork of `@gotgenes/pi-permission-system` with built-in quick policy commands and prompt UX updates.\n\n## What It Does\n\n- **Hides disallowed tools** before the agent starts \u2014 no wasted turns probing for blocked tools\n- **Enforces allow / ask / deny** at tool-call time with UI confirmation dialogs\n- **Controls bash commands** with wildcard pattern matching (`git *: ask`, `rm -rf *: deny`)\n- **Gates MCP and skill access** at server, tool, and skill-name granularity\n- **Protects sensitive file patterns** \u2014 cross-cutting `path` rules deny `.env`, `~/.ssh/*`, etc. across all tools and bash at once\n- **Guards external paths** \u2014 prompts before file tools or bash commands reach outside `cwd`\n- **Forwards prompts from subagents** \u2014 `ask` policies work even in non-UI execution contexts\n\n## Install\n\nInstall from npm:\n\n```bash\npi install npm:pi-quick-perms\n```\n\nnpm package: [pi-quick-perms](https://www.npmjs.com/package/pi-quick-perms)\n\nGlobal policy lives at:\n\n```text\n~/.pi/agent/extensions/pi-quick-perms/config.json\n```\n\nProject policy remains compatible with the upstream path:\n\n```text\n<project>/.pi/extensions/pi-permission-system/config.json\n```\n\n## Quick Start\n\n1. Create the global config file at `~/.pi/agent/extensions/pi-quick-perms/config.json`:\n\n    ```jsonc\n    {\n      \"permission\": {\n        \"*\": \"allow\",\n        \"path\": {\n          \"*\": \"allow\",\n          \"*.env\": \"deny\",\n          \"*.env.*\": \"deny\",\n          \"*.env.example\": \"allow\"\n        },\n        \"bash\": {\n          \"rm -rf *\": \"deny\",\n          \"sudo *\": \"ask\"\n        },\n        \"external_directory\": \"ask\"\n      }\n    }\n    ```\n\n2. Start Pi \u2014 the extension automatically loads and enforces your policy.\n\n`pi-quick-perms` also provides shortcut commands:\n\n```text\n/allow bash gh api *\n/block bash sudo *\n/ask bash git push *\n/policy\n/policy-reload\n```\n\n`/block` writes the underlying `deny` action. Rule mutations save the active policy file and call Pi's reload flow automatically.\n\n### Project and global quick rules\n\nQuick rule commands write to the project policy by default:\n\n```text\n/allow bash gh api *\n/block bash sudo *\n```\n\nThose rules are saved to:\n\n```text\n<cwd>/.pi/extensions/pi-permission-system/config.json\n```\n\nUse `--global` to write a rule for every project:\n\n```text\n/allow --global bash gh api *\n/block --global bash sudo *\n```\n\nGlobal rules are saved to:\n\n```text\n~/.pi/agent/extensions/pi-quick-perms/config.json\n```\n\nProject policy overrides global policy, so use project rules for repo-specific exceptions and global rules for defaults you want everywhere.\n\nAll permissions use one of three states:\n\n|State|Behavior|\n|---|---|\n|`allow`|Permits the action silently|\n|`deny`|Blocks the action with an error message|\n|`ask`|Prompts the user for confirmation via UI|\n\nWhen the dialog prompts, you can approve once or approve a pattern for the rest of the session.\nSee [docs/session-approvals.md](docs/session-approvals.md) for details on session-scoped rules and pattern suggestions.\n\nThe `path` surface is a cross-cutting gate that applies to **all** file access \u2014 both Pi tools and bash commands.\nA `path` deny cannot be overridden by a per-tool allow, making it the right place to protect sensitive files like `.env` or `~/.ssh/*` from every tool at once.\n\nFor per-tool path patterns (`read`, `write`, `edit`, `find`, `grep`, `ls`), patterns are matched against the file path from `input.path`.\nThis lets you express rules like \"allow reads but deny `.env` files\" at the individual tool level.\n\nFour layers compose with most-restrictive-wins: `path` (cross-cutting) \u2192 `external_directory` (CWD boundary) \u2192 per-tool patterns \u2192 `bash` command patterns.\n\n## Configuration\n\nConfig lives in one JSON file per scope:\n\n|Scope|Path|\n|---|---|\n|Global|`~/.pi/agent/extensions/pi-quick-perms/config.json`|\n|Project|`<cwd>/.pi/extensions/pi-permission-system/config.json`|\n\nProject overrides global; per-agent YAML frontmatter overrides both.\n\nWithin a surface map like `bash` or `mcp`, **last matching rule wins** \u2014 put broad catch-alls first and specific overrides after.\n\nFor the full reference \u2014 all surfaces, runtime knobs, per-agent overrides, merge semantics, and common recipes \u2014 see [docs/configuration.md](docs/configuration.md).\n\n## Documentation\n\n|Document|Contents|\n|---|---|\n|[docs/configuration.md](docs/configuration.md)|Full policy reference, runtime knobs, per-agent overrides, recipes|\n|[docs/session-approvals.md](docs/session-approvals.md)|Session-scoped rules, pattern suggestions, bash arity table|\n|[docs/cross-extension-api.md](docs/cross-extension-api.md)|Cross-extension service accessor, event bus integration, decision broadcasts|\n|[docs/subagent-integration.md](docs/subagent-integration.md)|Permission forwarding, coexistence with subagent extensions|\n|[docs/guides/permission-frontmatter-for-subagent-extensions.md](docs/guides/permission-frontmatter-for-subagent-extensions.md)|Convention guide for subagent extension authors|\n|[docs/opencode-compatibility.md](docs/opencode-compatibility.md)|OpenCode compatibility \u2014 shared concepts, divergences, porting guide|\n|[docs/troubleshooting.md](docs/troubleshooting.md)|Common issues, diagnostic logging, threat model|\n|[docs/migration/legacy-to-flat.md](docs/migration/legacy-to-flat.md)|Migration from pre-v2 config layout|\n\n## Development\n\n```bash\npnpm run build       # Type-check TypeScript (no emit)\npnpm run lint        # Biome lint + format check\npnpm run lint:fix    # Biome lint + format auto-fix\npnpm run lint:md     # markdownlint-cli2 on README etc.\npnpm run lint:all    # lint + lint:md\npnpm run format      # Biome format --write\npnpm run test        # Run tests from ./tests\npnpm run check       # build + lint:all + test\n```\n\n### Pre-commit hooks\n\nThis project uses [prek](https://prek.j178.dev/) to run Biome and markdownlint on staged files before each commit.\nRun `pnpm install` to set up hooks automatically.\n\n## Acknowledgments\n\nThis project began as a fork of [MasuRii/pi-permission-system](https://github.com/MasuRii/pi-permission-system).\nThank you to [MasuRii](https://github.com/MasuRii) for the original work that made this possible.\n\nThank you to the [OpenCode](https://opencode.ai) team for the permission model design that inspired the flat config format and evaluation semantics used in this extension.\n\n## License\n\n[MIT](LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "pi-coding-agent",
+    "coding-agent",
+    "permissions",
+    "policy",
+    "access-control",
+    "authorization",
+    "security"
+  ],
+  "author": {
+    "name": "Chris Lasher"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/cmptr/pi-quick-perms#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cmptr/pi-quick-perms.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-15T16:04:12.048Z",
+    "modified": "2026-05-15T16:32:27.322Z",
+    "1.0.0": "2026-05-15T16:04:12.270Z",
+    "1.0.1": "2026-05-15T16:06:14.660Z",
+    "1.0.2": "2026-05-15T16:19:08.132Z",
+    "1.0.3": "2026-05-15T16:32:27.040Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 19,
+  "download_trend": []
+}

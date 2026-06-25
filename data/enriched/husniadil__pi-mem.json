@@ -1,0 +1,38 @@
+{
+  "name": "@husniadil/pi-mem",
+  "latest_version": "0.1.0",
+  "description": "Pi extension that bridges to claude-mem for persistent cross-session memory",
+  "readme": "# @husniadil/pi-mem\n\n[![npm version](https://img.shields.io/npm/v/@husniadil/pi-mem.svg)](https://www.npmjs.com/package/@husniadil/pi-mem)\n[![CI](https://github.com/husniadil/pi-mem/actions/workflows/ci.yml/badge.svg)](https://github.com/husniadil/pi-mem/actions/workflows/ci.yml)\n[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)\n[![Node](https://img.shields.io/node/v/@husniadil/pi-mem.svg)](./package.json)\n\nPi extension that bridges to [claude-mem](https://github.com/thedotmack/claude-mem) for persistent cross-session memory. Mirrors Claude Code's memory UX inside pi: auto-injects context at session start (with TUI banner), captures pi events as observations, and exposes the full 3-layer memory workflow (`mem_search` \u2192 `mem_timeline` \u2192 `mem_get_observations`) to the agent.\n\n## Important: Maintainer Non-Support\n\nclaude-mem's maintainer has explicitly declined to add first-class pi support. This package uses claude-mem's `rawAdapter` fallback (`default: return rawAdapter` in `src/cli/adapters/index.ts`) \u2014 a switch fallback, not a public API. **Any breaking change in claude-mem can break pi-mem with no notice.** Pin to `claude-mem` 13.x and don't file pi-mem bugs against claude-mem.\n\n## Prerequisites\n\n- [claude-mem](https://github.com/thedotmack/claude-mem) installed (`npx claude-mem install`)\n- Node \u2265 22\n- pi \u2265 0.74\n\n## Install\n\n```bash\npi install npm:@husniadil/pi-mem\n```\n\nRestart pi. The extension auto-loads.\n\n## How It Works\n\n1. **session_start**: pi-mem verifies claude-mem is installed, starts the worker if needed, fetches recent observations via `worker-service.cjs hook pi context`, and displays the TUI banner via `ctx.ui.notify(...)`.\n2. **before_agent_start** (every turn): re-injects the cached context into `systemPrompt`, wrapped in `<claude-mem-context>...</claude-mem-context>`. Identical content across turns \u2192 LLM prompt cache hits.\n3. **message_end / tool_result / agent_end**: fire-and-forget subprocess spawns to log events as claude-mem observations.\n4. **Agent tools** (HTTP to claude-mem worker \u2014 mirrors the Claude Code MCP 3-layer workflow):\n   - **`mem_search({query, limit?})`** \u2014 `GET /api/search`. Returns a categorized markdown table of matching observations/sessions/prompts with IDs in `| #<id> |` cells. Limit caps each category, so total results can be up to 3\u00d7 limit.\n   - **`mem_timeline({anchor?|query?, depth_before?, depth_after?, project?})`** \u2014 `GET /api/timeline`. Step 2 of the workflow: returns N items before/after an anchor for context. Anchor accepts observation ID (number), session ID (`S<id>`), or ISO timestamp. XOR with `query` \u2014 provide one or the other, not both. Defaults: `depth_before=10`, `depth_after=10`.\n   - **`mem_get_observations({ids, orderBy?, limit?, project?})`** \u2014 `POST /api/observations/batch`. Step 3: fetch the full 23-field records (title, narrative, facts, files_modified, etc.) for IDs surfaced by `mem_search`. Output is raw JSON (matches Claude Code's MCP `get_observations` 1:1). Non-existent IDs silently dropped.\n\n## Configuration\n\nPi-mem-specific env vars (genuinely pi-specific):\n\n| Env Var                   | Default | Notes                                          |\n| ------------------------- | ------- | ---------------------------------------------- |\n| `PI_MEM_ENABLED`          | `true`  | Master kill switch                             |\n| `PI_MEM_CAPTURE`          | `true`  | Disable capture, keep inject + search          |\n| `PI_MEM_SPAWN_TIMEOUT_MS` | `30000` | Per-subprocess timeout                         |\n| `PI_MEM_LOG_LEVEL`        | `warn`  | `silent` / `error` / `warn` / `info` / `debug` |\n\nInherited from claude-mem (transparent \u2014 no pi-mem env var introduced):\n\n| Env Var                                   | Purpose                                                                                            |\n| ----------------------------------------- | -------------------------------------------------------------------------------------------------- |\n| `CLAUDE_CONFIG_DIR`                       | Root for worker path discovery (default `$HOME/.claude`)                                           |\n| `CLAUDE_MEM_WORKER_PORT`                  | Worker HTTP port (default `37700 + (uid % 100)`)                                                   |\n| `CLAUDE_MEM_WORKER_HOST`                  | Worker host (default `127.0.0.1`)                                                                  |\n| `CLAUDE_PLUGIN_ROOT`                      | Claude Code-injected plugin path                                                                   |\n| `CLAUDE_MEM_DATA_DIR`                     | claude-mem data dir                                                                                |\n| `CLAUDE_MEM_CONTEXT_SHOW_TERMINAL_OUTPUT` | Controls whether the TUI banner appears (set to `true` in `~/.claude-mem/settings.json` to enable) |\n\n## Troubleshooting\n\n- **`claude-mem is not installed`** \u2014 run `npx claude-mem install`.\n- **`claude-mem worker failed to start`** \u2014 try `npx claude-mem start` manually. Inspect with `npx claude-mem status`.\n- **No TUI banner** \u2014 set `CLAUDE_MEM_CONTEXT_SHOW_TERMINAL_OUTPUT=true` in `~/.claude-mem/settings.json` (claude-mem only emits `systemMessage` when this is on).\n- **Memory feels stale** \u2014 pi-mem caches the auto-injected context once per session at `session_start`, so newly captured observations won't appear in `systemPrompt` until you restart the pi session. The `mem_search` / `mem_timeline` / `mem_get_observations` tools are unaffected \u2014 they always hit live HTTP endpoints and reflect current corpus state, so use them when you need up-to-date results mid-session.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "claude-mem",
+    "memory",
+    "ai",
+    "coding-agent",
+    "extension"
+  ],
+  "author": {
+    "name": "Husni Adil Makmur",
+    "email": "husni.adil@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/husniadil/pi-mem#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/husniadil/pi-mem.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-26T17:35:32.649Z",
+    "0.1.0": "2026-05-26T17:35:32.964Z",
+    "modified": "2026-05-26T17:35:33.156Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

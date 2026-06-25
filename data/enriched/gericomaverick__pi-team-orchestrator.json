@@ -1,0 +1,348 @@
+{
+  "name": "@gericomaverick/pi-team-orchestrator",
+  "latest_version": "0.2.8",
+  "description": "Pi extension for team/project orchestration with markdown-defined teams and session-backed state",
+  "readme": "# Pi Team Orchestrator\n\nA Pi extension for running multi-role team workflows from the normal CLI chat interface.\n\nIt supports:\n- Team loading from shared-role manifests (`teams/<team>/team.json`) and legacy markdown role directories (`teams/<team>/roles/*.md`)\n- Project context under `~/.pi/projects`\n- Session-backed orchestration state (team/project/phase/handoffs/blockers/decisions)\n- Structured coordination tools (status, handoff, blocker, decision events)\n- File-backed workflow docs under `<project>/documents`\n- One active task packet per workflow lane under `<project>/documents/working/tasks/`\n- Compact on-disk task registry under `<project>/documents/working/task-registry.json`\n- Strict role gates so agents only advance when the brief, checkpoint packet, task packet, and ownership are in place\n- Workflow modes (`lean`, `delivery`, `recovery`) to cap default read bundles\n- Live workflow/status indicators\n\n---\n\n## Default behavior (important)\n\nThis extension is **chat-first** and **state-first**:\n\n- You communicate to the team through normal CLI chat prompts.\n- Coordination is recorded as structured events (not chat-thread inboxes).\n- `pi_messenger` is **blocked by default**.\n\nYou can override messenger policy per session:\n\n```text\n/messenger-mode allowed\n```\n\nReturn to default:\n\n```text\n/messenger-mode blocked\n```\n\n---\n\n## Quick start\n\nStart Pi with the extension from this repo root:\n\n```bash\npi -e ./src/index.ts\n```\n\nSet context:\n\n```text\n/team-list\n/team-load web-app\n/project-init my-project --bind-active-team\n/project-brief Initial brief for this project.\n/workflow-resume\n/task-status\n```\n\nIf project already exists:\n\n```text\n/project-switch my-project\n/project-bind-team web-app\n/project-migrate\n/workflow-resume\n```\n\nFor an older project created before the file-backed workflow upgrade, run `/project-migrate` once after switching/binding. That seeds the new workflow packet and task registry from the old log where possible.\n\n### Copy/paste session script (new project smoke test)\n\nUse this directly in a fresh Pi session (replace `my-new-project` and optionally team id):\n\n```text\n/messenger-mode blocked\n/team-list\n/team-load web-app\n/project-init my-new-project --bind-active-team\n/team-status\n/project-status\n\nScout this project and produce a concise brief: current state, top risks, and unknowns. Then hand off to planner.\nPlanner: create a milestone plan with acceptance criteria and explicit dependencies.\n/session-signoff --role planner --status handoff --next architect\n/workflow-status\n/checkpoint-log\n```\n\nFor game workflows, swap `web-app` with `game-dev`.\n\nCheckpoint/handoff events are also written to a project-local file for cross-session recovery:\n- `<project>/.pi-orchestrator/checkpoints.md`\n\n### Copy/paste resume script (existing project)\n\n```text\n/messenger-mode blocked\n/project-switch my-new-project\n/team-load web-app\n/project-bind-team web-app\n/project-migrate\n/workflow-status\n/task-status\n```\n\n`/workflow-resume` is now the primary resume command. It points to the exact role, task packet, latest checkpoint, gate issues, and role-scoped read bundle. `/workflow-status` is the broader operator view.\n\n---\n\n## How to communicate with the agents\n\nAfter team/project context is set, type normal prompts in CLI.\n\nExamples:\n\n```text\nScout this repo for auth and payment touchpoints, then hand off to planner with top risks.\n```\n\n```text\nPlanner: break this into milestones with acceptance criteria and dependencies.\n```\n\n```text\nArchitect + coder: propose a contract-first API change plan and implement the first safe slice.\n```\n\n```text\nReviewer: evaluate current changes for release blockers and provide go/no-go recommendation.\n```\n\nThe extension injects orchestration context at turn start so these prompts are interpreted as team workflow instructions.\n\n---\n\n## Command reference\n\n### Primary daily commands\n- `/workflow-resume`\n- `/project-brief <summary>`\n- `/workflow-status`\n- `/task-status`\n- `/workflow-mode [lean|delivery|recovery]`\n- `/workflow-next`\n- `/session-signoff [--role ... --status ... --next ... --task ... --summary ...]`\n\nThese are the commands you should need most of the time. The other workflow commands are mainly for inspection or manual recovery.\n\n### Team\n- `/team-list`\n- `/team-load <team-id>` (or `/team-load` for picker)\n- `/team-status` (or `/team-status <team-id>`)\n- `/footer-mode <rich|compact>`\n- `/team-board <on|off>`\n- `/messenger-mode <blocked|allowed>`\n\n### Project\n- `/project-list`\n- `/project-init <project-id> [--bind-active-team]`\n- `/project-switch <project-id>` (or `/project-switch` for picker)\n- `/project-bind-team <team-id>` (or `/project-bind-team` for picker)\n- `/project-brief <summary>`\n- `/project-migrate`\n- `/project-status` (or `/project-status <project-id>`)\n\n### Workflow visibility\n- `/workflow-resume`\n- `/workflow-status`\n- `/workflow-reseed`\n- `/workflow-mode [lean|delivery|recovery]`\n- `/task-status`\n- `/agent-status`\n- `/handoff-log`\n- `/blockers`\n- `/decision-log`\n- `/checkpoint-log`\n- `/session-signoff [--role ... --status ... --next ... --task ... --summary ...]`\n- `/workflow-next`\n\n### Manual checkpoint signing\n- `/checkpoint-sign [--summary <text>] [--role <role-id>] [--status in_progress|handoff|done|blocked] [--task <task-id>] [--next <role-id>]`\n\nIf `--summary` is omitted, the extension auto-generates a concise checkpoint summary.\n\n### End-of-session signoff (recommended)\n- `/session-signoff [--summary <text>] [--role <role-id>] [--status in_progress|handoff|done|blocked] [--task <task-id>] [--next <role-id>]`\n\nThis signs a checkpoint (default status: `handoff`) and prints a compact resume card with the exact commands to continue in a new session.\n\n---\n\n## Structured coordination primitives\n\nThe orchestrator prefers these tools internally:\n- `team_role_status`\n- `team_handoff`\n- `team_blocker`\n- `team_decision_log`\n- `team_checkpoint_sign`\n\nThis keeps team coordination as a workflow/event log instead of conversational message history.\n\n---\n\n## File-backed workflow model\n\nEvery bound project gets a small workflow filesystem:\n\n```text\n<project>/\n  documents/\n    index.json\n    canonical/\n      project-brief.md\n      decision-log.md\n      workflow-status.md\n    checkpoints/\n      <timestamp>-<role>-<status>.md\n    supporting/\n      active-blockers.md\n    working/\n      tasks/\n        <task-id>.md\n      task-registry.json\n    archive/\n  .pi-orchestrator/\n    checkpoints.md\n```\n\nThe intended usage is:\n- `project-brief.md`: concise canonical overview of the project\n- `workflow-status.md`: previous/current/next workflow lane plus active task, gates, stale docs, and read bundle\n- checkpoint packet: the latest resumable handoff packet for the active task\n- task packet: the live working packet for the one active task lane\n- `task-registry.json`: compact machine-readable task ownership and next-step state\n- `decision-log.md`: concise approved decisions only\n- `checkpoints.md`: compatibility audit log, not the main resume surface\n\nEfficiency rules:\n- Agents are prompted to read only the role-scoped relevant files by default.\n- `/workflow-resume` and the active task packet are the default restart surface, not broad project history.\n- Archived and superseded checkpoint packets are not part of the default read set.\n- The task registry is compact on purpose; it should stay operational, not narrative.\n- If a role is missing its required brief/checkpoint/task packet/ownership, gates stop it from advancing.\n- Handoffs and done checkpoints require evidence references, not just narrative text.\n\n---\n\n## Shared Roles And Custom Teams\n\nTeams can now be composed from a shared role library.\n\nPrimary layout:\n\n```text\nroles/<role-id>.md\nteams/<team-id>/team.json\n```\n\nExample:\n\n```json\n{\n  \"id\": \"my-team\",\n  \"name\": \"My Team\",\n  \"roles\": [\"scout\", \"planner\", \"architect\", \"coder\", \"reviewer\"]\n}\n```\n\nEach role id in `team.json` resolves to `roles/<role-id>.md` unless a custom `source` is set.\n\nTeam manifests can override selected role fields:\n- `name`\n- `phase`\n- `model`\n- `thinking`\n- `deliverables`\n- `handoffTo`\n\nBackward compatibility remains:\n- If `teams/<team>/team.json` does not exist, the loader still falls back to `teams/<team>/roles/*.md`.\n\nProject-specific teams are supported, for example:\n- `teams/moonglow/team.json`\n\nSee also:\n- `docs/06-quickstart-usage.md`\n- `docs/07-file-backed-workflow.md`\n\n---\n\n## UI indicators\n\nFooter now stays compact and project-focused.\n\nA card-style **Workflow Lane** widget is rendered below the editor to show:\n- previous agent\n- current agent\n- next agent\n- status/task/note for each slot\n\nSwitch modes:\n\n```text\n/footer-mode rich\n/footer-mode compact\n```\n\nToggle board widget:\n\n```text\n/team-board on\n/team-board off\n```\n\n---\n\n## Development\n\n### Run locally\n\n```bash\npi -e ./src/index.ts\n```\n\n### Smoke test\n\n```bash\nnpm run smoke\n```\n\n### Optional: use `just` command shortcuts\n\nA `justfile` is included with Moonglow helpers:\n\n```bash\njust --list\njust moonglow-new\njust moonglow-resume\njust moonglow-signoff-auto\n```\n\n---\n\n## Package + release\n\n### Verify package contents\n\n```bash\nnpm run pack:check\n```\n\n### Optional local package install test\n\n```bash\npi install /home/openclaw/.pi/projects/pi-team-orchestrator\npi list\n```\n\n### Release\n\nRecommended GitHub release flow:\n\n1. Bump `package.json` version and update `CHANGELOG.md`.\n2. Push the commit.\n3. Push a matching tag such as `v0.2.6`.\n4. GitHub Actions creates the GitHub Release.\n5. The npm publish workflow also runs from that tag push and publishes from GitHub.\n\nLocal dry run:\n\n```bash\nnpm run release:dry\n```\n\nLocal publish:\n\n```bash\nnpm run release\n```\n\nLocal publish with npm OTP:\n\n```bash\nNPM_OTP=123456 npm run release\n```\n\nInstall from npm:\n\n```bash\npi install npm:@gericomaverick/pi-team-orchestrator@0.2.6\n```\n\nGitHub workflows:\n- [`.github/workflows/github-release.yml`](.github/workflows/github-release.yml): creates a GitHub Release on `v*` tag push\n- [`.github/workflows/npm-publish.yml`](.github/workflows/npm-publish.yml): publishes to npm on `v*` tag push, GitHub Release publish, or manual dispatch\n\nnpm package setting:\n- If you want GitHub trusted publishing with an emergency token fallback, choose `Require two-factor authentication or a granular access token with bypass 2fa enabled`.\n- If you want only trusted publishing and never want token-based fallback, choose `Require two-factor authentication and disallow tokens`.\n\nThis repo now supports both trusted publishing and `NPM_TOKEN` fallback in GitHub Actions, so the first option is the pragmatic choice.\n\n---\n\n## Additional docs\n\n- `docs/06-quickstart-usage.md`\n- `docs/02-cli-workflow-and-indicators.md`\n- `docs/03-shared-memory-and-drift-prevention.md`\n- `docs/04-data-model.md`\n- `docs/05-implementation-plan.md`\n- `docs/08-release-and-publishing.md`\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "orchestration",
+    "agents"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/gericomaverick/pi-team-orchestrator#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gericomaverick/pi-team-orchestrator.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-10T11:28:03.710Z",
+    "modified": "2026-03-12T09:57:18.902Z",
+    "0.1.2": "2026-03-10T11:28:03.980Z",
+    "0.2.6": "2026-03-12T09:13:59.565Z",
+    "0.2.7": "2026-03-12T09:53:21.109Z",
+    "0.2.8": "2026-03-12T09:57:18.617Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 19,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 87
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 293
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 17
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 2
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 17
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 1
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 22
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 2
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 23
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

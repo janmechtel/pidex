@@ -1,0 +1,29 @@
+{
+  "name": "pi-context-filter",
+  "latest_version": "1.0.0",
+  "description": "A pi extension that provides .gitignore-style control over which context files and skills appear in the system prompt",
+  "readme": "# Context Filter\n\nA pi extension that gives you `.gitignore`-style control over which context files, agent instructions, and skills are included in the system prompt.\n\n## Why?\n\nPi automatically loads `AGENTS.md` / `CLAUDE.md` files from your home directory, ancestor directories, and the current project. It also loads all discovered skills into the prompt. Sometimes you want to override this \u2014 exclude a parent project's instructions when working in a subfolder, skip the global `AGENTS.md`, or inject your own context files.\n\n## Setup\n\nPlace a `.context` file in your project's `.pi/` directory:\n\n```\nyour-project/\n\u251c\u2500\u2500 .pi/\n\u2502   \u2514\u2500\u2500 .context\n\u2514\u2500\u2500 ...\n```\n\nPi reads this file on session start. Use `/reload` to pick up changes without restarting.\n\n## Syntax\n\n```bash\n# Lines starting with # are comments\n# Blank lines are ignored\n\n# Exclude files with ! (supports globs)\n!~/.pi/agent/AGENTS.md\n\n# Include files with + (resolved relative to project root)\n+.pi/MYCONTEXT.md\n```\n\n### Exclusions (`!`)\n\nExclude `AGENTS.md` / `CLAUDE.md` sections and skill entries from the system prompt. Patterns are matched against absolute file paths using [picomatch](https://github.com/micromatch/picomatch) glob syntax.\n\n```bash\n# Exact path (~ expands to home directory)\n!~/.pi/agent/AGENTS.md\n\n# All AGENTS.md files from any ancestor directory\n!**/AGENTS.md\n\n# A specific skill\n!**/skills/brainstorm/SKILL.md\n\n# All skills under a directory\n!**/skills/**\n```\n\n### Inclusions (`+`)\n\nAdd arbitrary files to the system prompt. Paths are resolved relative to the project root. Files are read fresh on every prompt, so edits are picked up immediately.\n\n```bash\n# Add a custom context file\n+.pi/MYCONTEXT.md\n\n# Absolute paths work too\n+~/shared-context/team-guidelines.md\n```\n\n## Examples\n\n**Use only the local project's AGENTS.md, ignore everything else:**\n\n```bash\n# .pi/.context\n!~/.pi/agent/AGENTS.md\n!../**/AGENTS.md\n```\n\n**Swap in your own context file:**\n\n```bash\n# .pi/.context\n!**/AGENTS.md\n+.pi/my-instructions.md\n```\n\n**Keep everything but drop a noisy skill:**\n\n```bash\n# .pi/.context\n!**/skills/brainstorm/SKILL.md\n```\n\n## How It Works\n\nThe extension hooks into pi's `before_agent_start` event to modify the system prompt before each LLM call:\n\n1. **Exclusions** \u2014 Strips `## /path/to/AGENTS.md` sections from the Project Context block and removes matching `<skill>` entries from the available skills list.\n2. **Inclusions** \u2014 Reads the specified files and appends them to the Project Context section.\n\nOn startup, a widget above the editor shows all active rules (auto-hides after 15 seconds), and a persistent footer status displays the filter summary (e.g., `[.context] \u2715 5 excluded`).\n\nNote: Pi's own `[Context]` and `[Skills]` startup display still shows all discovered files \u2014 that's pi's internal display and can't be changed by extensions. The widget and footer make it clear what's actually being filtered from the prompt.\n\n## Limitations\n\n- **Extensions cannot be filtered.** Extension loading happens before any extension code runs, so this tool can only control what appears in the *system prompt* (AGENTS.md content and skill listings).\n- **Format-dependent.** The extension parses the system prompt structure that pi generates. If pi significantly changes its prompt format in the future, the filtering may need updating.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/HazAT/pi-context-filter#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HazAT/pi-context-filter.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-07T19:17:17.365Z",
+    "1.0.0": "2026-02-07T19:17:17.579Z",
+    "modified": "2026-02-07T19:17:17.759Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

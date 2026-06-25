@@ -1,0 +1,49 @@
+{
+  "name": "pi-i18n",
+  "latest_version": "0.1.17",
+  "description": "/lang lets pi speak \u4e2d\u6587, \u65e5\u672c\u8a9e, \ud55c\uad6d\uc5b4, Espa\u00f1ol, Fran\u00e7ais, Deutsch, and more.",
+  "readme": "# pi-i18n\r\n\r\n[![npm](https://img.shields.io/npm/v/pi-i18n?style=flat)](https://www.npmjs.com/package/pi-i18n)\r\n[![license](https://img.shields.io/npm/l/pi-i18n?style=flat)](./LICENSE)\r\n[![stars](https://img.shields.io/github/stars/jerryfan/pi-i18n?style=social)](https://github.com/jerryfan/pi-i18n)\r\n\r\nLTR-only i18n/l10n platform for the **Pi coding agent** TUI and for Pi extensions.\r\n\r\nWhy it\u2019s different:\r\n- **extension-only**: no pi-core fork required\r\n- ships real locale bundles + a small API for other extensions\r\n- includes opt-in **core-hacks** (runtime patching) to localize high-impact Pi UI surfaces today\r\n\r\nIf this is useful, please star the repo \u2192 it directly influences how much time goes into expanding locale coverage.\r\n\r\n---\r\n\r\n## What it looks like\r\n\r\nDeterministic \u201cimmersive tour\u201d demo (all locales, 3 phases):\r\n1) `/settings` across all locales\r\n2) simulated localized chat across all locales\r\n3) `/hotkeys` across all locales\r\n\r\n![Pi immersive i18n tour](https://raw.githubusercontent.com/jerryfan/pi-i18n/main/assets/pi-immersive.gif)\r\n\r\n---\r\n\r\n## Install\r\n\r\nInstall with **Pi**, not npm:\r\n\r\n```bash\r\npi install npm:pi-i18n\r\n```\r\n\r\nThen restart Pi (or run `/reload`).\r\n\r\n---\r\n\r\n## Quickstart (2 minutes)\r\n\r\n1) Apply the beginner preset:\r\n\r\n```text\r\n/lang setup beginner\r\n```\r\n\r\n2) Switch language (examples):\r\n\r\n```text\r\n/lang zh-TW\r\n/lang ja\r\n/lang fr\r\n```\r\n\r\n3) Health checks:\r\n\r\n```text\r\n/lang doctor\r\n/lang debug\r\n/lang probe\r\n```\r\n\r\n---\r\n\r\n## Commands\r\n\r\nAll operational controls stay under **`/lang`** (command names are not localized):\r\n\r\n- `/lang` \u2014 switch UI language / pick a locale\r\n- `/lang doctor` \u2014 check missing keys / placeholder mismatches\r\n- `/lang debug` \u2014 diagnostics for core-hacks + slash menu surfaces\r\n- `/lang probe [on|off|reset]` \u2014 runtime patch probe mode/report\r\n- `/lang setup beginner` \u2014 sane defaults + enables core-hacks\r\n- `/lang demo chat` \u2014 deterministic localized demo chat\r\n- `/lang hacks` \u2014 toggle core-hacks\r\n\r\n---\r\n\r\n## Locale coverage\r\n\r\n<details>\r\n<summary><strong>Shipped locales</strong> (click to expand)</summary>\r\n\r\n- Full bundles: **en, zh-TW, zh-CN, ja, ko, es, pt-BR, fr, de**\r\n- Stub (English) bundles: **it, pt-PT, nl, pl, tr, vi, id, uk, hi, sv, da, fi, cs, ro, el, sg**\r\n- RTL: not supported in v1 (explicitly out of scope)\r\n\r\n</details>\r\n\r\n---\r\n\r\n## What the extension actually does\r\n\r\n### 1) i18n platform for extensions\r\n\r\n- bundles (`BundleV1`) + namespace/key translation API\r\n- compatibility surface:\r\n  - `pi-i18n/requestApi`\r\n  - `pi-i18n/registerBundle`\r\n- upstream-aligned aliases (`pi-core/i18n/*`) so future core i18n can replace this cleanly\r\n\r\n### 2) Best-effort Pi UI localization (no pi-core changes)\r\n\r\nPi UI strings are not all routed through an i18n system today.\r\nSo this project includes **core-hacks**: runtime monkeypatching against internal Pi UI render paths.\r\n\r\nScope is intentionally conservative:\r\n- UI chrome / selectors / status / warnings / errors\r\n- slash command descriptions and help surfaces (e.g. `/hotkeys`)\r\n- never tool args/results, never model output\r\n\r\nImplementation anchor:\r\n- `src/core-hacks.ts`\r\n\r\n---\r\n\r\n## For extension authors\r\n\r\nRequest the API synchronously and translate at render time:\r\n\r\n```ts\r\nlet i18n: any = null;\r\npi.events.emit(\"pi-i18n/requestApi\", {\r\n  reply: (api: any) => {\r\n    i18n = api;\r\n  },\r\n});\r\n\r\nconst t = (k: string, p?: any) => (i18n ? i18n.t(`ext.myext.${k}`, p) : k);\r\n```\r\n\r\nRegister bundles:\r\n\r\n```ts\r\npi.events.emit(\"pi-i18n/registerBundle\", bundle);\r\n```\r\n\r\nContract + rollout standards:\r\n- `SPEC.md`\r\n\r\n---\r\n\r\n## Configuration\r\n\r\nConfig is stored as JSON.\r\n\r\nUser config:\r\n- `~/.pi/agent/state/pi-i18n/config.json`\r\n\r\nProject override:\r\n- `<repo>/.pi/state/pi-i18n/config.json`\r\n\r\nCommon keys:\r\n- `locale` (e.g. `\"zh-TW\"`, `\"fr\"`)\r\n- `fallbackLocale` (default: `\"en\"`)\r\n- `coreHacksEnabled` (best-effort UI localization)\r\n- `probeEnabled` (patch telemetry)\r\n- `disableHeader`, `disableHeaderOnStartup`\r\n\r\n---\r\n\r\n## Files\r\n\r\n- user config: `~/.pi/agent/state/pi-i18n/config.json`\r\n- project config: `<repo>/.pi/state/pi-i18n/config.json`\r\n\r\n---\r\n\r\n## Troubleshooting\r\n\r\n- **Installed but `/lang` is unknown**\r\n  - run `/reload` (or restart Pi)\r\n- **Strings didn\u2019t change after switching locale**\r\n  - run `/lang hacks` (core-hacks must be enabled to localize non-i18n\u2019d Pi UI)\r\n- **Unsure what\u2019s patched**\r\n  - run `/lang probe` and `/lang debug`\r\n\r\n---\r\n\r\n## Development\r\n\r\nLocal dev install:\r\n\r\n```bash\r\npi install -l <path-to-pi-i18n>\r\n```\r\n\r\nThen:\r\n\r\n```text\r\n/reload\r\n/lang doctor\r\n```\r\n\r\n---\r\n\r\n## For maintainers\r\n\r\nRelease plan: see `RELEASE.md`.\r\n\r\nManual quality gate (in a real Pi session):\r\n\r\n```text\r\n/lang setup beginner\r\n/lang doctor\r\n/lang debug\r\n/lang probe\r\n\r\n/settings\r\n/hotkeys\r\n```\r\n\r\n---\r\n\r\n## Demo media (how to regenerate the GIF)\r\n\r\nThe hero GIF is produced via **stills \u2192 stitch** (not fragile sleeps):\r\n\r\n```bash\r\n# WSL2 recommended\r\nOUT=\"$HOME/tmp/pi-i18n-immersive-$(date +%F)-r1\"\r\nmkdir -p \"$OUT\"\r\nbash tools/vhs/make-immersive-stills.sh \"$OUT\"\r\n\r\n# outputs:\r\n# - $OUT/pi-immersive.gif\r\n# - $OUT/pi-immersive.mp4\r\n# - $OUT/stills/*.png\r\n```\r\n\r\nSee `VHS.md` for WSL setup (ttyd >= 1.7.2).\r\n\r\n---\r\n\r\n## License\r\n\r\nMIT\r\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "i18n",
+    "l10n",
+    "localization",
+    "terminal-ui",
+    "tui",
+    "zh-tw"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/jerryfan/pi-i18n",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jerryfan/pi-i18n.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/jerryfan/pi-i18n/main/assets/pi-i18n-card.png",
+    "i18n": {
+      "manifest": "./i18n.manifest.json",
+      "capability": "pi.i18n.v1",
+      "contractVersion": 1
+    }
+  },
+  "time": {
+    "created": "2026-04-21T03:52:09.462Z",
+    "modified": "2026-05-01T00:54:11.647Z",
+    "2.8.2": "2019-07-26T09:00:50.235Z",
+    "0.1.10": "2026-04-21T03:52:09.680Z",
+    "0.1.11": "2026-04-21T03:56:46.844Z",
+    "0.1.14": "2026-04-21T10:49:20.952Z",
+    "0.1.15": "2026-05-01T00:12:47.312Z",
+    "0.1.16": "2026-05-01T00:14:38.034Z",
+    "0.1.17": "2026-05-01T00:54:11.532Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 44,
+  "download_trend": []
+}

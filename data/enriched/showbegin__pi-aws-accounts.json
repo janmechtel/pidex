@@ -1,0 +1,37 @@
+{
+  "name": "@showbegin/pi-aws-accounts",
+  "latest_version": "0.1.0",
+  "description": "Pi extension: safe multi-account AWS + EKS context switching with a fail-honest prod guardrail and a visible active-account indicator.",
+  "readme": "# @showbegin/pi-aws-accounts\n\nA [Pi](https://pi.dev) extension that gives the agent **one safe, visible control point for multi-account AWS + EKS work**:\n\n- `/aws-switch <env>` \u2014 switch the active AWS profile **and** kube context together, live, mid-session. No restart, no `--profile` on every command.\n- A persistent **status indicator** showing the active env / profile / context \u2014 so you (and the model) always know which account is live.\n- A **prod guardrail** \u2014 when a prod env is active, mutating `aws` / `kubectl` / `helm` commands require confirmation before the agent can run them. It re-checks the *live* context on every command, so a switch made even in a separate terminal can't slip past.\n\n## Why this exists\n\nSwitching AWS context in a *shell* is a solved problem \u2014 [granted](https://github.com/common-fate/granted), [aws-vault](https://github.com/99designs/aws-vault), [kubectx](https://github.com/ahmetb/kubectx), [direnv](https://direnv.net/). But none of them reach **inside an agent harness**: they switch your shell, not the context the agent's `bash` commands run in, and none gate the agent's actions on prod. The moment you put an LLM with shell access in front of multiple AWS accounts, the harness needs its own context control and its own guardrail. That's the gap this fills.\n\nThe switch itself is fully deterministic \u2014 the LLM is never in the path that decides which account is active. The model does the operational work *within* a context you set; it cannot fat-finger the wrong account.\n\n## Install\n\n```bash\npi install npm:@showbegin/pi-aws-accounts\n# or, local checkout:\npi install ./pi-aws-accounts\n```\n\nThat's it \u2014 there's **no config to write**. On startup the extension auto-derives your switchable envs from `~/.aws/config` (your profiles) and your kube contexts, pairing each profile to its cluster by AWS account id. Run `/aws-switch` to see what it found.\n\n## Configuration (optional)\n\nYou only need a config file to **arm the prod guard** or to cover envs the auto-derive can't see. The easiest way to arm the guard is to run **`/aws-set-prod`** inside Pi \u2014 it writes the prod flag for the cluster you pick, no hand-editing. Or edit it directly; it lives at `~/.pi/agent/aws-accounts.json` (local to your machine \u2014 account ids never go in this package); copy [`aws-accounts.example.json`](./aws-accounts.example.json):\n\n```json\n{\n  \"prodAccounts\": [\"111111111111\"],\n  \"envs\": {\n    \"stage\": { \"context\": \"arn:aws:eks:eu-central-1:222222222222:cluster/stage\" }\n  }\n}\n```\n\n- **`prodAccounts`** \u2014 AWS account ids that are production. Any env (derived or explicit) in one of these accounts gets the prod guard. Marking prod by **account**, not by cluster name, is deliberate: the account is the real blast-radius boundary, and it never lies the way a name like `prod-test` does.\n- **`envs`** \u2014 only for what auto-derive misses: a kube context with no matching AWS profile, a custom (non-ARN) context, a friendlier alias, or a manual pairing. Anything here is unioned with, and overrides, the derived envs.\n\n## Usage\n\n| Command | Action |\n| --- | --- |\n| `/aws-switch` | Open an interactive picker of detected clusters |\n| `/aws-switch stage` | Switch directly to a cluster by name |\n| `/aws-set-prod` | Pick a cluster to mark as **production** (persists, arms the guard) |\n| `/aws-whoami` | Print active profile, `sts get-caller-identity`, and kube context |\n\n## Prerequisites & graceful degradation\n\nThe extension loads cleanly even with nothing configured, and **never throws into your Pi session**. Each capability degrades independently:\n\n| Capability | Requires | If missing |\n| --- | --- | --- |\n| Auto-derived envs | `~/.aws/config` and/or `kubectl` on PATH | derives from whatever is present; if none found, `/aws-switch` says so |\n| Kube context switch | a kube context + `kubectl` on PATH | AWS profile switch still applies; kube step reports failure |\n| `/aws-whoami` | `aws` CLI on PATH | reports \"aws unavailable\", no crash |\n| Prod guard | `prodAccounts` set in the optional config | **off, and says so on startup** \u2014 see below |\n\n## The prod guard fails *honest*\n\nIf no `prodAccounts` are configured, the guard is **disabled and tells you so on startup** \u2014 it never guesses prod from a cluster name. You mark prod explicitly by account id, and an env is guarded when its account is in `prodAccounts` (or it sets `\"prod\": true` directly). When a prod env is active, any cloud command that isn't clearly read-only requires confirmation (fail-safe: unrecognized commands are treated as needing confirmation), and if the guard's own logic errors it **blocks** rather than silently allowing.\n\n**The guard validates the real context on every command \u2014 even if it was switched in another terminal.** It reads the live `kubectl config current-context` at the moment each cloud command runs (and honors an inline `use-context` in the command itself) rather than trusting cached state, so it can't be dodged by starting a session already on prod, by the model switching itself via bash (even chained as `use-context prod && kubectl delete \u2026`), or by a switch made in a separate shell outside Pi. The one honest limit: a context it can't map to a known prod env can't be judged prod.\n\n## Security\n\nPi extensions run with your full system permissions and can execute arbitrary code. This one shells out to `aws` and `kubectl` and reads `~/.pi/agent/aws-accounts.json`. Review the source ([`src/index.ts`](./src/index.ts)) before installing \u2014 it's intentionally small.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "aws",
+    "eks",
+    "kubectl",
+    "devops",
+    "guardrail"
+  ],
+  "author": {
+    "name": "showbegin"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/showbegin/pi-aws-accounts#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/showbegin/pi-aws-accounts.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-04T11:05:28.385Z",
+    "0.1.0": "2026-06-04T11:05:28.707Z",
+    "modified": "2026-06-04T11:05:28.968Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 21,
+  "download_trend": []
+}

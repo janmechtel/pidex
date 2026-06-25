@@ -1,0 +1,37 @@
+{
+  "name": "pi-better-workflows",
+  "latest_version": "0.1.1",
+  "description": "pi-better-workflows \u2014 deterministic multi-agent orchestration for Pi. Faithful port of Claude Code's Workflow tool (agent/pipeline/parallel/phase/log) with background runs, resume-from-runId journaling, worktree isolation, and an extra rule teaching the L",
+  "readme": "# pi-better-workflows\n\nDeterministic multi-agent workflows for [Pi](https://pi.dev). GitHub: https://github.com/anishthite/better-workflows This package registers a `workflow` tool that runs JavaScript orchestration scripts with subagents, background execution, resumable journals, phases, structured output, and optional git worktree isolation.\n\nIt is intentionally close to Claude Code's `Workflow` tool semantics, with one Pi-specific safety improvement: if a workflow result is truncated inline, the tool description tells the assistant to read the persisted run journal before answering.\n\n## Install\n\n```bash\npi install npm:pi-better-workflows\n```\n\nFor local development:\n\n```bash\npi install /absolute/path/to/pi-better-workflows\n```\n\nThe package manifest exposes `./extensions/workflow.ts` through the `pi.extensions` field, so Pi loads it as a normal package extension.\n\n> Both this package and other workflow extensions may register a tool named `workflow`. Enable only one at a time.\n\n## Quick start\n\nAsk Pi to run a workflow, or call the tool directly with a script:\n\n```js\nexport const meta = {\n  name: 'summarize-files',\n  description: 'Summarize important project files',\n  phases: [\n    { title: 'Read', detail: 'Inspect files' },\n    { title: 'Synthesize', detail: 'Merge findings' },\n  ],\n}\n\nphase('Read')\nconst summaries = await pipeline(\n  ['README.md', 'package.json'],\n  file => agent(`Read ${file} and summarize the useful facts.`, {\n    label: `read:${file}`,\n    phase: 'Read',\n  })\n)\n\nphase('Synthesize')\nreturn await agent(`Combine these summaries:\\n${summaries.join('\\n\\n')}`, {\n  label: 'final',\n  phase: 'Synthesize',\n})\n```\n\nThe tool returns a `runId` immediately. Results are delivered back into the conversation when the background run finishes.\n\n## Tool API\n\n`workflow` accepts:\n\n| Field | Purpose |\n|---|---|\n| `script` | Inline workflow JavaScript. Must start with `export const meta = { ... }`. |\n| `scriptPath` | Run a previously saved workflow script. |\n| `name` | Run a named/saved workflow when available. |\n| `args` | JSON value exposed to the script as global `args`. |\n| `resumeFromRunId` | Replay unchanged completed `agent()` calls from a prior run journal. |\n| `title`, `description` | Accepted for compatibility and ignored; use `meta` instead. |\n\n## Script runtime\n\nWorkflow scripts are plain JavaScript running in a deterministic sandbox.\n\nGlobals:\n\n| Global | Purpose |\n|---|---|\n| `agent(prompt, opts)` | Spawn a Pi subagent; returns text or schema-validated JSON. |\n| `pipeline(items, ...stages)` | Run items through async stages without a barrier between stages. |\n| `parallel(thunks)` | Run async thunks concurrently and wait for all of them. |\n| `phase(title)` | Move subsequent work into a progress phase. |\n| `log(message)` | Emit workflow progress. |\n| `workflow(ref, args)` | Run one nested workflow. |\n| `args` | User-provided JSON input. |\n| `budget` | `{ total, spent(), remaining() }`; `total` is currently `null`. |\n\nUseful `agent()` options:\n\n| Option | Purpose |\n|---|---|\n| `label` | Short unique label for progress and resume identity. |\n| `phase` | Explicit phase assignment. |\n| `schema` | JSON Schema for structured output. |\n| `model` | Per-agent model override. |\n| `effort` | Per-agent reasoning effort override. |\n| `isolation: 'worktree'` | Run the agent in a temporary git worktree. |\n| `agentType` | Use a named Pi subagent definition. |\n\nDeterminism rules: `Date.now()`, `Math.random()`, and argless `new Date()` throw inside the sandbox so resume stays stable.\n\nCaps: concurrent agents are limited to `min(16, cpu cores - 2)`, each run can create up to 1000 agents, and one `pipeline()`/`parallel()` call can process up to 4096 items.\n\n## Commands and storage\n\nUse `/workflows` in Pi to inspect recent workflow runs.\n\nRuntime files are stored under:\n\n```text\n~/.pi/better-workflows/scripts/  # persisted inline scripts\n~/.pi/better-workflows/runs/     # run journals and results\n```\n\nIf an inline completion is truncated, read the full journal before summarizing:\n\n```bash\njq '.result' ~/.pi/better-workflows/runs/<runId>.json\n```\n\n## Development\n\n```bash\n# Pure runtime smoke tests\nnode $(npm root -g)/pi-subagents/node_modules/jiti/lib/jiti-cli.mjs test/smoke.ts\n\n# Pi SDK load check\nnode --import $(npm root -g)/pi-subagents/node_modules/jiti/lib/jiti-register.mjs test/loadcheck.ts\n```\n\n## Package contents\n\n```text\nextensions/workflow.ts   Pi extension entry point\nsrc/tool.ts              tool schema and registration\nsrc/runtime.ts           workflow sandbox and runtime globals\nsrc/agent.ts             Pi subagent bridge\nsrc/manager.ts           background run manager\nsrc/persistence.ts       script and journal storage\nsrc/worktree.ts          git worktree isolation\nsrc/structured-output.ts structured_output helper for schema agents\ntest/                    smoke, load, probe, and e2e checks\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "workflow",
+    "orchestration",
+    "subagents",
+    "claude-code"
+  ],
+  "author": {
+    "name": "Anish Thite"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/anishthite/better-workflows#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anishthite/better-workflows.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/workflow.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-18T04:14:59.244Z",
+    "0.1.1": "2026-06-18T04:14:59.579Z",
+    "modified": "2026-06-18T04:14:59.799Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 130,
+  "download_trend": []
+}

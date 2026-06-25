@@ -1,0 +1,38 @@
+{
+  "name": "@aprimediet/git-workflow",
+  "latest_version": "1.0.1",
+  "description": "Branching strategy enforcer + safe git commands (/git:init, /git:commit, /git:worktree, /git:push, +11 extras) for the pi coding agent.",
+  "readme": "# `@aprimediet/git-workflow`\n\n> Branching strategy enforcer + safe git commands for the **pi coding agent**.\n\nThis extension enforces a branching strategy (gitflow / github-flow / gitlab-flow / trunk-based)\nat project init time, persists the choice to `~/.pi/projects/<project-id>/git-workflow.json`, and\nprovides 15 slash commands that wrap every common git workflow with explicit user confirmation.\n\nThe agent is **never allowed** to run `git commit`, `git push`, `git tag -m`, `gh pr create/merge`,\nor `glab mr create/merge` without asking first. Suggest `/git:commit`, `/git:push`, etc. instead.\n\n## Install\n\n```bash\npi install @aprimediet/git-workflow\n```\n\n## Setup\n\nOn first `pi` startup inside a git repo, you'll be prompted to pick a branching strategy. The\nchoice persists to `~/.pi/projects/<project-id>/git-workflow.json` (NOT in the repo) so it\nsurvives `git clean` and cross-machine clones.\n\nTo re-pick later:\n\n```\n/git:init\n```\n\n## Commands\n\n### Core\n\n| Command | What it does |\n|---|---|\n| `/git:init` | Pick a branching strategy, create base branches, write config. |\n| `/git:commit` | Detect changes, suggest a conventional-commit message, commit on approval. |\n| `/git:worktree` | Suggest a worktree pattern based on current branch + strategy, create it. |\n| `/git:push` | Push current branch to origin (with `-u` first time). |\n\n### Extras\n\n| Command | What it does |\n|---|---|\n| `/git:pr` | Open a pull request / merge request via `gh` or `glab`. |\n| `/git:merge <src>` | Merge `<src>` into current branch with strategy-aware flags. |\n| `/git:rebase <base>` | Rebase current branch onto `<base>` (refuses if dirty). |\n| `/git:log [filters]` | Pretty git log with `--since`, `--author`, `--` path filters. |\n| `/git:stash [name]` | Stash changes with a strategy-aware name. |\n| `/git:diff [args]` | Show diff with optional ref/path filters. |\n| `/git:tag vX.Y.Z [-m msg]` | Create annotated SemVer tag; ask to push. |\n| `/git:reset <mode> <target>` | Soft/mixed/hard reset with mandatory backup branch. |\n| `/git:branch list\\|create\\|delete` | Branch management with strategy validation. |\n| `/git:status` | Compact 4-line status summary. |\n| `/git:changelog [ref]` | Generate grouped Markdown changelog since `<ref>`. |\n\n## Branching strategies\n\n| Strategy | Branches |\n|---|---|\n| `gitflow` | `master`, `dev`, `features/*`, `release/*`, `hotfix/*`, `bugfix/*` |\n| `github-flow` | `master`, `features/*`, `bugfix/*` |\n| `gitlab-flow` | `master`, `staging`, `production`, `features/*`, `hotfix/*` |\n| `trunk-based` | `main`, `features/*`, `release/*` |\n\nEach strategy ships as an `agentskills.io`-compliant skill that the agent loads when it sees\nmatching work.\n\n## Safety gates\n\nThe extension wires five lifecycle hooks:\n\n1. **G1 \u2014 `session_start`**: if the project has git but no config, prompts to initialize.\n2. **G2 \u2014 `before_agent_start`**: injects a \"Git Workflow Safety Policy\" + active-strategy\n   reminder into the system prompt so the agent knows to suggest slash commands instead of\n   running git directly.\n3. **G3 \u2014 `tool_call`**: blocks `git commit`, `git push`, `git tag -m`, `gh pr create/merge`,\n   `glab mr create/merge` unless explicitly confirmed by the user. Slash-command handlers bypass\n   via a sentinel flag.\n4. **G4 \u2014 `agent_end`**: after each turn, if the working tree is dirty, asks \"Commit now?\" and\n   suggests `/git:commit` (never auto-executes).\n5. **G5 \u2014 `tool_call`**: detects `git checkout -b` / `git switch -c` for branches outside the\n   configured strategy and asks the user to either cancel, create anyway, or update the strategy.\n\n## Memory integration\n\nThis extension does not depend on `@aprimediet/memory`. If you have it installed and want\ngit-related events persisted to memory (strategy decisions, commits, pushes, tag, PR), configure\nyour memory extension to capture these events via its own means \u2014 e.g. a session-end hook that\nparses the current branch + last commit and writes a memory entry.\n\n## File layout\n\n```\n~/.pi/projects/<project-id>/\n\u2514\u2500\u2500 git-workflow.json          # persisted config (strategy, branches, preferences)\n```\n\n## Publishing\n\nThis package is published under the `@aprimediet` npm scope. To publish a new version:\n\n```bash\ncd extensions/git-workflow\n# bump version in package.json\nnpm run pack:dry\nnpm publish --access public --userconfig /tmp/npmrc\n```\n\nSee [../../prompts/git-workflow.md](../../prompts/git-workflow.md) for the full build prompt and\nspecification.\n\n## License\n\nMIT \u00a9 aprimediet",
+  "keywords": [
+    "pi-package",
+    "git",
+    "workflow",
+    "branching-strategy"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/aprimediet/pi-git-workflow#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aprimediet/pi-git-workflow.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-25T18:34:49.116Z",
+    "modified": "2026-06-25T18:43:19.649Z",
+    "0.1.0": "2026-06-25T18:03:06.803Z",
+    "0.2.0": "2026-06-25T18:16:16.450Z",
+    "1.0.0": "2026-06-25T18:34:49.408Z",
+    "1.0.1": "2026-06-25T18:43:19.505Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 0,
+  "download_trend": []
+}

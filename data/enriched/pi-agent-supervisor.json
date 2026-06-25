@@ -1,0 +1,42 @@
+{
+  "name": "pi-agent-supervisor",
+  "latest_version": "1.1.2",
+  "description": "Runtime safety net for AI agents \u2014 blocks dangerous commands, protects files, enforces rate limits, and records sessions.",
+  "readme": "# Agent Supervisor for Pi\n\n[![npm version](https://img.shields.io/npm/v/pi-agent-supervisor)](https://www.npmjs.com/package/pi-agent-supervisor)\n[![license](https://img.shields.io/npm/l/pi-agent-supervisor)](./LICENSE)\n\n> Runtime safety net for AI agents \u2014 blocks dangerous commands, protects sensitive files, enforces rate limits, and records sessions to an append-only audit log.\n\n## Philosophy\n\nThe other three gates handle *what* agents do (contrib, review, project). The supervisor handles *how* agents do it \u2014 in real-time, while they work.\n\n## Install\n\n```bash\npi install npm:pi-agent-supervisor\n```\n\n## Tools\n\n| Tool | What it does |\n|---|---|\n| `supervisor_status()` | Show session stats \u2014 rate, errors, blocked calls |\n| `supervisor_log(tail)` | Read audit log (read-only, last N lines) |\n| `supervisor_override(reason)` | Request human override for blocked operation |\n\n## Runtime Protections\n\nThese run **passively on every tool call** \u2014 no agent action needed:\n\n| Protection | Default | Behavior |\n|---|---|---|\n| Dangerous commands | 12 patterns | Blocks `rm -rf /`, `git push --force`, `sudo`, fork bombs, etc. |\n| File protection | 6 files + 5 patterns | Blocks writes to `.env`, credentials, SSH keys, secrets |\n| Rate limiting | 50/min warn, 80/min block | Pauses agent if tool call rate exceeds threshold |\n| Error escalation | 3 consecutive | Alerts human after 3+ consecutive errors |\n| Audit logging | Enabled | Append-only log of all tool calls, errors, blocks |\n\n## Configuration\n\nCreate `.supervisorrc.yml`:\n\n```yaml\n# Blocked command patterns (comma-separated regex)\nblockedPatterns: \"rm\\\\s+-rf\\\\s+/,rm\\\\s+-rf\\\\s+~,git\\\\s+push\\\\s+.*--force,sudo,chmod\\\\s+777\"\n\n# Protected files (write blocked)\nprotectedFiles: \".env,.env.local,credentials.json,.claude/settings.local.json,.git/config\"\n\n# Protected file patterns (glob)\nprotectedPatterns: \"*.pem,*.key,id_rsa*,*secret*,*credential*\"\n\n# Rate limiting\nrateLimitPerMinute: 50     # Warn threshold\nrateLimitHardBlock: 80     # Block threshold\n\n# Error escalation\nmaxConsecutiveErrors: 3    # Escalate after this many consecutive errors\n\n# Audit log\nenableAuditLog: true\nauditLogPath: \".supervisor/audit.log\"\n```\n\n## Audit Log\n\nEvery action is recorded to an append-only log:\n\n```\n[2026-05-14T04:00:00.000Z] SESSION_START host=macbook cwd=/project\n[2026-05-14T04:00:01.000Z] CALL bash (rate: 1/min)\n[2026-05-14T04:00:02.000Z] CALL edit (rate: 2/min)\n[2026-05-14T04:00:03.000Z] BLOCK dangerous-cmd: rm -rf /tmp/*\n[2026-05-14T04:00:04.000Z] ERROR bash: command not found (consecutive: 1)\n[2026-05-14T04:00:05.000Z] SESSION_END calls=15 errors=1 blocked=1\n```\n\nThe log is **append-only** \u2014 agents cannot modify or delete it.\n\n## Examples\n\n### Blocked: Dangerous Command\n\n```\n\u2192 bash(\"sudo rm -rf /\")\n\u26d4 Dangerous command blocked (pattern: \"sudo\")\n\u2192 supervisor_override(reason=\"Need to clean deployment directory\")\nHuman confirmation required...\n```\n\n### Blocked: Protected File\n\n```\n\u2192 write(\".env\", \"SECRET=xyz\")\n\u26d4 Write to protected file blocked: .env\n```\n\n### Rate Limited\n\n```\n\u26a0\ufe0f High tool call rate (55/50 calls/min). Slow down.\n\u26d4 Rate limit exceeded (85/80 calls/min). Paused.\n```\n\n## Integration\n\nInstall all four gates for full agent governance:\n\n```bash\npi install npm:pi-contrib-gate\npi install npm:pi-review-gate\npi install npm:pi-project-gate\npi install npm:pi-agent-supervisor\n```\n\n## License\n\nMIT \u00a9 [nandal](https://github.com/nandal)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "governance",
+    "safety",
+    "supervisor",
+    "rate-limiting",
+    "audit-log"
+  ],
+  "author": {
+    "name": "nandal",
+    "email": "nandal@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/nandal/pi-ext/tree/main/supervisor",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nandal/pi-ext.git",
+    "directory": "supervisor"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-13T23:59:42.015Z",
+    "modified": "2026-05-14T16:52:18.788Z",
+    "1.0.0": "2026-05-13T23:59:42.205Z",
+    "1.1.0": "2026-05-14T00:45:23.544Z",
+    "1.1.1": "2026-05-14T13:24:13.785Z",
+    "1.1.2": "2026-05-14T16:52:18.372Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": null,
+  "download_trend": []
+}

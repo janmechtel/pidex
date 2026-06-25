@@ -1,0 +1,353 @@
+{
+  "name": "@gonrocca/skillautoforge-pi",
+  "latest_version": "0.1.2",
+  "description": "skillautoforge-pi \u2014 an installable pi (pi.dev) package that adds the skill auto-learning loop pi is missing. pi already stores, surfaces (progressive disclosure), and loads skills; this package adds the behavioral loop: a skill_save tool plus prompt guide",
+  "readme": "# @gonrocca/skillautoforge-pi\n\n> The skill auto-learning loop pi is missing. pi already stores, surfaces, and loads skills \u2014 this adds the behavioral loop: distill a reusable skill after a hard task, refine one that proved wrong.\n\n<div align=\"center\">\n\n[![npm](https://img.shields.io/npm/v/@gonrocca/skillautoforge-pi?color=af8aff&label=npm)](https://www.npmjs.com/package/@gonrocca/skillautoforge-pi) [![repo](https://img.shields.io/badge/repo-github-7497ff?logo=github&logoColor=white)](https://github.com/gonzalonicolasr/skillautoforge-pi) [![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/aNFCZBZVT3) [![license](https://img.shields.io/npm/l/@gonrocca/skillautoforge-pi?color=eebe5c)](./LICENSE)\n\n### \ud83d\udcac Join the community\n\nQuestions, ideas, or want to debate skills & agent design? Come hang out:\n\n[![Join the Discord](https://img.shields.io/badge/Discord-join%20the%20chat-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/aNFCZBZVT3)\n\n</div>\n\n---\n\nskillautoforge-pi is a pi ([pi.dev](https://pi.dev)) package. It does **not**\nreimplement pi's skill system \u2014 pi already does the hard parts:\n\n- **Storage**: scans `~/.pi/agent/skills/`, `~/.agents/skills/`, and project skill dirs.\n- **Surfacing (progressive disclosure)**: only skill *descriptions* sit in the system prompt; the full `SKILL.md` loads on demand.\n- **Invocation**: `/skill:name` loads and runs a skill.\n\nWhat pi lacks is the *behavioral loop* \u2014 the nudge to **create** a skill after a\nhard task and to **refine** one when it was wrong. This package adds exactly\nthat, and nothing else. Inspired by [Hermes Agent](https://github.com/)'s\n\"after difficult/iterative tasks, offer to save as a skill\" pattern.\n\n## \ud83d\udce6 Install\n\n```\npi install npm:@gonrocca/skillautoforge-pi\n```\n\nNeeds Node \u2265 20.6.0. Restart pi after install.\n\n## \ud83d\udee0 What it adds\n\n### `skill_save` tool (LLM-callable)\n\nA deterministic writer. The model supplies a kebab-case `name`, a specific\n`description` (what it does + when to use it), and a Markdown `body` (pattern,\nordered steps, exact commands, gotchas). The extension validates the name,\nbuilds valid frontmatter, and writes `~/.pi/agent/skills/<name>/SKILL.md` \u2014\nthe library pi already scans. The model never hand-serializes frontmatter or\nguesses the path.\n\n- Invalid names are normalized (slugified) rather than rejected outright.\n- Missing description/body are rejected (pi won't load a description-less skill).\n- Saving over an existing name without `overwrite:true` is refused with guidance\n  to read-then-merge \u2014 so refinement never blind-clobbers a skill.\n\n### Prompt guidelines (the loop)\n\nWhile `skill_save` is active, pi surfaces these guidelines:\n\n- *After a difficult, multi-step, or iterative task with a reusable pattern, call `skill_save`.* Routine one-off work is skipped.\n- *If a skill you loaded was missing steps or had a wrong command, read it and call `skill_save` with `overwrite:true` and the merged content* \u2014 refine, don't duplicate.\n\nThese ride pi's `promptGuidelines` mechanism, so they appear only when the tool\nis active \u2014 no manual system-prompt surgery, no always-on token tax beyond the\nguideline bullets.\n\n### `/skill-save` command (manual)\n\nForce distillation of the current session:\n\n```\n/skill-save                       # distill whatever is reusable here\n/skill-save focus on the deploy   # optional hint\n```\n\n## \ud83d\udd04 How the loop closes\n\n1. **Distill** \u2014 after a hard task, the model calls `skill_save`.\n2. **Store** \u2014 the extension writes `SKILL.md` into pi's user skill library.\n3. **Surface** \u2014 pi indexes the new skill's description into the system prompt (next session, or now after `/reload`).\n4. **Refine** \u2014 when the model re-applies a skill and finds it lacking, it reads and re-saves the merged version with `overwrite:true`.\n\n## \ud83d\udd17 Composition with zero-pi / devteam-pi\n\nNo code coupling. Because `skill_save` writes into pi's shared skill library,\nany agent pi runs \u2014 a plain session, a `/forge` run, a `/devteam` role \u2014 that\nhas skills enabled will see distilled skills surface automatically. To let the\nloop run *inside* zero's SDD phases, enable skills on the relevant phase agents\n(they ship with `inheritSkills: false`).\n\n## \ud83e\uddea Development\n\n```\nnpm test   # node --test --experimental-strip-types\n```\n\nThe deterministic core (`extensions/skill-write.ts`) is pure and unit-tested.\nDependency-free, no build step \u2014 pi loads the TypeScript directly via jiti.\n\n## License\n\nMIT \u00a9 Gonzalo Rocca\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "skills",
+    "auto-learning",
+    "skill-forge",
+    "ai-coding-agent"
+  ],
+  "author": {
+    "name": "Gonzalo Rocca"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/gonzalonicolasr/skillautoforge-pi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gonzalonicolasr/skillautoforge-pi.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/skillautoforge.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/gonzalonicolasr/skillautoforge-pi/main/assets/preview.png"
+  },
+  "time": {
+    "created": "2026-05-20T19:50:16.305Z",
+    "modified": "2026-05-20T21:04:20.893Z",
+    "0.1.0": "2026-05-20T19:50:16.576Z",
+    "0.1.1": "2026-05-20T20:26:43.942Z",
+    "0.1.2": "2026-05-20T21:04:20.135Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 19,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 392
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 17
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

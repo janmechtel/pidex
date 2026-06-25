@@ -1,0 +1,42 @@
+{
+  "name": "pi-psql",
+  "latest_version": "2.2.0",
+  "description": "Secure PostgreSQL client skill for pi - query databases with encrypted credentials",
+  "readme": "# pi-psql\n\n[![npm version](https://badge.fury.io/js/pi-psql.svg)](https://www.npmjs.com/package/pi-psql)\n[![Release](https://github.com/patrixr/pi-psql/actions/workflows/release.yml/badge.svg)](https://github.com/patrixr/pi-psql/actions/workflows/release.yml)\n[![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)\n\nA secure PostgreSQL client skill for [pi coding agent](https://pi.dev). Query databases with AES-256-GCM encrypted credentials that the AI never sees.\n\n## Features\n\n- \ud83d\udd10 **Secure** \u2014 Credentials encrypted at rest with AES-256-GCM\n- \ud83e\udd16 **AI-Safe** \u2014 Agent can query but never see passwords or connection strings\n- \ud83d\udda5\ufe0f **Unified CLI** \u2014 All commands through a single `pi-psql` entry point\n- \ud83c\udf10 **Easy Setup** \u2014 TUI-styled web UI for managing connections\n- \ud83d\udd0d **Full Introspection** \u2014 Query, schema inspection, tables, views, indexes\n\n## Installation\n\n### Global (recommended)\n\n```bash\npi install git:github.com/patrixr/pi-psql\n```\n\nOr manually:\n\n```bash\ncd ~/.pi/agent/skills\ngit clone git@github.com:patrixr/pi-psql.git\ncd pi-psql\nnpm install\n```\n\n### Project-local\n\n```bash\ncd .pi/skills\ngit clone git@github.com:patrixr/pi-psql.git\ncd pi-psql\nnpm install\n```\n\n## Setup\n\n### 1. Open the connection manager\n\n```bash\n./cli.js open-connection-manager\n```\n\nThis opens a local web UI where you can add, test, and manage connections. The command **blocks** until you click **Done \u2014 return to agent**, making it safe to use from within an AI session.\n\n**Security:** The web server runs on `localhost:9876`. All data stays on your machine. The AI cannot observe your browser interactions.\n\n### 2. Add a connection\n\nIn the web UI:\n1. Click **[A] Add Connection**\n2. Fill in connection details or paste a connection string\n3. Choose SSL mode if needed\n4. Optionally test before saving\n5. Click Save\n\nCredentials are immediately encrypted and stored in `connections.enc`.\n\n### 3. Use with the AI\n\nOnce connections are configured, the AI uses them automatically via `cli.js`.\n\n## CLI Reference\n\nAll commands go through the unified CLI:\n\n```\n./cli.js <command> [options]\n```\n\n### Global Options\n\n| Flag | Alias | Description |\n|------|-------|-------------|\n| `--connection <name>` | `-c` | Connection to use (defaults to the configured default) |\n| `--format <fmt>` | `-f` | Output format: `table` (default), `json`, `csv` |\n\n### Commands\n\n| Command | Description |\n|---------|-------------|\n| `query [sql]` | Execute a SQL statement |\n| `tables` | List all tables |\n| `views` | List all views |\n| `describe <table>` | Show column definitions for a table |\n| `indexes <table>` | List indexes on a table |\n| `info` | Show database server info |\n| `connections` | List configured connections |\n| `test [connection]` | Test a connection |\n| `open-connection-manager` | Open the web UI to add/edit/remove connections |\n\nRun `./cli.js --help` or `./cli.js <command> --help` for full usage.\n\n### Examples\n\n```bash\n# See what's available\n./cli.js connections\n./cli.js info\n\n# Run queries\n./cli.js query \"SELECT * FROM users LIMIT 10\"\n./cli.js query --file ./report.sql\n./cli.js query \"SELECT COUNT(*) FROM orders\" --connection production\n\n# Explore the schema\n./cli.js tables\n./cli.js views --schema reporting\n./cli.js describe users\n./cli.js describe analytics.events   # schema.table notation\n./cli.js indexes orders\n\n# Machine-readable output\n./cli.js query \"SELECT id, email FROM users\" --format json | jq '.[].email'\n./cli.js tables --format csv > tables.csv\n\n# Test a connection\n./cli.js test production\n\n# Manage connections\n./cli.js open-connection-manager\n```\n\n## Security Model\n\n### Encryption\n\n- **Algorithm**: AES-256-GCM (authenticated encryption)\n- **Key**: Auto-generated 256-bit key stored in `.key`\n- **Storage**: Encrypted credentials in `connections.enc`\n\n### What the AI Can Do\n\n- \u2705 List connection names\n- \u2705 Execute SQL queries\n- \u2705 Inspect schemas, tables, views, indexes\n- \u2705 Test connections\n\n### What the AI Cannot Do\n\n- \u274c See passwords or connection strings\n- \u274c Create or modify connections (only the human via web UI)\n- \u274c Access the encryption key\n\n### Backup Your Key\n\n```bash\ncat ~/.pi/agent/skills/pi-psql/.key\n```\n\n> **Important:** If you lose `.key`, you lose access to your encrypted connections. Back it up securely.\n\n## Project Structure\n\n```\npi-psql/\n\u251c\u2500\u2500 SKILL.md                      # Agent-facing instructions (read by AI)\n\u251c\u2500\u2500 README.md                     # Human documentation (this file)\n\u251c\u2500\u2500 cli.js                        # Unified CLI entry point\n\u251c\u2500\u2500 launch-connection-manager.js  # Web UI server\n\u251c\u2500\u2500 core/\n\u2502   \u251c\u2500\u2500 crypto.js                 # AES-256-GCM encryption\n\u2502   \u251c\u2500\u2500 storage.js                # Connection storage\n\u2502   \u251c\u2500\u2500 database.js               # Query execution & introspection\n\u2502   \u2514\u2500\u2500 index.js                  # Exports\n\u251c\u2500\u2500 public/                       # Connection manager web UI\n\u2502   \u251c\u2500\u2500 index.html\n\u2502   \u2514\u2500\u2500 app.js\n\u251c\u2500\u2500 .key                          # Encryption key (gitignored)\n\u251c\u2500\u2500 connections.enc               # Encrypted connections (gitignored)\n\u2514\u2500\u2500 package.json\n```\n\n## Troubleshooting\n\n### \"Connection not found\"\n\nRun `./cli.js connections` to see what's available. If empty, open the connection manager:\n\n```bash\n./cli.js open-connection-manager\n```\n\n### Port already in use\n\n```bash\nlsof -i :9876\n```\n\nKill the process or set a different port with `POSTGRES_CLIENT_PORT=9877 ./cli.js open-connection-manager`.\n\n### Lost encryption key\n\nIf `.key` is missing and `connections.enc` exists, you'll need to re-add all connections. Delete `connections.enc` and run `open-connection-manager` to start fresh.\n\n## Publishing\n\nThis package uses [semantic-release](https://github.com/semantic-release/semantic-release) for automated versioning. Push conventional commits to `main` and releases are handled automatically.\n\nSee [CONTRIBUTING.md](CONTRIBUTING.md) and [.github/PUBLISHING.md](.github/PUBLISHING.md) for details.\n\n## Contributing\n\nIssues and PRs welcome at https://github.com/patrixr/pi-psql\n\nPlease follow the [Code of Conduct](CODE_OF_CONDUCT.md) and use [conventional commits](https://www.conventionalcommits.org/).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-skill",
+    "postgresql",
+    "postgres",
+    "database",
+    "sql",
+    "encryption",
+    "secure"
+  ],
+  "author": {
+    "name": "Patrick"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/patrixr/pi-psql#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/patrixr/pi-psql.git"
+  },
+  "pi": {
+    "skills": [
+      "./"
+    ]
+  },
+  "time": {
+    "created": "2026-04-20T08:33:14.770Z",
+    "modified": "2026-04-24T06:43:25.786Z",
+    "1.0.0": "2026-04-20T08:33:14.898Z",
+    "2.0.8": "2026-04-21T02:18:27.490Z",
+    "2.0.9": "2026-04-21T02:41:09.825Z",
+    "2.1.0": "2026-04-24T06:22:31.037Z",
+    "2.2.0": "2026-04-24T06:43:25.506Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 4,
+  "download_trend": []
+}

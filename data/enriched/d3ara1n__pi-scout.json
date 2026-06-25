@@ -1,0 +1,34 @@
+{
+  "name": "@d3ara1n/pi-scout",
+  "latest_version": "1.0.1",
+  "description": "Per-turn side agent decision framework for pi \u2014 uses a cheap model to select skills and route models before each conversation turn",
+  "readme": "# @d3ara1n/pi-scout\n\nPer-turn side agent decision framework for [pi](https://github.com/earendil-works/pi).\n\nBefore each conversation turn, a cheap side agent model analyzes the user's prompt and makes routing decisions:\n\n1. **skill-router** \u2014 Selects which skills to activate and injects their full content (replacing pi's default skill metadata list)\n2. **model-router** \u2014 Automatically switches the active model role based on task complexity\n\nBoth modules can be independently toggled on/off.\n\n## Why model-router is disabled by default\n\nModel-router switches the active model role based on task complexity, which can:\n\n- **Break prompt caching**: Different models don't share cache, causing cache write costs on each switch\n- **Increase API costs**: Frequent model switching adds ~118% overhead in typical workloads\n- **Reduce performance**: Cache misses mean re-uploading system prompt and tools each time\n\nWe recommend keeping model-router disabled unless you specifically need it. Enable it via:\n\n```bash\n/scout:model-router on        # Temporary (current session)\n```\n\nOr add to `settings.json` for persistent enablement:\n\n```jsonc\n{\n  \"scout\": {\n    \"modules\": {\n      \"modelRouter\": true\n    }\n  }\n}\n```\n\n## How it works\n\n```\nUser sends prompt\n    \u2502\n    \u25bc\nbefore_agent_start hook fires\n    \u2502\n    \u251c\u2500 Side agent (cheap model) analyzes prompt + available skills + current role\n    \u251c\u2500 Returns: { skills: [...], role: \"...\", reasoning: \"...\" }\n    \u2502\n    \u251c\u2500 [skill-router] Strips <available_skills> XML, injects selected skill SKILL.md content\n    \u2514\u2500 [model-router] Switches model if a different role is recommended\n```\n\n## Dependencies\n\n- [`@d3ara1n/pi-model-roles`](../pi-model-roles) \u2014 model role resolution\n\n## Installation\n\n```bash\npi extension add @d3ara1n/pi-scout\n```\n\n## Configuration\n\nEdit `~/.pi/agent/settings.json`:\n\n```jsonc\n{\n  \"scout\": {\n    \"enabled\": true,\n    \"sideAgentRole\": \"fast\",\n    \"maxSelectedSkills\": 5,\n    \"modules\": {\n      \"skillRouter\": true,\n      \"modelRouter\": false\n    }\n  }\n}\n```\n\n| Field | Default | Description |\n|-------|---------|-------------|\n| `enabled` | `true` | Global on/off |\n| `sideAgentRole` | `\"utility\"` | pi-model-roles role for the side agent |\n| `maxSelectedSkills` | `5` | Max skills the side agent can select |\n| `modules.skillRouter` | `true` | Enable/disable skill routing |\n| `modules.modelRouter` | `false` | Enable/disable model routing (disabled by default to avoid cache inefficiency and extra costs) |\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/scout` | Show scout status and last decision |\n| `/scout:skill-router on/off` | Toggle skill-router module |\n| `/scout:model-router on/off` | Toggle model-router module |\n\n## Performance\n\nSide agent adds ~0.5\u20132s latency per turn. Output is limited to 256 tokens.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/d3ara1n/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/d3ara1n/pi-extensions.git",
+    "directory": "packages/pi-scout"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-05T08:10:04.905Z",
+    "modified": "2026-06-24T06:43:50.014Z",
+    "0.1.0": "2026-06-05T08:10:05.236Z",
+    "0.1.1": "2026-06-06T11:06:21.429Z",
+    "1.0.0": "2026-06-23T15:32:25.728Z",
+    "1.0.1": "2026-06-24T06:43:49.750Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 269,
+  "download_trend": []
+}

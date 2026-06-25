@@ -1,0 +1,350 @@
+{
+  "name": "@zackify/pi-port-forward",
+  "latest_version": "1.0.3",
+  "description": "A pi extension that adds an interactive SSH local port forwarding command.",
+  "readme": "# pi-port-forward\n\n![pi-port-forward screenshot](assets/pi-port-forward.png)\n\nA reusable [pi](https://github.com/badlogic/pi) package that adds a `/port` slash command for SSH local port forwarding.\n\nIt lists listening TCP ports on configured SSH remotes, shows the process name / PID when available, and lets you toggle forwards from inside pi.\n\n## Features\n\n- Configurable slash command name, default `/port`\n- Multiple SSH remotes via `settings.json`\n- Configurable allowed ports and port ranges\n- Configurable local bind host, remote target host, SSH options, and local port offsets\n- Interactive picker:\n  - `Space` toggles the highlighted port and keeps the picker open\n  - `Enter` toggles the highlighted port and closes\n  - `Esc` closes\n- Persistent `Forwarded ports` widget above the input editor\n- Forwards are stopped when untoggled, when pi reloads/shuts down, or when the parent pi process disappears\n\n## Requirements\n\n- pi with extension/package support\n- SSH access to each configured remote\n- Key-based or otherwise non-interactive SSH auth; the extension uses `BatchMode=yes`\n- `ss` or `netstat` on the remote host\n- Free local ports for the forwards you start\n\n## Install\n\n### From npm\n\nAfter this package is published:\n\n```bash\npi install npm:@zackify/pi-port-forward\n```\n\nThen reload pi:\n\n```text\n/reload\n```\n\n### Manual install\n\nCopy the extension into your global pi extensions directory:\n\n```bash\nmkdir -p ~/.pi/agent/extensions\ncp index.ts ~/.pi/agent/extensions/pi-port-forward.ts\n```\n\nOr install it only for one project:\n\n```bash\nmkdir -p .pi/extensions\ncp index.ts .pi/extensions/pi-port-forward.ts\n```\n\nThen add config to `~/.pi/agent/settings.json` and reload pi.\n\n## Config\n\nThe extension reads `portForward` from `~/.pi/agent/settings.json`.\n\nMinimal example using an SSH config alias named `dev`:\n\n```json\n{\n  \"portForward\": {\n    \"providers\": [\n      {\n        \"id\": \"dev\",\n        \"remote\": \"dev\",\n        \"label\": \"dev\",\n        \"allowedPorts\": [3000, 5173, { \"from\": 8000, \"to\": 8999 }]\n      }\n    ]\n  }\n}\n```\n\nMultiple remotes are supported:\n\n```json\n{\n  \"portForward\": {\n    \"command\": \"port\",\n    \"providers\": [\n      {\n        \"id\": \"dev\",\n        \"remote\": \"me@dev.example.com\",\n        \"label\": \"dev\",\n        \"allowedPorts\": [3000, { \"from\": 8080, \"to\": 9000 }]\n      },\n      {\n        \"id\": \"staging\",\n        \"remote\": \"staging\",\n        \"label\": \"staging\",\n        \"allowedPorts\": [5173, { \"from\": 8000, \"to\": 8999 }]\n      }\n    ]\n  }\n}\n```\n\nAvoid local port collisions with `localPortOffset`:\n\n```json\n{\n  \"portForward\": {\n    \"providers\": [\n      {\n        \"id\": \"dev\",\n        \"remote\": \"dev\",\n        \"allowedPorts\": [3000]\n      },\n      {\n        \"id\": \"staging\",\n        \"remote\": \"staging\",\n        \"allowedPorts\": [3000],\n        \"localPortOffset\": 10000\n      }\n    ]\n  }\n}\n```\n\nThis maps `dev:3000` to `127.0.0.1:3000` and `staging:3000` to `127.0.0.1:13000`.\n\n### Config reference\n\n| Field | Type | Default | Description |\n| --- | --- | --- | --- |\n| `command` | string | `\"port\"` | Slash command name, with or without leading `/`. |\n| `maxVisible` | number | `15` | Maximum visible picker rows before scrolling. |\n| `providers` | array | `[]` | SSH remotes to scan. No personal default remote is configured. |\n| `providers[].id` | string | derived from label | Stable unique provider ID used for forward state. |\n| `providers[].remote` | string | required | SSH target, e.g. `user@host` or an SSH config alias. `ssh` is also accepted as an alias. |\n| `providers[].label` | string | host part of remote | Display label. `hostLabel` is also accepted as an alias. |\n| `providers[].allowedPorts` | array | `[3000, {\"from\":8080,\"to\":9000}]` | Ports shown in the picker. Entries may be numbers or `{ \"from\": number, \"to\": number }` ranges. |\n| `providers[].localHost` | string | `\"127.0.0.1\"` | Local bind address for `ssh -L`. |\n| `providers[].remoteHost` | string | `\"127.0.0.1\"` | Target host as seen from the remote SSH server. |\n| `providers[].localPortOffset` | number | `0` | Added to the remote port to choose the local port. Useful when two remotes expose the same port. |\n| `providers[].sshOptions` | string[] | `[]` | Extra arguments passed to `ssh`, for example `[\"-J\", \"jump-host\"]`. |\n\n## Usage\n\nReload pi after installing/configuring:\n\n```text\n/reload\n```\n\nThen run:\n\n```text\n/port\n```\n\nUse arrow keys to select a port. Press `Space` to toggle and keep the picker open, or `Enter` to toggle and close.\n\n## Security notes\n\nOnly configure remotes you trust. The extension runs `ssh <remote> \"ss ... || netstat ...\"` to list listening ports and opens local SSH forwards. Use `allowedPorts` to limit what appears in the picker.\n\nForwards bind to `127.0.0.1` by default so they are only reachable from your local machine unless you explicitly change `localHost`.\n\n## Troubleshooting\n\n### No listening TCP ports found\n\n- Check that the service is running on the remote.\n- Check that its port is included in `allowedPorts`.\n- Run `ssh <remote> 'ss -H -ltnp || netstat -ltnp'` manually to verify output.\n\n### Could not list ports\n\n- Check SSH connectivity: `ssh <remote>`.\n- Ensure non-interactive auth works. Password prompts fail because `BatchMode=yes` is used.\n- Check SSH aliases in `~/.ssh/config`.\n\n### localhost port is already in use\n\n- Stop the local process using that port, or configure `localPortOffset` for that provider.\n\n### Process name is `unknown`\n\n- Some systems hide process info from `ss` / `netstat` unless run with elevated permissions.\n- The forward can still work even if the process name is unknown.\n\n## Releasing\n\nThis repository includes a GitHub Actions workflow that publishes to npm when a GitHub release is created.\n\n1. Add an `NPM_TOKEN` repository secret.\n2. Create a GitHub release named like `v1.2.3` or `1.2.3`.\n3. The workflow sets `package.json` to that version and runs `npm publish --provenance --access public`.\n\n## Files\n\n- `index.ts` \u2014 extension source\n- `package.json` \u2014 pi package metadata for `@zackify/pi-port-forward`, including the `pi-package` keyword\n- `.github/workflows/publish.yml` \u2014 npm publish workflow\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "ssh",
+    "port-forward",
+    "tui"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/zackify/pi-port-forward#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zackify/pi-port-forward.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/zackify/pi-port-forward/master/assets/pi-port-forward.png"
+  },
+  "time": {
+    "created": "2026-04-30T00:48:54.569Z",
+    "modified": "2026-04-30T03:08:07.119Z",
+    "1.0.1": "2026-04-30T00:48:54.783Z",
+    "1.0.2": "2026-04-30T00:52:30.573Z",
+    "1.0.3": "2026-04-30T03:08:06.853Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 7,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 368
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 26
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

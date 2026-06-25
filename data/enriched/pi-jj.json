@@ -1,0 +1,353 @@
+{
+  "name": "pi-jj",
+  "latest_version": "0.3.0",
+  "description": "Pi extension package for Jujutsu workflows (checkpointing, rewind, and jj onboarding)",
+  "readme": "# pi-jj\n\n![pi-jj banner](./assets/banner-concept-no-text.svg)\n\nPi extension package for **Jujutsu-first** workflows.\n\n## Features\n\n- **Checkpoints**: automatic jj snapshots on every agent turn with rewind support\n- **Stacked PRs**: inspect, plan, publish, and sync stacked PRs via GitHub\n- **Onboarding**: guided jj init with user/email config and restore mode selection\n- **Agent integration**: LLM-callable tool + packaged skill for safe stacked-PR workflows\n\n## Install\n\n### From npm (recommended)\n\n```bash\npi install npm:pi-jj\n```\n\nThis installs the package and loads its bundled extension + skills automatically.\n\nIf you prefer editing settings manually, add this to `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\n    \"npm:pi-jj\"\n  ]\n}\n```\n\nThen restart Pi or run `/reload`.\n\n### Local development / path install\n\n```json\n{\n  \"packages\": [\n    \"/absolute/path/to/pi-jj\"\n  ]\n}\n```\n\nAdvanced/manual (extension path only):\n\n```json\n{\n  \"extensions\": [\"/absolute/path/to/pi-jj/index.ts\"],\n  \"skills\": [\"/absolute/path/to/pi-jj/skills\"]\n}\n```\n\n## How it works\n\n### Onboarding\n\nOn first prompt in a git repo that isn't yet a jj repo, the extension offers to initialize:\n\n1. `jj git init --colocate` to set up jj alongside git\n2. Checks `user.name` / `user.email` \u2014 if missing, offers to copy from git config (`jj config set --repo`)\n3. Prompts for restore mode preference (`file` or `operation`)\n\nYou can also run `/jj-init` manually. `/jj-deinit` removes jj metadata (`/jj-deinit full` also cleans `refs/jj/*`).\n\n### Checkpoint system\n\n**Capture**: On the first agent turn per prompt, the extension snapshots:\n- `commit_id` (revision) \u2014 the exact file state\n- `change_id` \u2014 stable identity across rewrites\n- `operation_id` (pre-turn) \u2014 jj operation before the agent ran\n- `operation_id` (post-turn) \u2014 jj operation after the agent finished\n\nThese are persisted as `jj-checkpoint` session custom entries and the user's chat entry is labeled `jj:<change-short>` for `/tree` navigation.\n\n**Restore** (via `/fork`, `/tree`, or `/jj-checkpoints`):\n\nTwo modes, configurable via `restoreMode` setting:\n\n| Mode | Command | What it restores | Trade-offs |\n|------|---------|-----------------|------------|\n| `file` (default) | `jj restore --from <revision>` | File contents only | Safe, no side effects on bookmarks or op history |\n| `operation` | `jj op restore <operationId>` + `jj git fetch --all-remotes` | Full repo state (working copy, bookmarks, visible heads) | More complete but rewinds operation history; auto-fetches to resync remotes |\n\nWhen navigating to a **user message** in `/tree`, the pre-turn operation ID is used (state before the agent ran). When navigating to an **agent message**, the post-turn operation ID is used (state after the agent finished).\n\nUndo always uses `jj op restore` back to the pre-restore operation, regardless of mode.\n\n**Commands**:\n- `/jj-checkpoints` \u2014 interactive picker with restore/copy/details actions\n- `/jj-checkpoints plain` \u2014 text list\n\n### Stacked PR flow\n\nThe stacked PR system manages a linear stack of jj changes as GitHub PRs with correct base targeting.\n\n#### jj concepts used\n\n- **Change**: a stable unit of work with a `change_id` that persists across amends/rebases\n- **Commit** (revision): an immutable snapshot; each change can have many commits over time\n- **Bookmark**: jj's equivalent of a git branch \u2014 required for pushing to a remote\n- **Operation**: a point-in-time snapshot of the entire repo state\n\n#### Stack detection\n\nThe extension uses the revset `(ancestors(@) | descendants(@)) & mutable()` with `--reversed` to find all mutable changes in the current stack, ordered bottom-up from trunk. Empty changes with no description (typically the working copy `@`) are filtered out.\n\n#### Flow\n\n**1. Inspect** \u2014 `/jj-stack-status`\n\nShows current revision/change/operation, checkpoint count, latest PR snapshot, and the mutable stack with per-change PR state:\n\n```\nstack:\n1. ksrmwuon rev:abc123 auth refactor (pr:#1 open)\n2. yqosqzzy rev:def456 add login endpoint (pr:#2 open)\n3. mzvwutvl rev:ghi789 add tests (pr:-)\n```\n\n**2. Plan** \u2014 `/jj-pr-plan [--remote origin]`\n\nFor each stack entry, computes:\n- **Bookmark name**: `push-<change-id-short>` (jj's default convention)\n- **Base target**: first change \u2192 repo default branch (e.g. `main`), subsequent changes \u2192 previous change's bookmark\n- Shows the exact commands that will run\n\n**3. Publish** \u2014 `/jj-pr-publish [--dry-run] [--draft] [--remote origin]`\n\nFor each change, bottom-up:\n1. `jj bookmark set push-<short> -r <changeId>` \u2014 attach a named bookmark\n2. `jj git push --bookmark push-<short> --remote origin` \u2014 push to remote\n3. `gh pr create --head push-<short> --base <base>` \u2014 create PR (or `gh pr edit` to update if PR exists and is open)\n\nBase targeting creates the PR dependency chain:\n```\nPR #1 (auth refactor)       base: main\nPR #2 (add login endpoint)  base: push-ksrmwuon  (PR #1's branch)\nPR #3 (add tests)           base: push-yqosqzzy  (PR #2's branch)\n```\n\n`--dry-run` reports the plan without pushing or creating PRs. `--draft` creates draft PRs.\n\n**4. Update after amending**\n\nWhen you amend a change mid-stack, jj automatically rebases all descendants. Just re-run `/jj-pr-publish` \u2014 it sets the same bookmarks on the (now rewritten) commits and pushes the updated state.\n\n**5. Sync** \u2014 `/jj-pr-sync [--remote origin]`\n\nQueries GitHub for current PR state and:\n- Updates session labels with PR numbers and state (`pr:#1 merged`, `pr:#2 open`)\n- **Retargets bases after merges**: if PR #1 merged, PR #2's base is automatically changed from `push-ksrmwuon` to `main` via `gh pr edit --base`\n- Reports retargeted PRs in the output\n\nThe retargeting logic walks backward through the stack: for each open PR, it finds the nearest ancestor that is still open. If all ancestors are merged/closed, the base becomes the default branch.\n\n**6. Close stack (optional after all merges)** \u2014 `/jj-stack-close [--remote origin]`\n\nCloses out a finished stack by:\n- refreshing PR state first and refusing to proceed if PRs are still open (unless `--force`)\n- deleting stack `push-*` bookmarks (unless `--keep-bookmarks`)\n- pushing bookmark deletions to the remote (with fetch + one retry on stale-ref errors)\n- creating a fresh working change from `main@origin` (`--no-new-change` to skip)\n\nUse `--dry-run` first to preview actions.\n\n#### Agent integration\n\nThe flow is accessible to the LLM via two mechanisms:\n\n**Tool**: `jj_stack_pr_flow` \u2014 executes stack commands directly by default (set `queue: true` only when explicit follow-up queuing is desired). Actions: `status`, `checkpoints`, `init`, `plan`, `publish`, `sync`, `close`, `settings`, `settings-reload`. Publish defaults to `--dry-run` unless `dryRun: false` is explicitly passed.\n\n**Skill**: `jj-stacked-pr` (invoke via `/skill:jj-stacked-pr`) \u2014 guides the model through the safe execution path:\n1. Status \u2192 2. Plan \u2192 3. Dry-run publish \u2192 4. User confirms \u2192 5. Real publish \u2192 6. Sync\n\n### Commands reference\n\n| Command | Description |\n|---------|-------------|\n| `/jj-init` | Initialize git repo for jj (`jj git init --colocate`) |\n| `/jj-deinit [full]` | Remove jj metadata (optionally clean `refs/jj/*`) |\n| `/jj-checkpoints [plain]` | Interactive checkpoint picker or plain text list |\n| `/jj-stack-status` | Current revision/change/op + stack + PR state |\n| `/jj-pr-plan [--remote]` | Preview stacked PR publish plan |\n| `/jj-pr-publish [--dry-run] [--draft] [--remote]` | Publish/update stacked PRs |\n| `/jj-pr-sync [--remote]` | Sync PR state from GitHub + retarget merged bases |\n| `/jj-stack-close [--remote] [--dry-run] [--keep-bookmarks] [--no-new-change] [--force]` | Close completed stack and optionally clean push bookmarks |\n| `/jj-settings [tui\\|plain\\|reload]` | Open settings TUI (default), or show plain/reload settings |\n\n## Configuration\n\nAdd optional settings under `piJj` in `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"piJj\": {\n    \"silentCheckpoints\": false,\n    \"maxCheckpoints\": 200,\n    \"checkpointListLimit\": 30,\n    \"promptForInit\": true,\n    \"promptForPublishMode\": true,\n    \"autoSyncOnPublish\": true,\n    \"restoreMode\": \"file\"\n  }\n}\n```\n\n- `silentCheckpoints` (default `false`): hide per-turn checkpoint notifications and show a compact status (`pi-jj: ready`).\n- `maxCheckpoints` (default `200`, clamped `10..5000`): max in-memory/session-rebuilt checkpoints kept for rewind resolution.\n- `checkpointListLimit` (default `30`, clamped `5..200`): number of checkpoints shown in `/jj-checkpoints` UI/plain list.\n- `promptForInit` (default `true`): whether to ask to initialize jj on first submitted prompt in git repos.\n- `promptForPublishMode` (default `true`): for `/jj-pr-publish` without `--dry-run`, show a mode picker (`Dry-run first`, `Publish now`, `Cancel`).\n- `autoSyncOnPublish` (default `true`): refresh PR state from GitHub before publish/dry-run and after real publish.\n- `restoreMode` (default `\"file\"`): checkpoint restore strategy. `\"file\"` uses `jj restore --from` (file contents only). `\"operation\"` uses `jj op restore` (full repo state, with auto `jj git fetch` to resync).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "jj",
+    "jujutsu",
+    "rewind",
+    "checkpoint"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/manojlds/pi-jj#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/manojlds/pi-jj.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-03-01T19:49:19.964Z",
+    "modified": "2026-03-02T15:01:17.527Z",
+    "0.2.0": "2026-03-01T19:49:20.198Z",
+    "0.2.1": "2026-03-01T20:09:43.807Z",
+    "0.3.0": "2026-03-02T15:01:17.226Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 22,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 262
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 37
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 22
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 33
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 23
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 27
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 6
+    }
+  ]
+}

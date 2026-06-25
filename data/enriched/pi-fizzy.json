@@ -1,0 +1,354 @@
+{
+  "name": "pi-fizzy",
+  "latest_version": "0.3.1",
+  "description": "Pi extension for fetching Fizzy.do cards and turning them into build or plan prompts.",
+  "readme": "# pi-fizzy\n\nA pi extension for loading a Fizzy card into the session, turning it into an immediate build prompt, or starting with a plan-first prompt.\n\nPlease note: This is fully vibe coded by pi itself.\n\n## Install\n\n### From npm\n\n```bash\npi install npm:pi-fizzy\n```\n\n### From git\n\n```bash\npi install git:github.com/denniseijpe/pi-fizzy\n```\n\n## Commands\n\n- `/fizzy https://app.fizzy.do/projectid/cards/cardid`\n  - Fetches the card, steps, and recent comments.\n  - Stores it as the active Fizzy card on the session.\n  - Injects the card details into the conversation context without starting work automatically.\n  - Prompts the user with: `Fizzy card loaded. What do you want to do?`\n  - Supports autocomplete: type `/fizzy <query>` and press Tab to search recent assigned cards.\n- `/fizzydo https://app.fizzy.do/projectid/cards/cardid`\n  - Fetches the card, steps, and recent comments.\n  - Moves the card into `Doing` before immediate implementation starts, creating the column if needed.\n  - Immediately sends a build prompt to pi.\n  - Supports autocomplete: type `/fizzydo <query>` and press Tab to search recent assigned cards.\n- `/fizzyplan https://app.fizzy.do/projectid/cards/cardid`\n  - Fetches the same data.\n  - Moves the card into `Doing` before planning starts, creating the column if needed.\n  - Starts with planning instructions and explicitly tells pi not to edit files yet.\n  - Supports autocomplete: type `/fizzyplan <query>` and press Tab to search recent assigned cards.\n- `/fizzycurrent`\n  - Shows the current active Fizzy card stored on the session.\n- `/fizzylist`\n  - Shows a centered modal with the latest 20 Fizzy tasks assigned to the account.\n  - Select an entry with \u2191/\u2193 and press Enter to load it, equivalent to `/fizzy <url>`.\n  - The modal scrolls within the available terminal height instead of overflowing.\n\n## Extra tools\n\n- `fizzy_get_card`\n  - Available to the agent during normal work.\n  - Lets pi refresh the live card context later if needed.\n  - If the session already has a current Fizzy card, the URL can be omitted.\n\n- `fizzy_add_comment`\n  - Posts a comment back to Fizzy.\n  - Uses the current session's active Fizzy card when no URL is provided.\n\n- `fizzy_move_to_column`\n  - Moves a card to a named column such as `Doing`, `Review`, or `QA`.\n  - Creates the target column if it does not exist yet.\n  - Special case: `Maybe` / `Maybe?` uses Fizzy's built-in `Maybe?` stream instead of creating a normal column.\n  - Uses the current session's active Fizzy card when no URL is provided.\n\n- `fizzy_mark_done`\n  - Marks a card done in Fizzy.\n  - Uses the current session's active Fizzy card when no URL is provided.\n\n- `fizzy_assign`\n  - Assigns the current user (pi) to a Fizzy card.\n  - Uses the current session's active Fizzy card when no URL is provided.\n  - Toggles assignment: calling it again on an already-assigned card will unassign.\n\n## Session behavior\n\nWhen you run `/fizzy`, `/fizzydo`, or `/fizzyplan`, the extension stores the current Fizzy card on the pi session.\n\nIf pi is running with a TUI, the extension also shows a small non-blocking overlay in the top-right corner with the current card number and a truncated title.\n\n`/fizzydo` and `/fizzyplan` move the card into a `Doing` column up front. `/fizzy` only loads the card into the session.\n\nIf you want pi to move a card into `Doing` later, ask pi explicitly or use `fizzy_move_to_column`.\n\nThat means later prompts like:\n\n- `write a small comment with a summary and then mark the issue as done`\n\ncan resolve `the issue` against the active Fizzy card for the current session.\n\n## Auth setup\n\nThis extension reads credentials from `~/.pi/agent/auth.json` (or `$PI_CODING_AGENT_DIR/auth.json`).\n\nMerge this entry into the top-level object in that file:\n\n```json\n{\n  \"fizzy\": {\n    \"type\": \"api_key\",\n    \"key\": \"YOUR_FIZZY_PERSONAL_ACCESS_TOKEN\",\n    \"baseUrl\": \"https://app.fizzy.do\"\n  }\n}\n```\n\nNotes:\n- `baseUrl` is optional if you always use `https://app.fizzy.do/...` URLs, but it is useful for self-hosted Fizzy instances.\n- `key` can be:\n  - a literal token,\n  - an environment variable name,\n  - or a shell command prefixed with `!`.\n\nExamples:\n\n```json\n{\n  \"fizzy\": {\n    \"type\": \"api_key\",\n    \"key\": \"FIZZY_API_TOKEN\"\n  }\n}\n```\n\n```json\n{\n  \"fizzy\": {\n    \"type\": \"api_key\",\n    \"key\": \"!op read 'op://Private/Fizzy/token'\"\n  }\n}\n```\n\n## Creating a Fizzy token\n\nFizzy supports personal access tokens.\n\nIn Fizzy:\n1. Open your profile.\n2. Go to the API section.\n3. Open **Personal access tokens**.\n4. Generate a new token.\n5. Give it permissions that cover the actions you want pi to perform.\n6. For `/fizzy`, `/fizzydo`, `/fizzyplan`, and `fizzy_get_card`, read access is enough.\n7. For `fizzy_add_comment`, `fizzy_move_to_column`, `fizzy_mark_done`, and `fizzy_assign`, the token also needs write access.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "fizzy",
+    "fizzy.do"
+  ],
+  "author": {
+    "name": "Dennis Eijpe"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/denniseijpe/pi-fizzy#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/denniseijpe/pi-fizzy.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-21T19:51:34.233Z",
+    "modified": "2026-05-18T17:33:30.870Z",
+    "0.1.0": "2026-04-21T19:51:34.366Z",
+    "0.2.0": "2026-04-22T09:08:13.568Z",
+    "0.2.1": "2026-04-22T12:35:34.067Z",
+    "0.2.2": "2026-04-22T14:28:02.879Z",
+    "0.2.3": "2026-04-23T08:36:20.788Z",
+    "0.3.0": "2026-04-26T19:31:12.292Z",
+    "0.3.1": "2026-05-18T17:33:30.747Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 13,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 81
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 619
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 35
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 37
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 148
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 33
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 28
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 29
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

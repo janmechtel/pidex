@@ -1,0 +1,35 @@
+{
+  "name": "@cmcconomy/pi-qwen-tool-parser",
+  "latest_version": "1.0.0",
+  "description": "A pi-mono extension that parses Qwen XML formatted tool calls and provides a wrapper tool for execution",
+  "readme": "# @cmcconomy/pi-qwen-tool-parser\n\n[![CI/CD Pipeline](https://github.com/cmcconomy/pi-qwen-tool-parser/actions/workflows/ci.yml/badge.svg)](https://github.com/cmcconomy/pi-qwen-tool-parser/actions/workflows/ci.yml)\n[![npm version](https://badge.fury.io/js/@cmcconomy%2Fpi-qwen-tool-parser.svg)](https://www.npmjs.com/package/@cmcconomy/pi-qwen-tool-parser)\n\nA pi-mono extension that provides tools to parse and execute Qwen XML formatted tool calls.\n\n## Features\n\n- **Qwen Tool Parser**: A custom tool (`qwen_tool_parser`) that parses Qwen XML formatted responses\n- **Auto-detection**: Detects Qwen XML patterns in assistant messages during turns\n- **Manual Parsing**: `/parse-qwen` command to parse and execute Qwen tools from recent messages\n- **Clean Output**: Automatically removes Qwen XML blocks from response content\n\n## Installation\n\n### Install globally:\n```bash\npi install npm:@cmcconomy/pi-qwen-tool-parser@1.0.0\n```\n\n### Install in project:\n```bash\npi install -l npm:@cmcconomy/pi-qwen-tool-parser@1.0.0\n```\n\n## Usage\n\n### Method 1: Using the qwen_tool_parser tool (Recommended)\n\nConfigure your system prompt to instruct Qwen models to use the `qwen_tool_parser` tool when they need to execute tools:\n\n**System Prompt Addition:**\n```\nWhen you need to execute a tool, wrap it in XML format and pass it to the \n'qwen_tool_parser' tool. For example:\n\n<LLM response text>\n\ud83d\udd27TOOL_CALL_START_9f8e7d6c5b4a3210<function_name>bash</function_name><parameters>{\"command\": \"ls\"}</parameters>\ud83d\udd1aTOOL_CALL_END_9f8e7d6c5b4a3210\n<more response text>\n\nThen call qwen_tool_parser with the complete response text.\n```\n\n### Method 2: Manual parsing with /parse-qwen\n\nAfter Qwen responds with XML tool calls, use the `/parse-qwen` command to parse and execute them:\n\n```bash\n# After Qwen sends a response with XML tools\n/parse-qwen\n```\n\nThe extension will:\n1. Find the most recent assistant message\n2. Parse any Qwen XML formatted tool calls\n3. Execute each tool using pi's standard tool execution\n4. Display results and show a cleaned version of the response (without XML blocks)\n\n### Method 3: Auto-detection notifications\n\nThe extension automatically detects when assistant messages contain Qwen XML patterns and notifies you:\n\n```\nDetected X Qwen XML tool call(s). Use /parse-qwen to execute them, or configure system prompt to use qwen_tool_parser.\n```\n\n## How It Works\n\n### `qwen_tool_parser` Tool\n\nThis custom tool accepts a complete LLM response text containing Qwen XML formatted tool calls:\n\n**Parameters:**\n- `qwen_response_text`: The full assistant message that may contain Qwen XML blocks\n\n**Example Usage:**\n```typescript\n// When the model responds with XML tools in its message\nawait ctx.tools.execute('qwen_tool_parser', {\n  qwen_response_text: \"Here's what I found:\\n\ud83d\udd27TOOL_CALL_START_9f8e7d6c5b4a3210<function_name>bash</function_name><parameters>{\\\"command\\\": \\\"ls -la\\\"}</parameters>\ud83d\udd1aTOOL_CALL_END_9f8e7d6c5b4a3210\\nLet me know if you need more.\"\n});\n```\n\n**Returns:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Successfully parsed and executed X Qwen tool(s)\",\n  \"parsed_count\": 1,\n  \"tools_executed\": [\"bash: {...}\"],\n  \"cleaned_response\": \"Here's what I found:\\n\\nLet me know if you need more.\"\n}\n```\n\n### `/parse-qwen` Command\n\nA command-line tool that automatically finds and parses the most recent assistant message:\n\n```typescript\npi.registerCommand('parse-qwen', {\n  description: 'Parse and execute Qwen XML tool calls from the last assistant message',\n  handler: async (args, ctx) => {\n    // Finds latest assistant message\n    // Parses Qwen XML tool calls\n    // Executes each tool\n    // Displays results\n  }\n});\n```\n\n### Auto-detection in `turn_end`\n\nThe extension listens to the `turn_end` event and automatically detects Qwen XML patterns:\n\n```typescript\npi.on('turn_end', async (event, ctx) => {\n  for (const msg of event.messages) {\n    if (msg.role === 'assistant') {\n      const parsed = parseQwenXML(msg.content);\n      if (parsed.toolCalls.length > 0) {\n        ctx.ui.notify(`Detected ${parsed.toolCalls.length} Qwen XML tool call(s)...`, 'info');\n      }\n    }\n  }\n});\n```\n\n## Example Workflow\n\n1. **Install the extension:**\n   ```bash\n   pi install npm:@cmcconomy/pi-qwen-tool-parser@1.0.0\n   ```\n\n2. **Configure your system prompt** to instruct Qwen to use XML format (optional)\n\n3. **Ask a question** that requires tool execution:\n   ```\n   What files are in the current directory?\n   ```\n\n4. **Qwen responds with XML:**\n   ```\n   Let me check the files for you:\n   \n   \ud83d\udd27TOOL_CALL_START_9f8e7d6c5b4a3210<function_name>bash</function_name><parameters>{\"command\": \"ls\"}</parameters>\ud83d\udd1aTOOL_CALL_END_9f8e7d6c5b4a3210\n   \n   I'll execute that command now.\n   ```\n\n5. **Execute the tools:**\n   - Use `/parse-qwen` to parse and execute, OR\n   - Call `qwen_tool_parser` tool with the response text\n\n## Qwen XML Format\n\nThe extension recognizes this format:\n\n```xml\n\ud83d\udd27TOOL_CALL_START_<unique_id><function_name>tool_name</function_name><parameters>{\"key\": \"value\"}</parameters>\ud83d\udd1aTOOL_CALL_END_<same_unique_id>\n```\n\nWhere:\n- `<unique_id>` is a hex string (e.g., `9f8e7d6c5b4a3210`)\n- `<function_name>` is the tool name to execute\n- `<parameters>` contains JSON with the tool arguments\n\n## Development\n\n### Prerequisites\n\n- Node.js 20+ \n- npm 9+\n\n### Setup\n\n```bash\nnpm install\n```\n\n### Build:\n```bash\nnpm run build\n```\n\n### Lint:\n```bash\nnpm run lint\n```\n\n### Type Check:\n```bash\nnpm run typecheck\n```\n\n### Run Tests:\n```bash\nnpm test\n```\n\n### Local testing:\n```bash\npi install ./path/to/package\n```\n\n## CI/CD\n\nThis project uses GitHub Actions for automated testing and publishing. See the `.github/workflows/ci.yml` file for details.\n\nRunning locally (equivalent to CI):\n\n```bash\nnpm run prepublishOnly\n# or individually:\nnpm run lint && npm run typecheck && npm run build && npm test\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "qwen",
+    "tool-parser",
+    "xml",
+    "extension"
+  ],
+  "author": {
+    "name": "cmcconomy"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/cmcconomy/pi-qwen-tool-parser#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cmcconomy/pi-qwen-tool-parser.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-04-01T21:40:20.300Z",
+    "1.0.0": "2026-04-01T21:40:20.507Z",
+    "modified": "2026-04-01T21:40:20.670Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 11,
+  "download_trend": []
+}

@@ -1,0 +1,34 @@
+{
+  "name": "@adamjen/pi-compact-fast",
+  "latest_version": "2.0.0",
+  "description": "/compact-fast command for Pi \u2014 compacts sessions with a fast local model instead of your main conversation model.",
+  "readme": "# @adamjen/pi-compact-fast\n\n**`/compact-fast` command for Pi** \u2014 compact your session using a fast local model instead of your main conversation model.\n\n## What it does\n\nPi normally uses your current conversation model for compaction (summarizing the session). This extension adds `/compact-fast` which:\n\n1. Looks up `qwen-35b-moe` from your configured models (`models.json`)\n2. Uses that model directly via a separate API call to generate the summary\n3. Returns the structured summary to Pi's built-in compaction system\n\nThis saves tokens on expensive models and speeds up compaction when using a smaller/faster local model.\n\n## Install\n\n```bash\npi install npm:@adamjen/pi-compact-fast@latest\n```\n\nOr try without installing:\n\n```bash\npi -e npm:@adamjen/pi-compact-fast\n```\n\n## Usage\n\n```\n/compact-fast\n```\n\nThat's it \u2014 Pi will compact the session using `qwen-35b-moe` instead of your current model.\n\n## Configure a different model\n\nEdit `extensions/index.ts` and change line 24:\n\n```ts\nconst COMPACT_MODEL_ID = \"your-model-id\";\n```\n\nThe model must be defined in your `~/.pi/agent/models.json` or provider config.\n\n## How it works\n\n1. Intercepts `session_before_compact` event\n2. Makes a direct API call to the target model via `completeSimple()` from `@mariozechner/pi-ai`\n3. Returns `{ compaction: { summary, firstKeptEntryId, tokensBefore, details } }` which Pi uses for compaction\n\n### Prompt structure (mirrors pi's native compaction)\n\n- **System prompt** tells model to ONLY summarize, not continue conversation\n- **Conversation comes BEFORE instructions** \u2014 the model follows the last pattern\n- **Previous summary** in `<previous-summary>` tags between conversation and instructions (for incremental updates)\n- **Split turns** generate two summaries merged with separator (mirrors pi's native behavior)\n- **File operations** tracked in both summary text AND `details` object\n\n## Changelog\n\n### 2.0.0 \u2014 Major rewrite\n\n- \u2705 Guard against empty content \u2014 aborts cleanly instead of writing garbage \"empty conversation\" summary\n- \u2705 File operations tracking \u2014 `<read-files>` and `<modified-files>` tags appended to summary, plus `details` object for pi's internal tracking\n- \u2705 Split turn handling \u2014 parallel dual summaries with proper merge separator when a single turn exceeds `keepRecentTokens`\n- \u2705 Correct token budgets \u2014 dynamic from `settings.reserveTokens * 0.8` / `* 0.5` instead of hardcoded 8192\n- \u2705 Added `TURN_PREFIX_SUMMARIZATION_PROMPT` for split-turn prefix summaries (different format: \"Original Request\", \"Early Progress\")\n- \u2705 Switched from `complete()` to `completeSimple()` \u2014 matches pi's internal API usage\n- \u2705 Added `stopReason === \"error\"` check \u2014 handles API failures gracefully instead of producing empty strings\n- \u2705 Removed debug logging (`console.error`)\n- \u26a0\ufe0f Default model changed from `qwen3.6-35b` to `qwen-35b-moe` (configure your own in models.json)\n\n### 1.x \u2014 Initial release\n\n- Basic compaction using a fast local model via direct API call\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "adamjen"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/adamjen/pi-compact-fast#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adamjen/pi-compact-fast.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-07T08:14:09.621Z",
+    "modified": "2026-05-07T10:32:09.032Z",
+    "1.0.0": "2026-05-07T08:14:09.825Z",
+    "1.0.1": "2026-05-07T08:15:55.197Z",
+    "1.0.2": "2026-05-07T08:17:31.261Z",
+    "2.0.0": "2026-05-07T10:32:08.906Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 11,
+  "download_trend": []
+}

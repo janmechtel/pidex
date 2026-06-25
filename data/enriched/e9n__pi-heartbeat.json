@@ -1,0 +1,37 @@
+{
+  "name": "@e9n/pi-heartbeat",
+  "latest_version": "0.1.1",
+  "description": "Periodic health check extension for pi \u2014 runs a heartbeat prompt as an isolated subprocess",
+  "readme": "# @e9n/pi-heartbeat\n\nPeriodic health check extension for [pi](https://github.com/mariozechner/pi-mono). Runs a configurable prompt as an isolated subprocess on an interval and alerts via pi-channels when something needs attention.\n\n## Features\n\n- Spawns a `pi --no-session` subprocess to run health checks in isolation\n- Reads `HEARTBEAT.md` from cwd as a per-project checklist; falls back to a generic check if missing\n- Suppresses `HEARTBEAT_OK` responses; escalates anything else as an alert via pi-channels\n- Delivers alerts via the `channel:send` event (integrates with **pi-channels**)\n- Optional persistent run history via **pi-kysely**\n- Web dashboard at `/heartbeat` via **pi-webserver**\n- Disabled by default \u2014 enable with `--heartbeat` flag, `/heartbeat on`, or `autostart: true`\n\n## Setup / Settings\n\nAdd to `~/.pi/agent/settings.json` (global) or `.pi/settings.json` (project):\n\n```json\n{\n  \"pi-heartbeat\": {\n    \"autostart\": false,\n    \"intervalMinutes\": 15,\n    \"activeHours\": { \"start\": \"08:00\", \"end\": \"22:00\" },\n    \"route\": \"ops\",\n    \"showOk\": false,\n    \"prompt\": null,\n    \"webui\": false,\n    \"useKysely\": false,\n    \"extensions\": null\n  }\n}\n```\n\n| Key | Default | Description |\n|-----|---------|-------------|\n| `autostart` | `false` | Start automatically on session start. |\n| `intervalMinutes` | `15` | Minutes between checks. |\n| `activeHours` | `{\"start\":\"08:00\",\"end\":\"22:00\"}` | Only run checks inside this window. `null` for 24/7. |\n| `route` | `\"ops\"` | pi-channels route for alert delivery. |\n| `showOk` | `false` | Also send a notification on `HEARTBEAT_OK` (not just alerts). |\n| `prompt` | `null` | Custom prompt override \u2014 bypasses `HEARTBEAT.md`. |\n| `webui` | `false` | Mount web dashboard on pi-webserver at `/heartbeat`. |\n| `useKysely` | `false` | Persist run history via pi-kysely instead of in-memory. |\n| `extensions` | `null` | Extensions to load in the subprocess. `null` = none. |\n\n### HEARTBEAT.md\n\nPlace a `HEARTBEAT.md` in your project root with a checklist of things to verify:\n\n```markdown\n# Heartbeat Checklist\n\n- Check that the API server responds on port 3000\n- Verify database connectivity\n- Confirm disk usage is below 90%\n```\n\nIf the file is missing or contains only headers/blank lines, checks are skipped.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/heartbeat on` | Start periodic checks |\n| `/heartbeat off` | Stop checks |\n| `/heartbeat status` | Show interval, run count, OK/alert totals, last result |\n| `/heartbeat run` | Run a check immediately |\n\nPass `--heartbeat` at startup to enable automatically: `pi --heartbeat`.\n\n## Web UI\n\nEnable with `\"webui\": true`. Requires **pi-webserver** (`\"pi-webserver\": { \"autostart\": true }`).\n\nDashboard at `http://localhost:4100/heartbeat` \u2014 live status, stats (runs / OK / alerts / rate), last check result, expandable history (up to 100 entries), and start / stop / run controls.\n\nREST API at `/api/heartbeat`:\n\n| Method | Body | Description |\n|--------|------|-------------|\n| `GET` | \u2014 | Status, stats, and history |\n| `POST` | `{ \"action\": \"start\" }` | Start heartbeat |\n| `POST` | `{ \"action\": \"stop\" }` | Stop heartbeat |\n| `POST` | `{ \"action\": \"run\" }` | Run a check immediately |\n\n## Events\n\n| Event | Payload | Description |\n|-------|---------|-------------|\n| `heartbeat:check` | `{ time }` | Emitted when a check starts |\n| `heartbeat:result` | `{ ok, response, durationMs, time }` | Emitted when a check completes |\n| `channel:send` | `{ route, text, source: \"pi-heartbeat\" }` | Alert dispatched to pi-channels |\n\n## Install\n\n```bash\npi install npm:@e9n/pi-heartbeat\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "Espen Nilsen",
+    "email": "hi@e9n.dev"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/espennilsen/pi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/espennilsen/pi.git",
+    "directory": "extensions/pi-heartbeat"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-02-17T09:11:27.091Z",
+    "modified": "2026-04-26T19:52:38.372Z",
+    "0.1.0": "2026-02-17T09:11:27.411Z",
+    "0.1.1": "2026-04-26T19:52:38.253Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 20,
+  "download_trend": []
+}

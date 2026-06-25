@@ -1,0 +1,31 @@
+{
+  "name": "pi-path-guard",
+  "latest_version": "0.1.1",
+  "description": "Pi extension package that normalizes path-like tool arguments and enriches filesystem/edit failures.",
+  "readme": "# pi-path-guard\n\n`pi-path-guard` is a pi package that reduces common tool-call failures by normalizing path-like arguments, running filesystem preflight checks, and appending actionable diagnostics to failed tool results.\n\n## Install\n\n```bash\npi install npm:pi-path-guard\n# or\npi install git:github.com/org/pi-path-guard@v1\n```\n\nThe package is discovered through `package.json`:\n\n```json\n{\n  \"keywords\": [\"pi-package\"],\n  \"pi\": { \"extensions\": [\"./extensions\"] }\n}\n```\n\n## What it does\n\n- Normalizes path-like arguments before `tool_call` execution:\n  - `~/Work/x` \u2192 `/Users/conte/Work/x`\n  - `~` \u2192 `/Users/conte`\n  - `@file.ts` \u2192 `file.ts`\n  - `file:///tmp/x` \u2192 `/tmp/x`\n  - Unicode spaces \u2192 normal spaces\n- Blocks calls that are known to fail in `strict` mode:\n  - `read(path=\".\")` before `EISDIR`\n  - missing files for `read`, `edit`, `ctx_execute_file`\n  - missing parent directories for `write`\n  - invalid GitNexus `repo: \"~\"`\n- Enriches failed `tool_result` messages with:\n  - closest matches for edit mismatches\n  - line numbers for non-unique edit blocks\n  - stale-read and formatter hints\n  - generic path diagnostics for `ENOENT`, `Path not found`, `EISDIR`\n  - `ctx_execute` command-not-found hints\n- Handles nested calls in `multi_tool_use.parallel`.\n- Parses `mcp.args` JSON strings, normalizes path-like fields inside, then serializes back to JSON.\n\n## Before / after\n\n### Directory read\n\nBefore:\n\n```text\nread EISDIR\n```\n\nAfter:\n\n```text\nBlocked: read expects a file, but got a directory:\n/Users/conte/Work/project\n\nUse ls/find instead:\n- ls(path=\"/Users/conte/Work/project\")\n- find(path=\"/Users/conte/Work/project\", pattern=\"...\")\n```\n\n### Missing path\n\n```text\nBlocked before tool execution: path does not exist.\n\nRaw: ~/Work/foo\nNormalized: /Users/conte/Work/foo\nParent exists: /Users/conte/Work\n\nSimilar paths:\n- /Users/conte/Work/foo-service\n- /Users/conte/Work/foobar\n```\n\n### Edit mismatch\n\n```text\nEdit diagnostic: edits[0].oldText was not found.\n\nClosest matches:\n1. lines 118-126, similarity 0.82\n   read(path=\"package/src/orchestrator-gate.ts\", offset=112, limit=22)\n\nLikely causes:\n- file changed since last read\n- formatter changed whitespace\n- oldText copied from stale content\n```\n\n## Configuration\n\nConfiguration is read from the first available JSON source:\n\n- `.pi/path-guard.json`\n- `path-guard.config.json`\n- `.path-guard.json`\n- `package.json` `pathGuard` key\n- `PATH_GUARD_CONFIG_JSON` environment variable\n\nEnvironment overrides:\n\n- `PATH_GUARD_MODE=strict|warn|off`\n- `PATH_GUARD_HOME_DIR=/Users/conte`\n- `PATH_GUARD_TELEMETRY=1|0`\n\nDefault config:\n\n```json\n{\n  \"pathGuard\": {\n    \"mode\": \"strict\",\n    \"homeDir\": \"/Users/conte\",\n    \"normalize\": {\n      \"tilde\": true,\n      \"atPrefix\": true,\n      \"fileUrl\": true,\n      \"unicodeSpaces\": true\n    },\n    \"preflight\": {\n      \"enabled\": true,\n      \"blockReadDirectories\": true,\n      \"blockMissingReadPaths\": true,\n      \"blockMissingEditPaths\": true,\n      \"blockMissingWriteParents\": true\n    },\n    \"editDiagnostics\": {\n      \"enabled\": true,\n      \"maxClosestMatches\": 5,\n      \"contextLines\": 6\n    },\n    \"telemetry\": {\n      \"enabled\": true\n    },\n    \"overrideBuiltinTools\": false\n  }\n}\n```\n\nModes:\n\n- `strict` \u2014 normalize and block bad calls.\n- `warn` \u2014 normalize and show warnings instead of most blocks.\n- `off` \u2014 collect no interventions; hooks return without mutation.\n\n## Commands\n\n- `/path-guard-stats` \u2014 shows session counters.\n- `/path-guard-config` \u2014 shows effective config.\n- `/path-guard-reset` \u2014 resets session-local stats, read tracking, and formatter tracking.\n\n## Safety\n\n`pi-path-guard` does not override built-in tools by default. It uses `tool_call` and `tool_result` middleware so built-in rendering and result shapes remain intact.\n\nIt intentionally does **not** normalize dangerous free-text fields such as `oldText`, `newText`, `command`, `code`, `query`, `prompt`, `content`, or `message`.\n\n## Tests\n\n```bash\nnpm test\nnpm run pack:dry-run\n```\n\n## Publishing\n\nBefore publishing, verify package contents:\n\n```bash\nnpm test\nnpm run pack:dry-run\n```\n\nThen publish from the package root:\n\n```bash\nnpm publish\n```\n\nThe published tarball is intentionally limited by the `files` field to runtime extension sources, `README.md`, and `LICENSE`.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "path-normalization",
+    "tool-call",
+    "diagnostics"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-04T11:52:58.927Z",
+    "modified": "2026-06-04T11:58:26.997Z",
+    "0.1.0": "2026-06-04T11:52:59.217Z",
+    "0.1.1": "2026-06-04T11:58:26.901Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

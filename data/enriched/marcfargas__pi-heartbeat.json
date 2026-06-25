@@ -1,0 +1,41 @@
+{
+  "name": "@marcfargas/pi-heartbeat",
+  "latest_version": "0.0.1",
+  "description": "Non-blocking timers and heartbeats for pi agents \u2014 stop using sleep",
+  "readme": "# @marcfargas/pi-heartbeat\n\nNon-blocking timers and heartbeats for [pi](https://github.com/badlogic/pi-mono) agents.\n\n`pi-heartbeat` replaces blocking `sleep` waits with timers that return immediately, so the agent can pause work without freezing the session.\n\n## What is pi?\n\n[Pi](https://github.com/badlogic/pi-mono) is an AI coding agent CLI (`@mariozechner/pi-coding-agent`).\n\nYou run AI models in an interactive terminal, and the agent executes tools/commands while you chat with it. In that environment, `bash` calls like `sleep 60` block the active turn and prevent interaction until the command finishes.\n\nThis extension gives the agent non-blocking waiting primitives (`timer`, `heartbeat`) so it can schedule follow-ups and return to idle immediately.\n\n## Why this extension?\n\nWithout this extension, waits are usually implemented with shell `sleep`, polling loops, or long-running turns. That causes:\n\n- blocked chat while waiting\n- poor UX for long builds/deploys\n- brittle polling logic in bash\n\nWith `pi-heartbeat`:\n\n- waits are non-blocking\n- timers can be canceled\n- follow-up messages include explicit context about what to check next\n\n## Install\n\n```bash\npi install npm:@marcfargas/pi-heartbeat\n```\n\nOr add to your `settings.json`:\n\n```json\n{\n  \"packages\": [\"npm:@marcfargas/pi-heartbeat\"]\n}\n```\n\n## Prerequisites\n\n- [pi](https://github.com/badlogic/pi-mono) installed and working\n- A pi session where the agent can call tools\n- Extension installed via `pi install` or `settings.json`\n\n## Tools\n\n### `timer`\n\nOne-shot wake-up after `N` seconds.\n\n```text\ntimer(seconds: 60, message: \"Check if build #42 finished \u2014 run gh run view 42\")\ntimer(seconds: 120, message: \"Retry deploy check\", id: \"deploy-check-2\")\n```\n\n- returns immediately (non-blocking)\n- wakes the agent once when the timer expires\n- supports multiple simultaneous timers\n- optional `id` for named cancellation\n\n### `heartbeat`\n\nPeriodic wake-up every `N` seconds until stopped.\n\n```text\nheartbeat(action: \"start\", interval_seconds: 30, message: \"Check deploy status\")\nheartbeat(action: \"status\")\nheartbeat(action: \"stop\")\n```\n\n- wakes the agent repeatedly with the provided message\n- only one heartbeat can be active at a time\n- starting a new heartbeat replaces the previous one\n\n### `/cancel-timer`\n\nManual timer/heartbeat control from chat.\n\n```text\n/cancel-timer            # list active timers\n/cancel-timer <id>       # cancel specific timer\n/cancel-timer heartbeat  # stop heartbeat\n/cancel-timer all        # cancel all timers + heartbeat\n```\n\nUse this when you need immediate control without waiting for the next trigger.\n\n## When to Use\n\n| Scenario | Before (blocks) | After (non-blocking) |\n|----------|------------------|----------------------|\n| Wait for build | `sleep 60 && gh run view 42` | `timer(60, 'Check build #42')` |\n| Monitor deploy | `while true; do sleep 30; check; done` | `heartbeat(start, 30, 'Check deploy')` |\n| Rate-limited API | `sleep 10` between calls | `timer(10, 'Resume API calls')` |\n\n## How It Works\n\n```text\nUser: \"Start the build and let me know when it's done\"\n\nAgent: calls timer(seconds: 60, message: \"Check build status\")\n       -> tool returns immediately\n       -> agent tells user \"I'll check in 60s\"\n       -> session stays interactive\n\n[60 seconds later]\n\nTimer fires -> pi triggers a new agent turn\n-> agent wakes with the timer message in context\n-> agent runs the follow-up check\n-> if needed, schedules another timer/heartbeat\n```\n\n## vs. sleep\n\n|  | `sleep 60` | `timer(60)` |\n|---|---|---|\n| Chat blocked? | \u2705 Yes | \u274c No |\n| User can interact? | \u274c No | \u2705 Yes |\n| Cancellable? | Kill process | `/cancel-timer` |\n| Multiple waits? | Sequential | Concurrent |\n| Wake-up context? | Shell state only | Explicit message/context |\n\n## Limits\n\n- `timer`\n  - range: **1\u20133600 seconds**\n  - supports multiple simultaneous timers\n  - optional named `id` for cancellation\n- `heartbeat`\n  - interval: **10\u20133600 seconds**\n  - only one active heartbeat at a time\n\n## Sleep Interceptor\n\nThis package also intercepts `sleep` in bash and blocks it only when `sleep` is the **only or last command** in a call.\n\n- `sleep 60` \u2192 **blocked** (only command)\n- `npm run build && sleep 60` \u2192 **blocked** (`sleep` is last)\n- `sleep 5 && npm start` \u2192 **allowed** (`sleep` is a startup delay before real work)\n\nDisable interception with:\n\n```bash\nPI_SLEEP_INTERCEPTOR=0\n```\n\n## Best Practices\n\n- Put actionable context in timer messages (what to check, what command to run)\n- Choose reasonable intervals (don\u2019t poll every 10s for long operations)\n- Stop heartbeats when done (they continue until explicitly stopped)\n- Use chained timers for progressive backoff: `30s -> 60s -> 120s`\n\n## Development\n\n```bash\nnpm test           # vitest run\nnpm run typecheck  # tsc --noEmit\nnpm run lint       # eslint\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "agent",
+    "timer",
+    "heartbeat",
+    "cron",
+    "non-blocking",
+    "polling"
+  ],
+  "author": {
+    "name": "Marc Fargas"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/marcfargas/pi-heartbeat#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marcfargas/pi-heartbeat.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-02-21T11:28:11.075Z",
+    "0.0.1": "2026-02-21T11:28:11.314Z",
+    "modified": "2026-02-21T11:28:11.851Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 7,
+  "download_trend": []
+}

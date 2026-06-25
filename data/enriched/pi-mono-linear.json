@@ -1,0 +1,37 @@
+{
+  "name": "pi-mono-linear",
+  "latest_version": "0.2.4",
+  "description": "Pi extension and skill for Linear GraphQL tools",
+  "readme": "# pi-mono-linear\n\nA pi extension and skill package that exposes native Linear GraphQL tools for issue, project, team, user, comment, file upload, cycle, label, workflow-state, and document workflows.\n\n## Tools\n\n### Workspace and users\n\n- `linear_whoami`\n- `linear_workspace_metadata`\n- `linear_list_teams`\n- `linear_get_team`\n- `linear_list_users`\n- `linear_get_user`\n\n### Issues\n\n- `linear_list_issues`\n- `linear_get_issue`\n- `linear_search_issues`\n- `linear_list_my_issues`\n- `linear_create_issue`\n- `linear_update_issue`\n\n### Metadata and related records\n\n- `linear_list_projects`\n- `linear_get_project`\n- `linear_list_issue_statuses`\n- `linear_get_issue_status`\n- `linear_list_labels`\n- `linear_list_cycles`\n- `linear_list_documents`\n- `linear_get_document`\n\n### Comments\n\n- `linear_list_comments`\n- `linear_create_comment`\n- `linear_configure_auth`\n\n### Files\n\n- `linear_upload_file`\n- `linear_upload_file_to_issue_comment`\n\nThe package also bundles the `linear` skill under `skills/linear/SKILL.md`.\n\n## Authentication\n\nThe extension looks for a Linear API key in this order:\n\n1. in-memory key override created by `/linear-auth --force` or `linear_configure_auth`\n2. `LINEAR_API_KEY` environment variable\n3. `~/.pi/agent/auth.json` at `.linear.key`\n\nIf no key is found, or if Linear rejects the key as invalid/expired, the native tools can prompt you with a masked local dialog and store the replacement key without returning it to the model.\n\nDo **not** paste API keys into an LLM chat.\n\n### Recommended: native auth command\n\nRun this in pi:\n\n```text\n/linear-auth --force\n```\n\nThe command shows the Linear API-key URL and required permissions, prompts for the key with masked input, and writes it to `~/.pi/agent/auth.json` at `.linear.key`.\n\nThe same flow is available to the agent through the `linear_configure_auth` tool. That tool returns only metadata such as `stored: true`; it never returns the key.\n\nIf a normal `linear_*` request fails because the key is missing, invalid, or expired, the extension retries once after prompting you for a fresh key.\n\n### Option A: environment variable\n\nFor the current shell session:\n\n```bash\nexport LINEAR_API_KEY=\"lin_api_xxx\"\n```\n\nTo persist it, add that export to your shell profile (`~/.zshrc`, `~/.bashrc`, etc.) or your preferred secrets manager.\n\n### Option B: pi auth file\n\nCreate or update `~/.pi/agent/auth.json`:\n\n```json\n{\n  \"linear\": {\n    \"key\": \"lin_api_xxx\"\n  }\n}\n```\n\nRecommended file permissions:\n\n```bash\nmkdir -p ~/.pi/agent\nchmod 700 ~/.pi/agent\nchmod 600 ~/.pi/agent/auth.json\n```\n\nIf the file already contains other credentials, merge the `linear.key` entry instead of overwriting the file.\n\n## Creating a Linear API key\n\n1. Open Linear.\n2. Go to **Settings \u2192 Account \u2192 Security & Access**.\n3. Under **Personal API keys**, click **Create key**.\n4. Name it something recognizable, for example `pi-agent`.\n5. Choose the minimum access level needed for your workflow.\n6. If your workspace supports team restrictions, restrict the key to only the teams pi needs.\n7. Copy the key once and store it via `LINEAR_API_KEY` or `~/.pi/agent/auth.json`.\n\n## Required scopes / permissions\n\nUse the least privilege that supports the tools you need:\n\n- **Read** is enough for read-only tools such as `linear_workspace_metadata`, `linear_search_issues`, `linear_get_issue`, list tools, and document/comment reads.\n- **Write** is required for mutation tools: `linear_create_issue`, `linear_update_issue`, `linear_create_comment`, `linear_upload_file`, and `linear_upload_file_to_issue_comment`.\n- **Admin** is not required for this extension's tools.\n\nIf you restrict the key to specific teams, the key must include the teams/projects/issues you want to query or mutate.\n\nLinear API keys are sent in the `Authorization` header as the raw key value; do not prefix them with `Bearer`.\n\n## Usage tips\n\n- Use `linear_workspace_metadata` first when team/project/state/label/user IDs are unknown.\n- `linear_create_issue` accepts either a team UUID or a team key; keys are resolved to UUIDs before the Linear mutation.\n- Use `linear_search_issues` for keyword lookup.\n- Use `linear_get_issue` before updating an issue or creating a comment.\n- `linear_get_issue` automatically parses Markdown images embedded in the issue description. When the active model supports image input, private `uploads.linear.app` images are downloaded in memory with Linear auth and attached to the tool result; images are not written to disk.\n- If the active model does not support image input, `linear_get_issue` does not download images and returns a clear skipped-images note plus image metadata.\n- Use `linear_list_issues` for filtered issue lists by team, assignee, status, and limit.\n- Use `linear_upload_file` to upload a local image, video, or generic file and return a Linear asset URL.\n- Use `linear_upload_file_to_issue_comment` after `linear_get_issue` to upload a local file and post a Markdown comment. Images are rendered with image Markdown; other files use links.\n- File upload tool results return sanitized metadata and the stable Linear asset URL. They do not return local file bytes, signed upload URLs, or upload headers.\n\n## Issue description images\n\nLinear issue screenshots embedded in descriptions are stored as Markdown image links, for example:\n\n```md\n![Screenshot](https://uploads.linear.app/...)\n```\n\nThese are part of the issue description Markdown, not GraphQL attachment objects. `linear_get_issue` reads them automatically when possible:\n\n- Vision-capable model: images are streamed into memory, base64-encoded, and returned as native image blocks alongside the Markdown description.\n- Text-only model: image downloads are skipped to avoid unnecessary network and payload work; the response includes a note explaining that a vision-capable model is required.\n- No files are saved locally by default.\n- The default safety limits are 10 description images and 10 MiB per image.\n\n## Troubleshooting\n\n### Missing auth key\n\nSet `LINEAR_API_KEY` or add `.linear.key` to `~/.pi/agent/auth.json`.\n\n### Permission errors\n\nConfirm the key has the right access level:\n\n- Read-only workflows need **Read**.\n- Create/update/comment workflows need **Write**.\n- Team-restricted keys must include the relevant team.\n\n### Custom Linear endpoint\n\nBy default, the extension uses `https://api.linear.app/graphql`. Override it with:\n\n```bash\nexport LINEAR_GRAPHQL_URL=\"https://api.linear.app/graphql\"\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-skill",
+    "linear"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-06T16:22:20.715Z",
+    "modified": "2026-05-21T18:48:29.664Z",
+    "0.1.1": "2026-05-06T16:22:20.963Z",
+    "0.1.2": "2026-05-06T16:43:39.943Z",
+    "0.2.1": "2026-05-08T17:03:24.424Z",
+    "0.2.2": "2026-05-08T22:43:24.045Z",
+    "0.2.3": "2026-05-11T18:15:41.569Z",
+    "0.2.4": "2026-05-21T18:48:29.553Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 31,
+  "download_trend": []
+}

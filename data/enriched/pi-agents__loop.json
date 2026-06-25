@@ -1,0 +1,47 @@
+{
+  "name": "@pi-agents/loop",
+  "latest_version": "0.3.1",
+  "description": "Recurring prompt execution and cron scheduling for pi-agent \u2014 /loop, cron_create, cron_delete, cron_list",
+  "readme": "# @pi-agents/loop\n\nRecurring prompt scheduling and cron job management for [pi-coding-agent](https://github.com/badlogic/pi-mono). Ported from Claude Code's `/loop` system.\n\n## Features\n\n- **`/loop` command** \u2014 Fixed interval (`/loop 5m check the deploy`) or dynamic self-pacing (`/loop monitor the build`)\n- **Cron tools** \u2014 LLM-callable `cron_create`, `cron_delete`, `cron_list` for programmatic scheduling\n- **ScheduleWakeup** \u2014 `schedule_wakeup` tool for model-driven dynamic pacing (60-3600s delays)\n- **Idle gating** \u2014 Prompts only fire when the agent is idle, never interrupting in-progress work\n- **Durable tasks** \u2014 Optionally persist schedules across sessions via `.pi-loop.json`\n- **Missed task recovery** \u2014 Durable one-shots missed while offline are detected and fired on restart\n- **Session resume** \u2014 Session-only tasks survive conversation compaction\n- **Anti-thundering-herd** \u2014 Deterministic jitter (50% of interval, 30-min cap) prevents API load spikes\n- **Auto-expiry** \u2014 Recurring tasks expire after 7 days by default\n- **Config files** \u2014 Per-project `.pi-loop.config.json` overrides\n- **Debug mode** \u2014 Set `PI_LOOP_DEBUG=1` for verbose logging\n\n## Install\n\n```bash\npi install npm:@pi-agents/loop@latest\n```\n\nOr add to your pi-agent settings (`~/.pi/agent/settings.json`):\n\n```json\n{\n  \"packages\": [\"npm:@pi-agents/loop\"]\n}\n```\n\n## Usage\n\n### Slash Commands\n\n| Command | Description |\n|---|---|\n| `/loop [interval] <prompt>` | Start a recurring loop (default: dynamic pacing) |\n| `/loop-list` | List all active loops |\n| `/loop-kill <id>` | Cancel a loop by ID |\n\n**Fixed interval:**\n```\n/loop 5m check the deploy\n/loop check tests every 15m\n```\n\n**Dynamic pacing (no interval):**\n```\n/loop monitor the build\n```\nThe agent executes the prompt immediately, then uses `schedule_wakeup` to self-pace subsequent iterations.\n\n### LLM Tools\n\nThe extension registers four tools the LLM can call directly:\n\n| Tool | Description |\n|---|---|\n| `cron_create` | Schedule a prompt on a 5-field cron expression |\n| `cron_delete` | Cancel a scheduled task by ID |\n| `cron_list` | List all active scheduled tasks |\n| `schedule_wakeup` | Arm a single-shot timer for dynamic self-pacing |\n\n**cron_create parameters:**\n\n| Parameter | Type | Default | Description |\n|---|---|---|---|\n| `cron` | string | required | 5-field cron expression in local time |\n| `prompt` | string | required | Prompt to enqueue at fire time |\n| `recurring` | boolean | true | true = recurring, false = one-shot |\n| `durable` | boolean | false | true = persist across sessions |\n| `label` | string | optional | Human-readable label |\n\n**schedule_wakeup parameters:**\n\n| Parameter | Type | Description |\n|---|---|---|\n| `delaySeconds` | number | Seconds until wake-up (clamped to 60-3600) |\n| `reason` | string | Why this delay was chosen |\n| `prompt` | string | Prompt to fire on wake-up |\n\n### Cron Format\n\nStandard 5-field cron in local time: `minute hour day-of-month month day-of-week`\n\n| Pattern | Meaning |\n|---|---|\n| `*/5 * * * *` | Every 5 minutes |\n| `0 */2 * * *` | Every 2 hours |\n| `30 14 * * *` | Daily at 2:30 PM |\n| `0 9 * * 1-5` | Weekdays at 9 AM |\n\n### Durable vs Session Tasks\n\n- **Session tasks** (default) \u2014 Live only for the current session. Survive compaction. Lost when the agent exits.\n- **Durable tasks** (`durable: true`) \u2014 Persisted to `.pi-loop.json`. Restored on next session start. Missed one-shots are recovered and fired.\n\n### Multi-Instance Safety\n\nWhen multiple pi-agent sessions run in the same directory, a file-based lock (`.pi-loop.json.lock`) ensures only one instance processes durable tasks. Uses PID-based liveness checking to recover from crashed sessions.\n\n## Configuration\n\nCreate `.pi-loop.config.json` in your project root to override defaults:\n\n```json\n{\n  \"maxJobs\": 50,\n  \"recurringMaxAgeMs\": 604800000,\n  \"durableFilePath\": \".pi-loop.json\"\n}\n```\n\n| Setting | Default | Description |\n|---|---|---|\n| `maxJobs` | 50 | Maximum concurrent scheduled tasks |\n| `recurringMaxAgeMs` | 604800000 (7d) | Auto-expiry for recurring tasks |\n| `recurringJitterFrac` | 0.5 | Jitter as fraction of cron gap (50%) |\n| `recurringJitterCapMs` | 1800000 (30m) | Maximum jitter delay |\n| `checkIntervalMs` | 1000 | Scheduler tick interval |\n| `durableFilePath` | `.pi-loop.json` | Durable task file path |\n\n## Development\n\n```bash\nnpm run build       # Compile TypeScript\nnpm run test        # Run all tests (unit + integration)\nnpm run test:unit   # Run unit tests only\nnpm run test:watch  # Watch mode\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "pi-agent",
+    "loop",
+    "cron",
+    "scheduler",
+    "recurring",
+    "automation"
+  ],
+  "author": {
+    "name": "ArtemisAI"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ArtemisAI/pi-loop#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArtemisAI/pi-loop.git"
+  },
+  "pi": {
+    "image": "https://raw.githubusercontent.com/ArtemisAI/pi-loop/main/assets/logo.png",
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-04-16T00:52:25.766Z",
+    "modified": "2026-04-17T15:32:10.107Z",
+    "0.1.0": "2026-04-16T00:52:25.992Z",
+    "0.1.1": "2026-04-16T01:45:34.683Z",
+    "0.3.0": "2026-04-16T23:24:51.572Z",
+    "0.3.1": "2026-04-17T15:32:09.950Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": null,
+  "download_trend": []
+}

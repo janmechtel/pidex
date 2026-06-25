@@ -1,0 +1,41 @@
+{
+  "name": "@akshaykarle/pi-tools",
+  "latest_version": "0.1.1",
+  "description": "Pi coding agent extensions \u2014 security hardening, agent teams and more",
+  "readme": "# @akshaykarle/pi-tools\n\nPi coding agent extensions for security hardening, sandboxing, task management, and multi-agent orchestration.\n\n## Installation\n\n```bash\npi install @akshaykarle/pi-tools\n```\n\nOr add to your `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\"@akshaykarle/pi-tools\"]\n}\n```\n\n## Extensions\n\nAll extensions are registered in `package.json` under `pi.extensions` and load automatically when the package is installed.\n\n### `security.ts`\n\nDefense-in-depth extension that intercepts tool calls and results.\n\n- **Hard blocks:** destructive filesystem commands (`rm -rf /`, `mkfs`, `dd of=/dev`, fork bombs), secret exfiltration (posting env vars or credential files to network), self-protection (cannot remove/modify the agent's extensions, `settings.json`, or `AGENTS.md`).\n- **Confirmation prompts:** `sudo`, `chmod`/`chown`, `git push --force`, `git reset --hard`, `git clean -f`, privileged Docker, network listeners.\n- **Secret masking:** redacts known secret env-var values from tool output. Covers explicit names plus `*_SECRET`, `*_TOKEN`, `*_API_KEY`, `*_PASSWORD`, `*_CREDENTIAL`, `*_PRIVATE_KEY` patterns.\n- **Prompt injection detection:** flags instruction hijacking, fake conversation markers, hidden zero-width Unicode, suspicious markdown image/link exfiltration. Warns rather than blocks to avoid false positives.\n\n### `sandbox.ts`\n\nOS-level sandbox via `@anthropic-ai/sandbox-runtime` plus an in-process tool guard for read/write paths and network domains.\n\n- Per-bash-call wrapping using `SandboxManager.wrapWithSandbox`.\n- Config loaded from `~/.pi-${profile}/sandbox.json` and `./.pi-${profile}/sandbox.json` (project overrides user).\n- Interactive prompts for blocked domains and write paths, with session/project/global persistence options.\n- Adds `--no-sandbox` flag and `/sandbox status|show|validate|reload|off|on` command.\n- Always scrubs configured env vars even when sandbox is disabled.\n\n### `todos.ts`\n\nStandalone task-board extension. Provides the `manage_tasks` tool with actions: `add`, `add_batch`, `update`, `list`, `get`. Tasks support dependencies, status (`queued|in-progress|done|failed`), and assignee. Storage directory resolved as: `setActiveTodosDir()` override \u2192 `PI_TODO_PATH` env \u2192 `.pi/todos/`.\n\n### `agent-teams.ts`\n\nMulti-agent orchestrator. Turns the pi session into a dispatcher that coordinates specialist agents running as separate pi processes. Each agent has its own context window, workspace, and tool allowlist. Includes a live terminal panel widget with per-agent status, tokens, and elapsed time.\n\nCommands: `/team-select`, `/team-list`, `/team-status`, `/team-handoffs`, `/team-off`. Tools (orchestrator-only): `dispatch_agent`, `manage_tasks`.\n\nSupports `shared` and `worktree` workspace modes. Crash recovery detects interrupted runs at startup. Full filesystem layout, agent definition format, skill decision rule, and team config \u2014 see [`extensions/agent-teams/README.md`](extensions/agent-teams/README.md).\n\n### `git-worktree.ts`\n\nStandalone git worktree management. Command: `/worktree list | create <name> | switch <name> | remove <path>`. Also adds `--worktree <name>` startup flag (creates if missing, switches into it). Re-exports helper functions consumed by `agent-teams.ts` worktree mode.\n\n### `@plannotator/pi-extension` (bundled)\n\nBundled from [@plannotator/pi-extension](https://github.com/backnotprop/plannotator). Interactive plan review for coding agents \u2014 annotate plans visually, share with your team, and automatically send feedback.\n\n## Skills\n\nProgressive-disclosure skills under `skills/`:\n\n- **`read-only`** \u2014 constrains an agent to read-only operations.\n- **`workspace-notes`** \u2014 instructs the agent to track progress on the shared task board via `manage_tasks` (from `todos.ts`) and write a final summary to `output.md` in its workspace.\n\nSkills are listed in `package.json` under `pi.skills` and auto-discovered by child pi processes (see the agent-teams skill decision rule).\n\n## Development\n\nThis repo uses [nix-direnv](https://github.com/nix-community/nix-direnv). Once installed, run `direnv allow` once \u2014 deps from `flake.nix` auto-load on `cd`.\n\nWithout direnv: `nix develop` then `npm install`.\n\n### Commands\n\n```bash\nnpm run build           # compile TypeScript \u2192 dist/\nnpm test                # run all tests once\nnpm run test:watch      # vitest interactive watch mode\nnpx tsc --noEmit        # type-check only\nnpx vitest run path/to/file.test.ts    # run a single test file\nnpx vitest run -t \"name pattern\"       # filter tests by name\nnpm run tui             # launch the agent-teams TUI dashboard\n```\n\n### Testing\n\n- Vitest with Node environment. Test files live next to source as `*.test.ts`.\n- Excluded paths: `node_modules`, `dist`, `.pi`, `.direnv` (see `vitest.config.ts`).\n- Internal helpers are exposed for tests via a `__testing__` export object (e.g. `sandbox.ts`).\n- CI (`.github/workflows/test.yml`) runs `npx tsc --noEmit` then `npm test` on Node 22 for every push to `main` and every PR.\n\n### Project layout\n\n```\nextensions/        # extension source \u2014 each *.ts is registered in package.json\n  agent-teams/     # agent-teams internals (loaders, runner, handoff log, ...)\n  sandbox/         # sandbox internals (config, path-guard, prompt, session-state)\n  git-worktree/    # worktree-manager\n  todos/           # task-board\nskills/            # progressive-disclosure skills (SKILL.md per skill)\nscripts/team-tui/  # TUI dashboard for monitoring agent-teams runs\n.pi/agents/        # local agent definitions and teams.yaml (consumed by agent-teams)\n```\n\n### Conventions\n\n- ESM-only \u2014 imports between local TS files use `.js` extensions (`tsconfig.json` uses `module: ES2022`, `moduleResolution: bundler`).\n- Never import implementation details from `@mariozechner/pi-coding-agent` \u2014 only its public API surface (it's a `peerDependency`).\n- Runtime state in `.pi/agent-teams`, `.pi/plans`, `.pi/todos` is git-ignored.\n- Publish is automated: GitHub release \u2192 `.github/workflows/publish.yml` \u2192 npm with provenance.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "akshaykarle"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/akshaykarle/pi-tools",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/akshaykarle/pi-tools.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/security.ts",
+      "./extensions/sandbox.ts",
+      "./extensions/todos.ts",
+      "./extensions/agent-teams.ts",
+      "./extensions/git-worktree.ts",
+      "node_modules/@plannotator/pi-extension"
+    ],
+    "skills": [
+      "./skills",
+      "node_modules/@plannotator/pi-extension/skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-02T09:09:08.315Z",
+    "modified": "2026-05-07T14:04:07.754Z",
+    "0.1.0": "2026-05-02T09:09:08.985Z",
+    "0.1.1": "2026-05-07T14:04:07.640Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 10,
+  "download_trend": []
+}

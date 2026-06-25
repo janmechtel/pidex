@@ -1,0 +1,353 @@
+{
+  "name": "@taimoorchatha/pi-context-footer",
+  "latest_version": "0.1.0",
+  "description": "pi coding-agent extension: turn-by-turn context-usage readout in the footer (bar, %, tokens, delta, last event).",
+  "readme": "# @taimoorchatha/pi-context-footer\n\nA [pi coding-agent](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) extension. Replaces pi's footer with a turn-by-turn context-usage readout:\n\n```\n\u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\u2591 42.3% 84k/200k +1.2k  assistant: response (320 out)\n^bar        ^pct  ^tokens ^delta  ^last event\n```\n\n- Updates after every user message, assistant message, and tool call.\n- Bar color: **green \u2192 yellow at 65% \u2192 red at 85%**.\n- Real token counts come from the provider (`ctx.getContextUsage()`) after each assistant turn. Between turns, deltas are ~4-chars-per-token estimates reconciled against the real value on the next assistant reply. Estimated rows are marked with a leading `~`.\n- Default shows only the most recent event. `/context-footer <N>` expands to the last N turns on separate lines (capped at 20).\n\n## Install\n\n```bash\npi install npm:@taimoorchatha/pi-context-footer\n```\n\nOr drop the source file directly into `~/.pi/agent/extensions/` (global) or `.pi/extensions/` in a project:\n\n```bash\ncurl -o ~/.pi/agent/extensions/context-footer.ts \\\n  https://raw.githubusercontent.com/taimoorchatha/pi-extensions/main/packages/context-footer/src/index.ts\n```\n\nNo compilation \u2014 pi loads TS directly via [jiti](https://github.com/unjs/jiti). `/reload` or start a new session and it activates.\n\n## Commands\n\n```\n/context-footer           toggle on/off\n/context-footer <N>       show last N turns on separate lines (0 = hide, max 20)\n/context-footer on | off  explicit\n```\n\n## What counts against the context window?\n\nEverything sent to the LLM per turn:\n\n1. **System prompt** \u2014 pi's baseline instructions + tool descriptions + any `AGENTS.md` + loaded skills. Usually **5\u201315k tokens on its own** before the conversation starts.\n2. **Tool results** \u2014 `read` on large files, `bash` output on builds/tests/logs. **Usually the dominant contributor in coding sessions.**\n3. **Assistant responses** \u2014 including the hidden reasoning tokens on thinking-capable models.\n4. **Tool calls** \u2014 the arguments the model sent.\n5. **Your prompts** \u2014 typically the smallest slice.\n\nThat's why the bar can jump 5\u201310% after a single large file read while a short typed prompt barely moves the needle. The delta column reflects all of it.\n\n## Design notes\n\nLearned from rebuilding this after an earlier attempt crashed pi hard:\n\n- **No `pi.sendMessage()` calls, ever.** The old design injected a \"marker\" message after each turn and tried to hide those markers from the LLM with an `on(\"context\")` filter. The filter checked the wrong field, so every marker leaked into the model's view of the conversation, looking like a new short user turn \u2014 the model kept replying briefly and its own reply triggered another marker, producing a tight reply loop. This extension is pure footer. It never touches the LLM's message list.\n- **Only documented `ThemeColor` keys.** `theme.fg()` throws on unknown keys, and because it's called from inside the TUI's render loop the throw can kill pi outright (terminal stays stuck in alt-screen + raw mode). Uses only `text`, `accent`, `muted`, `dim`, `success`, `warning`, `error`.\n- **Defensive try/catch** in every lifecycle handler and inside the footer's `render()`. If anything unexpected throws, the footer silently degrades to `ctx ?` instead of taking pi down.\n\n## License\n\nMIT \u2014 see [LICENSE](./LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-agent",
+    "pi-extension",
+    "pi-coding-agent",
+    "context-window",
+    "footer",
+    "tui",
+    "extension"
+  ],
+  "author": {
+    "name": "Taimoor Chatha"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/taimoorchatha/pi-extensions/tree/main/packages/context-footer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/taimoorchatha/pi-extensions.git",
+    "directory": "packages/context-footer"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-10T06:35:08.674Z",
+    "0.1.0": "2026-05-10T06:35:08.893Z",
+    "modified": "2026-05-10T06:35:09.046Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 14,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 137
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

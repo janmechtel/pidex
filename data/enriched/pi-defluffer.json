@@ -1,0 +1,35 @@
+{
+  "name": "pi-defluffer",
+  "latest_version": "0.1.0",
+  "description": "Pi extension that safely defluffs user prompts before sending them to the model.",
+  "readme": "# pi-defluffer\n\nPi extension that trims polite/filler text from user prompts before sending them to the model.\n\nInspired by GrahamTheDev's Defluffer idea: https://dev.to/grahamthedev/defluffer-reduce-token-usage-by-45-26jj\n\nThis is not magic compression. It is conservative prompt cleanup:\n\n- removes pleasantries and filler\n- collapses common phrases\n- preserves code blocks, inline code, URLs, env vars, CLI flags, quoted strings\n- protects detected JSON/YAML snippets while compressing surrounding text\n- skips legal/policy/exact-file-output prompts\n- skips slash commands and steering input\n- shows a small TUI widget with estimated token savings\n\n## Install\n\n```bash\npi install npm:pi-defluffer\n```\n\nFrom GitHub:\n\n```bash\npi install git:github.com/RespectMathias/pi-defluffer\n```\n\n## Commands\n\n```text\n/defluff on\n/defluff off\n/defluff status\n/defluff stats\n/defluff profile off|safe|standardGuardedDedupe\n/defluff min <0-80>\n/defluff preview <text>\n/defluff animation widget|off\n/defluff reset-stats\n```\n\nDefault profile: `standardGuardedDedupe`.\n\n## Testing\n\nRun local tests:\n\n```bash\nnpm test\n```\n\nThis runs Vitest unit tests plus a pi extension load check.\n\nWe also tested whether prompt compression saved tokens without damaging intent.\n\n### Prompt-integrity proxy test\n\n20 prompt fixtures across code, JSON/YAML, debugging, legal, math, creative, transcript, and agent tasks.\n\n| Variant                     | Avg input savings | Quality proxy | Critical failures |\n| --------------------------- | ----------------: | ------------: | ----------------: |\n| no script                   |              0.0% |          5.00 |                 0 |\n| original-ish/basic          |             13.7% |          4.74 |                 4 |\n| aggressive/extended         |             13.7% |          4.78 |                 3 |\n| standard/extended           |              8.6% |          4.89 |                 1 |\n| safe/extended               |              5.6% |          5.00 |                 0 |\n| guarded standard            |              8.1% |          5.00 |                 0 |\n| guarded + transcript dedupe |              9.5% |          5.00 |                 0 |\n\nTakeaway: aggressive compression saves more input tokens, but breaks exact terms. Guarded compression is safer.\n\n### LLM A/B test with Codex\n\nWe spawned Codex processes for baseline vs defluffed prompts, then used Codex as judge.\n\n| Metric                             | Result |\n| ---------------------------------- | -----: |\n| fixtures                           |      6 |\n| avg input savings                  | 16.29% |\n| avg baseline score                 |   4.83 |\n| avg defluffed score                |   4.50 |\n| judge ties                         |      5 |\n| baseline wins                      |      1 |\n| compression-caused critical losses |      0 |\n\nCase breakdown:\n\n| Case           | Category        | Input saved | Judge result                         |\n| -------------- | --------------- | ----------: | ------------------------------------ |\n| demo_001       | code refactor   |      33.65% | tie                                  |\n| code_002       | code generation |       4.23% | tie                                  |\n| json_004       | structured      |       2.94% | tie                                  |\n| transcript_009 | transcript      |      29.82% | tie                                  |\n| legal_013      | legal           |       0.00% | baseline win, not compression-caused |\n| copy_017       | creative        |      27.08% | tie                                  |\n\nEstimated total tokens in LLM test went from `1779` to `1707`, about `4%` saved. Output length can grow, so input savings do not always equal total savings.\n\n## Practical conclusion\n\nUse defluffing for:\n\n- polite prompts\n- noisy transcript prompts\n- long natural-language task descriptions\n- code tasks with fluff outside code blocks\n\nAvoid or skip compression for:\n\n- legal text\n- policy text\n- exact file-output prompts\n- prompts where exact wording matters globally\n\nFor exact JSON prompts, the extension protects detected JSON/YAML snippets and still compresses safe surrounding prose.\n\nThis extension defaults to skip risky cases.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "prompt-compression",
+    "llm",
+    "tokens"
+  ],
+  "author": {
+    "name": "RespectMathias"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/RespectMathias/pi-defluffer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RespectMathias/pi-defluffer.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-08T02:10:28.207Z",
+    "0.1.0": "2026-06-08T02:10:28.458Z",
+    "modified": "2026-06-08T02:10:28.650Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

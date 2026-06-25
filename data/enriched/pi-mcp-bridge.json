@@ -1,0 +1,35 @@
+{
+  "name": "pi-mcp-bridge",
+  "latest_version": "0.1.0",
+  "description": "A minimal pi extension that exposes MCP server tools to pi via stdio transport.",
+  "readme": "# pi-mcp-bridge\n\nA minimal MCP client extension for [pi](https://github.com/earendil-works/pi-coding-agent).\n\nAttach any [MCP](https://modelcontextprotocol.io) server to pi. The extension spawns the server as a persistent subprocess, discovers its tools via the standard MCP handshake, and registers them so the pi agent can call them directly \u2014 no per-call startup overhead, no stubs.\n\n## Install\n\n```bash\n# From pi.dev gallery\npi install https://github.com/tmonk/pi-mcp-bridge\n```\n\n```bash\n# Or try without installing\nMCP_SERVER_CMD=\"python -m my_mcp_server\" pi -e https://github.com/tmonk/pi-mcp-bridge \"Run my tool\"\n```\n\n## Usage\n\n```bash\n# Load with an MCP server\nMCP_SERVER_CMD=\"python -m my_mcp_server\" pi \"Run a query with my MCP tool\"\n\n# With a working directory and extra args\nMCP_SERVER_DIR=~/projects/my-server MCP_SERVER_CMD=\"node server.js\" MCP_SERVER_ARGS='[\"--port\", \"8080\"]' pi \"...\"\n\n# With pi's isolation flags\nMCP_SERVER_DIR=~/projects/my-server pi -p --no-extensions --no-skills \"Use the registered tool\"\n```\n\n## How it works\n\n1. **On load** \u2014 spawns the MCP server as a persistent subprocess and completes the initialization handshake (`initialize` \u2192 `notifications/initialized`).\n2. **Discovery** \u2014 issues `tools/list`, then calls `pi.registerTool()` for each discovered tool with dynamically converted TypeBox parameter schemas.\n3. **Execution** \u2014 when the agent calls a tool, sends `tools/call` over the persistent connection and returns the result. No subprocess spawned per call.\n4. **Cleanup** \u2014 on `session_shutdown`, gracefully shuts down the server (SIGTERM \u2192 SIGKILL after 2s).\n\n## Configuration\n\n| Variable | Description |\n|---|---|\n| `MCP_SERVER_CMD` | Command to run the MCP server **(required)** |\n| `MCP_SERVER_DIR` | Working directory for the server (optional) |\n| `MCP_SERVER_ARGS` | JSON array of extra CLI arguments (optional) |\n\n## Features\n\n- **Persistent connection** \u2014 single subprocess for all tool calls (10x+ faster for warm calls vs. spawn-per-call)\n- **Dynamic schemas** \u2014 MCP `inputSchema` \u2192 TypeBox conversion gives the LLM proper parameter types for each tool\n- **Concurrent requests** \u2014 JSON-RPC ID-based promise matching handles overlapping tool calls\n- **Graceful shutdown** \u2014 protocol-level shutdown + SIGTERM + SIGKILL fallback\n- **Timeout protection** \u2014 per-request timeout (default 30s) prevents hanging on unresponsive servers\n- **Stderr forwarding** \u2014 server diagnostics are forwarded to pi's stderr\n\n## Development\n\n```bash\ngit clone https://github.com/tmonk/pi-mcp-bridge\ncd pi-mcp-bridge\nnpm install\nnpm test\n```\n\nThe extension is a single `index.ts` file. Pi loads it via jiti \u2014 no build step.\n\n## Test\n\n```bash\nnpm test            # 35 tests (unit + integration + e2e)\nnpm run test:watch  # watch mode\nnpm run test:coverage\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "extension",
+    "mcp",
+    "model-context-protocol",
+    "tool-bridge"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/tmonk/pi-mcp-bridge",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tmonk/pi-mcp-bridge.git"
+  },
+  "pi": {
+    "type": "extension",
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-20T17:11:28.085Z",
+    "0.1.0": "2026-05-20T17:11:28.311Z",
+    "modified": "2026-05-20T17:11:28.610Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

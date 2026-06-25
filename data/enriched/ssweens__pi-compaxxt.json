@@ -1,0 +1,32 @@
+{
+  "name": "@ssweens/pi-compaxxt",
+  "latest_version": "1.1.0",
+  "description": "Enhanced compaction for pi \u2014 session context and LLM-ranked important files",
+  "readme": "# pi-compaxxt\n\n```bash\npi install @ssweens/pi-compaxxt\n```\n\nEnhanced compaction for [pi](https://github.com/badlogic/pi-mono). Two improvements to every compaction, zero extra LLM calls.\n\n![pi-compaxxt context compaction](screenshot.png)\n\n## Features\n\n### Session Context\n\nEvery compaction summary is prepended with the current session file path and thread ID:\n\n```markdown\n## Session Context\n**Session:** `/Users/you/.pi/agent/sessions/abc123/session.jsonl`\n**Thread ID:** `e7f2a3c1-...`\n\nUse the `session_query` tool to retrieve specific context from messages that were summarized away.\n\n---\n\n## Goal\n...\n```\n\nAfter compaction, the LLM knows exactly where to look if it needs older context that was summarized away. The bundled `session_query` tool makes this retrieval cheap \u2014 it doesn't load the full session, just answers a targeted question from it.\n\n### LLM-Judged Important Files\n\nThe compaction prompt is augmented to ask the LLM to identify the most goal-relevant files as part of generating the summary. The file sections are restructured:\n\n```xml\n<important-files>\nsrc/core/compaction.ts\nextensions/handoff.ts\n</important-files>\n\n<modified-files>\nsrc/core/compaction.ts\nextensions/handoff.ts\nsrc/utils.ts\n</modified-files>\n\n<other-read-files>\npackage.json\ndocs/api.md\n</other-read-files>\n```\n\nFiles are selected using these criteria:\n- Directly related to accomplishing the goal\n- Contain reference code or patterns to follow\n- Will need to be read, edited, or created\n- Provide important context or constraints\n\n`<modified-files>` is left untouched (intentional overlap with important-files is fine). `<read-files>` becomes `<other-read-files>` with the important ones pruned out.\n\nIf the LLM doesn't output a parseable `## Most Important Files` section, the extension falls back to the default `<read-files>`/`<modified-files>` format silently.\n\n## Components\n\n| Component | Type | Description |\n|-----------|------|-------------|\n| [compaction.ts](extensions/compaction.ts) | Extension | `session_before_compact` hook \u2014 session context + file restructuring |\n| [session-query.ts](extensions/session-query.ts) | Extension | `session_query` tool for querying session history |\n| [pi-session-query/](skills/pi-session-query/SKILL.md) | Skill | Instructions for using `session_query` |\n\n## Notes\n\n- If you also have `@ssweens/pi-handoff` installed, both packages register the `session_query` tool. Pi will warn about the duplicate \u2014 it's harmless, one will shadow the other.\n- Works with `/compact [instructions]` \u2014 user instructions are preserved and the file importance prompt is appended after them.\n- On any compaction error, falls back to pi's default compaction silently (with a warning notification).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "ssweens"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "extensions"
+    ],
+    "skills": [
+      "skills"
+    ]
+  },
+  "time": {
+    "created": "2026-03-10T05:56:13.260Z",
+    "modified": "2026-03-30T17:38:47.792Z",
+    "1.0.0": "2026-03-10T05:56:13.545Z",
+    "1.1.0": "2026-03-30T17:38:47.688Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

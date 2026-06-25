@@ -1,0 +1,353 @@
+{
+  "name": "@rhinos0608/pi-subagents",
+  "latest_version": "0.7.4",
+  "description": "A pi extension that brings Claude Code-style autonomous sub-agents to pi. Fork of @tintinweb/pi-subagents.",
+  "readme": "# @rhinos0608/pi-subagents\n\nA [pi](https://pi.dev) extension that brings **Claude Code-style autonomous sub-agents** to pi. Spawn specialized agents that run in isolated sessions \u2014 each with its own tools, system prompt, model, and thinking level. Run them in foreground or background, steer them mid-run, resume completed sessions, and define your own custom agent types.\n\n> **Status:** Early release.\n\n> **\ud83d\udd31 Fork Notice** \u2014 This is a **divergent fork** of [tintinweb/pi-subagents](https://github.com/tintinweb/pi-subagents) by [rhinos0608](https://github.com/rhinos0608). It adds a **fork subagent feature**: sub-agents can be spawned as children that receive the parent's exact system prompt and conversation context \u2014 ideal for delegated work that needs full project awareness without inheriting the parent's session state. See the [Fork section](#fork-divergence) for details.\n\n<img width=\"600\" alt=\"pi-subagents screenshot\" src=\"https://github.com/rhinos0608/pi-subagents/raw/master/media/screenshot.png\" />\n\n\nhttps://github.com/user-attachments/assets/8685261b-9338-4fea-8dfe-1c590d5df543\n\n\n## Features\n\n- **Claude Code look & feel** \u2014 same tool names, calling conventions, and UI patterns (`Agent`, `get_subagent_result`, `steer_subagent`) \u2014 feels native\n- **Parallel background agents** \u2014 spawn multiple agents that run concurrently with automatic queuing (configurable concurrency limit, default 4) and smart group join (consolidated notifications)\n- **Live widget UI** \u2014 persistent above-editor widget with animated spinners, live tool activity, token counts, and colored status icons\n- **Conversation viewer** \u2014 select any agent in `/agents` to open a live-scrolling overlay of its full conversation (auto-follows new content, scroll up to pause)\n- **Custom agent types** \u2014 define agents in `.pi/agents/<name>.md` with YAML frontmatter: custom system prompts, model selection, thinking levels, tool restrictions\n- **Mid-run steering** \u2014 inject messages into running agents to redirect their work without restarting\n- **Session resume** \u2014 pick up where an agent left off, preserving full conversation context\n- **Graceful turn limits** \u2014 agents get a \"wrap up\" warning before hard abort, producing clean partial results instead of cut-off output\n- **Case-insensitive agent types** \u2014 `\"explore\"`, `\"Explore\"`, `\"EXPLORE\"` all work. Unknown types fall back to general-purpose with a note\n- **Fuzzy model selection** \u2014 specify models by name (`\"haiku\"`, `\"sonnet\"`) instead of full IDs, with automatic filtering to only available/configured models\n- **Context inheritance** \u2014 optionally fork the parent conversation into a sub-agent so it knows what's been discussed\n- **Persistent agent memory** \u2014 three scopes (project, local, user) with automatic read-only fallback for agents without write tools\n- **Git worktree isolation** \u2014 run agents in isolated repo copies; changes auto-committed to branches on completion\n- **Skill preloading** \u2014 inject named skill files from `.pi/skills/` into agent system prompts\n- **Tool denylist** \u2014 block specific tools via `disallowed_tools` frontmatter\n- **Styled completion notifications** \u2014 background agent results render as themed, compact notification boxes (icon, stats, result preview) instead of raw XML. Expandable to show full output. Group completions render each agent individually\n- **Event bus** \u2014 lifecycle events (`subagents:created`, `started`, `completed`, `failed`, `steered`, `compacted`) emitted via `pi.events`, enabling other extensions to react to sub-agent activity\n- **Cross-extension RPC** \u2014 other pi extensions can spawn and stop subagents via the `pi.events` event bus (`subagents:rpc:ping`, `subagents:rpc:spawn`, `subagents:rpc:stop`). Standardized reply envelopes with protocol versioning. Emits `subagents:ready` on load\n- **Schedule subagents** \u2014 pass `schedule` to the `Agent` tool to fire on cron / interval / one-shot. Session-scoped jobs with PID-locked persistence; results land via the same `subagent-notification` followUp path as manual background completions; manage via `/agents \u2192 Scheduled jobs`\n\n## Install\n\n```bash\npi install npm:@rhinos0608/pi-subagents\n```\n\nOr load directly for development:\n\n```bash\npi -e ./src/index.ts\n```\n\n## Quick Start\n\nThe parent agent spawns sub-agents using the `Agent` tool:\n\n```\nAgent({\n  subagent_type: \"Explore\",\n  prompt: \"Find all files that handle authentication\",\n  description: \"Find auth files\",\n  run_in_background: true,\n})\n```\n\nForeground agents block until complete and return results inline. Background agents return an ID immediately and notify you on completion.\n\n### Scheduling\n\nAdd a `schedule` field to register the agent to fire later instead of running now:\n\n```\nAgent({\n  subagent_type: \"Explore\",\n  prompt: \"Look at recent commits and summarize what changed since last week\",\n  description: \"Weekly commit review\",\n  schedule: \"0 0 9 * * 1\",   // 9am every Monday (6-field cron)\n})\n```\n\nSchedule formats:\n\n- **Cron** \u2014 6-field (`second minute hour day-of-month month day-of-week`), e.g. `\"0 0 9 * * 1\"` for 9am every Monday, `\"0 */15 * * * *\"` for every 15 minutes.\n- **Interval** \u2014 `\"5m\"`, `\"1h\"`, `\"30s\"`, `\"2d\"`. Fires repeatedly at that interval.\n- **One-shot relative** \u2014 `\"+10m\"`, `\"+2h\"`, `\"+1d\"`. Fires once at that future time.\n- **One-shot absolute** \u2014 full ISO timestamp, e.g. `\"2026-12-25T09:00:00.000Z\"`.\n\nWhen a schedule fires, the spawn runs in background and its completion notification arrives in the conversation through the same `subagent-notification` followUp path as a manually-spawned background agent \u2014 your parent agent reasons about the result the same way.\n\nSchedules are **session-scoped**: they reset on `/new` and restore on `/resume`. List and cancel via `/agents \u2192 Scheduled jobs` (creation is the `Agent` tool's job \u2014 there is no parallel manual-create wizard). Storage at `<cwd>/.pi/subagent-schedules/<sessionId>.json` with PID-based file locking for cross-instance safety.\n\n**Disable the feature entirely**: `/agents \u2192 Settings \u2192 Scheduling \u2192 disabled` removes `schedule` from the `Agent` tool spec (no LLM-context cost), hides the menu entry, and stops any active scheduler. The schema-level removal takes effect on the next pi session; the runtime kill is immediate. Re-enable from the same menu.\n\nRestrictions:\n- `schedule` cannot be combined with `inherit_context` (no parent conversation exists at fire time) or `resume` (schedules create fresh agents).\n- `run_in_background` is forced to `true`.\n- Scheduled fires bypass the `maxConcurrent` queue so a 5-minute interval cannot be deferred behind long-running manual agents.\n- **Headless `pi -p` doesn't wait for scheduled subagents.**\n\n## UI\n\nThe extension renders a persistent widget above the editor showing all active agents:\n\n```\n\u25cf Agents\n\u251c\u2500 \u2839 Agent  Refactor auth module \u00b7 \u27f35\u226430 \u00b7 5 tool uses \u00b7 33.8k token (62%) \u00b7 12.3s\n\u2502    \u23bf  editing 2 files\u2026\n\u251c\u2500 \u2839 Explore  Find auth files \u00b7 \u27f33 \u00b7 3 tool uses \u00b7 12.4k token (8%) \u00b7 4.1s\n\u2502    \u23bf  searching\u2026\n\u251c\u2500 \u2839 Agent  Long-running task \u00b7 \u27f342 \u00b7 38 tool uses \u00b7 91.0k token (84% \u00b7 \u21bb2) \u00b7 2m17s\n\u2502    \u23bf  reading\u2026\n\u2514\u2500 2 queued\n```\n\nThe token field is annotated with two optional signals inside parens:\n- **`NN%`** \u2014 context-window utilization (color-coded: <70% dim, 70\u201385% warning, \u226585% error). Omitted when the model has no declared `contextWindow`, or briefly right after compaction.\n- **`\u21bbN`** \u2014 number of times the session has compacted, when > 0. Stays dim; the percent's color carries urgency.\n\nIndividual agent results render Claude Code-style in the conversation:\n\n| State | Example |\n|-------|---------|\n| **Running** | `\u2839 \u27f33\u226430 \u00b7 3 tool uses \u00b7 12.4k token (8%)` / `\u23bf searching, reading 3 files\u2026` |\n| **Completed** | `\u2713 \u27f38 \u00b7 5 tool uses \u00b7 33.8k token (62%) \u00b7 12.3s` / `\u23bf Done` |\n| **Wrapped up** | `\u2713 \u27f350\u226450 \u00b7 50 tool uses \u00b7 89.1k token (84% \u00b7 \u21bb2) \u00b7 45.2s` / `\u23bf Wrapped up (turn limit)` |\n| **Stopped** | `\u25a0 \u27f33 \u00b7 3 tool uses \u00b7 12.4k token (8%)` / `\u23bf Stopped` |\n| **Error** | `\u2717 \u27f33 \u00b7 3 tool uses \u00b7 12.4k token (8%)` / `\u23bf Error: timeout` |\n| **Aborted** | `\u2717 \u27f355\u226450 \u00b7 55 tool uses \u00b7 102.3k token (95% \u00b7 \u21bb3)` / `\u23bf Aborted (max turns exceeded)` |\n\nCompleted results can be expanded (ctrl+o in pi) to show the full agent output inline.\n\nBackground agent completion notifications render as styled boxes:\n\n```\n\u2713 Find auth files completed\n  \u27f33 \u00b7 3 tool uses \u00b7 12.4k token \u00b7 4.1s\n  \u23bf  Found 5 files related to authentication...\n  transcript: .pi/output/agent-abc123.jsonl\n```\n\nGroup completions render each agent as a separate block. The LLM receives structured `<task-notification>` XML for parsing, while the user sees the themed visual.\n\n## Default Agent Types\n\n| Type | Tools | Model | Prompt Mode | Description |\n|------|-------|-------|-------------|-------------|\n| `general-purpose` | all 7 | inherit | `append` (parent twin) | Inherits the parent's full system prompt \u2014 same rules, CLAUDE.md, project conventions |\n| `Explore` | read, bash, grep, find, ls | haiku (falls back to inherit) | `replace` (standalone) | Fast codebase exploration (read-only) |\n| `Plan` | read, bash, grep, find, ls | inherit | `replace` (standalone) | Software architect for implementation planning (read-only) |\n\nThe `general-purpose` agent is a **parent twin** \u2014 it receives the parent's entire system prompt plus a sub-agent context bridge, so it follows the same rules the parent does. Explore and Plan use standalone prompts tailored to their read-only roles.\n\nDefault agents can be **ejected** (`/agents` \u2192 select agent \u2192 Eject) to export them as `.md` files for customization, **overridden** by creating a `.md` file with the same name (e.g. `.pi/agents/general-purpose.md`), or **disabled** per-project with `enabled: false` frontmatter.\n\n## Custom Agents\n\nDefine custom agent types by creating `.md` files. The filename becomes the agent type name. Any name is allowed \u2014 using a default agent's name overrides it.\n\nAgents are discovered from two locations (higher priority wins):\n\n| Priority | Location | Scope |\n|----------|----------|-------|\n| 1 (highest) | `.pi/agents/<name>.md` | Project \u2014 per-repo agents |\n| 2 | `$PI_CODING_AGENT_DIR/agents/<name>.md` (default `~/.pi/agent/agents/<name>.md`) | Global \u2014 available everywhere |\n\nProject-level agents override global ones with the same name, so you can customize a global agent for a specific project. The global location follows the upstream `PI_CODING_AGENT_DIR` env var \u2014 set it to relocate all pi-coding-agent state (agents, skills, settings) to a custom directory.\n\n### Example: `.pi/agents/auditor.md`\n\n```markdown\n---\ndescription: Security Code Reviewer\ntools: read, grep, find, bash\nmodel: anthropic/claude-opus-4-6\nthinking: high\nmax_turns: 30\n---\n\nYou are a security auditor. Review code for vulnerabilities including:\n- Injection flaws (SQL, command, XSS)\n- Authentication and authorization issues\n- Sensitive data exposure\n- Insecure configurations\n\nReport findings with file paths, line numbers, severity, and remediation advice.\n```\n\nThen spawn it like any built-in type:\n\n```\nAgent({ subagent_type: \"auditor\", prompt: \"Review the auth module\", description: \"Security audit\" })\n```\n\n### Frontmatter Fields\n\nAll fields are optional \u2014 sensible defaults for everything.\n\n| Field | Default | Description |\n|-------|---------|-------------|\n| `description` | filename | Agent description shown in tool listings |\n| `display_name` | \u2014 | Display name for UI (e.g. widget, agent list) |\n| `tools` | all 7 | Comma-separated built-in tools: read, bash, edit, write, grep, find, ls. `none` for no tools |\n| `extensions` | `true` | Inherit MCP/extension tools. `false` to disable |\n| `skills` | `true` | Inherit skills from parent. Can be a comma-separated list of skill names to preload from `.pi/skills/` |\n| `memory` | \u2014 | Persistent agent memory scope: `project`, `local`, or `user`. Auto-detects read-only agents |\n| `disallowed_tools` | \u2014 | Comma-separated tools to deny even if extensions provide them |\n| `isolation` | \u2014 | Set to `worktree` to run in an isolated git worktree |\n| `model` | inherit parent | Model \u2014 `provider/modelId` or fuzzy name (`\"haiku\"`, `\"sonnet\"`) |\n| `thinking` | inherit | off, minimal, low, medium, high, xhigh |\n| `max_turns` | unlimited | Max agentic turns before graceful shutdown. `0` or omit for unlimited |\n| `prompt_mode` | `replace` | `replace`: body is the full system prompt (no AGENTS.md / CLAUDE.md inheritance). `append`: body appended to parent's prompt (agent acts as a \"parent twin\" \u2014 inherits parent's AGENTS.md / CLAUDE.md) |\n| `inherit_context` | `false` | Fork parent conversation into agent |\n| `run_in_background` | `false` | Run in background by default |\n| `isolated` | `false` | No extension/MCP tools, only built-in |\n| `enabled` | `true` | Set to `false` to disable an agent (useful for hiding a default agent per-project) |\n\nFrontmatter is authoritative. If an agent file sets `model`, `thinking`, `max_turns`, `inherit_context`, `run_in_background`, `isolated`, or `isolation`, those values are locked for that agent. `Agent` tool parameters only fill fields the agent config leaves unspecified.\n\n## Tools\n\n### `Agent`\n\nLaunch a sub-agent.\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `prompt` | string | yes | The task for the agent |\n| `description` | string | yes | Short 3-5 word summary (shown in UI) |\n| `subagent_type` | string | yes | Agent type (built-in or custom) |\n| `model` | string | no | Model \u2014 `provider/modelId` or fuzzy name (`\"haiku\"`, `\"sonnet\"`) |\n| `thinking` | string | no | Thinking level: off, minimal, low, medium, high, xhigh |\n| `max_turns` | number | no | Max agentic turns. Omit for unlimited (default) |\n| `run_in_background` | boolean | no | Run without blocking |\n| `resume` | string | no | Agent ID to resume a previous session |\n| `isolated` | boolean | no | No extension/MCP tools |\n| `isolation` | `\"worktree\"` | no | Run in an isolated git worktree |\n| `inherit_context` | boolean | no | Fork parent conversation into agent |\n\n### `get_subagent_result`\n\nCheck status and retrieve results from a background agent.\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `agent_id` | string | yes | Agent ID to check |\n| `wait` | boolean | no | Wait for completion |\n| `verbose` | boolean | no | Include full conversation log |\n\n### `steer_subagent`\n\nSend a steering message to a running agent. The message interrupts after the current tool execution.\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `agent_id` | string | yes | Agent ID to steer |\n| `message` | string | yes | Message to inject into agent conversation |\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/agents` | Interactive agent management menu |\n\nThe `/agents` command opens an interactive menu:\n\n```\nRunning agents (2) \u2014 1 running, 1 done     \u2190 only shown when agents exist\nAgent types (6)                             \u2190 unified list: defaults + custom\nCreate new agent                            \u2190 manual wizard or AI-generated\nSettings                                    \u2190 max concurrency, max turns, grace turns, join mode\n```\n\n- **Agent types** \u2014 unified list with source indicators: `\u2022` (project), `\u25e6` (global), `\u2715` (disabled). Select an agent to manage it:\n  - **Default agents** (no override): Eject (export as `.md`), Disable\n  - **Default agents** (ejected/overridden): Edit, Disable, Reset to default, Delete\n  - **Custom agents**: Edit, Disable, Delete\n  - **Disabled agents**: Enable, Edit, Delete\n- **Eject** \u2014 writes the embedded default config as a `.md` file to project or personal location, so you can customize it\n- **Disable/Enable** \u2014 toggle agent availability. Disabled agents stay visible in the list (marked `\u2715`) and can be re-enabled\n- **Create new agent** \u2014 choose project/personal location, then manual wizard (step-by-step prompts for name, tools, model, thinking, system prompt) or AI-generated (describe what the agent should do and a sub-agent writes the `.md` file). Any name is allowed, including default agent names (overrides them)\n- **Settings** \u2014 configure max concurrency, default max turns, grace turns, and join mode at runtime\n\n## Graceful Max Turns\n\nInstead of hard-aborting at the turn limit, agents get a graceful shutdown:\n\n1. At `max_turns` \u2014 steering message: *\"Wrap up immediately \u2014 provide your final answer now.\"*\n2. Up to 5 grace turns to finish cleanly\n3. Hard abort only after the grace period\n\n| Status | Meaning | Icon |\n|--------|---------|------|\n| `completed` | Finished naturally | `\u2713` green |\n| `steered` | Hit limit, wrapped up in time | `\u2713` yellow |\n| `aborted` | Grace period exceeded | `\u2717` red |\n| `stopped` | User-initiated abort | `\u25a0` dim |\n\n## Concurrency\n\nBackground agents are subject to a configurable concurrency limit (default: 4). Excess agents are automatically queued and start as running agents complete. The widget shows queued agents as a collapsed count.\n\nForeground agents bypass the queue \u2014 they block the parent anyway.\n\n## Join Strategies\n\nWhen background agents complete, they notify the main agent. The **join mode** controls how these notifications are delivered. It applies only to background agents.\n\n| Mode | Behavior |\n|------|----------|\n| `smart` (default) | 2+ background agents spawned in the same turn are auto-grouped into a single consolidated notification. Solo agents notify individually. |\n| `async` | Each agent sends its own notification on completion (original behavior). Best when results need incremental processing. |\n| `group` | Force grouping even when spawning a single agent. Useful when you know more agents will follow. |\n\n**Timeout behavior:** When agents are grouped, a 30-second timeout starts after the first agent completes. If not all agents finish in time, a partial notification is sent with completed results and remaining agents continue with a shorter 15-second re-batch window for stragglers.\n\n**Configuration:**\n- Configure join mode in `/agents` \u2192 Settings \u2192 Join mode\n\n## Persistent Settings\n\nRuntime tuning values set via `/agents` \u2192 Settings (max concurrency, default max turns, grace turns, default join mode) persist across pi restarts. Two files, merged on load:\n\n- **Global:** `~/.pi/agent/subagents.json` \u2014 your machine-wide defaults. Edit by hand; the `/agents` menu never writes here.\n- **Project:** `<cwd>/.pi/subagents.json` \u2014 per-project overrides. Written by `/agents` \u2192 Settings.\n\n**Precedence:** project overrides global on any field present in both. Missing fields fall back to the hardcoded defaults (max concurrency `4`, default max turns unlimited, grace turns `5`, join mode `smart`).\n\n**Example \u2014 global defaults for a beefy machine:**\n\n```bash\nmkdir -p ~/.pi/agent\ncat > ~/.pi/agent/subagents.json <<'EOF'\n{\n  \"maxConcurrent\": 16,\n  \"graceTurns\": 10\n}\nEOF\n```\n\nEvery project now starts with concurrency 16 and grace 10, without ever touching the menu. Individual projects can still override via `/agents` \u2192 Settings.\n\n**Failure behavior:** missing file is silent; malformed JSON logs a `[pi-subagents] Ignoring malformed settings at \u2026` warning to stderr; invalid/out-of-range field values are dropped per-field; write failures downgrade the `/agents` toast to a warning with `(session only; failed to persist)`.\n\n## Events\n\nAgent lifecycle events are emitted via `pi.events.emit()` so other extensions can react:\n\n| Event | When | Key fields |\n|-------|------|------------|\n| `subagents:created` | Background agent registered | `id`, `type`, `description`, `isBackground` |\n| `subagents:started` | Agent transitions to running (including queued\u2192running) | `id`, `type`, `description` |\n| `subagents:completed` | Agent finished successfully | `id`, `type`, `durationMs`, `tokens` (lifetime `{ input, output, total }`), `toolUses`, `result` |\n| `subagents:failed` | Agent errored, stopped, or aborted | same as completed + `error`, `status` |\n| `subagents:steered` | Steering message sent | `id`, `message` |\n| `subagents:compacted` | Agent's session successfully compacted | `id`, `type`, `description`, `reason` (`\"manual\"` / `\"threshold\"` / `\"overflow\"`), `tokensBefore`, `compactionCount` |\n| `subagents:scheduled` | Schedule lifecycle change | `{ type: \"added\" \\| \"removed\" \\| \"updated\" \\| \"fired\" \\| \"error\", \u2026 }` (job/agentId/error fields per type) |\n| `subagents:scheduler_ready` | Scheduler bound to session, enabled jobs armed | `sessionId`, `jobCount` |\n| `subagents:ready` | Extension loaded and RPC handlers registered | \u2014 |\n| `subagents:settings_loaded` | Persisted settings applied at extension init | `settings` (merged global + project) |\n| `subagents:settings_changed` | `/agents` \u2192 Settings mutation was applied | `settings`, `persisted` (`boolean` \u2014 `false` on write failure) |\n\n`tokens.total` = `input + output + cacheWrite`. `cacheRead` is excluded \u2014 each turn's `cacheRead` is the cumulative cached prefix re-read on that one API call, so summing per-message would over-count it. Use `contextUsage.percent` (surfaced as `(NN%)` in the widget) for current context size.\n\n## Cross-Extension RPC\n\nOther pi extensions can spawn and stop subagents programmatically via the `pi.events` event bus, without importing this package directly.\n\nAll RPC replies use a standardized envelope: `{ success: true, data?: T }` on success, `{ success: false, error: string }` on failure.\n\n### Discovery\n\nListen for `subagents:ready` to know when RPC handlers are available:\n\n```typescript\npi.events.on(\"subagents:ready\", () => {\n  // RPC handlers are registered \u2014 safe to call ping/spawn/stop\n});\n```\n\n### Ping\n\nCheck if the subagents extension is loaded and get the protocol version:\n\n```typescript\nconst requestId = crypto.randomUUID();\nconst unsub = pi.events.on(`subagents:rpc:ping:reply:${requestId}`, (reply) => {\n  unsub();\n  if (reply.success) console.log(\"Protocol version:\", reply.data.version);\n});\npi.events.emit(\"subagents:rpc:ping\", { requestId });\n```\n\n### Spawn\n\nSpawn a subagent and receive its ID:\n\n```typescript\nconst requestId = crypto.randomUUID();\nconst unsub = pi.events.on(`subagents:rpc:spawn:reply:${requestId}`, (reply) => {\n  unsub();\n  if (!reply.success) {\n    console.error(\"Spawn failed:\", reply.error);\n  } else {\n    console.log(\"Agent ID:\", reply.data.id);\n  }\n});\npi.events.emit(\"subagents:rpc:spawn\", {\n  requestId,\n  type: \"general-purpose\",\n  prompt: \"Do something useful\",\n  options: { description: \"My task\", run_in_background: true },\n});\n```\n\n### Stop\n\nStop a running agent by ID:\n\n```typescript\nconst requestId = crypto.randomUUID();\nconst unsub = pi.events.on(`subagents:rpc:stop:reply:${requestId}`, (reply) => {\n  unsub();\n  if (!reply.success) console.error(\"Stop failed:\", reply.error);\n});\npi.events.emit(\"subagents:rpc:stop\", { requestId, agentId: \"agent-id-here\" });\n```\n\nReply channels are scoped per `requestId`, so concurrent requests don't interfere.\n\n## Persistent Agent Memory\n\nAgents can have persistent memory across sessions. Set `memory` in frontmatter to enable:\n\n```yaml\n---\nmemory: project   # project | local | user\n---\n```\n\n| Scope | Location | Use case |\n|-------|----------|----------|\n| `project` | `.pi/agent-memory/<name>/` | Shared across the team (committed) |\n| `local` | `.pi/agent-memory-local/<name>/` | Machine-specific (gitignored) |\n| `user` | `~/.pi/agent-memory/<name>/` | Global personal memory |\n\nMemory uses a `MEMORY.md` index file and individual memory files with frontmatter. Agents with write tools get full read-write access. **Read-only agents** (no `write`/`edit` tools) automatically get read-only memory \u2014 they can consume memories written by other agents but cannot modify them. This prevents unintended tool escalation.\n\nThe `disallowed_tools` field is respected when determining write capability \u2014 an agent with `tools: write` + `disallowed_tools: write` correctly gets read-only memory.\n\n## Worktree Isolation\n\nSet `isolation: worktree` to run an agent in a temporary git worktree:\n\n```\nAgent({ subagent_type: \"refactor\", prompt: \"...\", isolation: \"worktree\" })\n```\n\nThe agent gets a full, isolated copy of the repository. On completion:\n- **No changes:** worktree is cleaned up automatically\n- **Changes made:** changes are committed to a new branch (`pi-agent-<id>`) and returned in the result\n\nIf the worktree cannot be created (not a git repo, no commits, or `git worktree add` fails), the `Agent` tool returns a clear error instead of running unisolated \u2014 `isolation: \"worktree\"` is a strict guarantee, not a hint. Initialize git and commit at least once, or omit `isolation`.\n\n## Skill Preloading\n\nSkills can be preloaded as named files from `.pi/skills/` or `~/.pi/skills/`:\n\n```yaml\n---\nskills: api-conventions, error-handling\n---\n```\n\nSkill files (`.md`, `.txt`, or extensionless) are read and injected into the agent's system prompt. Project-level skills take priority over global ones. Symlinked skill files are rejected for security.\n\n## Tool Denylist\n\nBlock specific tools from an agent even if extensions provide them:\n\n```yaml\n---\ntools: read, bash, grep, write\ndisallowed_tools: write, edit\n---\n```\n\nThis is useful for creating agents that inherit extension tools but should not have write access.\n\n## Architecture\n\n```\nsrc/\n  index.ts            # Extension entry: tool/command registration, rendering\n  types.ts            # Type definitions (AgentConfig, AgentRecord, etc.)\n  default-agents.ts   # Embedded default agent configs (general-purpose, Explore, Plan)\n  agent-types.ts      # Unified agent registry (defaults + user), tool name resolution\n  agent-runner.ts     # Session creation, execution, graceful max_turns, steer/resume\n  agent-manager.ts    # Agent lifecycle, concurrency queue, completion notifications\n  cross-extension-rpc.ts # RPC handlers for cross-extension spawn/ping via pi.events\n  group-join.ts       # Group join manager: batched completion notifications with timeout\n  custom-agents.ts    # Load user-defined agents from .pi/agents/*.md\n  memory.ts           # Persistent agent memory (resolve, read, build prompt blocks)\n  skill-loader.ts     # Preload skill files from .pi/skills/\n  output-file.ts      # Streaming output file transcripts for agent sessions\n  worktree.ts         # Git worktree isolation (create, cleanup, prune)\n  prompts.ts          # Config-driven system prompt builder\n  context.ts          # Parent conversation context for inherit_context\n  env.ts              # Environment detection (git, platform)\n  ui/\n    agent-widget.ts       # Persistent widget: spinners, activity, status icons, theming\n    conversation-viewer.ts # Live conversation overlay for viewing agent sessions\n```\n\n## Fork Divergence\n\nThis is a **divergent fork** of [tintinweb/pi-subagents](https://github.com/tintinweb/pi-subagents) (v0.7.1).\n\n### What's different\n\n- **Fork subagent mode** \u2014 Sub-agents can be spawned as explicit child processes of the parent agent. Omit `subagent_type` to trigger fork mode, which clones the parent's exact system prompt byte-for-byte and seeds the child conversation with the parent's last tool-call turn for prompt-cache sharing.\n- **Recursive fork guard** \u2014 Fork detection scans for fork boilerplate in messages to prevent infinite nesting.\n- **`/fork` command** \u2014 Quick-access slash command to fork a subagent inline.\n- **New default agent type `fork`** \u2014 Registered as a hidden type (not user-selectable) for programmatic fork execution.\n\n### Upstream\n\nThe original `@tintinweb/pi-subagents` package is maintained by [tintinweb](https://github.com/tintinweb) and can be found at [github.com/tintinweb/pi-subagents](https://github.com/tintinweb/pi-subagents).\n\n## License\n\nMIT \u2014 [rhinos0608](https://github.com/rhinos0608) (fork) / [tintinweb](https://github.com/tintinweb) (original)\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "subagent",
+    "agent",
+    "autonomous"
+  ],
+  "author": {
+    "name": "rhinos0608"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/rhinos0608/pi-subagents#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rhinos0608/pi-subagents.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "video": "https://github.com/rhinos0608/pi-subagents/raw/master/media/demo.mp4",
+    "image": "https://github.com/rhinos0608/pi-subagents/raw/master/media/screenshot.png"
+  },
+  "time": {
+    "created": "2026-05-12T04:45:12.328Z",
+    "modified": "2026-05-12T11:22:23.087Z",
+    "0.7.2": "2026-05-12T04:45:12.620Z",
+    "0.7.3": "2026-05-12T11:07:06.059Z",
+    "0.7.4": "2026-05-12T11:22:22.952Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 14,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 271
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 47
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 31
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

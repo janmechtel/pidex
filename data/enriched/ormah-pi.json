@@ -1,0 +1,37 @@
+{
+  "name": "ormah-pi",
+  "latest_version": "0.1.0",
+  "description": "Ormah local memory layer integration for the Pi coding agent \u2014 whisper recall, memory tools, transcript capture, self-maintenance.",
+  "readme": "# Ormah-Pi\n\nThe Ormah memory layer for the [Pi](https://github.com/earendil-works/pi-coding-agent) coding agent \u2014 the Pi counterpart to Ormah's Claude Code integration (`integrations/claude-plugin/`).\n\nOrmah is a local-first, self-maintaining memory system for AI agents. This extension wires Pi into a local Ormah server so memory is **involuntary**: relevant context is whispered before each prompt, and sessions are extracted into durable memory when they end.\n\nLocal. Private. Portable. Yours to keep.\n\n## What it does\n\n- **Whisper (involuntary recall)** \u2014 before each prompt, calls `POST /agent/whisper` and injects the returned context as a hidden message so the LLM starts the turn with memory. Ports Claude's `UserPromptSubmit` hook.\n- **Memory tools** \u2014 registers six tools the LLM can call, proxied to the Ormah HTTP API:\n  - `ormah_remember`, `ormah_recall`, `ormah_recall_node`, `ormah_mark_outdated`, `ormah_submit_feedback`, `ormah_run_maintenance`\n- **Transcript capture** \u2014 on compaction (`session_before_compact`) and session end (`session_shutdown`), normalizes the Pi session into `User:`/`Assistant:` text and `POST /ingest/conversation` for server-side extraction. Ports Claude's `PreCompact` + `SessionEnd` hooks.\n- **Commands** \u2014 `/ormah:setup`, `/ormah:status`, `/ormah:maintenance`, `/ormah:upgrade`, `/ormah:reload`.\n- **Self-maintenance** \u2014 when enabled, whisper appends a `maintenance_due` signal at most once per 24h; `/ormah:maintenance` loads the maintenance agent prompt so the session runs the two-step `ormah_run_maintenance` flow.\n\n## Requirements\n\n- Pi \u2265 0.80\n- A running local Ormah server (`ormah server start`, default `http://127.0.0.1:8787`)\n\n## Install\n\nFull end-user flow (Ormah runtime + Pi extension + wiring) is in [SETUP.md](./SETUP.md). Short version:\n\n```bash\n# 1. Ormah runtime (detects Pi and wires it automatically)\nbash <(curl -fsSL https://ormah.me/install.sh)\n# 2. Pi extension from the package gallery\npi install npm:ormah-pi\n# 3. In Pi: /reload, then /ormah:status\n```\n\nOther sources:\n\n```bash\npi install git:github.com/r-spade/ormah@main      # from git (tag/commit pinned)\npi install npm:ormah-pi -l                        # project-local (.pi/settings.json)\npi -e ./integrations/pi-plugin/ormah-pi.ts         # try without installing (dev)\n```\n\n`ormah-pi` appears on the [pi.dev/packages](https://pi.dev/packages) gallery because its `package.json` carries the `pi-package` keyword.\n\n## First-run setup\n\nIf `ormah setup` (step 1) already detected Pi, you're done \u2014 `/ormah:status` should show `connected`. If you used `--skip-client-setup`, run `/ormah:setup` inside Pi: it runs `ormah setup --skip-client-setup` (server + local models + autostart) and writes the Ormah guidance block into `~/.pi/agent/AGENTS.md`. Then `/reload`.\n\n## Configuration\n\nAll settings are env vars (read from the environment and `~/.config/ormah/.env`):\n\n| Var | Default | Purpose |\n|---|---|---|\n| `ORMAH_HOST` / `ORMAH_PORT` | `127.0.0.1` / `8787` | Ormah server location |\n| `ORMAH_BASE_URL` | `http://$HOST:$PORT` | Override base URL entirely |\n| `ORMAH_WHISPER_NUDGE_INTERVAL` | `10` | Nudge the agent to `remember` every N prompts (0 = off) |\n| `ORMAH_WHISPER_OUT_MIN_TURNS` | `3` | Minimum user turns before a session is stored |\n| `ORMAH_PI_MAINTENANCE_ENABLED` | `false` | Enable the `maintenance_due` whisper signal (falls back to `ORMAH_CLAUDE_MAINTENANCE_ENABLED`) |\n| `ORMAH_MAINTENANCE_SIGNAL_INTERVAL_HOURS` | `24` | Max once per N hours the signal is appended |\n| `ORMAH_PI_*_TIMEOUT_MS` | various | Per-call HTTP timeouts |\n\n> **Note:** whisper store (transcript extraction) and LLM-backed maintenance need an Ormah LLM provider (`ORMAH_LLM_PROVIDER=ollama|litellm` + key). Local recall, whisper retrieval, and the tools work without one.\n\n## Publishing (maintainers)\n\nTo list `ormah-pi` on the [pi.dev/packages](https://pi.dev/packages) gallery, publish to npm from this directory. The `package.json` already carries the `pi-package` keyword (required for gallery listing) and declares core imports as `peerDependencies` (Pi bundles them \u2014 do not bundle them yourself).\n\n```bash\ncd integrations/pi-plugin\nnpm version patch            # bump version\nnpm publish --access public # gallery re-indexes packages tagged pi-package\n```\n\nUsers then install with `pi install npm:ormah-pi` (versioned pins like `npm:ormah-pi@0.1.1` are respected). For an optional gallery preview, add `pi.image` (PNG/JPEG/GIF/WebP) or `pi.video` (MP4) to the `pi` block in `package.json`.\n\nTag releases so git installs can pin a ref: `git tag v0.1.1 && git push --tags`, then `pi install git:github.com/r-spade/ormah@v0.1.1`.\n\n## Architecture\n\nTransport is HTTP `fetch` to the Ormah server \u2014 the same `/agent/*` routes Ormah's own MCP adapter (`src/ormah/adapters/maintenance_manager.py` \u2026 `mcp_adapter.py`) uses \u2014 so no `ormah mcp` subprocess is needed. Pi sessions live at `~/.pi/agent/sessions/` with a different JSONL shape than Claude/Codex, so transcript capture normalizes entries client-side and feeds `POST /ingest/conversation` directly (no upstream Ormah change required).\n\n## Layout\n\n```text\nintegrations/pi-plugin/\n  ormah-pi.ts            # entry \u2014 wires events, tools, commands\n  package.json           # pi-package metadata (pi.extensions)\n  tsconfig.json\n  src/\n    config.ts            # ORMAH_* env config\n    client.ts            # HTTP client \u2192 /agent/* and /ingest/*\n    space.ts             # space detection (mirrors space_detect.py)\n    whisper.ts           # before_agent_start inject + nudge + maintenance_due\n    tools.ts             # 6 registerTool calls\n    store.ts             # session_before_compact / session_shutdown \u2192 /ingest\n    session.ts           # Pi entries \u2192 normalized conversation text\n    maintenance.ts       # loads the maintenance agent prompt\n  agents/\n    ormah-maintenance.md # maintenance agent prompt (port of upstream)\n```\n\n## License\n\nMIT, same as Ormah.\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "ormah",
+    "memory",
+    "agent"
+  ],
+  "author": {
+    "name": "r-spade"
+  },
+  "license": "MIT",
+  "homepage": "https://ormah.me",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/r-spade/ormah.git",
+    "directory": "integrations/pi-plugin"
+  },
+  "pi": {
+    "extensions": [
+      "./ormah-pi.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-24T15:43:26.504Z",
+    "0.1.0": "2026-06-24T15:43:26.762Z",
+    "modified": "2026-06-24T15:43:26.947Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 135,
+  "download_trend": []
+}

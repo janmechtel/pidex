@@ -1,0 +1,31 @@
+{
+  "name": "pi-moa-subagents",
+  "latest_version": "0.1.1",
+  "description": "Mixture-of-experts bug diagnosis for Pi",
+  "readme": "# pi-moa-subagents\n\nMixture-of-experts bug diagnosis for Pi. Point multiple models at a bug, have each investigate independently, then synthesize findings into an executive summary or an implemented-and-tested fix.\n\n## Prerequisites\n\nThis extension requires [pi-subagents](https://github.com/nicobailon/pi-subagents). Install it first:\n\n```bash\npi install npm:pi-subagents\n```\n\n`pi-moa-subagents` does not bundle pi-subagents \u2014 it uses its `subagent` tool as the execution engine. If you try to run `/moa-subagents` without it, you'll get a clear error with installation instructions.\n\n## Installation\n\n```bash\npi install npm:pi-moa-subagents\n```\n\nOr install from a local path during development:\n\n```bash\npi install /absolute/path/to/pi-moa-subagents\n```\n\n## How It Works\n\n1. You describe the bug (inline or multi-line editor).\n2. You select 1+ **investigator models** (multi-select) \u2014 each gets run sequentially via subagent `concurrency: 1` to respect single-GPU VRAM limits. Investigators are read-only by instruction (tools: `read`, `grep`, `find`, `bash`).\n3. You pick a **synthesis model** (single select) that consolidates findings.\n4. You choose **summary-only** or **auto-implement-and-test**.\n\nInvestigators write reports to `diagnose/<timestamp>/` as `.md` files. The synthesis step reads these and either:\n\n- **Summary mode**: Produces root cause, confidence, evidence per model, and a recommended fix direction. Nothing is changed in the codebase.\n- **Implement mode**: Hands off to the built-in `worker` agent with an acceptance contract requiring tests to pass before finishing.\n\n## Usage\n\n### With inline description\n\n```\n/moa-subagents The login form crashes when a user enters special characters in the email field\n```\n\n### With multi-line editor (bare invocation)\n\n```\n/moa-subagents\n```\n\nOpens a text editor for a detailed bug description including steps to reproduce, expected vs. actual behavior, etc.\n\n## Architecture Notes\n\n- **Sequential model loading.** Uses `concurrency: 1` on the investigator batch \u2014 models run one at a time so only one local model occupies VRAM at once.\n- **Investigators are read-only by instruction.** The `investigator` agent has `read`, `grep`, `find`, and `bash` tools (no `edit`/`write`), plus an explicit system prompt not to modify files. Since `bash` is included, a model could technically write via shell redirection if it ignored instructions \u2014 this is enforced by convention, not hard sandboxing.\n- **Agent file.** The `investigator.md` agent definition ships in the package source and is copied to `~/.pi/agent/agents/investigator.md` (or `$PI_CODING_AGENT_DIR/agents/`) on first session start. Existing customizations at that path are never overwritten.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/jonathanjaramillo/pi-moa-subagents#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jonathanjaramillo/pi-moa-subagents.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-21T02:17:43.691Z",
+    "modified": "2026-06-21T02:29:44.941Z",
+    "0.1.0": "2026-06-21T02:17:43.884Z",
+    "0.1.1": "2026-06-21T02:29:44.821Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 277,
+  "download_trend": []
+}

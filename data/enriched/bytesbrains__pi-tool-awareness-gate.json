@@ -1,0 +1,39 @@
+{
+  "name": "@bytesbrains/pi-tool-awareness-gate",
+  "latest_version": "1.0.3",
+  "description": "Tool limitation awareness layer for AI agents \u2014 intercepts tool results, infers quality signals, injects limitation reminders, and logs structured envelopes for evaluation.",
+  "readme": "# Tool Awareness Gate for Pi\n\n> Intercepts every tool result, infers quality signals, injects limitation reminders into agent context, and logs structured envelopes for evaluation. **Zero code changes required in other gates.**\n\n## Install\n\n```bash\npi install npm:pi-tool-awareness-gate\n```\n\nOr add to `.pi/settings.json`:\n\n```json\n{\n  \"packages\": [\"npm:pi-tool-awareness-gate\"]\n}\n```\n\n## What It Does\n\nEvery tool your agent calls \u2014 bash, read, write, edit, browser, CI, doctor \u2014 returns a result. But how reliable is that result? The awareness gate intercepts every `tool_result` event and adds:\n\n| Signal | What It Tells the Agent |\n|---|---|\n| **Status** | `success`, `partial`, `failure`, `timeout`, `unauthorized` |\n| **Confidence** | 0-1 score \u2014 how reliable is this result? |\n| **Completeness** | `full`, `partial`, `minimal` \u2014 did we get everything? |\n| **Truncation** | Was output cut off? |\n| **Freshness** | How stale is the data? |\n| **Warnings** | Human + agent readable caveats |\n| **Suggestions** | Actionable next steps (\"retry with narrower scope\") |\n\n## How It Works\n\n```\nTool executes \u2192 tool_result event fires\n     \u2502\n     \u25bc\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 1. Infer quality signals    \u2502  \u2190 heuristic analysis of raw output\n\u2502 2. Detect limitation flags  \u2502  \u2190 truncated? stale? scoped?\n\u2502 3. Generate warnings        \u2502  \u2190 \"Output was truncated\"\n\u2502 4. Format short reminder    \u2502  \u2190 1-2 line summary\n\u2502 5. Inject into agent context\u2502  \u2190 prepended to result text\n\u2502 6. Log rich payload         \u2502  \u2190 .awareness/envelopes.log\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\n### Short Reminder Example\n\nWhen a tool result has issues, the agent sees:\n\n```\n\u26a0\ufe0f [bash] conf:0% partial truncated\n   \u2022 Non-zero exit code: 1 \u2022 Output was truncated\n   \u2192 Check stderr output for error details before retrying\n\n$ ls /nonexistent\nls: /nonexistent: No such file or directory\n```\n\n### Rich Payload Example\n\nLogged to `.awareness/envelopes.log`:\n\n```json\n{\n  \"timestamp\": \"2026-05-15T10:30:00.000Z\",\n  \"tool\": \"bash\",\n  \"invocation_id\": \"bash-42\",\n  \"status\": \"partial\",\n  \"latency_ms\": 45,\n  \"quality\": {\n    \"confidence\": 0.8,\n    \"completeness\": \"full\",\n    \"freshness\": 0.5,\n    \"accuracy\": 0.8\n  },\n  \"limitations\": { \"truncated\": false },\n  \"warnings\": [],\n  \"suggestions\": []\n}\n```\n\n## Tool-Specific Inference\n\nThe gate has tool-specific heuristics for richer signals:\n\n| Tool | Extra Signals Detected |\n|---|---|\n| `bash` | Exit code, stderr presence, timeout |\n| `read` | Truncation at limit, offset/limit awareness |\n| `write`/`edit` | Bytes written vs expected |\n| `browser_*` | HTTP errors, OCR failures, timeouts |\n| `ci_*` | API errors, Gitea connectivity issues |\n| `doctor_*` | Informational \u2014 no warnings |\n\n## Configuration\n\nCreate `.awarenessrc.yml` in your project root (optional \u2014 sensible defaults):\n\n```yaml\n# Enable/disable the awareness layer\nenabled: true\n\n# Inject short reminders into agent context\ninjectReminders: true\n\n# Log rich payloads for evaluation\nlogEnvelopes: true\n\n# Where to write envelope logs\nenvelopeLogPath: .awareness/envelopes.log\n\n# Max warnings to include per short reminder (before truncation)\nmaxWarningsInReminder: 3\n\n# Quality thresholds\nthresholds.lowConfidence: 0.5\nthresholds.staleFreshness: 0.3\nthresholds.maxWarningsBeforeCritical: 5\n\n# Tools to skip awareness tracking (comma-separated)\nexcludedTools:\n```\n\n## Architecture\n\n```\ntool-awareness-gate/\n\u251c\u2500\u2500 package.json\n\u251c\u2500\u2500 src/\n\u2502   \u251c\u2500\u2500 index.ts      \u2190 Hooks pi.on(\"tool_result\"), main orchestration\n\u2502   \u251c\u2500\u2500 types.ts      \u2190 ToolResultEnvelope<T>, QualitySignals, LimitationFlags\n\u2502   \u251c\u2500\u2500 infer.ts      \u2190 Heuristic inference from raw tool outputs\n\u2502   \u251c\u2500\u2500 format.ts     \u2190 Short reminder + rich payload formatters\n\u2502   \u251c\u2500\u2500 config.ts     \u2190 .awarenessrc.yml loader\n\u2502   \u2514\u2500\u2500 helpers.ts    \u2190 Invocation IDs, text extraction, log appending\n\u2514\u2500\u2500 README.md\n```\n\n## Integration with Other Gates\n\n**No code changes needed.** The awareness gate works at the framework level, intercepting events from all gates automatically.\n\nWhen a gate wants to provide domain-specific quality signals (richer than what inference can detect), it imports the envelope types:\n\n```typescript\nimport type { ToolResultEnvelope } from \"pi-tool-awareness-gate/src/types\";\n\n// Gate enriches its own result with domain-specific quality signals\nreturn {\n  content: [...],\n  details: {\n    ...details,\n    _awareness: {\n      quality: { freshness: 0.95 },  // CI just fetched live data\n      limitations: { truncated: false },\n    },\n  },\n};\n```\n\nThe awareness gate will **merge** gate-provided signals with its own inference, preferring the gate's signals when available.\n\n## Benefits\n\n- **More trustworthy agents** \u2014 agents know when to doubt results\n- **Better debugging** \u2014 structured logs show tool quality over time\n- **Reduced overconfidence** \u2014 agents see explicit confidence scores\n- **Progressive adoption** \u2014 works automatically, gates enrich when ready\n- **Zero breaking changes** \u2014 no modifications to existing tool code\n\n## License\n\nMIT \u00a9 [nandal](https://github.com/nandal)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "tool-awareness",
+    "quality-signals",
+    "limitation-detection",
+    "agent-protocol",
+    "observability"
+  ],
+  "author": {
+    "name": "nandal",
+    "email": "nandal@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/nandal/pi-ext/tree/main/tool-awareness-gate",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nandal/pi-ext.git",
+    "directory": "tool-awareness-gate"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-15T18:57:18.727Z",
+    "1.0.3": "2026-05-15T18:57:19.134Z",
+    "modified": "2026-05-15T18:57:19.373Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

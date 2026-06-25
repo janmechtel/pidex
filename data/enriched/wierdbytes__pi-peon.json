@@ -1,0 +1,40 @@
+{
+  "name": "@wierdbytes/pi-peon",
+  "latest_version": "0.1.1",
+  "description": "Play CESP/OpenPeon sound packs on pi lifecycle events \u2014 peons, GLaDOS, battlecruisers and 300+ more community sound packs.",
+  "readme": "# @wierdbytes/pi-peon\n\n[CESP / OpenPeon](https://openpeon.com/spec) sound-pack player for the\n[pi](https://github.com/earendil-works/pi) coding agent.\n\n> *\"Work, work.\"*\n\nDrop a sound pack into `~/.openpeon/packs/<name>/` (or install one from\nthe [community registry](https://openpeon.com/packs) - 300+ packs:\npeons, GLaDOS, Stronghold lords, StarCraft battlecruisers, ...) and pi\nwill play a clip on every notable lifecycle event.\n\n## Install\n\n```bash\npi install @wierdbytes/pi-peon\n```\n\nThe default config points at the **peon** pack (Warcraft III Orc Peon).\nIf it isn't on disk yet, the extension auto-downloads it from the\n[community registry](https://peonping.github.io/registry/index.json)\non `session_start`. The pack ends up at `~/.openpeon/packs/peon/` and\nthe very first `session.start` clip plays as soon as the install\nfinishes \u2014 no restart needed.\n\n## What you hear\n\n| pi event                                  | CESP category       |\n| ----------------------------------------- | ------------------- |\n| `session_start` (startup / new)           | `session.start`     |\n| `agent_start`                             | `task.acknowledge`  |\n| `agent_end` (turn used tools)             | `task.complete`     |\n| `agent_end` (no tools, just chat)         | `input.required`    |\n| `tool_result` with `isError === true`     | `task.error`        |\n| `after_provider_response` with `status === 429` | `resource.limit` |\n| `session_shutdown` (reason `\"quit\"`)      | `session.end`       |\n| user sending \u2265 3 messages in 5 s          | `user.spam`         |\n\nEvery category can be toggled individually from the settings modal -\nthe on-disk pack decides whether that category has actual sounds, and\nmissing categories are silently skipped (per spec).\n\n## Commands\n\n```text\n/peon                  open settings modal (active pack, volume, mute,\n                       per-event toggles, registry browser, sound preview)\n/peon status           print active pack + player + config path\n/peon mute             silence every category until /peon unmute\n/peon unmute\n/peon test [category]  play a random sound from the named category\n                       (defaults to session.start). Bypasses debounce.\n/peon reset            restore default config\n```\n\nCLI flag `--no-peon` disables playback for one pi session without\ntouching the config.\n\n## Settings modal\n\nEverything you can configure interactively lives behind `/peon`:\n\n- **Packs\u2026** \u2014 one unified picker for everything pack-related. Opens\n  a sectioned list with three groups:\n  - **Active** \u2014 the pack currently bound to events.\n  - **Available** \u2014 installed packs at `~/.openpeon/packs/`.\n  - **Registry** \u2014 everything else from\n    [`https://peonping.github.io/registry/index.json`](https://peonping.github.io/registry/index.json).\n\n  Keys inside the picker:\n  - `\u2191`/`\u2193` \u2014 navigate (skips section headers).\n  - `Enter` \u2014 drill into the highlighted pack's sound files.\n  - `Tab` \u2014 set the highlighted pack as active. Downloads + installs\n    automatically when the pack lives only in the registry.\n  - `Esc` \u2014 back to the main settings.\n  - Type to substring-filter across pack id, display name, description,\n    tags, language, and trust tier (case-insensitive).\n\n  Inside the **files** drill-in:\n  - `\u2191`/`\u2193` \u2014 navigate the sound list (no filter row \u2014 a single\n    pack rarely has more than ~30 clips).\n  - `Enter` \u2014 play the sound. Uses the local copy if the pack is\n    installed; otherwise downloads just **that one clip** to\n    `$TMPDIR/peon-previews/` and plays from there \u2014 no full-pack\n    install needed for auditioning.\n  - `Tab` \u2014 set this sound's pack as the active pack (same install-\n    if-needed logic).\n  - `Esc` \u2014 back to the packs picker.\n\n  Left/Right arrows are filter-cursor movement only \u2014 they don't\n  drive navigation between submenus.\n\n- **Master volume** \u2014 0\u2013100. Scaled to each backend's native range\n  (afplay's `-v 0.0\u20131.0`, paplay's 0\u201365\u202f536, ffplay's `-volume 0\u2013100`).\n- **Muted** \u2014 global kill switch.\n- **Per-event toggles** \u2014 one boolean per CESP category. The settings\n  description tells you whether the active pack actually has sounds for\n  that category.\n\n## Audio backends\n\nDetected once per session via `which` / `where`:\n\n| Platform | Order tried                                          |\n| -------- | ---------------------------------------------------- |\n| macOS    | `afplay`                                              |\n| Linux    | `pw-play`, `paplay`, `ffplay`, `mpv`, `play`, `aplay` |\n| Windows  | `powershell.exe` (`System.Windows.Media.MediaPlayer`) |\n\n`aplay` has no volume control; the master-volume setting is ignored\nwhen it's the only backend.\n\n## Storage layout\n\n```\n~/.openpeon/packs/<pack>/\n   \u251c\u2500\u2500 openpeon.json         # CESP manifest\n   \u2514\u2500\u2500 sounds/\n       \u251c\u2500\u2500 *.wav | *.mp3 | *.ogg\n\n~/.pi/agent/peon/\n   \u2514\u2500\u2500 config.json           # this extension's own config\n```\n\nOverride the pack root with `PEON_PACKS_DIR=/some/other/dir`. Override\nthe state dir with the standard `PI_AGENT_DIR`.\n\n## Picker behaviour\n\n- **No-repeat** - when a category has > 1 sound, the picker never picks\n  the same one twice in a row.\n- **Debounce** - events firing within 500 ms of the previous play of\n  the same category are suppressed.\n- **User-spam cooldown** - `user.spam` re-fires at most once per 10 s.\n\n## Spec reference\n\nBuilt against [CESP 1.0](https://openpeon.com/spec). Manifest format,\ncategory-alias fallback, and tarball-from-GitHub install flow all\nfollow the spec verbatim - packs that work in any other CESP-aware\ntool work here, and vice versa.\n\n## License\n\nMIT - see [LICENSE](./LICENSE). Sound packs themselves ship under their\nown licenses; see each pack's `openpeon.json`.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "coding-agent",
+    "extension",
+    "sounds",
+    "openpeon",
+    "cesp",
+    "peon"
+  ],
+  "author": {
+    "name": "wierdbytes"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/wierdbytes/pi-wierd-stuff/tree/master/packages/peon",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wierdbytes/pi-wierd-stuff.git",
+    "directory": "packages/peon"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-15T19:15:26.738Z",
+    "modified": "2026-05-15T20:32:47.847Z",
+    "0.1.0": "2026-05-15T19:15:27.048Z",
+    "0.1.1": "2026-05-15T20:32:47.538Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 21,
+  "download_trend": []
+}

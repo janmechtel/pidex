@@ -1,0 +1,348 @@
+{
+  "name": "@anishthite/pi-better-workflows",
+  "latest_version": "0.1.1",
+  "description": "pi-better-workflows \u2014 deterministic multi-agent orchestration for Pi. Faithful port of Claude Code's Workflow tool (agent/pipeline/parallel/phase/log) with background runs, resume-from-runId journaling, worktree isolation, and an extra rule teaching the L",
+  "readme": "# @anishthite/pi-better-workflows\n\nDeterministic multi-agent workflows for [Pi](https://pi.dev). This package registers a `workflow` tool that runs JavaScript orchestration scripts with subagents, background execution, resumable journals, phases, structured output, and optional git worktree isolation.\n\nIt is intentionally close to Claude Code's `Workflow` tool semantics, with one Pi-specific safety improvement: if a workflow result is truncated inline, the tool description tells the assistant to read the persisted run journal before answering.\n\n## Install\n\n```bash\npi install npm:@anishthite/pi-better-workflows\n```\n\nFor local development:\n\n```bash\npi install /absolute/path/to/pi-better-workflows\n```\n\nThe package manifest exposes `./extensions/workflow.ts` through the `pi.extensions` field, so Pi loads it as a normal package extension.\n\n> Both this package and other workflow extensions may register a tool named `workflow`. Enable only one at a time.\n\n## Quick start\n\nAsk Pi to run a workflow, or call the tool directly with a script:\n\n```js\nexport const meta = {\n  name: 'summarize-files',\n  description: 'Summarize important project files',\n  phases: [\n    { title: 'Read', detail: 'Inspect files' },\n    { title: 'Synthesize', detail: 'Merge findings' },\n  ],\n}\n\nphase('Read')\nconst summaries = await pipeline(\n  ['README.md', 'package.json'],\n  file => agent(`Read ${file} and summarize the useful facts.`, {\n    label: `read:${file}`,\n    phase: 'Read',\n  })\n)\n\nphase('Synthesize')\nreturn await agent(`Combine these summaries:\\n${summaries.join('\\n\\n')}`, {\n  label: 'final',\n  phase: 'Synthesize',\n})\n```\n\nThe tool returns a `runId` immediately. Results are delivered back into the conversation when the background run finishes.\n\n## Tool API\n\n`workflow` accepts:\n\n| Field | Purpose |\n|---|---|\n| `script` | Inline workflow JavaScript. Must start with `export const meta = { ... }`. |\n| `scriptPath` | Run a previously saved workflow script. |\n| `name` | Run a named/saved workflow when available. |\n| `args` | JSON value exposed to the script as global `args`. |\n| `resumeFromRunId` | Replay unchanged completed `agent()` calls from a prior run journal. |\n| `title`, `description` | Accepted for compatibility and ignored; use `meta` instead. |\n\n## Script runtime\n\nWorkflow scripts are plain JavaScript running in a deterministic sandbox.\n\nGlobals:\n\n| Global | Purpose |\n|---|---|\n| `agent(prompt, opts)` | Spawn a Pi subagent; returns text or schema-validated JSON. |\n| `pipeline(items, ...stages)` | Run items through async stages without a barrier between stages. |\n| `parallel(thunks)` | Run async thunks concurrently and wait for all of them. |\n| `phase(title)` | Move subsequent work into a progress phase. |\n| `log(message)` | Emit workflow progress. |\n| `workflow(ref, args)` | Run one nested workflow. |\n| `args` | User-provided JSON input. |\n| `budget` | `{ total, spent(), remaining() }`; `total` is currently `null`. |\n\nUseful `agent()` options:\n\n| Option | Purpose |\n|---|---|\n| `label` | Short unique label for progress and resume identity. |\n| `phase` | Explicit phase assignment. |\n| `schema` | JSON Schema for structured output. |\n| `model` | Per-agent model override. |\n| `effort` | Per-agent reasoning effort override. |\n| `isolation: 'worktree'` | Run the agent in a temporary git worktree. |\n| `agentType` | Use a named Pi subagent definition. |\n\nDeterminism rules: `Date.now()`, `Math.random()`, and argless `new Date()` throw inside the sandbox so resume stays stable.\n\nCaps: concurrent agents are limited to `min(16, cpu cores - 2)`, each run can create up to 1000 agents, and one `pipeline()`/`parallel()` call can process up to 4096 items.\n\n## Commands and storage\n\nUse `/workflows` in Pi to inspect recent workflow runs.\n\nRuntime files are stored under:\n\n```text\n~/.pi/better-workflows/scripts/  # persisted inline scripts\n~/.pi/better-workflows/runs/     # run journals and results\n```\n\nIf an inline completion is truncated, read the full journal before summarizing:\n\n```bash\njq '.result' ~/.pi/better-workflows/runs/<runId>.json\n```\n\n## Development\n\n```bash\n# Pure runtime smoke tests\nnode $(npm root -g)/pi-subagents/node_modules/jiti/lib/jiti-cli.mjs test/smoke.ts\n\n# Pi SDK load check\nnode --import $(npm root -g)/pi-subagents/node_modules/jiti/lib/jiti-register.mjs test/loadcheck.ts\n```\n\n## Package contents\n\n```text\nextensions/workflow.ts   Pi extension entry point\nsrc/tool.ts              tool schema and registration\nsrc/runtime.ts           workflow sandbox and runtime globals\nsrc/agent.ts             Pi subagent bridge\nsrc/manager.ts           background run manager\nsrc/persistence.ts       script and journal storage\nsrc/worktree.ts          git worktree isolation\nsrc/structured-output.ts structured_output helper for schema agents\ntest/                    smoke, load, probe, and e2e checks\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "workflow",
+    "orchestration",
+    "subagents",
+    "claude-code"
+  ],
+  "author": {
+    "name": "Anish Thite"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions/workflow.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-17T21:21:51.830Z",
+    "modified": "2026-06-18T00:31:30.090Z",
+    "0.1.0": "2026-06-17T21:21:52.122Z",
+    "0.1.1": "2026-06-18T00:31:29.996Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 164,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 295
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

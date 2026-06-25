@@ -1,0 +1,48 @@
+{
+  "name": "@capyup/pi-exa",
+  "latest_version": "0.5.1",
+  "description": "Exa web research for pi via five first-class tools + skill + local CLI. Uses the official exa-js SDK directly \u2014 no MCP server, no adapter. Tools: exa_search, exa_similar, exa_fetch, exa_answer, exa_research. Supports real-time livecrawl, subpage extractio",
+  "readme": "# pi-exa\n\nExa web research for [pi](https://github.com/badlogic/pi-mono). Calls Exa\ndirectly through the official [`exa-js`](https://www.npmjs.com/package/exa-js)\nSDK \u2014 no MCP server, no adapter, no `mcp.json` to provision.\n\n## Architecture (v0.4)\n\nv0.4 registers **five first-class tools** (`exa_search`, `exa_similar`,\n`exa_fetch`, `exa_answer`, `exa_research`) plus a **prompt template** for\nthe `/exa` command. The agent can now invoke Exa directly as a tool call \u2014\nno bash parsing, no skill-body guessing, no \"maybe the model decides to load\nthe skill\" uncertainty.\n\nThe **skill** (`skills/pi-exa/SKILL.md`) and **CLI**\n(`skills/pi-exa/scripts/exa.mjs`) are kept as a fallback: when the user\nuses natural language (\"search the web for ...\") without `/exa`, the skill\nstill teaches the agent how to call the CLI via bash.\n\nLayers:\n\n| Layer | Role | Permanent context |\n|---|---|---|\n| **Tools** (`exa_search`, `exa_similar`, `exa_fetch`, `exa_answer`, `exa_research`) | Direct tool calls \u2014 highest hit rate | ~500 tokens (5 schemas, no promptSnippets) |\n| **Prompt** (`prompts/exa.md` via `/exa`) | Explicit trigger, loads decision tree into context | ~15 tokens (minimal front matter) |\n| **Skill** (`skills/pi-exa/SKILL.md`) | Natural-language fallback | ~15 tokens (minimal front matter) |\n| **CLI** (`scripts/exa.mjs`) | Actual workhorse, shared by all paths | 0 |\n\n## Install\n\n```bash\npi install npm:@capyup/pi-exa\n```\n\n(Or `pi install git:github.com/capyup/pi-exa` if you want to track `main`\ndirectly.)\n\nEither form pulls `exa-js` and registers the extension, skill, and prompt.\n\nThen save your API key (get one from <https://dashboard.exa.ai>):\n\n```text\n/exa-auth <your-exa-api-key>\n```\n\nThe CLI and tools re-read the key file on every call, so no `/reload` is\nneeded after auth changes.\n\nTo verify:\n\n```text\n/exa-status\n```\n\n## Usage\n\n### Fast path: `/exa` (recommended)\n\nType `/exa` followed by your request. The prompt template loads and instructs\nthe agent to call the right tool directly:\n\n```text\n/exa \u6700\u8fd1\u5173\u4e8e Claude Code \u7684\u65b0\u95fb\n/exa \u627e\u548c\u8fd9\u7bc7\u6587\u7ae0\u7c7b\u4f3c\u7684 https://example.com/article\n/exa \u603b\u7ed3 https://exa.ai/docs\n/exa \u8c01\u662f Anthropic \u7684 CEO\n/exa \u5199\u4e00\u4efd\u5173\u4e8e AI \u7f16\u7a0b\u52a9\u624b\u5e02\u573a\u7684\u6df1\u5ea6\u8c03\u7814\u62a5\u544a\n```\n\nHit rate: **100%** \u2014 the prompt template explicitly says \"call `exa_search`\"\n(or `exa_similar` / `exa_fetch` / `exa_answer` / `exa_research`), so the model never misses.\n\n### Natural-language path\n\nJust ask in plain language. The skill metadata (~15 tokens) sits in the\nsystem prompt permanently; when the model decides the task matches, it loads\nthe skill body and learns the CLI syntax. This works but is slightly less\nreliable than `/exa` because it depends on the model's intent classification.\n\n```text\n\u5e2e\u6211\u641c\u4e00\u4e0b\u6700\u8fd1\u7684 AI \u65b0\u95fb\n\u8fd9\u4e2a\u94fe\u63a5\u8bf4\u4e86\u4ec0\u4e48\uff1fhttps://example.com/article\n```\n\n### Direct tool calls (agent-driven)\n\nThe model can also invoke the tools on its own without `/exa` or skill\ntriggering, because the tool schemas are always in the system prompt. This\nhappens when the agent is confident a web search is needed.\n\n### CLI (for humans or scripts)\n\n```bash\n# from the skill directory:\n./scripts/exa.mjs status\n./scripts/exa.mjs search \"anthropic claude code release notes\" --days 30 --num 5\n./scripts/exa.mjs similar https://exa.ai/blog/introducing-exa --num 5\n./scripts/exa.mjs fetch https://exa.ai/docs/sdks/javascript-sdk --mode summary\n./scripts/exa.mjs answer \"Who is the current CEO of Anthropic?\"\n./scripts/exa.mjs research \"Compare the top 5 AI coding assistants in 2025, their pricing, and key differentiators\"\n```\n\nAdd `--help` to any subcommand for the full option list.\n\n## Slash commands\n\n| Command | What it does |\n|---|---|\n| `/exa <request>` | Load the Exa prompt template and trigger tool-based research. |\n| `/exa-auth <key>` | Save the Exa API key to `~/.pi/exa.config.json` (mode `0600`). |\n| `/exa-auth --clear` | Forget the saved key. |\n| `/exa-status` | Show whether a key is in place and where it came from. |\n\n## Files this package owns\n\n- `~/.pi/exa.config.json` \u2014 stores `{ \"apiKey\": \"...\" }`. Mode `0600`.\n  Other fields are preserved but not used.\n\nThis package does **not** touch `~/.pi/agent/mcp.json`,\n`~/.config/mcp/mcp.json`, `.mcp.json`, or `.pi/mcp.json`.\n\n## Migration from earlier versions\n\n### v0.3.x \u2192 v0.4.x\n\n1. `pi update npm:@capyup/pi-exa` (or `pi update https://github.com/capyup/pi-exa.git`)\n2. Your existing key in `~/.pi/exa.config.json` is reused.\n3. `/reload` or restart pi.\n4. The five new tools (`exa_search`, `exa_similar`, `exa_fetch`, `exa_answer`, `exa_research`) will appear\n   in your tool list. `/exa` will be available as a slash command.\n\n### v0.2.x (MCP) \u2192 v0.4.x\n\nFollow the v0.3 migration steps first if you skipped that version, then the\nv0.4 steps above.\n\n### v0.1.x (bespoke tools) \u2192 v0.4.x\n\nThe old tool names are gone. The new tools are `exa_search`, `exa_similar`, `exa_fetch`,\n`exa_answer`, `exa_research`. No manual remap is needed \u2014 the agent uses them automatically.\n\n## Token-cost comparison\n\n| Version | Permanent context cost | Failure modes |\n|---|---|---|\n| v0.1.x (9 bespoke tools + routing prose) | ~750 tokens | tool name drift; you-pay-even-if-unused |\n| v0.2.x (MCP, 2 direct tools) | ~400 tokens + MCP proxy overhead | mcp.json missing; remote MCP unreachable; adapter version mismatch |\n| v0.3.x (skill + CLI) | ~120 tokens (skill metadata) | **hit rate depends on model guessing** |\n| **v0.4.x (tools + skill + /exa prompt)** | **~500 tokens (5 tool schemas)** | **near-100% hit rate via `/exa`** |\n\nv0.4 trades a moderate permanent-context increase (~380 tokens vs v0.3) for a\nmassive hit-rate improvement plus powerful tools (`exa_similar` for finding\nrelated content and `exa_research` for deep investigation).\nIf you want the absolute minimum permanent cost, stay on v0.3.x; if you want\nthe agent to actually do web research when you ask, use v0.4.x.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "pi-skill",
+    "exa",
+    "web-search",
+    "research"
+  ],
+  "author": {
+    "name": "capyup"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/capyup/pi-exa#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/capyup/pi-exa.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-10T06:56:50.929Z",
+    "modified": "2026-05-11T04:30:00.691Z",
+    "0.3.0": "2026-05-10T06:56:51.239Z",
+    "0.3.1": "2026-05-10T07:36:21.013Z",
+    "0.4.0": "2026-05-10T08:22:37.472Z",
+    "0.4.1": "2026-05-10T08:25:36.561Z",
+    "0.5.0": "2026-05-11T04:22:07.944Z",
+    "0.5.1": "2026-05-11T04:30:00.595Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 22,
+  "download_trend": []
+}

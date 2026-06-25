@@ -1,0 +1,353 @@
+{
+  "name": "pi-adaptive-finder",
+  "latest_version": "0.2.0",
+  "description": "Fast local workspace Finder for Pi using rg retrieval plus configurable OpenAI-compatible rerankers",
+  "readme": "# pi-adaptive-finder\n\nFast read-only Finder for Pi. It uses local `rg` and path retrieval first, then optionally reranks candidate files with fast OpenAI-compatible providers such as Cerebras or Groq. It supports explicit `cwd`/`root`/`roots` scoping and also auto-detects absolute path mentions in the query.\n\n## Why\n\nNormal codebase spelunking burns agent context and time. This tool makes one broad reconnaissance pass and returns likely entrypoints, supporting files, and line-cited evidence.\n\n## Install\n\nFrom npm, once published:\n\n```bash\npi install npm:pi-adaptive-finder\n```\n\nFrom a local checkout while developing:\n\n```bash\npi install /absolute/path/to/pi-adaptive-finder\n```\n\nTemporary one-run test:\n\n```bash\npi -e /absolute/path/to/pi-adaptive-finder\n```\n\n## Tool\n\nBy default the extension registers:\n\n```text\nadaptive_finder\n```\n\nExample prompt inside Pi:\n\n```text\nUse adaptive_finder to find where saved views are implemented in Nexus, including hooks, API clients, mocks, and tests.\n```\n\nUseful parameters:\n\n| Parameter | Description |\n|---|---|\n| `query` | Broad reconnaissance task, search hints, and desired deliverable. |\n| `cwd` | Directory/repo/worktree to search instead of the Pi session cwd. |\n| `root` | Alias for `cwd`. |\n| `roots` | Multiple directories/repos to search together. Non-session results are returned as absolute paths. |\n\nPrefer `cwd` or `roots` whenever the target is a sibling repo, a worktree, or an installed Pi package:\n\n```json\n{\n  \"query\": \"Find the tff-fff tool implementation and tool registration files.\",\n  \"cwd\": \"/opt/homebrew/lib/node_modules/@the-forge-flow/fff-pi\"\n}\n```\n\nIf no explicit root is provided, Adaptive Finder scans the query for absolute paths like `/Users/.../Git/project` and searches those roots automatically.\n\nTo replace an existing `finder` tool instead:\n\n```bash\nexport PI_ADAPTIVE_FINDER_TOOL_NAME=finder\n```\n\n## Provider presets\n\nThe extension works without an API key using local ranking only. With API keys, it adds rerankers.\n\n### Cerebras\n\n```bash\nexport CEREBRAS_API_KEY=\"...\"\nexport PI_ADAPTIVE_FINDER_PRESET=cerebras\n```\n\nDefault Cerebras rerankers:\n\n- `gpt-oss-120b`, `reasoning_effort: low`\n- `zai-glm-4.7`, `reasoning_effort: none`\n\nOn macOS it also checks Keychain services:\n\n- `cerebras-api-key`\n\n### Groq\n\n```bash\nexport GROQ_API_KEY=\"...\"\nexport PI_ADAPTIVE_FINDER_PRESET=groq\n```\n\nDefault Groq rerankers:\n\n- `openai/gpt-oss-120b`, `reasoning_effort: low`\n- `openai/gpt-oss-20b`, `reasoning_effort: low`\n\nOn macOS it also checks Keychain services:\n\n- `groq-api-key`\n\n### Auto\n\nDefault preset:\n\n```bash\nexport PI_ADAPTIVE_FINDER_PRESET=auto\n```\n\n`auto` tries available Cerebras and Groq rerankers, capped by `PI_ADAPTIVE_FINDER_MAX_RERANKERS`.\n\n### Local only\n\n```bash\nexport PI_ADAPTIVE_FINDER_PRESET=local\n```\n\n## Custom OpenAI-compatible rerankers\n\nSet `PI_ADAPTIVE_FINDER_RERANKERS` to a JSON array. Each provider uses chat completions. `baseUrl` can be either the API root or the full `/chat/completions` endpoint.\n\n```bash\nexport PI_ADAPTIVE_FINDER_RERANKERS='[\n  {\n    \"name\": \"groq-oss-120b\",\n    \"baseUrl\": \"https://api.groq.com/openai/v1\",\n    \"apiKeyEnv\": \"GROQ_API_KEY\",\n    \"model\": \"openai/gpt-oss-120b\",\n    \"reasoningEffort\": \"low\"\n  },\n  {\n    \"name\": \"cerebras-glm\",\n    \"baseUrl\": \"https://api.cerebras.ai/v1\",\n    \"apiKeyEnv\": \"CEREBRAS_API_KEY\",\n    \"model\": \"zai-glm-4.7\",\n    \"reasoningEffort\": \"none\",\n    \"extraBody\": { \"clear_thinking\": false }\n  }\n]'\n```\n\nSupported fields:\n\n```ts\ntype RerankerConfig = {\n  name: string;\n  baseUrl: string;\n  model: string;\n  apiKeyEnv?: string;\n  apiKey?: string;\n  keychainService?: string;\n  reasoningEffort?: \"none\" | \"low\" | \"medium\";\n  maxCompletionTokens?: number;\n  headers?: Record<string, string>;\n  extraBody?: Record<string, unknown>;\n};\n```\n\n## Other configuration\n\n```bash\nexport PI_ADAPTIVE_FINDER_TOOL_NAME=adaptive_finder\nexport PI_ADAPTIVE_FINDER_PRESET=auto\nexport PI_ADAPTIVE_FINDER_MAX_RERANKERS=2\nexport PI_ADAPTIVE_FINDER_MAX_CANDIDATES=72\nexport PI_ADAPTIVE_FINDER_MAX_SELECTED=8\nexport PI_ADAPTIVE_FINDER_TIMEOUT_MS=12000\n```\n\n## Development\n\n```bash\nnpm install\nnpm run check\nnpm run pack:check\npi -e .\n```\n\n## Publish to npm\n\n1. Pick the package name and update `package.json` metadata.\n2. Login:\n\n```bash\nnpm login\n```\n\n3. Verify the tarball:\n\n```bash\nnpm run pack:check\n```\n\n4. Publish:\n\n```bash\nnpm publish --access public\n```\n\n5. Install from npm:\n\n```bash\npi install npm:pi-adaptive-finder\n```\n\nPi's package gallery discovers npm packages tagged with the `pi-package` keyword.\n\n## Security\n\nPi extensions run with full local permissions. This extension is read-only by design and shells out only to `rg` and macOS `security` for optional Keychain lookup. Review code before installing any third-party Pi package.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "finder",
+    "code-search",
+    "workspace-search",
+    "groq",
+    "cerebras",
+    "openai-compatible"
+  ],
+  "author": {
+    "name": "Mahir Isikli"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/Mahir-Isikli/pi-adaptive-finder#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mahir-Isikli/pi-adaptive-finder.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-07T09:31:15.227Z",
+    "modified": "2026-05-12T19:25:00.166Z",
+    "0.1.0": "2026-05-07T09:31:15.446Z",
+    "0.1.1": "2026-05-08T14:41:55.043Z",
+    "0.2.0": "2026-05-12T19:25:00.049Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 8,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 345
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 40
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

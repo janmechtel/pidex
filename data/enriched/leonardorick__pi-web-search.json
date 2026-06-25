@@ -1,0 +1,45 @@
+{
+  "name": "@leonardorick/pi-web-search",
+  "latest_version": "0.2.3",
+  "description": "Web search tool for pi \u2014 Exa MCP search with DuckDuckGo fallback via wreq-js.",
+  "readme": "# @leonardorick/pi-web-search\n\nWeb search tool for [pi](https://github.com/earendil-works/pi) \u2014 Exa hosted MCP search with DuckDuckGo HTML fallback via [wreq-js](https://www.npmjs.com/package/wreq-js) browser TLS fingerprinting. Companion to [pi-smart-fetch](https://www.npmjs.com/package/pi-smart-fetch).\n\n## Why\n\nPi's built-in web search relies on Anthropic's first-party `web_search_20250305` tool, which is only available when running Claude models. This package fills the gap for any other model with a keyless `web_search` tool.\n\nSearch tries Exa's hosted MCP endpoint first (`web_search_exa` over JSON-RPC). If Exa MCP fails, rate-limits, or returns no results, the tool falls back to DuckDuckGo HTML search.\n\nBare Node `fetch()` (even with a spoofed User-Agent header) gets served DDG's anti-bot anomaly page (`cc=botnet`) because the TLS/HTTP2 fingerprint leaks \"this is Node, not Chrome.\" `wreq-js` wraps native Rust bindings that emulate real browser TLS/HTTP2 fingerprints \u2014 same primitive `pi-smart-fetch` uses for `web_fetch`.\n\n## Install\n\n```jsonc\n// ~/.pi/agent/settings.json\n{\n  \"packages\": [\"npm:@leonardorick/pi-web-search\"],\n}\n```\n\n## Tool\n\nRegisters `web_search`:\n\n| param             | type       | required | description                                                                               |\n| ----------------- | ---------- | -------- | ----------------------------------------------------------------------------------------- |\n| `query`           | `string`   | yes      | Search query (min length 2)                                                               |\n| `allowed_domains` | `string[]` | no       | Only return results from these domains                                                    |\n| `blocked_domains` | `string[]` | no       | Exclude results from these domains                                                        |\n| `numResults`      | `integer`  | no       | Result cap. Default `8`, min `1`, max `20`.                                               |\n| `freshness`       | `string`   | no       | Time filter. `day` / `week` / `month` / `year`, or custom range `YYYY-MM-DDtoYYYY-MM-DD`. |\n| `country`         | `string`   | no       | ISO 3166-1 alpha-2 country code for region-localised results (e.g. `US`, `DE`, `BR`).     |\n\n`allowed_domains` and `blocked_domains` are mutually exclusive. The tool translates filters to Exa `site:` / `-site:` query terms and also enforces them client-side. It over-fetches when filters are active so post-filter trimming can still meet the requested `num_results` cap.\n\n### Provider support matrix\n\n| filter            | Exa MCP                       | DuckDuckGo (fallback) |\n| ----------------- | ----------------------------- | --------------------- |\n| `allowed_domains` | yes (via `site:`)             | yes (via `site:`)     |\n| `blocked_domains` | yes (via `-site:`)            | yes (via `-site:`)    |\n| `numResults`      | yes (native)                  | yes (post-filter)     |\n| `freshness`       | best-effort (may be ignored)\u00b9 | yes (`df=` param)     |\n| `country`         | best-effort (may be ignored)\u00b9 | yes (`kl=` param)     |\n\n\u00b9 Exa MCP's documented schema only exposes `query` and `numResults`. Extra fields are sent best-effort: harmless if ignored, honored if Exa supports them in the future. The DuckDuckGo fallback enforces them reliably.\n\nOutput mirrors Claude Code's `Web search results for query: \"...\"` block, including the `Links: [...]` JSON line and the \"REMINDER: include sources\" suffix \u2014 the model is expected to append a `Sources:` markdown list to its reply.\n\n## Design notes\n\nNo `prompt` argument and no summarization step. Claude Code's `WebSearchTool` calls Haiku with the user-provided prompt to compress results before returning. Pi's built-in tools (`read`, `grep`, etc.) follow a \"raw output, model digests it\" pattern \u2014 this extension matches that convention.\n\nAnonymous Exa MCP access is rate-limited by Exa (currently documented as `2` QPS and `50` tool calls/day per IP). The tool treats Exa as a best-effort first provider and keeps DDG as fallback.\n\n> **TODO:** Add an optional `prompt` parameter paired with configurable `model`/`provider` settings so results can be summarized before returning \u2014 matching Claude Code's behavior. The summarizer should use the active pi provider rather than hardcoding a specific model.\n\n## Limitations\n\n- Anonymous Exa MCP quota is shared by client IP; heavy use can hit `429` and fall back to DDG.\n- DDG HTML scraping is best-effort. If DDG changes its result markup the snippet regex is the most likely break point; titles + URLs degrade more gracefully.\n- `freshness` and `country` are only guaranteed on the DDG fallback. On Exa MCP they ride along as extra fields and are silently ignored unless Exa expands the schema.\n- This package only returns search results and snippets. Use `web_fetch` from `pi-smart-fetch` for page content extraction.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "web-search",
+    "exa",
+    "mcp",
+    "duckduckgo",
+    "wreq-js",
+    "tls-fingerprinting"
+  ],
+  "author": {
+    "name": "Leonardo Rick"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/leonardorick/dotfiles#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leonardorick/dotfiles.git",
+    "directory": "personal-npm-packages/public/pi-web-search"
+  },
+  "pi": {
+    "extensions": [
+      "./index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-04-25T20:45:19.226Z",
+    "modified": "2026-05-18T19:02:20.751Z",
+    "0.1.0": "2026-04-25T20:45:19.460Z",
+    "0.1.1": "2026-04-25T21:02:03.763Z",
+    "0.1.2": "2026-04-25T21:09:59.075Z",
+    "0.1.3": "2026-04-29T17:54:37.090Z",
+    "0.2.1": "2026-05-02T13:42:44.907Z",
+    "0.2.2": "2026-05-02T13:44:53.704Z",
+    "0.2.3": "2026-05-18T19:02:20.653Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": null,
+  "download_trend": []
+}

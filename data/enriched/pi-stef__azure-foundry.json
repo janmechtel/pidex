@@ -1,0 +1,37 @@
+{
+  "name": "@pi-stef/azure-foundry",
+  "latest_version": "0.1.3",
+  "description": "Azure Foundry and Azure OpenAI deployments as native Pi providers \u2014 config-driven, JSONC support, validation",
+  "readme": "# @pi-stef/azure-foundry\n\nAzure Foundry and Azure OpenAI deployments as native Pi providers \u2014 config-driven, JSONC support, validation.\n\n## Overview\n\nThis package registers Azure Foundry and Azure OpenAI deployments as native Pi providers from a JSONC configuration file. Each deployment becomes a provider whose model IDs are selected as `<deployment-id>/<model-id>`.\n\nKey features:\n- Config-driven setup with JSONC support\n- Two API modes: `openai-completions` and `azure-openai-responses`\n- Custom headers support\n- Multiple deployments per configuration\n- Built-in validation and verification\n\n## Install\n\n```sh\npi install npm:@pi-stef/azure-foundry\n```\n\nStart Pi once after installing. On first load, the extension creates:\n\n```text\n~/.pi/azure-foundry/config.json\n~/.pi/azure-foundry/config.schema.json\n```\n\n## Configuration\n\nEdit `config.json`, uncomment or add a deployment, and export the bearer-token env var named by `apiKeyEnv`.\n\n```bash\nexport AZURE_API_KEY=...\n```\n\n### Azure Foundry (openai-completions)\n\nFor Azure Foundry, use the modern OpenAI-compatible v1 endpoint:\n\n```jsonc\n{\n  \"id\": \"azure-foundry\",\n  \"name\": \"Azure Foundry East US\",\n  \"baseUrl\": \"https://<resource>.services.ai.azure.com/openai/v1/\",\n  \"apiKeyEnv\": \"AZURE_API_KEY\",\n  \"api\": \"openai-completions\",\n  \"models\": [\n    {\n      \"id\": \"Kimi-K2.6\",\n      \"name\": \"Kimi K2.6\",\n      \"reasoning\": false,\n      \"input\": [\"text\"],\n      \"contextWindow\": 128000,\n      \"maxTokens\": 2048,\n      \"cost\": { \"input\": 0, \"output\": 0, \"cacheRead\": 0, \"cacheWrite\": 0 }\n    }\n  ]\n}\n```\n\n### Azure OpenAI (azure-openai-responses)\n\nClassic Azure OpenAI via `azure-openai-responses`:\n\n```jsonc\n{\n  \"id\": \"aoai-eastus\",\n  \"name\": \"Azure OpenAI East US\",\n  \"baseUrl\": \"https://my-aoai.openai.azure.com\",\n  \"apiKeyEnv\": \"AZURE_OPENAI_API_KEY\",\n  \"api\": \"azure-openai-responses\",\n  \"models\": [\n    {\n      \"id\": \"o4-mini\",\n      \"name\": \"o4-mini\",\n      \"reasoning\": true,\n      \"input\": [\"text\"],\n      \"contextWindow\": 200000,\n      \"maxTokens\": 16000,\n      \"cost\": { \"input\": 0, \"output\": 0, \"cacheRead\": 0, \"cacheWrite\": 0 }\n    }\n  ]\n}\n```\n\nFor `azure-openai-responses`, Pi normalizes the URL to `<host>/openai/v1` and reads the API version from `AZURE_OPENAI_API_VERSION`, defaulting to `v1`. The host must end with `.openai.azure.com` or `.cognitiveservices.azure.com`.\n\n## Config Reference\n\nTop-level shape:\n\n```jsonc\n{\n  \"$schema\": \"./config.schema.json\",\n  \"deployments\": []\n}\n```\n\nDeployment fields:\n\n| Field | Required | Notes |\n| --- | --- | --- |\n| `id` | Yes | Provider id. Lowercase letters, numbers, and hyphens. |\n| `name` | Yes | Display name. |\n| `baseUrl` | Yes | `https://` endpoint. Rules depend on `api`. |\n| `apiKeyEnv` | Yes | Env-var name containing the bearer token. The secret is not stored in config. |\n| `api` | Yes | `openai-completions` or `azure-openai-responses`. |\n| `authHeader` | No | Defaults to `true`. Set `false` only if custom headers carry auth. |\n| `headers` | No | Map of header name to env-var name. Values must look like env-var names. |\n| `models` | Yes | One or more model entries. |\n\n## Multiple Deployments\n\n```jsonc\n{\n  \"deployments\": [\n    { \"id\": \"foundry-east\", \"name\": \"Foundry East\", \"baseUrl\": \"https://east.services.ai.azure.com/openai/v1/\", \"apiKeyEnv\": \"AZURE_EAST_KEY\", \"api\": \"openai-completions\", \"models\": [] },\n    { \"id\": \"foundry-west\", \"name\": \"Foundry West\", \"baseUrl\": \"https://west.services.ai.azure.com/openai/v1/\", \"apiKeyEnv\": \"AZURE_WEST_KEY\", \"api\": \"openai-completions\", \"models\": [] },\n    { \"id\": \"aoai-eastus\", \"name\": \"AOAI East US\", \"baseUrl\": \"https://my-aoai.openai.azure.com\", \"apiKeyEnv\": \"AZURE_OPENAI_API_KEY\", \"api\": \"azure-openai-responses\", \"models\": [] }\n  ]\n}\n```\n\n## Custom Headers\n\n```jsonc\n\"headers\": {\n  \"api-key\": \"AZURE_HEADER_KEY\",\n  \"x-ms-useragent\": \"AZURE_USER_AGENT\"\n}\n```\n\nHeader values are env-var names. Pi resolves them at request time. If an env var is missing, Pi sends the literal configured string as a fallback, so keep config values as env-var names rather than secrets.\n\n## Verification\n\nRun the package verifier after exporting the configured API key:\n\n```bash\npnpm -F @pi-stef/azure-foundry verify\n```\n\nUse `PI_AZURE_FOUNDRY_CONFIG=/path/to/config.json` to verify a test config without touching the default file.\n\nCommon outputs:\n\n| Output | Fix |\n| --- | --- |\n| `200` | The deployment is reachable. |\n| `401` | Check the env var named by `apiKeyEnv`. |\n| `404` | Check the model deployment id and base URL. |\n| `timeout after 10s` | Check network access, proxy, and endpoint host. |\n\n## Environment Variables\n\n| Variable | Purpose |\n| --- | --- |\n| `AZURE_API_KEY` | Example bearer token env var for Azure Foundry deployments when `apiKeyEnv` is set to `AZURE_API_KEY`. |\n| `PI_AZURE_FOUNDRY_CONFIG` | Override config path for tests or alternate profiles. |\n| `PI_AZURE_FOUNDRY_DEBUG` | Set to `1` for debug logging. |\n| `AZURE_OPENAI_API_VERSION` | Optional Pi-side version for `azure-openai-responses`; defaults to `v1`. |\n\n## Troubleshooting\n\n### Authentication Fails\n\nCheck the env var named by `apiKeyEnv` is exported and contains the correct bearer token.\n\n### Model Not Found\n\nCheck the model deployment id and base URL. For `azure-openai-responses`, ensure the host ends with `.openai.azure.com` or `.cognitiveservices.azure.com`.\n\n### Timeout\n\nCheck network access, proxy, and endpoint host. Use `PI_AZURE_FOUNDRY_DEBUG=1` for detailed logging.\n\n## Remove\n\n```sh\npi remove @pi-stef/azure-foundry\n```\n\n## Update\n\n```sh\npi update @pi-stef/azure-foundry\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "azure",
+    "azure-foundry",
+    "azure-openai",
+    "provider"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://sfiorini.github.io/pi-stef/packages/azure-foundry.html",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sfiorini/pi-stef.git",
+    "directory": "packages/azure-foundry"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-15T21:24:32.199Z",
+    "modified": "2026-06-20T21:14:05.285Z",
+    "0.1.1": "2026-06-15T21:24:32.553Z",
+    "0.1.2": "2026-06-17T03:34:22.717Z",
+    "0.1.3": "2026-06-20T21:14:05.166Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 187,
+  "download_trend": []
+}

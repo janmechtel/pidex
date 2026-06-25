@@ -1,0 +1,36 @@
+{
+  "name": "pi-mcp-audience",
+  "latest_version": "0.1.0",
+  "description": "Filter MCP content based on audience annotations for the Pi coding agent \u2014 hide content not intended for the user",
+  "readme": "# pi-mcp-audience\n\n**Filter MCP content based on audience annotations for [Pi coding agent](https://pi.dev).**\n\nMCP resources and content blocks can carry [`annotations`](https://modelcontextprotocol.io/specification/2025-11-25/server/resources#annotations) including an `audience` field indicating who the content is intended for \u2014 `\"user\"`, `\"assistant\"`, or both. This extension reads those annotations and hides content that is **not** meant for the user (e.g., raw JSON payloads, internal data, structured responses for the LLM only).\n\n## How it works\n\nWhen an MCP tool returns content, each block may carry annotations:\n\n```json\n{\n  \"type\": \"text\",\n  \"text\": \"Here's what I found...\",\n  \"annotations\": { \"audience\": [\"user\", \"assistant\"] }\n},\n{\n  \"type\": \"text\",\n  \"text\": \"{ \\\"raw\\\": \\\"json payload\\\" }\",\n  \"annotations\": { \"audience\": [\"assistant\"] }\n}\n```\n\n- The first block includes `\"user\"` \u2192 displayed normally.\n- The second block is **assistant-only** \u2192 hidden from the user display, but **still visible to the AI** (the LLM processes it, the user sees a placeholder).\n\nHidden items are replaced with a compact note:\n```\n[1 assistant-only content block hidden \u2014 visible to AI only]\n```\n\n## Installation\n\n### 1. Install pi-mcp-extension (with annotation support)\n\npi-mcp-audience works with the tools registered by [pi-mcp-extension](https://github.com/irahardianto/pi-mcp-extension). It inspects the `audience` field in annotations on each content block, which requires annotation preservation in `convertMcpContent()`.\n\n**A PR adding annotation preservation upstream is still in progress** \u2014 until it merges, use the patched fork which already includes it:\n\n```bash\nnpm install -g git+https://github.com/cwt/pi-mcp-extension.git\n```\n\n> Once the [upstream PR](https://github.com/irahardianto/pi-mcp-extension/pulls) merges, annotation preservation will be built into `pi-mcp-extension` directly and `pi install npm:pi-mcp-extension` is all you need \u2014 no fork required.\n\n### 2. Install pi-mcp-audience\n\n```bash\npi install npm:pi-mcp-audience\n```\n\nOr for local testing:\n```bash\npi -e src/index.ts\n```\n\n## Usage\n\n### Toggle visibility\n| Method | Action |\n|--------|--------|\n| `/mcp-audience` | Toggle |\n| `/mcp-audience on` | Show all content (including assistant-only) |\n| `/mcp-audience off` | Hide assistant-only content (default) |\n| `Ctrl+Shift+A` | Keyboard shortcut |\n\n### Diagnostics\n| Command | Description |\n|---------|-------------|\n| `/mcp-audience debug` | Show annotation stats for last N tool calls |\n| `/mcp-audience status` | Current state summary |\n\n### Footer status\n```\n3 item(s) hidden by audience filter\n```\n\n## Compatibility\n\n### pi-mcp-extension\nThe primary target. Requires annotation preservation in `convertMcpContent()` \u2014 see installation step 1 above.\n\n### Any tool\nWorks with any tool returning `annotations.audience` \u2014 not just MCP tools. Harmless if no annotations are present (no-op).\n\n## Architecture\n\nTwo-phase approach:\n\n| Phase | Event | What happens | User sees | AI sees |\n|-------|-------|-------------|-----------|---------|\n| 1. Filter | `tool_result` | Replace assistant-only items with placeholders. Stash originals in `details.__mcpAudienceOriginals` | Placeholder | Placeholder (temporarily) |\n| 2. Restore | `context` | Before each LLM call, restore originals from details into the context copy (deep copy, safe to modify) | Unaffected | **Full original data** |\n\nThe `context` event fires before every LLM call with a **deep copy** of messages. We restore the original content blocks there, so the AI always sees the complete data. The session's stored messages retain the filtered version for display.\n\n## Project Structure\n\n```\npi-mcp-audience/\n\u251c\u2500\u2500 src/\n\u2502   \u251c\u2500\u2500 index.ts              # Extension entry point (default export)\n\u2502   \u251c\u2500\u2500 audience-filter.ts    # Core filtering logic\n\u2502   \u2514\u2500\u2500 types.ts              # Shared type definitions\n\u251c\u2500\u2500 tests/\n\u2502   \u2514\u2500\u2500 audience-filter.test.ts  # 12 tests\n\u251c\u2500\u2500 package.json\n\u251c\u2500\u2500 tsconfig.json\n\u251c\u2500\u2500 .gitignore\n\u251c\u2500\u2500 .npmignore\n\u251c\u2500\u2500 LICENSE\n\u2514\u2500\u2500 README.md\n```\n\n## Technical Details\n\n- **Hook**: `tool_result` (filter display) + `context` (restore for AI)\n- **Content inspection**: Checks `item.annotations.audience` and `item.resource.annotations.audience`\n- **Persistence**: Filtered indices + originals stored in `details.__mcpAudienceOriginals`\n- **Toggle state**: In-memory (per session), affects future tool results\n- **No peer dependency**: pi-mcp-audience does not import pi-mcp-extension. It hooks Pi's event system generically. If no annotations are present, it's a no-op.\n\n## Development\n\n```bash\n# Typecheck\nnpm run typecheck\n\n# Run tests\nnpm test\n\n# Test with pi\npi -e src/index.ts\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "mcp",
+    "audience",
+    "annotations",
+    "model-context-protocol"
+  ],
+  "author": {
+    "name": "cwt114"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/cwt/pi-mcp-audience",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cwt/pi-mcp-audience.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-11T09:22:15.991Z",
+    "0.1.0": "2026-06-11T09:22:16.274Z",
+    "modified": "2026-06-11T09:22:16.532Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 7,
+  "download_trend": []
+}

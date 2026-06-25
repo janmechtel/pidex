@@ -1,0 +1,45 @@
+{
+  "name": "pi-engram",
+  "latest_version": "0.2.3",
+  "description": "Standalone shareable Engram extension package for pi-coding-agent",
+  "readme": "# pi-engram\n\nStandalone shareable [Pi](https://github.com/badlogic/pi-mono) package for Engram persistent memory integration.\n\n![pi-engram logo](docs/pi-engram-logo.jpg)\n\nIt ships a native Pi extension plus a small Engram memory-protocol skill. The recommended install path is npm, with GitHub installs available for pinned or unreleased versions.\n\n> Security note: Pi extensions run with your full system permissions. Review extension source before installing packages from any repository.\n\n## What it does\n\n- registers native Pi memory tools for Engram\n- adds an Engram memory-protocol skill for Pi agents\n- tracks Pi session lifecycle events in Engram\n- captures user prompts through Pi's `input` lifecycle event\n- attempts to auto-start the Engram backend with `engram serve` when needed\n- keeps startup conservative: it can notify when project memory exists, but it does not auto-inject full memory context\n- helps preserve continuity through compaction recovery instructions and summary persistence\n- redacts `<private>...</private>` blocks before sending data to Engram\n\n## Install\n\n### From npm\n\n```bash\npi install npm:pi-engram\n```\n\nThen reload Pi:\n\n```text\n/reload\n```\n\n### From git\n\nInstall the latest `main` from GitHub:\n\n```bash\npi install git:github.com/felipe3dfx/pi-engram\n```\n\nInstall a pinned release tag:\n\n```bash\npi install git:github.com/felipe3dfx/pi-engram@v0.2.0\n```\n\n### From Engram TUI/setup flow\n\nEngram's main repository has an active PR for installing the Pi integration through the Engram setup/TUI flow. If you are testing that PR or using an Engram build that includes it, prefer the Engram-managed setup path for the bundled/offline installation experience.\n\nThis repository remains the standalone npm/GitHub package for users who want to install the Pi package directly.\n\n## Uninstall\n\nList installed packages:\n\n```bash\npi list\n```\n\nRemove the package using the same source shown by `pi list`, for example:\n\n```bash\npi remove npm:pi-engram\n```\n\nor for a GitHub install:\n\n```bash\npi remove git:github.com/felipe3dfx/pi-engram\n```\n\nThen reload or restart Pi.\n\n## Usage\n\nAfter installation and `/reload`, Pi agents get native Engram tools and the Engram skill.\n\nTypical prompts:\n\n```text\nRemember this architecture decision with Engram.\nSearch Engram for previous work on this project.\nBefore we stop, save a session summary.\nAfter compaction, recover context from Engram.\n```\n\nThe extension also records lifecycle and prompt metadata automatically where supported by Pi events.\n\n## Commands and tools\n\n### Slash commands\n\n```text\n/engram-status\n```\n\nShows Engram backend, project, session, binary, auto-start, and last-memory diagnostics. The Engram status line also includes the detected project name, for example `\ud83e\udde0 pi-engram \u00b7 ready`.\n\n```text\n/engram-recovery\n```\n\nShows compaction recovery instructions when automatic compaction summary extraction is unavailable or when you need manual recovery guidance.\n\n### Native tools\n\n| Tool | Purpose |\n|------|---------|\n| `mem_context` | Fetch compact project continuity context from Engram. |\n| `mem_search` | Search Engram observations with text and optional filters. |\n| `mem_save` | Save a durable observation. |\n| `mem_session_summary` | Persist an end-of-session or post-compaction summary. |\n| `mem_get_observation` | Load one full observation by ID. |\n| `mem_save_prompt` | Persist a prompt explicitly when needed. |\n\n## Behavior\n\n### Backend auto-start\n\nWhen a memory tool or lifecycle hook needs Engram, the extension checks the local backend health endpoint. If it is not running, it attempts to start:\n\n```bash\nengram serve\n```\n\nThe default binary name is `engram`. Override it with:\n\n```bash\nENGRAM_BIN=/path/to/engram pi\n```\n\nThe default port is `7437`. Override it with:\n\n```bash\nENGRAM_PORT=7437 pi\n```\n\n### Startup policy\n\nAt session start, the extension may check whether recent project memory exists. If it finds relevant memory and Pi has UI available, it notifies you.\n\nIt does **not** automatically load or inject the full memory context. Ask the agent to call `mem_context` when you want continuity restored.\n\n### Prompt and session capture\n\nThe extension uses Pi lifecycle events to:\n\n- register session starts\n- save session shutdown metadata\n- capture user prompts from the `input` event\n- skip extension-generated input to avoid double capture\n\n### Compaction recovery\n\nThe extension supports compaction resilience in two ways:\n\n1. `session_before_compact` tries to inject a `FIRST ACTION REQUIRED` instruction into compaction instructions when Pi exposes a supported event shape.\n2. `session_compact` tries to persist the compacted summary to Engram.\n\nIf summary extraction or persistence is unavailable, run:\n\n```text\n/engram-recovery\n```\n\nThen ask the agent to call `mem_context` manually.\n\n### Privacy redaction\n\nAny text wrapped in `<private>...</private>` is replaced with `[REDACTED]` before leaving the extension.\n\nExample:\n\n```text\npublic note <private>secret</private>\n```\n\nbecomes:\n\n```text\npublic note [REDACTED]\n```\n\n## Development\n\nThe extension entrypoint is:\n\n```text\nextensions/engram.ts\n```\n\nThe included skill is:\n\n```text\nskills/engram/SKILL.md\n```\n\nRun the full release guard locally:\n\n```bash\nnpm run check\n```\n\nThis runs TypeScript checks, the Vitest suite, the deterministic runtime harness, and an npm pack dry-run.\n\nRun individual checks when iterating:\n\n```bash\nnpm run typecheck\nnpm test\nnpm run test:harness\nnpm run pack:dry-run\n```\n\nEquivalent direct harness command:\n\n```bash\nnode test/runtime-harness.mjs extensions/engram.ts\n```\n\nThe package also has a `prepublishOnly` guard, so manual `npm publish` runs the publish checks before uploading.\n\n## Relationship to `engram setup pi`\n\nThis repository is the standalone npm/GitHub package for sharing, inspecting, and contributing to the Pi integration.\n\nThe Engram monorepo has an active PR for a first-party Pi setup flow via Engram's setup/TUI experience, including the equivalent of:\n\n```bash\nengram setup pi\n```\n\nThat flow materializes and installs a local package from the Engram binary for an embedded/offline experience. This repository does not include that installer wiring; it contains only the standalone Pi package assets used for npm/GitHub distribution.\n\n## Troubleshooting\n\n### Memory tools cannot auto-start Engram\n\nVerify `engram` resolves correctly in the environment used to launch Pi:\n\n```bash\ncommand -v engram\nengram --version\n```\n\nIf needed:\n\n```bash\nENGRAM_BIN=/absolute/path/to/engram pi\n```\n\n### Extension or skill does not appear\n\nRun `/reload` in Pi after installation, or restart Pi.\n\n### Duplicate or stale Pi packages\n\nIf Pi reports resource conflicts from stale installs, inspect installed packages:\n\n```bash\npi list\n```\n\nRemove stale duplicates with:\n\n```bash\npi remove <package-source>\n```\n\nThen reinstall this package.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "pi-coding-agent",
+    "engram",
+    "memory",
+    "persistent-memory",
+    "ai-agents"
+  ],
+  "author": {
+    "name": "felipe.3dfx"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/felipe3dfx/pi-engram#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/felipe3dfx/pi-engram.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/engram.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "image": "https://raw.githubusercontent.com/felipe3dfx/pi-engram/main/docs/pi-engram-logo.jpg"
+  },
+  "time": {
+    "created": "2026-04-25T01:05:15.768Z",
+    "modified": "2026-04-25T02:37:02.632Z",
+    "0.2.0": "2026-04-25T01:05:16.001Z",
+    "0.2.1": "2026-04-25T01:11:58.520Z",
+    "0.2.2": "2026-04-25T01:33:20.569Z",
+    "0.2.3": "2026-04-25T02:37:02.331Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": null,
+  "download_trend": []
+}

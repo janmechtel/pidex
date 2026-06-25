@@ -1,0 +1,348 @@
+{
+  "name": "@anton-kochev/telos",
+  "latest_version": "0.2.0",
+  "description": "Telos: repo-scoped structured task tracking for pi.",
+  "readme": "# telos\n\nRepo-scoped structured task tracking for pi.\n\nTelos adds a `/tasks` command and an agent-callable `telos_tasks` tool. Tasks persist in the current repository's `.pi/telos-tasks.md`, so they survive pi sessions and remain inspectable outside pi.\n\n## Install\n\n```bash\npi install npm:@anton-kochev/telos\n```\n\nPin to a version:\n\n```bash\npi install npm:@anton-kochev/telos@<version>\n```\n\nFor local development from a checkout of [`pi-extensions`](https://github.com/anton-kochev/pi-extensions):\n\n```bash\npi install ./telos\npi install ./telos -l   # project-local\n```\n\nTemporary test run:\n\n```bash\npi -e ./telos\n```\n\n## Usage\n\nInside pi:\n\n```text\n/tasks\n/tasks list [--archived|--all]\n/tasks create [--priority low|medium|high|urgent] [--status todo|in_progress|blocked|done|archived] [--notes <notes>] [--depends <id[,id...]>] <title>\n/tasks show <id>\n/tasks update <id> [--title <title>] [--priority low|medium|high|urgent] [--status todo|in_progress|blocked|done|archived] [--notes <notes>] [--depends <id[,id...]>]\n/tasks status <id> <todo|in_progress|blocked|done|archived>\n/tasks complete <id>\n/tasks reopen <id>\n/tasks block <id>\n/tasks archive <id>\n/tasks delete <id>       # rejected; use archive instead\n/tasks --help\n```\n\nExamples:\n\n```text\n/tasks create --priority high \"Implement Telos MVP\"\n/tasks list --all\n/tasks update TSK-abc123ef --notes \"Waiting on review\"\n/tasks create --depends TSK-abc123ef \"Build on existing task\"\n/tasks complete TSK-abc123ef\n/tasks archive TSK-abc123ef\n```\n\n`/tasks` with no arguments opens a read-only interactive task list when pi has an interactive UI. Use `\u2191`/`\u2193` to move the chevron pointer between tasks, press `Enter` or `Space` to open/close details for the selected task, and press `Esc`, `Ctrl+C`, or `q` to exit without modifying tasks. In non-interactive modes it prints the active task list as text.\n\n### Interactive list legend\n\nThe interactive list uses compact glyphs so task rows stay scannable:\n\nStatuses:\n\n```text\n\u25a1 todo\n\u25a3 in_progress\n\u25a7 blocked\n\u25a0 done\n\u25ab archived\n```\n\nPriorities:\n\n```text\n\u25cf\u25cf\u25cf urgent\n\u25cf\u25cf\u25cb high\n\u25cf\u25cb\u25cb medium\n\u25cb\u25cb\u25cb low\n```\n\nDependency indicator:\n\n```text\n\u25c21   depends on one task\n\u25c22   depends on two tasks\n```\n\nExample row:\n\n```text\n\u203a \u25a1 TSK-9d6a63e4  \u25cf\u25cb\u25cb  Dependent test task  \u25c21\n```\n\nThe `\u203a` chevron marks the selected task. Press `Enter` or `Space` to switch to a details view for that task:\n\n```text\n\u2500\u2500\u2500 TSK-9d6a63e4 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n  Dependent test task\n  \u25a1 todo \u00b7 \u25cf\u25cb\u25cb medium\n\n  Dependencies\n  \u25a1 TSK-e1fe6249  \u25cf\u25cb\u25cb  Move Telos task artifact under .pi\n\n  Created  2026-06-04 11:08 UTC\n  Updated  2026-06-04 11:08 UTC\n```\n\nThe details view shows the description and dependencies only when they are present. Long descriptions wrap instead of truncating.\n\nCompleted tasks are dimmed and sorted after incomplete active tasks. Dependency IDs are not expanded in the list; use the details view or `/tasks show <id>` for full details.\n\n## Agent tool\n\nTelos registers one LLM-callable tool: `telos_tasks`.\n\nThe tool supports the same task operations as `/tasks`: create, list, show, update, status, complete, reopen, block, archive, and delete rejection. It also accepts `dependencies: string[]` for create and update operations. It is described neutrally so the agent can use it when the user asks to manage or track tasks; Telos does not add any automatic per-turn task creation or tracking hook.\n\n## `.pi/telos-tasks.md` artifact\n\nTelos stores canonical task data in YAML frontmatter under the repository's `.pi` directory:\n\n```md\n---\ntelos_version: 1\ntasks:\n  - id: TSK-abc123ef\n    title: Implement Telos MVP\n    status: todo\n    priority: high\n    notes: \"\"\n    dependencies: []\n    created: \"2026-06-02T12:00:00.000Z\"\n    updated: \"2026-06-02T12:00:00.000Z\"\n---\n\n# Tasks\n\nGenerated human-readable summary...\n```\n\nThe YAML frontmatter is the source of truth. The Markdown body is regenerated after successful Telos mutations and should be treated as display output.\n\nTask fields:\n\n- `id` \u2014 stable task ID, generated as `TSK-{short_hash}`, for example `TSK-abc123ef`\n- `title` \u2014 non-empty task title\n- `status` \u2014 `todo`, `in_progress`, `blocked`, `done`, or `archived`\n- `priority` \u2014 `low`, `medium`, `high`, or `urgent`\n- `notes` \u2014 string, may be empty\n- `dependencies` \u2014 task IDs this task depends on; use `[]` when there are none. Dependencies must reference existing tasks, cannot reference the task itself, and cannot contain duplicates.\n- `created` \u2014 ISO 8601 timestamp\n- `updated` \u2014 ISO 8601 timestamp\n\nArchive is the MVP soft-delete mechanism. Physical deletion is rejected and leaves `.pi/telos-tasks.md` unchanged.\n\n## Local development\n\n```bash\ncd telos\nnpm install\nnpm test\n```\n\nTelos uses Node's built-in `node:test` runner with `tsx` for TypeScript tests.\n\n## Publish\n\nThis package is intended to publish through the repository's trusted publishing workflow. Release with a package-specific tag:\n\n```bash\ncd telos\nnpm version patch --tag-version-prefix=\"telos-v\"\ngit push --follow-tags\n```\n\n## Notes\n\nThis package imports pi runtime packages as peer dependencies:\n\n- `@earendil-works/pi-ai`\n- `@earendil-works/pi-coding-agent`\n- `@earendil-works/pi-tui`\n- `typebox`\n\nDo not bundle those dependencies; pi provides them at runtime.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "tasks",
+    "todo",
+    "project-management"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/anton-kochev/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anton-kochev/pi-extensions.git",
+    "directory": "telos"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-02T22:34:46.032Z",
+    "modified": "2026-06-04T12:44:13.427Z",
+    "0.1.0": "2026-06-02T22:34:46.444Z",
+    "0.2.0": "2026-06-04T12:44:13.178Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 15,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 63
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 189
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 4
+    }
+  ]
+}

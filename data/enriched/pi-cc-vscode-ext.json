@@ -1,0 +1,34 @@
+{
+  "name": "pi-cc-vscode-ext",
+  "latest_version": "0.1.0",
+  "description": "Pi extension that exposes VS Code editor context through Claude Code's local IDE bridge.",
+  "readme": "# Pi VS Code Context Bridge\n\nThis extension reuses the existing Claude Code VSCode extension to co-opt it's TUI context injection functionality to automatically pull your selected VS Code context into Pi, so\nterminal sessions can see the active file, cursor, and highlighted code from\nyour editor.\n\n<p align=\"center\">\n  <img src=\"images/vscode-context-injection-example.png\" alt=\"Automatically injected VS Code context in a Pi session\" width=\"800\">\n</p>\n\n## Features\n\n- Registers a `vscode_context` tool that the model can call for the current VS\n  Code editor context.\n- Adds a `/vscode` command for viewing bridge status, refreshing state, and\n  toggling automatic context injection for the current session.\n- Shows a compact footer status for disconnected, active-file, and selected-line\n  states.\n- Automatically injects changed VS Code context before an agent turn, while\n  deduplicating unchanged context by fingerprint.\n- Keeps Claude Code IDE bridge authorization tokens local and out of tool,\n  prompt, and status output.\n\n## Requirements\n\n- Pi with package extension support.\n- Node.js `>=22.18`.\n- VS Code connected through Claude Code's IDE integration.\n\nThis extension depends on Claude Code's local IDE bridge lock files under\n`~/.claude/ide/*.lock`. If no Claude Code IDE bridge is active, the extension\nreports a disconnected state and does not inject editor context automatically.\n\n## Installation\n\nInstall the package with Pi:\n\n```bash\npi install npm:pi-cc-vscode-ext\n```\n\nYou can also install directly from a Git checkout or run the extension during\nlocal development:\n\n```bash\npi install ./\npi -e ./extensions/claude-ide-vscode.ts\n```\n\nPi loads the extension through the package manifest:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./extensions/claude-ide-vscode.ts\"],\n    \"image\": \"https://raw.githubusercontent.com/JoeHelbing/pi-cc-vscode-ext/main/images/vscode-context-injection-example.png\"\n  }\n}\n```\n\n## Usage\n\nStart Pi from a workspace that is also open in VS Code through Claude Code. When\nVS Code context is available, Pi automatically injects changed editor context\nbefore each agent turn.\n\nUse the tool from the model when explicit editor context is useful:\n\n```text\nUse vscode_context to inspect my current VS Code selection.\n```\n\nUse the slash command for interactive control:\n\n```text\n/vscode\n```\n\nThe command shows the current bridge status and includes actions to refresh,\nreset automatic injection state, or toggle automatic injection for the session.\n\n## Screenshots\n\n<p align=\"center\">\n  <img src=\"images/vscode-context-injection-example.png\" alt=\"Automatically injected VS Code context in a Pi session\" width=\"800\">\n</p>\n\n<p align=\"center\">\n  <img src=\"images/vscode-command-menu-and-footer.png\" alt=\"The /vscode command menu and footer status\" width=\"800\">\n</p>\n\n<p align=\"center\">\n  <img src=\"images/claude-code-vscode-bridge.png\" alt=\"Pi showing selected VS Code context from VS Code\" width=\"800\">\n</p>\n\n## How it works\n\nClaude Code's VS Code integration writes local lock files under\n`~/.claude/ide/*.lock`. Each lock records the local WebSocket port, process id,\nworkspace folders, IDE metadata, and an authorization token.\n\nThis extension:\n\n1. Reads Claude Code IDE lock files from the local machine.\n2. Prefers live locks whose workspace contains Pi's current working directory.\n3. Connects to `ws://127.0.0.1:<port>` with the lock token.\n4. Calls Claude Code's MCP-style `getLatestSelection` IDE tool.\n5. Normalizes the active file path, cursor or selection range, selected text,\n   and status summary for Pi.\n\nAuthorization tokens are used only for the local WebSocket request. They are not\nreturned by `vscode_context`, inserted into model context, printed in status\ntext, or written by this package.\n\n## Package contents\n\nThe npm package includes:\n\n- `extensions/claude-ide-vscode.ts` - the Pi extension and bridge logic.\n- `images/vscode-context-injection-example.png` - package/gallery preview image.\n- `images/vscode-command-menu-and-footer.png` - command menu and footer screenshot.\n- `images/claude-code-vscode-bridge.png` - Claude Code bridge screenshot.\n- `README.md` - package documentation.\n- `LICENSE` - Apache 2.0 license text.\n- `package.json` - package metadata and Pi manifest.\n\n## Limitations\n\n- Claude Code's local IDE bridge and lock-file format are not public Pi APIs and\n  may change.\n- The bridge only works when Claude Code's VS Code integration is running on the\n  same machine as Pi.\n- Selected text may be truncated before prompt injection to avoid oversized\n  context.\n\n## Development\n\nRun the syntax check:\n\n```bash\nnpm run check\n```\n\nPreview the npm package contents:\n\n```bash\nnpm pack --dry-run\n```\n\n## License\n\nApache-2.0\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "vscode",
+    "claude-code",
+    "ide-context"
+  ],
+  "author": null,
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/JoeHelbing/pi-cc-vscode-ext#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JoeHelbing/pi-cc-vscode-ext.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/claude-ide-vscode.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/JoeHelbing/pi-cc-vscode-ext/main/images/vscode-context-injection-example.png"
+  },
+  "time": {
+    "created": "2026-06-24T03:19:24.700Z",
+    "0.1.0": "2026-06-24T03:19:24.996Z",
+    "modified": "2026-06-24T03:19:25.159Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,39 @@
+{
+  "name": "pi-memd",
+  "latest_version": "0.4.0",
+  "description": "Project-level session memory for the pi coding agent \u2014 a single MEMD.md file per project",
+  "readme": "<p align=\"center\">\n  <img src=\"pi-memd.png\" alt=\"pi-memd logo\" width=\"200\"/>\n</p>\n\n# pi-memd\n\nProject-level session memory for the [pi coding agent](https://pi.dev/) \u2014 a single **MEMD.md** file per project.\n\n## Why\n\nEvery other pi memory extension either uses SQLite (unreadable outside the tool), spawns LLM calls on session shutdown (slow), or scatters memory across dozens of files. **pi-memd** is different:\n\n- **One file** \u2014 `MEMD.md` at project root. Human-readable. Git-ignorable.\n- **Zero dependencies** \u2014 No SQLite, no vector DB, no git dependency. Pure TypeScript + Node fs.\n- **Zero LLM calls** \u2014 No consolidation step. No reflection model. All operations are deterministic file I/O.\n- **Fast** \u2014 Read on session start, cached in memory. Tools do append-only writes.\n- **Smart clean** \u2014 Built-in dedup, stale detection, and size management via `memd_clean`.\n- **Dynamic sections** \u2014 Agents can create any section on the fly (Research, Notes, Ideas, etc.). No artificial restrictions.\n\n## MEMD.md Structure\n\n```markdown\n# Project Memory\n\n## Decisions\n- 2025-05-05: Using FastAPI for the API layer \u2014 simpler than Flask for async\n- 2025-05-04: Chose PostgreSQL over MongoDB \u2014 relational data model fits better\n\n## Active Context\n- Docker stack uses Cloudflare Tunnel for public access\n- All services on `labnet` Docker network\n\n## Bugs & Fixes\n- 2025-05-03: Immich container OOM \u2014 increased memory limit to 4G\n\n## Changelog\n- 2025-05-05: Added health endpoint to FastAPI service\n\n## Patterns\n- Always use `labnet` Docker network for new services\n- Conventional commits for all repos\n```\n\nSections auto-date entries for Decisions, Bugs & Fixes, and Changelog. Active Context and Patterns are undated.\n\n**Dynamic sections:** Agents can write to any section name \u2014 not just the five defaults. New sections are created automatically and preserved in order after the configured sections. Use this for ad-hoc needs like Research, Notes, Ideas, or any project-specific category.\n\n## Install\n\n```bash\npi install npm:pi-memd\n```\n\nOr add to `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\"npm:pi-memd\"]\n}\n```\n\nOr project-local in `.pi/settings.json`:\n\n```json\n{\n  \"packages\": [\"npm:pi-memd\"]\n}\n```\n\n## Tools\n\n| Tool | Description |\n|------|-------------|\n| `memd_write` | Append entries or overwrite sections in MEMD.md |\n| `memd_read` | Read entire MEMD.md or a specific section |\n| `memd_search` | Search entries by keyword (case-insensitive) |\n| `memd_clean` | Remove duplicates and stale entries (supports dry run) |\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/memd` | Show MEMD.md statistics |\n| `/memd-clean` | Interactive clean with confirmation |\n| `/memd-init` | Create MEMD.md and add to .gitignore |\n\n## Configuration\n\nIn `~/.pi/agent/settings.json` or `.pi/settings.json`:\n\n```json\n{\n  \"memd\": {\n    \"enabled\": true,\n    \"maxSizeKb\": 64,\n    \"maxAgeDays\": 90,\n    \"sections\": [\"Decisions\", \"Active Context\", \"Bugs & Fixes\", \"Changelog\", \"Patterns\"],\n    \"autoInit\": true,\n    \"injectContext\": true\n  }\n}\n```\n\n| Setting | Default | Description |\n|---------|---------|-------------|\n| `enabled` | `true` | Enable/disable MEMD |\n| `maxSizeKb` | `64` | Max MEMD.md size in KB before lightweight injection |\n| `maxAgeDays` | `90` | Days before Changelog/Bugs entries are stale |\n| `sections` | 5 defaults | Initial section names in order (dynamic sections auto-added) |\n| `autoInit` | `true` | Auto-create MEMD.md on first session |\n| `injectContext` | `true` | Inject MEMD.md content into system prompt |\n\n## How It Works\n\n1. **Session start** \u2014 Reads MEMD.md, auto-creates if missing, adds to .gitignore if in git repo\n2. **Every agent turn** \u2014 Injects MEMD.md content into system prompt as `<memd>` XML block\n3. **Agent writes** \u2014 Uses `memd_write` tool to append entries when the user says \"remember this\" or the agent identifies something worth persisting\n4. **Clean** \u2014 Periodically run `memd_clean` or `/memd-clean` to remove duplicates and stale entries\n\n## vs Other Memory Extensions\n\n| Feature | pi-memd | @samfp/pi-memory | pi-self-learning | jo-inc/pi-mem |\n|---------|---------|-------------------|------------------|---------------|\n| Storage | Single MEMD.md | SQLite DB | Multi .md + git | Multi .md files |\n| Per-project | Yes | Global or project | Project-local | Global |\n| LLM calls | None | Yes (consolidation) | Yes (reflection) | Yes (dashboard) |\n| Human-readable | Yes | No (DB) | Yes | Yes |\n| Size management | Built-in clean | Manual | Manual | Manual |\n| .gitignore auto | Yes | N/A | No | No |\n| Zero-dep | Yes (fs only) | better-sqlite3 | None | None |\n\n## License\n\nMIT",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "memory",
+    "markdown",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "greedy"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/whonixnetworks/pi-memd#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/whonixnetworks/pi-memd.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-05T11:51:19.821Z",
+    "modified": "2026-05-24T15:08:09.812Z",
+    "0.1.0": "2026-05-05T11:51:20.156Z",
+    "0.1.1": "2026-05-05T12:30:44.705Z",
+    "0.2.1": "2026-05-07T11:03:27.493Z",
+    "0.3.0": "2026-05-07T11:32:48.081Z",
+    "0.4.0": "2026-05-24T15:08:09.708Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": null,
+  "download_trend": []
+}

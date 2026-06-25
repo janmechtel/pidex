@@ -1,0 +1,39 @@
+{
+  "name": "pi-remote-agent",
+  "latest_version": "1.0.0",
+  "description": "Secure remote agent bridge for pi \u2014 delegate tasks to another pi instance over Tailscale. Includes /ask-agent command and ask_remote_agent tool for LLM-driven delegation.",
+  "readme": "<p align=\"center\">\n  <img src=\"https://img.shields.io/badge/pi-extension-6C5CE7?style=for-the-badge\" alt=\"pi extension\" />\n  <img src=\"https://img.shields.io/badge/tailscale-mesh-blue?style=for-the-badge&logo=tailscale\" alt=\"Tailscale\" />\n  <img src=\"https://img.shields.io/npm/v/@aman-asmuei/pi-remote-agent?style=for-the-badge&color=critical\" alt=\"npm version\" />\n</p>\n\n<h1 align=\"center\">\ud83c\udf19 pi-remote-agent</h1>\n<p align=\"center\"><em>Delegate tasks to a friend's pi agent \u2014 securely, over Tailscale.</em></p>\n\n---\n\n## \ud83e\udde0 What is this?\n\n**pi-remote-agent** is a pi extension that lets your pi session talk to another pi instance running on a friend's machine. Think pair programming, second opinions, or delegating subtasks \u2014 all from within your pi TUI.\n\nYour LLM can even call the remote agent *automatically* via the `ask_remote_agent` tool.\n\n<p align=\"center\">\n  <img src=\"https://placehold.co/600x200/6C5CE7/white?text=You+%E2%86%94+Remote+Agent+via+Tailscale\" alt=\"architecture diagram\" />\n</p>\n\n---\n\n## \ud83d\ude80 Quick Start\n\n### 1. Your friend sets up the bridge\n\nOn their machine, they run pi with the bridge enabled:\n\n```bash\npi --bridge --rpc-port 18777\n```\n\nTheir bridge will be reachable at `https://<their-tailscale-node>.ts.net/rpc`.\n\n### 2. You configure the peer\n\nAdd their bridge URL to your remote agents config:\n\n```bash\n# ~/.pi/agent/remote-agents.json\n{\n  \"friend\": \"https://friend-mac.tail1234.ts.net/rpc\"\n}\n```\n\nOr set it once via environment variable:\n\n```bash\nexport REMOTE_AGENT_URL=\"https://friend-mac.tail1234.ts.net/rpc\"\n```\n\n### 3. Install the extension\n\n```bash\npi install npm:@aman-asmuei/pi-remote-agent\n```\n\n### 4. Start delegating\n\n```\n# Command (manual)\n/ask-agent @friend Refactor the auth module to use JWT instead of sessions\n\n# Tool (LLM auto-invokes)\n\"When should I use a connection pool vs a single connection?\"\n\u2192 LLM automatically calls ask_remote_agent\n```\n\n---\n\n## \ud83d\udcd6 Usage\n\n### `/ask-agent` Command\n\n```\n/ask-agent <prompt>                \u2192 Uses default peer (REMOTE_AGENT_URL)\n/ask-agent @friend <prompt>        \u2192 Targets a named peer from remote-agents.json\n```\n\nThe command streams the response in real-time, showing which tools the remote agent is using (read, bash, edit, write).\n\n### `ask_remote_agent` Tool\n\nThe LLM can also call the remote agent automatically. It's registered as a tool in your session, so you don't need to manually decide when to delegate \u2014 your model routes tasks that benefit from an external perspective.\n\n```\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502  You: \"Is this SQL query vulnerable to injection?\"\u2502\n\u2502                                                   \u2502\n\u2502  Arienz: \ud83d\udd12 Asking Security SME (remote)...        \u2502\n\u2502  Remote: \u274c Yes \u2014 3 vulnerabilities found.        \u2502\n\u2502          \u2022 Unsanitized input on line 12            \u2502\n\u2502          \u2022 No parameterized query on line 18       \u2502\n\u2502          \u2022 User input in ORDER BY clause           \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\n---\n\n## \u2699\ufe0f Configuration\n\n| Key | Location | Description |\n|-----|----------|-------------|\n| `REMOTE_AGENT_URL` | Environment | Default bridge URL (fallback) |\n| `remote-agents.json` | `~/.pi/agent/` | Named peers with bridge URLs |\n\n```jsonc\n// ~/.pi/agent/remote-agents.json\n{\n  \"alice\":   \"https://alice-dev.tail1234.ts.net/rpc\",\n  \"bob\":     \"https://bob-server.tail1234.ts.net/rpc\",\n  \"work\":    \"https://ci-bot.work-net.ts.net/rpc\"\n}\n```\n\n---\n\n## \ud83d\udd12 Security\n\n- All traffic routes through **Tailscale's encrypted mesh** \u2014 no open ports, no public exposure\n- Sessions are ephemeral \u2014 created, used, and destroyed per-request\n- Your API keys and credentials are never sent to the remote agent\n- Extensions have full system access \u2014 review the source before installing (this repo is MIT-licensed and auditable at [index.ts](./index.ts))\n\n---\n\n## \ud83d\udcc1 Project Structure\n\n```\npi-remote-agent/\n\u251c\u2500\u2500 index.ts          # Extension entry point (single file)\n\u251c\u2500\u2500 package.json      # pi package manifest\n\u2514\u2500\u2500 README.md         # You are here\n```\n\n---\n\n## \ud83d\udee0\ufe0f Development\n\n```bash\n# Clone and test locally\ngit clone https://github.com/aman-asmuei/pi-remote-agent\ncd pi-remote-agent\npi install ./    # Install from local path\n\n# Or test without installing\npi -e ./index.ts\n```\n\n---\n\n## \ud83d\udcc4 License\n\nMIT \u00a9 Aman \u2014 share, remix, and build on it freely.\n\n---\n\n<p align=\"center\">\n  <sub>Built with \ud83e\udd32 for the pi ecosystem. <a href=\"https://pi.dev/packages\">View on pi.dev \u2192</a></sub>\n</p>\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "remote-agent",
+    "tailscale",
+    "collaboration",
+    "agent-bridge",
+    "pair-programming"
+  ],
+  "author": {
+    "name": "aman_asmuei"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/amanasmuei/pi-remote-agent#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amanasmuei/pi-remote-agent.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://placehold.co/600x200/6C5CE7/white?text=pi-remote-agent+bridge"
+  },
+  "time": {
+    "created": "2026-05-06T02:53:08.713Z",
+    "1.0.0": "2026-05-06T02:53:08.930Z",
+    "modified": "2026-05-06T02:53:09.101Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

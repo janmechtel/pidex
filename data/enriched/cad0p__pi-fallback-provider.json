@@ -1,0 +1,344 @@
+{
+  "name": "@cad0p/pi-fallback-provider",
+  "latest_version": "0.1.0",
+  "description": "Automatic model cycling when the pi agent gets stuck on errors",
+  "readme": "# pi-fallback-provider\n\nAutomatic model cycling when the pi agent gets stuck on errors.\n\n## The problem\n\nWhen an LLM provider fails (rate limit, context overflow, content policy, etc.), pi's built-in retry handles transient errors (429, 5xx). But when retries are exhausted \u2014 or the error isn't retryable \u2014 the agent just stops. You have to manually switch models and continue from the current context.\n\n## How this extension helps\n\nInstead of classifying errors or intercepting at the transport layer, this extension uses **progress detection**:\n\n```\nagent_end fires with stopReason === \"error\"\n  \u2192 start 20s timer\n  \u2192 if turn_start fires \u2192 cancel timer (pi is making progress)\n  \u2192 if timer expires \u2192 cycle to next model, send \"continue\"\n```\n\n- **No error classification** \u2014 works for any error type\n- **Respects pi's retries** \u2014 20s timeout gives pi's built-in retry (3 retries \u00d7 exponential backoff \u2248 14s) a chance to finish\n- **Sends `continue` after switching** \u2014 resumes from the current agent context instead of replaying a stale user request\n- **Resets on each failure** \u2014 each `agent_end` with error resets the timer, so it waits for the *last* failure's quiet period\n- **Skips user aborts** \u2014 only triggers on `stopReason === \"error\"`, not `\"aborted\"` (ESC)\n- **Smart ordering** \u2014 prefers the last working model (cached 1h), skips recently failed models (5min cooldown)\n\n## Install\n\n```bash\npi install git:github.com/cad0p/pi-fallback-provider\n```\n\nOr copy `index.ts` to `~/.pi/agent/extensions/`.\n\n## Configuration\n\nNo configuration needed \u2014 it cycles through all models you have authenticated in pi.\n\nSet `PI_FALLBACK_DEBUG=true` for verbose logging:\n\n```bash\nPI_FALLBACK_DEBUG=true pi\n```\n\n## Manual trigger\n\nUse `/cycle-model` to manually cycle to the next available model and send `continue`.\n\n## How it decides which model to try next\n\n1. **Cached model** \u2014 if you recently had a working model, try it first (1h TTL)\n2. **Round-robin** \u2014 cycles through remaining authenticated models\n3. **Failed models last** \u2014 models that recently failed are tried as a last resort (5min cooldown)\n\n## Differences from existing extensions\n\n| Extension | Approach | Auto on error? | Cycles models? |\n|---|---|---|---|\n| **pi-fallback-provider (xilnick)** | Transport-level stream interception | Only retryable | Within chain |\n| **pi-retry** | `agent_end` hook, same-model retry | Only `aborted` | \u274c Same model |\n| **pi-model-switch** | LLM tool for manual switching | \u274c | \u2705 Manual |\n| **pi-cycle** | F8 hotkey, profile cycling | \u274c | \u2705 Manual |\n| **This extension** | `agent_end` + progress timer | \u2705 Any error | \u2705 Automatic |\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-extension",
+    "pi-package",
+    "pi",
+    "model-failover",
+    "model-cycling",
+    "high-availability"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-08T21:21:54.623Z",
+    "0.1.0": "2026-06-08T21:21:54.926Z",
+    "modified": "2026-06-08T21:21:55.122Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 9,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 52
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 3
+    }
+  ]
+}

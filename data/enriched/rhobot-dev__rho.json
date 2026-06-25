@@ -1,0 +1,361 @@
+{
+  "name": "@rhobot-dev/rho",
+  "latest_version": "0.1.12",
+  "description": "AI agent with persistent memory, heartbeat check-ins, and a knowledge vault",
+  "readme": "# rho\n\n[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/mikeyobrien/rho)\n[![@tau_rho_ai](https://img.shields.io/badge/@tau__rho__ai-000000?logo=x)](https://x.com/tau_rho_ai)\n\nAn always-on personal AI operator that:\n- stays running in the background,\n- remembers context across sessions,\n- and checks in proactively on a schedule.\n\nRuns on **macOS**, **Linux**, and **Android** (plus **iPhone/iPad via SSH**).\n\n<p align=\"center\">\n  <img alt=\"rho web ui\" src=\"docs/web-ui-hero.jpg\" />\n</p>\n\nBuilt on [pi coding agent](https://github.com/badlogic/pi-mono).\n\n<details>\n<summary><b>Terminal demo</b></summary>\n\n![Rho demo](docs/demo.gif)\n\n</details>\n\n---\n\n## Why rho\n\nMost AI tools are stateless chat tabs. rho is built for ongoing operation.\n\n- **Persistent memory**: durable context across sessions\n- **Memory observability**: inspect, search, and edit what the agent has learned\n- **Proactive heartbeat**: check-ins every 30m by default\n- **Local-first state**: your memory and config stay on your machine\n- **BYO model/provider**: use your own pi/provider setup\n- **Multi-surface control**: terminal, web UI, Telegram, and agent email\n\n---\n\n## 2-minute quick start (recommended)\n\nPrerequisites: **Node.js 18+**, **tmux**, **git**\n\n```bash\nnpm install -g @rhobot-dev/rho\nrho init && rho sync\nrho login && rho start\nrho\n```\n\nThat gives you:\n- initialized config in `~/.rho/`\n- authenticated provider access via pi\n- background heartbeat daemon\n- an attached interactive session\n\n### First 5 minutes\n\nRun these after install:\n\n```bash\nrho status                # daemon + module health\n/rho status               # heartbeat status (inside session)\n/rho now                  # trigger immediate check-in\n/brain                    # open memory viewer\n/vault inbox              # see captured knowledge items\n```\n\n---\n\n## Web UI (first-class, built in)\n\nrho includes a browser workspace for day-to-day operation:\n\n- chat with real-time streaming responses\n- session browsing + forking from any message\n- memory management (`/brain` entries)\n- task management\n- config editing (`~/.rho/init.toml`)\n- line-level code review at `/review`\n\n### Lightweight + performant by design\n\n- **No-build web split**: server logic in `web/*.ts`, browser runtime in `web/public/js/*.js` (no frontend bundler/transpile pipeline).\n- **Lean server runtime**: Hono-based routes with response compression enabled.\n- **Low-latency updates**: live RPC/WebSocket streaming for chat responses.\n- **Push over poll where possible**: server emits `sessions_changed` UI events; client updates immediately.\n- **Idle-aware behavior**: polling pauses when the tab is hidden or user is idle, then resumes on activity.\n- **Render throttling for streams**: markdown updates are debounced (150ms) to reduce UI churn during rapid token deltas.\n- **Session metadata caching**: session info is cached by file `mtime` to avoid unnecessary re-reads.\n\n```bash\nrho web\nrho web --port 4000\nrho web --open\n```\n\nThen open `http://localhost:3141` (or your host IP).\n\n### Positioning vs OpenClaw / nanobot\n\n| Project | Web experience emphasis |\n|---|---|\n| **rho** | Built-in operator workspace with stronger memory observability and a lightweight no-build stack (chat, learned-memory inspection/editing, tasks, config, review) |\n| **OpenClaw** | Strong Gateway Control UI + WebChat control plane |\n| **nanobot** | README primarily emphasizes CLI + channel gateway flows |\n\n---\n\n## Install alternatives\n\n<details>\n<summary><b>pi package install</b></summary>\n\n```bash\npi install npm:@rhobot-dev/rho\nrho init && rho sync\nrho login && rho start\n```\n\n</details>\n\n<details>\n<summary><b>macOS / Linux (installer script)</b></summary>\n\n```bash\ngit clone https://github.com/mikeyobrien/rho.git ~/.rho/project\ncd ~/.rho/project && ./install.sh\n```\n\nThe installer checks missing dependencies and supports NixOS.\n\n</details>\n\n<details>\n<summary><b>Android (Termux)</b></summary>\n\nInstall [Termux](https://f-droid.org/packages/com.termux/) and [Termux:API](https://f-droid.org/packages/com.termux.api/) from F-Droid, then:\n\n```bash\ncurl -fsSL https://rhobot.dev/install | bash\n```\n\n</details>\n\n<details>\n<summary><b>iPhone / iPad via SSH</b></summary>\n\nRun rho on a server/VPS/home machine, then connect from iOS using Termius (or any SSH client).\n\nGuide: [docs/iphone-setup.md](docs/iphone-setup.md)\n\n</details>\n\n---\n\n## What you can do with rho\n\n| Use case | What rho does |\n|---|---|\n| **Daily operator loop** | Keeps reminders/tasks alive between sessions and runs periodic check-ins |\n| **Memory-backed coding copilot** | Stores durable behavior/preferences/learnings, and lets you inspect/edit that learned state directly |\n| **Inbox agent** | Gets `name@rhobot.dev`, polls, reads, and replies to email |\n| **Telegram-controlled agent** | Receives prompts from Telegram and responds in-thread |\n| **Browser control panel** | Web UI for chat, memory, tasks, and config |\n\n---\n\n## Mobile Live Mode (native Android wrapper)\n\nIf you use the native Android wrapper (`mobile/rho-android`) to run rho-web, background behavior has two explicit modes:\n\n- **Idle Mode (default):** best battery behavior. No always-on background socket while the app is backgrounded; reconnect + replay happens when the app becomes active again.\n- **Live Mode (GO LIVE):** starts an Android foreground service with a persistent notification and lease heartbeats to keep active streams alive while locked/backgrounded.\n\nUse **Live Mode** when stream continuity matters (for example, long active responses while the phone is locked). Without it, WebView background limits can cause disconnect/orphan behavior around the default orphan window.\n\nTradeoffs:\n- higher battery/network usage while Live Mode is active,\n- persistent foreground notification,\n- explicit user-controlled lifecycle (`GO LIVE` / `STOP LIVE`).\n\nBaseline Live Mode reliability does **not** require Firebase credentials.\n\n---\n\n## Surfaces and modules\n\n### Core runtime\n- **Heartbeat**: scheduled autonomous check-ins\n- **Brain**: append-only structured memory (`brain.jsonl`)\n- **Vault**: markdown knowledge graph (`~/.rho/vault/`)\n\n### Channels\n- **Email**: agent inbox at `name@rhobot.dev`\n- **Telegram**: polling adapter with allowlist + moderation flow\n\n### Interface\n- **CLI**: `rho ...` commands\n- **Session slash commands**: `/rho`, `/brain`, `/vault`, `/skill`, `/telegram`, `/email`\n- **Web UI**: chat + memory/tasks/config in browser\n\n---\n\n## Security and ownership model\n\n- **Your memory is local** (`~/.rho/brain/brain.jsonl`)\n- **Your config is local** (`~/.rho/init.toml`, `~/.rho/packages.toml`)\n- **Your providers are yours** (`rho login` via pi)\n- **Telegram controls**: allowlists and mention gating\n- **Email controls**: sender controls + outbound policy limits\n\nNo hosted rho memory backend required.\n\n---\n\n## Command quick reference\n\n```bash\nrho                      # start and attach\nrho init                 # initialize ~/.rho config\nrho sync                 # sync rho config to pi\nrho doctor               # health + config checks\nrho login                # authenticate providers\nrho start                # start background daemon\nrho stop                 # stop daemon\nrho status               # daemon/module status\nrho trigger              # force heartbeat now\nrho logs                 # recent heartbeat output\nrho config               # show effective config\nrho calc \"2 + 2 * 3\"     # quick arithmetic calculator\nrho upgrade              # update and resync\nrho skills <args>        # skills provider wrapper\n```\n\nInside a session:\n\n```text\n/rho status              heartbeat state\n/rho now                 immediate check-in\n/rho interval 30m        set check-in interval\n/rho enable/disable      toggle heartbeat\n/bootstrap status        bootstrap lifecycle state\n/brain                   memory operations\n/vault inbox             captured vault items\n/skill run pdd           planning workflow\n/skill run code-assist   implementation workflow\n```\n\n---\n\n## Platform support\n\n| Platform | Status | Notes |\n|---|---|---|\n| Linux | Supported | Native install + daemon + web UI |\n| macOS | Supported | Native install + daemon + web UI |\n| Android (Termux) | Supported | Extra mobile capabilities via platform skills |\n| iPhone/iPad | Supported (SSH client) | Run rho remotely, connect via SSH |\n\n---\n\n## Docs map\n\n- [Demo walkthrough](docs/demo.md)\n- [Telegram setup + troubleshooting](docs/telegram.md)\n- [iPhone/iPad setup](docs/iphone-setup.md)\n- [Android mobile app over Tailscale](docs/mobile-tailscale.md)\n- [VPS setup guide](docs/vps-setup.md)\n- [Skills providers (vercel + clawhub)](docs/skills.md)\n- [Brain bootstrapping guide](docs/bootstrapping-brain.md)\n- [Configuration reference](docs/configuration.md)\n\n---\n\n## For contributors\n\nProject structure and internals are intentionally modular:\n- `cli/` for command surface and daemon orchestration\n- `extensions/` for runtime tools/modules\n- `skills/` for portable markdown runbooks\n- `platforms/` for platform-specific installs/capabilities\n- `web/` for browser UI + RPC bridge\n\nFor full tree + extension/skill details, see current `README.md` and `docs/`.\n\n---\n\n## Links\n\n- [pi coding agent](https://github.com/badlogic/pi-mono)\n- [@tau_rho_ai](https://x.com/tau_rho_ai)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-skill",
+    "ai-agent",
+    "memory",
+    "heartbeat",
+    "knowledge-vault"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://rhobot.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikeyobrien/rho.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "image": "https://raw.githubusercontent.com/mikeyobrien/rho/main/docs/logo.png"
+  },
+  "time": {
+    "created": "2026-02-11T15:55:32.036Z",
+    "modified": "2026-03-15T02:42:45.448Z",
+    "0.1.0": "2026-02-11T15:55:32.352Z",
+    "0.1.1": "2026-02-11T16:02:05.842Z",
+    "0.1.2": "2026-02-11T16:49:13.051Z",
+    "0.1.6": "2026-02-16T21:59:07.040Z",
+    "0.1.7": "2026-02-20T16:23:24.108Z",
+    "0.1.8": "2026-02-21T21:29:00.307Z",
+    "0.1.9": "2026-02-25T04:39:10.896Z",
+    "0.1.10": "2026-03-14T21:02:21.410Z",
+    "0.1.11": "2026-03-14T21:09:32.620Z",
+    "0.1.12": "2026-03-15T02:42:45.143Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": 46,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 418
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 270
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 183
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 71
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 403
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 180
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 115
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 88
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 52
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 36
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 30
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 34
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 33
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 67
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 23
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 46
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 38
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 52
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 3
+    }
+  ]
+}

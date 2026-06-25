@@ -1,0 +1,37 @@
+{
+  "name": "pi-permissions",
+  "latest_version": "1.0.4",
+  "description": "Configurable allow/deny permission rules for pi tool calls \u2014 control which bash commands, file reads, writes, and edits the agent can perform.",
+  "readme": "# pi-permissions [![npm version](https://img.shields.io/npm/v/pi-permissions)](https://www.npmjs.com/package/pi-permissions) [![license](https://img.shields.io/npm/l/pi-permissions)](./LICENSE)\n\nA [pi](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) extension that provides **configurable allow/deny permission rules** for tool calls \u2014 control which bash commands, file reads, writes, and edits the agent can perform.\n\n- Define **allow** rules to whitelist specific commands\n- Define **deny** rules to block dangerous operations\n- Deny always wins \u2014 block `git push` even if `git *` is allowed\n- Supports glob patterns with `*` wildcards\n- Project-local or global configuration\n\n## Install\n\n```bash\npi install npm:pi-permissions\n```\n\n<details>\n<summary>Alternative install methods</summary>\n\nFrom the public git repo:\n\n```bash\npi install git:github.com/NicoAvanzDev/pi-permissions\n```\n\nFrom a local clone:\n\n```bash\npi install .\n```\n\nLoad without installing:\n\n```bash\npi --no-extensions -e npm:pi-permissions\n```\n\n</details>\n\n## Quick start\n\nCreate `.pi/permissions.json` in your project (or `~/.pi/agent/permissions.json` for global rules):\n\n```json\n{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(npm run *)\",\n      \"Bash(npm test *)\",\n      \"Bash(git commit *)\",\n      \"Bash(git diff *)\",\n      \"Bash(git status)\",\n      \"Bash(git log *)\"\n    ],\n    \"deny\": [\n      \"Bash(git push *)\",\n      \"Bash(rm -rf *)\",\n      \"Write(*.env)\",\n      \"Edit(*.env)\"\n    ]\n  }\n}\n```\n\nOn session start, the extension loads your rules and reports how many were found. Any tool call that matches a deny rule is blocked before execution.\n\n### Example session\n\n```text\n> pi\nPermissions loaded: 6 allow, 4 deny rules\n\n> (agent tries to run `git push origin main`)\n\u26d4 Blocked: Bash command matches deny rule \"Bash(git push *)\"\n```\n\nAfter editing `permissions.json`, type `/reload` in pi to apply the changes.\n\n## How it works\n\n### Rule format\n\nRules use the format `Tool(pattern)` where:\n\n- **Tool** \u2014 the pi tool name: `Bash`, `Write`, `Edit`, `Read`\n- **pattern** \u2014 a glob pattern where `*` matches any characters\n\n### Supported tools\n\n| Tool | What the pattern matches against |\n|------|----------------------------------|\n| `Bash(pattern)` | The bash command string |\n| `Write(pattern)` | The file path being written |\n| `Edit(pattern)` | The file path being edited |\n| `Read(pattern)` | The file path being read |\n\n### Evaluation logic\n\nFor every tool call the extension:\n\n1. **checks deny rules first** \u2014 if any deny rule matches, the call is blocked\n2. **checks allow rules next** \u2014 if allow rules exist for that tool, the call must match at least one\n3. **passes through** \u2014 if no allow rules exist for the tool, all calls are permitted (unless denied)\n\nThis means:\n- Use **deny** to block specific dangerous commands\n- Use **allow** to whitelist only approved commands (everything else is blocked)\n- **Deny always wins** over allow\n\n### Pattern examples\n\n| Pattern | Matches | Doesn't match |\n|---------|---------|---------------|\n| `Bash(git push *)` | `git push origin main` | `git pull` |\n| `Bash(npm run *)` | `npm run build`, `npm run test` | `npm install` |\n| `Bash(* --version)` | `node --version`, `npm --version` | `node index.js` |\n| `Write(*.env)` | `.env`, `app.env` | `.env.example` |\n| `Write(secrets/*)` | `secrets/key.pem` | `src/secrets.ts` |\n\n## Configuration\n\n| Location | Scope |\n|----------|-------|\n| `.pi/permissions.json` | Project-local (checked first) |\n| `~/.pi/agent/permissions.json` | Global fallback |\n\nThe extension checks the project-local path first. If not found, it falls back to the global config.\n\n## Notes\n\n- rules are loaded once on session start\n- use `/reload` to pick up changes without restarting\n- deny rules are always evaluated before allow rules\n- if no allow rules exist for a tool type, all calls for that tool are permitted\n- glob `*` matches any sequence of characters (including path separators in file patterns)\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "permissions",
+    "security",
+    "allow-deny"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/NicoAvanzDev/pi-permissions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NicoAvanzDev/pi-permissions.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-24T08:13:17.558Z",
+    "modified": "2026-03-24T08:47:55.750Z",
+    "1.0.0": "2026-03-24T08:13:17.816Z",
+    "1.0.1": "2026-03-24T08:18:20.136Z",
+    "1.0.2": "2026-03-24T08:33:17.068Z",
+    "1.0.3": "2026-03-24T08:37:47.021Z",
+    "1.0.4": "2026-03-24T08:47:55.472Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 29,
+  "download_trend": []
+}

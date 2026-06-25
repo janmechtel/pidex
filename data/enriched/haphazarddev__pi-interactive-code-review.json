@@ -1,0 +1,355 @@
+{
+  "name": "@haphazarddev/pi-interactive-code-review",
+  "latest_version": "0.3.2",
+  "description": "A pi extension for interactive code review against your default branch, including uncommitted changes, with line or hunk comments, batching, and inline agent responses.",
+  "readme": "# @haphazarddev/pi-interactive-code-review\n\nReview your current branch and working tree like a pull request, directly inside pi.\n\nIt opens an interactive diff browser against your default branch, lets you move file by file and hunk by hunk, toggle word wrap for long diff lines, open a searchable changed-file list with per-file +/- summaries, attach review comments to lines, hunks, or whole files, and then either batch those comments or send them to the agent immediately.\n\nWhen the agent replies, the extension stores the response on the matching review thread so you can reopen the review UI and follow the conversation inline with the diff.\n\n## Install\n\n```bash\npi install npm:@haphazarddev/pi-interactive-code-review\n```\n\nOr from a local checkout:\n\n```bash\npi install ./extensions/pi-interactive-code-review\n```\n\n## Usage\n\nOpen the review UI:\n\n```bash\n/review\n```\n\nOptionally review against a specific ref instead of the detected default branch:\n\n```bash\n/review origin/main\n/review main\n/review --base origin/main\n```\n\nReview a child repository or another repository path from your current working directory:\n\n```bash\n/review --repo repos/test-repo\n/review --repo repos/test-repo --base origin/main\n```\n\nA single bare argument that points to a git repository directory is treated as the review target; otherwise it is treated as the base ref.\n\nWhen `/review` discovers exactly one dirty candidate repo under the current working directory, it opens that repo automatically. When multiple dirty repos are discovered, it asks you to select the review target. File paths in the diff and in review prompts are relative to the selected repo root. Clean child repos are hidden by default; use `/review --include-clean` to force the picker and include them. Use `/review --scan-depth <n>` to override the default child repo scan depth of 3. Use `/review --current` to force the innermost/current repo when pi is running inside a nested repo.\n\nIf a child repo cannot be opened, check that the path exists, contains a `.git` directory or file, and has a resolvable base ref such as `origin/main`.\n\n## Controls\n\nInside the review UI, press `?` to show the full control reference in the lower section.\n\n\n### Movement\n\n- `Tab` / `Shift+Tab` - next/previous changed file\n- `[` - previous hunk, automatically moving to the previous file when you're already at the first hunk\n- `]` - next hunk, automatically moving to the next file when you're already at the last hunk\n- `\u2191` / `\u2193` - move through lines, automatically crossing into the previous/next hunk or file at the boundaries\n\n### Extra shortcuts shown in `?` help\n\n- `n` / `p` - next/previous changed file when diff search is not active\n- `j` / `k` - move through lines, automatically crossing hunk and file boundaries\n- `d` / `u` or `Ctrl+D` / `Ctrl+U` - move down/up half a page, including across adjacent hunks and files\n\n### Actions\n\n- `/` - search within the current file diff\n- `g` - open the changed-file picker with fuzzy filename matching and per-file summaries\n- `c` - start an inline line comment or question\n- `H` - start an inline hunk comment or question\n- `F` - start an inline file-level comment or question\n- `1-4` or `e` - edit a visible comment thread inline\n- `x` or `Backspace` - delete a visible comment thread\n- `s` - send all queued review comments as one batch\n- `r` - refresh the diff against the current base ref\n- `w` - toggle word wrap in the diff viewer\n- `?` - toggle help\n- `F1` / `Alt+H` - toggle help, including while a text input is focused\n- `Esc` / `q` - close\n\nWhile the file picker is open:\n\n- type to fuzzy-match changed files by filename only\n- matched characters are highlighted in the picker\n- typing resets selection to the top-ranked result\n- `\u2191` / `\u2193` - move the selected match while keeping focus in the filter input\n- `Ctrl+N` / `Ctrl+P` - alternate next/previous match keys\n- `Enter` - jump to the selected file\n- `F1` / `Alt+H` - toggle help without leaving the filter input\n- `Esc` - close the picker\n\nWhile diff search is open:\n\n- type to search within the current file diff\n- visible matches are highlighted in the diff view\n- `\u2191` / `\u2193` - move between matches while keeping focus in the search input\n- `Ctrl+N` / `Ctrl+P` - alternate next/previous match keys\n- `Enter` - jump to the selected match and close the search input\n- `Esc` - close the search input and keep the current search active\n- `n` / `N` - move to the next/previous match after closing the search input\n- `F1` / `Alt+H` - toggle help without leaving the search input\n\nWhile the inline comment editor is open:\n\n- `Enter` - save the comment\n- `Shift+Enter` - insert a newline\n- `Tab` - toggle between **batch** and **immediate** send mode\n- `F1` / `Alt+H` - toggle help without leaving the editor\n- `Esc` - cancel editing\n\n## Review flow\n\n1. Open `/review`\n2. Navigate through the diff file by file, use the hunk banners and `Hunk x/y \u2022 \u2191/\u2193 ...` indicators to see when a file has more hunks above or below, and use the top/bottom navigation banners to see when `[` / `]` will continue into the previous/next file, press `g` to jump through a fuzzy searchable file list with `+added` / `-removed` summaries, or press `/` to search inside the current file diff\n3. Add comments/questions inline while still seeing the diff above the editor\n4. Use `Tab` in the inline editor to choose either:\n   - **batch** to queue the thread\n   - **immediate** to have the agent address it right away\n5. Press `s` when you want to send the whole queued batch\n6. Use `1-4` or `e` to reopen and edit visible comments\n7. Sending comments closes the review UI so pi can run the review turn cleanly\n8. Reopen `/review` to see agent responses attached to the relevant threads\n\n## Notes\n\n- The extension compares the merge-base of your review base and `HEAD` against your current working tree, so committed, staged, unstaged, and untracked file changes are all reviewable.\n- Default branch detection prefers `origin/HEAD`, then falls back to `origin/main`, `origin/master`, `main`, and `master`.\n- Review thread state is stored in the session, so queued comments and agent responses survive reloads and session switches on the same branch.\n- Agent replies are requested in a thread-tagged format so the extension can attach them back to the correct line/hunk/file thread.\n\n## Repository\n\n- Source: https://github.com/HaphazardDev/pi-extensions\n- Issues: https://github.com/HaphazardDev/pi-extensions/issues\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "code-review",
+    "git",
+    "diff"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/HaphazardDev/pi-extensions/tree/main/extensions/pi-interactive-code-review#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HaphazardDev/pi-extensions.git",
+    "directory": "extensions/pi-interactive-code-review"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-04-21T03:20:30.028Z",
+    "modified": "2026-05-20T19:40:33.974Z",
+    "0.1.0": "2026-04-21T03:20:30.603Z",
+    "0.1.1": "2026-04-21T23:36:15.446Z",
+    "0.1.2": "2026-04-22T00:50:45.534Z",
+    "0.1.3": "2026-04-23T00:09:56.109Z",
+    "0.1.4": "2026-04-23T00:32:43.271Z",
+    "0.2.0": "2026-05-05T00:49:03.776Z",
+    "0.3.0": "2026-05-09T00:46:16.549Z",
+    "0.3.1": "2026-05-15T22:20:05.441Z",
+    "0.3.2": "2026-05-20T19:40:33.678Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": 46,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 167
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 460
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 115
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 206
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 189
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 188
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 29
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 31
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 29
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 39
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 13
+    }
+  ]
+}

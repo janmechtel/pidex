@@ -1,0 +1,374 @@
+{
+  "name": "pi-tidy-mcp-adapter",
+  "latest_version": "0.1.31",
+  "description": "MCP (Model Context Protocol) adapter extension for Pi coding agent fork form https://github.com/nicobailon/pi-mcp-adapter",
+  "readme": "<p>\n  <img src=\"banner.png\" alt=\"pi-mcp-adapter\" width=\"1100\">\n</p>\n\n# Pi MCP Adapter\n\nUse MCP servers with [Pi](https://github.com/badlogic/pi-mono/) without burning your context window.\n\nhttps://github.com/user-attachments/assets/4b7c66ff-e27e-4639-b195-22c3db406a5a\n\n## Why This Exists\n\nMario wrote about [why you might not need MCP](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/). The problem: tool definitions are verbose. A single MCP server can burn 10k+ tokens, and you're paying that cost whether you use those tools or not. Connect a few servers and you've burned half your context window before the conversation starts.\n\nHis take: skip MCP entirely, write simple CLI tools instead.\n\nBut the MCP ecosystem has useful stuff - databases, browsers, APIs. This adapter gives you access without the bloat. One proxy tool (~200 tokens) instead of hundreds. The agent discovers what it needs on-demand. Servers only start when you actually use them.\n\n## Install\n\n```bash\npi install npm:pi-tidy-mcp-adapter\n```\n\nRestart Pi after installation.\n\n## Quick Start\n\nCreate `~/.pi/agent/mcp.json`:\n\n```json\n{\n  \"mcpServers\": {\n    \"chrome-devtools\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"chrome-devtools-mcp@latest\"]\n    }\n  }\n}\n```\n\nServers are **lazy by default** \u2014 they won't connect until you actually call one of their tools. The adapter caches tool metadata so search and describe work without live connections.\n\n```\nmcp({ search: \"screenshot\" })\n```\n```\nchrome_devtools_take_screenshot\n  Take a screenshot of the page or element.\n\n  Parameters:\n    format (enum: \"png\", \"jpeg\", \"webp\") [default: \"png\"]\n    fullPage (boolean) - Full page instead of viewport\n```\n```\nmcp({ tool: \"chrome_devtools_take_screenshot\", args: '{\"format\": \"png\"}' })\n```\n\nNote: `args` is a JSON string, not an object.\n\nTwo calls instead of 26 tools cluttering the context.\n\n## Config\n\n### Server Options\n\n```json\n{\n  \"mcpServers\": {\n    \"my-server\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"some-mcp-server\"],\n      \"lifecycle\": \"lazy\",\n      \"idleTimeout\": 10\n    }\n  }\n}\n```\n\n| Field | Description |\n|-------|-------------|\n| `command` | Executable for stdio transport |\n| `args` | Command arguments |\n| `env` | Environment variables (`${VAR}` interpolation) |\n| `cwd` | Working directory |\n| `url` | HTTP endpoint (StreamableHTTP with SSE fallback) |\n| `auth` | `\"bearer\"` or `\"oauth\"` |\n| `bearerToken` / `bearerTokenEnv` | Token or env var name |\n| `lifecycle` | `\"lazy\"` (default), `\"eager\"`, or `\"keep-alive\"` |\n| `idleTimeout` | Minutes before idle disconnect (overrides global) |\n| `exposeResources` | Expose MCP resources as tools (default: true) |\n| `directTools` | `true`, `string[]`, or `false` \u2014 register tools individually instead of through proxy |\n| `disabledTools` | `string[]` \u2014 completely hide specific tools from the agent |\n| `debug` | Show server stderr (default: false) |\n\n### Lifecycle Modes\n\n- **`lazy`** (default) \u2014 Don't connect at startup. Connect on first tool call. Disconnect after idle timeout. Cached metadata keeps search/list working without connections.\n- **`eager`** \u2014 Connect at startup but don't auto-reconnect if the connection drops. No idle timeout by default (set `idleTimeout` explicitly to enable).\n- **`keep-alive`** \u2014 Connect at startup. Auto-reconnect via health checks. No idle timeout. Use for servers you always need available.\n\n### Settings\n\n```json\n{\n  \"settings\": {\n    \"toolPrefix\": \"server\",\n    \"idleTimeout\": 10,\n    \"showStatus\": true\n  },\n  \"mcpServers\": { }\n}\n```\n\n| Setting | Description |\n|---------|-------------|\n| `toolPrefix` | `\"server\"` (default), `\"short\"` (strips `-mcp` suffix), or `\"none\"` |\n| `idleTimeout` | Global idle timeout in minutes (default: 10, 0 to disable) |\n| `directTools` | Global default for all servers (default: false). Per-server overrides this. |\n| `disabledTools` | Global list of tools to disable. Per-server `disabledTools` adds to this list. |\n| `showStatus` | Show MCP status in bottom bar (default: false) |\n| `notify` | Show notify messages in TUI (default: false) |\n\n**Debug Mode**: Set `MCP_DEBUG=1` environment variable to see lifecycle events (reconnect, idle shutdown, errors) in stderr. Always active regardless of `notify` setting.\n\nPer-server `idleTimeout` overrides the global setting.\n\n### Direct Tools\n\nBy default, all MCP tools are accessed through the single `mcp` proxy tool. This keeps context small but means the LLM has to discover tools via search. If you want specific tools to show up directly in the agent's tool list \u2014 alongside `read`, `bash`, `edit`, etc. \u2014 add `directTools` to your config.\n\nPer-server:\n\n```json\n{\n  \"mcpServers\": {\n    \"chrome-devtools\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"chrome-devtools-mcp@latest\"],\n      \"directTools\": true\n    },\n    \"github\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"@modelcontextprotocol/server-github\"],\n      \"directTools\": [\"search_repositories\", \"get_file_contents\"]\n    },\n    \"huge-server\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"mega-mcp@latest\"]\n    }\n  }\n}\n```\n\n| Value | Behavior |\n|-------|----------|\n| `true` | Register all tools from this server as individual Pi tools |\n| `[\"tool_a\", \"tool_b\"]` | Register only these tools (use original MCP names) |\n| Omitted or `false` | Proxy only (default) |\n\nTo set a global default for all servers:\n\n```json\n{\n  \"settings\": {\n    \"directTools\": true\n  },\n  \"mcpServers\": {\n    \"huge-server\": {\n      \"directTools\": false\n    }\n  }\n}\n```\n\nPer-server `directTools` overrides the global setting. The example above registers direct tools for every server except `huge-server`.\n\nEach direct tool costs ~150-300 tokens in the system prompt (name + description + schema). Good for targeted sets of 5-20 tools. For servers with 75+ tools, stick with the proxy or pick specific tools with a `string[]`.\n\nDirect tools register from the metadata cache (`~/.pi/agent/mcp-cache.json`), so no server connections are needed at startup. On the first session after adding `directTools` to a new server, the cache won't exist yet \u2014 tools fall back to proxy-only and the cache populates in the background. Restart Pi and they'll be available. To force it: `/mcp reconnect <server>` then restart.\n\n### Disabled Tools\n\nCompletely hide specific MCP tools from the agent. Unlike `directTools` (which makes tools visible), `disabledTools` removes tools from search, metadata, and tool listings entirely. Useful for blocking dangerous operations or tools you don't want the agent to access.\n\nPer-server:\n\n```json\n{\n  \"mcpServers\": {\n    \"dangerous-server\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"risky-mcp@latest\"],\n      \"disabledTools\": [\"delete_everything\", \"format_hard_drive\"]\n    },\n    \"huge-server\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"mega-mcp@latest\"],\n      \"directTools\": true\n    }\n  }\n}\n```\n\nTo set a global default:\n\n```json\n{\n  \"settings\": {\n    \"disabledTools\": [\"dangerous_operation\"]\n  },\n  \"mcpServers\": {\n    \"huge-server\": {\n      \"directTools\": true\n    }\n  }\n}\n```\n\n**Interaction with `directTools`:**\n- If a tool is both in `directTools` and `disabledTools`, `disabledTools` takes precedence \u2014 the tool is hidden\n- Setting a tool as disabled automatically removes it from direct registration\n- Setting a disabled tool as direct automatically re-enables it\n\n**Interactive configuration:** Run `/mcp` to open an interactive panel showing all servers with connection status, tools, and direct/proxy toggles. Press `d` on any tool to toggle its disabled state (disabled tools show with a \u2715 icon). You can reconnect servers, initiate OAuth, and toggle tools between direct and proxy \u2014 all from one overlay. Changes are written to your config file; restart Pi to apply.\n\n**Subagent integration:** If you use the subagent extension, agents can request direct MCP tools in their frontmatter with `mcp:server-name` syntax. See the subagent README for details.\n\n### Import Existing Configs\n\nAlready have MCP set up elsewhere? Import it:\n\n```json\n{\n  \"imports\": [\"cursor\", \"claude-code\", \"claude-desktop\"],\n  \"mcpServers\": { }\n}\n```\n\nSupported: `cursor`, `claude-code`, `claude-desktop`, `vscode`, `windsurf`, `codex`\n\n### Project Config\n\nAdd `.pi/mcp.json` in a project root for project-specific servers. Project config overrides global and imported servers.\n\n## Usage\n\n| Mode | Example |\n|------|---------|\n| Status | `mcp({ })` |\n| List server | `mcp({ server: \"name\" })` |\n| Search | `mcp({ search: \"screenshot navigate\" })` |\n| Describe | `mcp({ describe: \"tool_name\" })` |\n| Call | `mcp({ tool: \"...\", args: '{\"key\": \"value\"}' })` |\n| Connect | `mcp({ connect: \"server-name\" })` |\n\nSearch includes both MCP tools and Pi tools (from extensions). Pi tools appear first with `[pi tool]` prefix. Space-separated words are OR'd.\n\nTool names are fuzzy-matched on hyphens and underscores \u2014 `context7_resolve_library_id` finds `context7_resolve-library-id`.\n\n## Commands\n\n| Command | What it does |\n|---------|--------------|\n| `/mcp` | Interactive panel (server status, tool toggles, reconnect) |\n| `/mcp tools` | List all tools |\n| `/mcp reconnect` | Reconnect all servers |\n| `/mcp reconnect <server>` | Connect or reconnect a single server |\n| `/mcp-auth <server>` | OAuth setup |\n\n## How It Works\n\nSee [ARCHITECTURE.md](./ARCHITECTURE.md) for the full picture. Short version:\n\n- One `mcp` tool in context (~200 tokens) instead of hundreds\n- Servers are lazy by default \u2014 they connect on first tool call, not at startup\n- Tool metadata is cached to disk so search/list/describe work without live connections\n- Idle servers disconnect after 10 minutes (configurable), reconnect automatically on next use\n- npx-based servers resolve to direct binary paths, skipping the ~143 MB npm parent process\n- MCP server validates arguments, not the adapter\n- Keep-alive servers get health checks and auto-reconnect\n- Specific tools can be promoted from the proxy to first-class Pi tools via `directTools` config, so the LLM sees them directly instead of having to search\n\n## Limitations\n\n- OAuth tokens obtained externally (no browser flow)\n- No automatic token refresh\n- Cross-session server sharing not yet implemented (each Pi session runs its own server processes)\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "coding-agent",
+    "extension",
+    "claude",
+    "llm"
+  ],
+  "author": {
+    "name": "VandeePunk"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/vandeefeng/pi-mcp-adapter#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vandeefeng/pi-mcp-adapter.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "video": "https://github.com/nicobailon/pi-mcp-adapter/raw/refs/heads/main/pi-mcp.mp4"
+  },
+  "time": {
+    "created": "2026-02-14T03:58:29.333Z",
+    "modified": "2026-05-02T03:20:52.646Z",
+    "0.0.1": "2026-02-14T03:58:29.480Z",
+    "0.0.2": "2026-02-17T15:01:40.567Z",
+    "0.0.3": "2026-02-17T15:45:43.134Z",
+    "0.0.4": "2026-02-17T15:49:33.964Z",
+    "0.0.5": "2026-02-17T15:51:00.336Z",
+    "0.0.6": "2026-02-17T15:51:41.990Z",
+    "0.0.7": "2026-02-17T15:52:11.091Z",
+    "0.0.8": "2026-02-17T16:10:36.530Z",
+    "0.0.9": "2026-02-22T14:47:48.218Z",
+    "0.1.0": "2026-03-22T03:50:26.931Z",
+    "0.1.1": "2026-03-26T11:31:27.855Z",
+    "0.1.2": "2026-03-26T13:45:36.872Z",
+    "0.1.21": "2026-04-16T05:42:27.308Z",
+    "0.1.22": "2026-04-17T06:29:21.831Z",
+    "0.1.23": "2026-04-17T07:38:23.264Z",
+    "0.1.24": "2026-04-25T14:20:00.016Z",
+    "0.1.26": "2026-04-28T11:09:05.073Z",
+    "0.1.27": "2026-04-29T06:21:01.333Z",
+    "0.1.28": "2026-04-29T06:58:05.793Z",
+    "0.1.29": "2026-04-29T16:35:38.257Z",
+    "0.1.30": "2026-05-01T04:27:11.175Z",
+    "0.1.31": "2026-05-02T03:20:52.537Z"
+  },
+  "versions_count": 22,
+  "downloads_last_week": 17,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 597
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 222
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 51
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 49
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 63
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 165
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 311
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 53
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 53
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 411
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 339
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 745
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 93
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 70
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 84
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 56
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 88
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 33
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 20
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

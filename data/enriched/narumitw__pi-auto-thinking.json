@@ -1,0 +1,37 @@
+{
+  "name": "@narumitw/pi-auto-thinking",
+  "latest_version": "0.1.15",
+  "description": "Pi extension that automatically adjusts thinking level from model capability and task difficulty.",
+  "readme": "# \ud83e\udde0 pi-auto-thinking \u2014 Automatic Thinking Level for Pi\n\n[![npm](https://img.shields.io/npm/v/@narumitw/pi-auto-thinking)](https://www.npmjs.com/package/@narumitw/pi-auto-thinking) [![Pi extension](https://img.shields.io/badge/Pi-extension-blue)](https://pi.dev) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)\n\n`@narumitw/pi-auto-thinking` is a native [Pi coding agent](https://pi.dev) extension that selects Pi's thinking level for each user task from the active model capability and a deterministic task-difficulty score.\n\nUse it when you want simple prompts to stay cheap and fast, while design, debugging, migration, security, or refactor tasks automatically get more reasoning budget.\n\n## \u2728 Features\n\n- Automatically selects `minimal`, `low`, `medium`, `high`, or `xhigh` before each agent turn.\n- Turns thinking `off` for models that do not advertise reasoning support.\n- Respects model `thinkingLevelMap` entries that mark levels unsupported.\n- Uses conservative defaults: enabled, `minLevel: \"minimal\"`, `maxLevel: \"high\"`.\n- Avoids extra LLM calls; task difficulty is scored with local deterministic heuristics.\n- Detects likely manual thinking-level changes and pauses automation for a few turns.\n- Adds `/auto-thinking` commands for status, enable/disable, and explaining the last decision.\n- Shows a compact statusline item after decisions without notifying every turn.\n\n## \ud83d\udce6 Install\n\n```bash\npi install npm:@narumitw/pi-auto-thinking\n```\n\nTry without installing permanently:\n\n```bash\npi -e npm:@narumitw/pi-auto-thinking\n```\n\nTry this package locally from the repository root:\n\n```bash\npi -e ./extensions/pi-auto-thinking\n```\n\n## \ud83d\ude80 Usage\n\n```text\n/auto-thinking status\n/auto-thinking on\n/auto-thinking off\n/auto-thinking explain\n```\n\n- `status` shows whether automation is enabled, the loaded config path, bounds, and warnings.\n- `on` enables automatic thinking selection for subsequent user prompts.\n- `off` disables automation and clears the extension statusline item.\n- `explain` shows the score, selected level, and matched signals from the last decision.\n\n## \ud83e\uddee How scoring works\n\nThe extension scores each prompt locally before Pi starts the agent loop. The base level mapping is:\n\n| Score | Base thinking level |\n| ---: | --- |\n| `<= 0` | `minimal` |\n| `1..2` | `low` |\n| `3..5` | `medium` |\n| `6..8` | `high` |\n| `>= 9` | `xhigh` |\n\nDefault weights:\n\n| Signal | Weight |\n| --- | ---: |\n| Quick, brief, concise, simple, or equivalent Chinese wording | `-2` |\n| Simple explanation, translation, or summary | `-1` |\n| Implementation, editing, or code-change request | `+2` |\n| Debugging, exception, stack trace, failure, or broken behavior | `+2` |\n| Tests, lint, typecheck, TypeScript, CI, or similar | `+1` |\n| Design, architecture, plan, proposal, or tradeoff work | `+3` |\n| Migration, refactor, compatibility, or breaking-change work | `+3` |\n| Security, auth, secrets, concurrency, transaction, rollback, or data-loss topic | `+3` |\n| Explicit deep reasoning request such as \u201cthink hard\u201d, \u201ccarefully\u201d, \u201c\u6df1\u5165\u201d, or \u201c\u4ed4\u7d30\u201d | `+3` |\n| Code block included | `+1` |\n| One file path mentioned | `+1` |\n| Three or more file paths mentioned | `+2` |\n| Long prompt | `+1` |\n| Image input attached | `+1` |\n\nAfter scoring, config bounds and model support are applied. For example, with the default `maxLevel: \"high\"`, a score that maps to `xhigh` is capped at `high`.\n\n## \u2699\ufe0f Configuration\n\nOptional config file:\n\n```text\n$PI_CODING_AGENT_DIR/pi-auto-thinking.json\n```\n\nWhen `PI_CODING_AGENT_DIR` is unset, the extension reads:\n\n```text\n~/.pi/agent/pi-auto-thinking.json\n```\n\nExample:\n\n```json\n{\n  \"enabled\": true,\n  \"minLevel\": \"minimal\",\n  \"maxLevel\": \"high\",\n  \"respectManualTurns\": 3,\n  \"modelOverrides\": {\n    \"anthropic/claude-haiku-4-5\": {\n      \"maxLevel\": \"medium\"\n    },\n    \"anthropic/claude-opus-4-5\": {\n      \"maxLevel\": \"xhigh\"\n    },\n    \"local/small-fast-model\": {\n      \"enabled\": false\n    }\n  }\n}\n```\n\nSupported levels are:\n\n```text\noff, minimal, low, medium, high, xhigh\n```\n\n`respectManualTurns` must be an integer from `0` to `20`. When a thinking level changes outside this extension, automation pauses for that many future user prompts. Pi's event does not expose the change source, so this detection is intentionally conservative.\n\n## \ud83e\udd16 Model capability behavior\n\n- If `ctx.model` is unavailable, the extension selects `off`.\n- If `ctx.model.reasoning` is false, the extension selects `off`.\n- If `ctx.model.thinkingLevelMap` marks a level as `null`, the extension skips that level.\n- Pi still performs its own final clamp when `pi.setThinkingLevel()` is called.\n\n## \ud83d\udcb8 Cost and latency caveats\n\nHigher thinking levels can increase latency and token usage depending on the provider. The default maximum is `high`, not `xhigh`, to avoid unexpectedly expensive turns. Use `/auto-thinking explain` to inspect why a level was selected, or `/auto-thinking off` to disable automation for the session.\n\n## \ud83d\uddc2\ufe0f Package layout\n\n```txt\nextensions/pi-auto-thinking/\n\u251c\u2500\u2500 src/\n\u2502   \u2514\u2500\u2500 auto-thinking.ts\n\u251c\u2500\u2500 README.md\n\u251c\u2500\u2500 LICENSE\n\u251c\u2500\u2500 tsconfig.json\n\u2514\u2500\u2500 package.json\n```\n\nThe package exposes its Pi extension through `package.json`:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./src/auto-thinking.ts\"]\n  }\n}\n```\n\n## \ud83d\udd0e Keywords\n\nPi extension, Pi coding agent, automatic thinking, reasoning level, task difficulty, TypeScript Pi package, npm Pi extension.\n\n## \ud83d\udcc4 License\n\nMIT. See [`LICENSE`](./LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "thinking",
+    "reasoning",
+    "automation"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/narumiruna/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/narumiruna/pi-extensions.git",
+    "directory": "extensions/pi-auto-thinking"
+  },
+  "pi": {
+    "extensions": [
+      "./src/auto-thinking.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-16T08:06:28.576Z",
+    "modified": "2026-05-16T09:55:39.209Z",
+    "0.1.12": "2026-05-16T08:06:28.839Z",
+    "0.1.14": "2026-05-16T08:09:43.640Z",
+    "0.1.15": "2026-05-16T09:55:38.845Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 16,
+  "download_trend": []
+}

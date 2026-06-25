@@ -1,0 +1,36 @@
+{
+  "name": "pi-asked",
+  "latest_version": "0.2.0",
+  "description": "Claude Code-style multi-question picker for pi. Tabbed picker with recommended answers, multi-select, and Other\u2026 text input.",
+  "readme": "# pi-ask \u2014 Claude Code-style multi-question picker for pi\n\nA small pi-coding-agent extension that registers one tool (`ask_pro`) for\nshowing a **tabbed, multi-question picker** in pi's TUI. Inspired by Claude\nCode's `AskUserQuestion`.\n\n## Features\n\n- **Multi-question** \u2014 pass a list of questions; the user navigates between\n  them with `Tab` / `Shift+Tab` or arrow keys\n- **Numbered options** \u2014 `1`\u2013`4` instant-pick\n- **Recommended answer** \u2014 first option (or the one with `recommended: true`)\n  is marked \u2b50\n- **Single-select** (default) \u2014 Enter on an option auto-advances to the next\n  question; on the last question, Enter submits\n- **Multi-select** \u2014 Enter toggles checkboxes; the last question shows a\n  visible \"Submit\" row\n- **Cancelled detection** \u2014 `Esc` resolves `{cancelled: true}`\n\n## Usage from an LLM\n\n```ts\nask_pro({\n  questions: [\n    {\n      header: \"Auth\",                         // 1-2 word tab label\n      question: \"Which auth approach?\",\n      options: [\n        { label: \"JWT in httpOnly cookie\", description: \"Stateless, scales horizontally\", recommended: true },\n        { label: \"JWT in localStorage\",     description: \"Simpler client, XSS risk\" },\n        { label: \"Server sessions + Redis\",  description: \"Revocable, but extra dep\" },\n      ],\n      multiSelect: false,\n    },\n    {\n      header: \"Tokens\",\n      question: \"Token storage?\",\n      options: [\n        { label: \"httpOnly cookie\" },\n        { label: \"Bearer in Authorization\" },\n      ],\n    },\n  ],\n})\n```\n\nResult:\n\n```ts\n// user picked \"JWT in httpOnly cookie\" + \"Bearer in Authorization\":\n{ answers: { 0: 0, 1: 1 } }\n\n// user pressed Esc:\n{ cancelled: true }\n```\n\n## UX\n\n```\n\u250c\u2500 pi-ask \u2014 2 questions \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 \u25c9 Auth    \u25cb Tokens                                              \u2502\n\u2502                                                                 \u2502\n\u2502 Q1 of 2: Which auth approach?                                  \u2502\n\u2502                                                                 \u2502\n\u2502   \u276f \u2b50 JWT in httpOnly cookie                                   \u2502\n\u2502       Stateless, scales horizontally                            \u2502\n\u2502                                                                 \u2502\n\u2502     JWT in localStorage                                         \u2502\n\u2502     Simpler client, XSS risk                                    \u2502\n\u2502                                                                 \u2502\n\u2502     Server sessions + Redis                                     \u2502\n\u2502     Revocable, but extra dependency                              \u2502\n\u2502                                                                 \u2502\n\u2502 \u2191\u2193 navigate \u00b7 1-3 pick \u00b7 tab/\u2192 next \u00b7 \u23ce next \u00b7 esc cancel      \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\n## Keys\n\n| Key | Action |\n|---|---|\n| `\u2191` / `k` | Move option up |\n| `\u2193` / `j` | Move option down |\n| `1` \u2013 `4` | Instant-pick that option |\n| `Tab` / `\u2192` | Next question |\n| `Shift+Tab` / `\u2190` / `Backspace` | Previous question |\n| `Space` | Multi-select only: toggle the current option. On \"Other\u2026\", opens the input dialog. |\n| `Enter` | **Single-select:** confirm + advance (or submit on last). **Multi-select:** advance to next question (or submit on last + all answered). Does NOT toggle. |\n| `Esc` | Cancel (returns `{cancelled: true}`) |\n\nMulti-select follows the Claude Code convention: **Space toggles, Enter\nadvances/submits**. Single-select uses Enter as the universal action key\n(toggle/pick + advance). When you're on the last question and all\nquestions are answered, the footer shows `\u23ce submit` in accent color.\n\n## Limits\n\n- 2\u20134 options per question (more is bad UX; the picker is meant for focused\n  choices, not long lists)\n- 1\u20136 questions per call (more = tab-switching fatigue)\n- At most 1 `recommended: true` per question\n- TUI and RPC modes only (`hasUI: true`); print mode returns an error\n\n## Setup\n\nDrop the directory in `~/.pi/agent/extensions/`:\n\n```bash\nls ~/.pi/agent/extensions/pi-ask/\n# index.ts picker.ts tests/ package.json tsconfig.json README.md\n```\n\npi auto-discovers and loads it on next start. The `ask_pro` tool is then\navailable to the LLM. No config required.\n\n## Development\n\n```bash\ncd ~/.pi/agent/extensions/pi-ask\nbun test              # runs tests/picker.test.ts\nbun run typecheck     # tsc --noEmit\n```\n\nCI: not configured (this is a single-file TUI component, low risk).\nAdd `.github/workflows/ci.yml` if you want green-tick PRs.\n\n## Why a separate extension?\n\nThe picker is **generic** \u2014 any pi extension (soly, your own tool, etc.) can\nuse `ask_pro` to drive multi-question Q&A without re-implementing the TUI.\nKeeping it separate from soly means:\n\n- soly stays focused on the plan/execute/discuss workflow\n- other extensions can adopt the same UX pattern\n- the picker can evolve independently (new key bindings, themes, layouts)\n",
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "pi-package",
+    "ask-user",
+    "multi-question",
+    "picker"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": {
+    "type": "git",
+    "url": "http://git.local.stbl/lowern1ght/pi-soly.framework.git",
+    "directory": "packages/pi-ask"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-15T20:14:04.064Z",
+    "modified": "2026-06-15T21:20:13.772Z",
+    "0.1.0": "2026-06-15T20:14:04.335Z",
+    "0.2.0": "2026-06-15T21:20:13.667Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

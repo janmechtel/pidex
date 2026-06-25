@@ -1,0 +1,349 @@
+{
+  "name": "@samfp/pi-steering-hooks",
+  "latest_version": "0.3.0",
+  "description": "Deterministic tool-call guardrails for pi \u2014 enforce rules with before-tool hooks instead of prompts. Zero token cost, 100% reliability.",
+  "readme": "# pi-steering-hooks\n\nDeterministic tool-call guardrails for [pi](https://github.com/badlogic/pi-mono). Enforce rules with before-tool hooks instead of prompts \u2014 zero token cost, 100% reliability.\n\nPrompt-based rules (\"never force push\") work most of the time. Steering hooks work every time. They intercept tool calls before execution and block violations deterministically, with an override escape hatch for when the agent has a good reason.\n\nInspired by [Strands Agents: Steering Accuracy Beats Prompts](https://strandsagents.com/blog/steering-accuracy-beats-prompts-workflows/).\n\n## Install\n\n```bash\npi install @samfp/pi-steering-hooks\n```\n\n## Default Rules\n\n**Repo safety:**\n\n| Rule | Tool | What it blocks |\n|------|------|---------------|\n| `no-force-push` | bash | `git push --force` (destructive history rewrite) |\n| `no-hard-reset` | bash | `git reset --hard` (discards uncommitted work) |\n| `no-rm-rf-slash` | bash | `rm -rf /` (catastrophic, no override allowed) |\n| `conventional-commits` | bash | Non-conventional `git commit -m` messages |\n| `no-long-running-commands` | bash | Dev servers and watchers that block the agent |\n\n**File-authoring guardrails (added in 0.3.0):** steer the agent toward the `write` and `edit` tools (which show diffs and run through LSP) instead of bash commands that author files invisibly.\n\n| Rule | Tool | What it blocks |\n|------|------|---------------|\n| `no-sed-inplace` | bash | `sed -i ...` (in-place edits without diff review) |\n| `no-perl-inplace` | bash | `perl -i` / `perl -pi` |\n| `no-awk-inplace` | bash | `awk -i inplace` |\n| `no-heredoc-to-file` | bash | `cat <<EOF > path` and friends authoring source files |\n| `no-redirect-source-author` | bash | `echo\\|printf\\|cat \u2026 > file.<sourceext>` |\n| `no-tee-source` | bash | `tee file.<sourceext>` |\n\nThe file-authoring rules have **two structural escape hatches** so legitimate generation pipelines aren't blocked:\n\n1. **Script pattern** \u2014 `write` a `tools/refactor.py` or `scripts/gen.sh`, then run it. Subprocess writes are not inspected.\n2. **Scratch directories** \u2014 redirects into `/tmp/`, `/dev/`, `dist/`, `build/`, `generated/`, `out/`, `reports/`, `coverage/`, `target/`, `.cache/` are always allowed.\n\nPlus the standard per-command override (`# steering-override: <rule> \u2014 <reason>`) for one-off cases.\n\nIf you don't want a default rule, disable it via `steering.json`:\n\n```json\n{ \"disable\": [\"no-tee-source\", \"conventional-commits\"] }\n```\n\n## Override Mechanism\n\nWhen a rule fires, the agent can retry with an override comment:\n\n```bash\ngit push --force origin main  # steering-override: no-force-push \u2014 deploying hotfix to unblock prod\n```\n\nThe override is allowed through but logged to the session for audit. Rules with `noOverride: true` (like `no-rm-rf-slash`) cannot be overridden.\n\n## Custom Rules\n\nCreate `steering.json` in your project root or `~/.pi/agent/`:\n\n```json\n{\n  \"disable\": [\"conventional-commits\"],\n  \"rules\": [\n    {\n      \"name\": \"no-git-push\",\n      \"tool\": \"bash\",\n      \"field\": \"command\",\n      \"pattern\": \"\\\\bgit\\\\s+push\\\\b\",\n      \"reason\": \"Use `cr` instead of `git push`.\"\n    },\n    {\n      \"name\": \"aws-requires-profile\",\n      \"tool\": \"bash\",\n      \"field\": \"command\",\n      \"pattern\": \"\\\\baws\\\\s+[a-z]\",\n      \"unless\": \"(--profile|AWS_PROFILE=|\\\\baws\\\\s+(sts\\\\s+get-caller-identity|configure)\\\\b)\",\n      \"reason\": \"Always use --profile or AWS_PROFILE with aws CLI commands.\"\n    },\n    {\n      \"name\": \"no-write-env-files\",\n      \"tool\": \"write\",\n      \"field\": \"path\",\n      \"pattern\": \"\\\\.env\",\n      \"reason\": \"Don't overwrite .env files \u2014 they may contain secrets.\",\n      \"noOverride\": true\n    }\n  ]\n}\n```\n\n### Rule Format\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `name` | string | Unique rule identifier |\n| `tool` | `\"bash\"` \\| `\"write\"` \\| `\"edit\"` | Which tool to intercept |\n| `field` | `\"command\"` \\| `\"path\"` \\| `\"content\"` | Which input field to test |\n| `pattern` | string | Regex \u2014 if it matches, the rule fires (violation) |\n| `requires` | string? | Additional regex that must also match (AND condition) |\n| `unless` | string? | Regex exemption \u2014 if this matches, rule doesn't fire |\n| `reason` | string | Message shown to the agent when blocked |\n| `noOverride` | boolean? | If true, no override escape hatch |\n\n### Config Locations\n\nChecked in order (first found wins):\n\n1. `./steering.json` (project root)\n2. `~/.pi/agent/steering.json` (global)\n\n## How It Works\n\n1. Extension registers a `tool_call` hook\n2. On every bash/write/edit call, rules are evaluated against the tool input\n3. If a rule matches: block the call and return the reason to the agent\n4. Agent sees the block message and adjusts its approach\n5. If the agent has a legitimate reason, it can retry with `# steering-override: rule-name \u2014 reason`\n6. Overrides are logged via `appendEntry` for audit\n\nNo tokens spent on rule enforcement. No prompt drift. No \"oops, the model forgot the rule this time.\"\n\n## Programmatic API\n\nThe package exports its internals so other extensions can build on top:\n\n```ts\nimport {\n  // Types\n  type Rule, type BashRule, type WriteRule, type EditRule,\n  type BashInput, type WriteInput, type EditInput,\n  type CompiledRule, type SteeringConfig,\n\n  // Defaults\n  DEFAULT_RULES,\n\n  // Path helpers \u2014 useful when authoring file-authoring guardrails\n  SCRATCH_PATH_PREFIXES, isScratchPath,\n\n  // Shell-string helpers \u2014 strip noise before scanning for shell metachars\n  stripHeredocBodies, stripQuotedStrings, stripBashComments,\n\n  // Rule lifecycle\n  compileRule, buildRules, evaluateRule, testRule,\n\n  // Override extraction\n  extractOverride,\n\n  // Config loader (`./steering.json` then `~/.pi/agent/steering.json`)\n  loadConfig,\n} from \"@samfp/pi-steering-hooks\";\n```\n\n### Function-form rules (procedural)\n\nWhen a rule needs more than a regex \u2014 e.g. parsing structure, applying multi-stage transforms, or consulting a path allowlist \u2014 use the `test` function form instead of `pattern`:\n\n```ts\nimport {\n  type BashRule,\n  isScratchPath,\n  stripHeredocBodies,\n  stripQuotedStrings,\n} from \"@samfp/pi-steering-hooks\";\n\nconst noHeredocToFile: BashRule = {\n  name: \"no-heredoc-to-file\",\n  tool: \"bash\",\n  reason:\n    \"Use the `write` tool to author files. Heredoc-to-file hides content from diff review and skips LSP.\",\n  test: ({ command }) => {\n    if (!/<<[-~]?\\s*['\"]?\\w+['\"]?/.test(command)) return false;\n    // Strip heredoc bodies + quotes so embedded `>` chars don't false-positive\n    // on Python comparisons, awk programs, etc.\n    const cleaned = stripQuotedStrings(stripHeredocBodies(command));\n    for (const m of cleaned.matchAll(/>>?\\s*([^\\s|&;<>()]+)/g)) {\n      const target = m[1].replace(/^['\"]|['\"]$/g, \"\");\n      if (target.startsWith(\"&\")) continue;\n      if (isScratchPath(target)) continue;\n      return true;\n    }\n    return false;\n  },\n};\n```\n\n`pattern` and `test` are mutually exclusive \u2014 `compileRule` throws if a rule has both or neither.\n\nFunction rules can only be added in code (not from `steering.json`, which is JSON).\n\n## Why heredoc-stripping matters\n\nA naive `>` scan against `python3 - <<'EOF' ... if x > 80: ... EOF` will treat the Python comparison as a shell redirect to a file named `80:`. The exported `stripHeredocBodies` helper removes heredoc bodies (preserving the opener line, where real shell redirects often live) before metachar scanning. Same logic applies to `stripQuotedStrings` for `grep '>' file` style false positives.\n\nThe regression case is covered in `index.test.ts` so it can't come back.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "extension",
+    "steering",
+    "guardrails",
+    "safety",
+    "hooks"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/samfoy/pi-steering-hooks#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/samfoy/pi-steering-hooks.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-04-15T18:01:05.265Z",
+    "modified": "2026-05-29T21:01:22.102Z",
+    "0.1.0": "2026-04-15T18:01:05.520Z",
+    "0.2.0": "2026-04-21T13:59:03.560Z",
+    "0.3.0": "2026-05-29T21:01:21.977Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 23,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 233
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 142
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 17
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 6
+    }
+  ]
+}

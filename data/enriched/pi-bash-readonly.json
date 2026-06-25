@@ -1,0 +1,40 @@
+{
+  "name": "pi-bash-readonly",
+  "latest_version": "0.3.0",
+  "description": "Sandboxed read-only bash for Pi agents via bwrap",
+  "readme": "# pi-bash-readonly\n\nSandboxed read-only bash for [Pi](https://github.com/badlogic/pi-mono) agents via [bwrap](https://github.com/containers/bubblewrap).\n\n## Install\n\n```bash\npi install npm:pi-bash-readonly\n```\n\n## What it does\n\nEvery `bash` tool call is wrapped in a bwrap sub-sandbox where the entire filesystem is mounted read-only (`--ro-bind / /`). By default, **nothing is writable** and **network is isolated** via `--unshare-net`.\n\nThis uses Linux mount and network namespaces. Unlike regex-based command filtering, writes are blocked at the filesystem level and TCP/UDP network access is blocked via namespace isolation \u2014 from any language runtime (Python, Perl, dd, etc.).\n\n> **Note:** Network isolation blocks TCP/UDP but Unix domain sockets on the mounted filesystem may still be reachable. See [limitations](docs/01-guide/limitations.md) for details.\n\nUser bash commands (`!` and `!!` in the TUI) are also sandboxed when read-only mode is active.\n\n## Configuration\n\n### Agent frontmatter (recommended)\n\nSet sandbox behavior per-agent in the agent's `.md` file:\n\n```yaml\n---\nname: scout\nbash-readonly: true\nbash-readonly-locked: true\n---\n```\n\n| Key | Default | Description |\n|-----|---------|-------------|\n| `bash-readonly` | \u2014 | Initial sandbox state. `true` = sandboxed, `false` = unrestricted. |\n| `bash-readonly-locked` | `false` | When `true`, disables the `/readonly` toggle command. |\n\nThe extension reads the agent file using the `PI_AGENT` environment variable. It searches `.pi/agents/` and any paths configured in `.pi/agents.json` `agentPaths`.\n\n### Config file\n\nConfigure via `.pi/pi-bash-readonly.json` (project) or `~/.pi/agent/pi-bash-readonly.json` (user). Project config takes priority.\n\n```json\n{\n  \"writable\": [\"/tmp\"],\n  \"enabled\": true,\n  \"network\": false\n}\n```\n\n| Key | Default | Description |\n|-----|---------|-------------|\n| `writable` | `[]` | Paths to mount writable inside the sandbox. `/tmp` gets an isolated tmpfs (not the host /tmp). Other paths are bind-mounted read-write. |\n| `enabled` | `true` | Initial sandbox state. Overridden by agent frontmatter. |\n| `network` | `false` | Allow network access inside the sandbox. Default is `false` (network isolated via `--unshare-net`). Set to `true` if agents need to fetch packages, clone repos, or make HTTP requests. |\n\nWithout `\"/tmp\"` in `writable`, commands like `sort` on large inputs will fail since they need temp space. Add it if your agents run commands that need scratch space.\n\n### Resolution order\n\n1. Agent frontmatter `bash-readonly` field (if `PI_AGENT` is set and agent file found)\n2. Config file `enabled` field\n3. Default: `true` (sandboxed)\n\n## Usage\n\nAdd to an agent's extensions:\n\n```yaml\nextensions:\n  - pi-bash-readonly\n```\n\nUse the `/readonly` command in an interactive session to toggle:\n\n```\n/readonly     # \ud83d\udd12 bash: read-only (bwrap)\n/readonly     # \ud83d\udd13 bash: full access\n```\n\nIf `bash-readonly-locked: true` is set in the agent's frontmatter, the toggle shows a \"locked\" notification and does nothing.\n\n## Visual indicator\n\nWhen the sandbox is active, bash tool calls display a \ud83d\udd12 icon in the tool header:\n\n```\n\ud83d\udd12 bash ls -la\n```\n\nThe status bar also shows `\ud83d\udd12 ro` when sandboxed.\n\n## How it works\n\n1. Registers a custom `bash` tool using `createBashTool` with a `spawnHook`\n2. The `spawnHook` wraps commands in bwrap via `bash -c` with shell escaping (no temp files)\n3. Intercepts `user_bash` events to sandbox `!` and `!!` commands too\n4. Reads agent frontmatter via `PI_AGENT` env var for per-agent configuration\n\n## Requirements\n\n- Linux with [bwrap](https://github.com/containers/bubblewrap) in `PATH`\n  - Debian/Ubuntu: `sudo apt install bubblewrap`\n  - Fedora: `sudo dnf install bubblewrap`\n  - Arch: `sudo pacman -S bubblewrap`\n- Falls back gracefully to unrestricted bash with a warning if bwrap is not found\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "sandbox",
+    "bwrap",
+    "read-only",
+    "security"
+  ],
+  "author": {
+    "name": "rhnvrm"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/rhnvrm/pi-bash-readonly#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rhnvrm/pi-bash-readonly.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-23T10:19:12.726Z",
+    "modified": "2026-04-05T11:45:41.794Z",
+    "0.1.0": "2026-03-23T10:19:12.967Z",
+    "0.2.0": "2026-03-24T16:12:44.987Z",
+    "0.3.0": "2026-04-05T11:45:41.532Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 12,
+  "download_trend": []
+}

@@ -1,0 +1,32 @@
+{
+  "name": "pi-thinking-only-guard",
+  "latest_version": "0.1.0",
+  "description": "Auto-recover trapped tool calls from thinking blocks for Qwen3.6 and similar models",
+  "readme": "# Qwen3.6 Thinking-Only Guard \u2014 Pi Extension\n\n## Problem\n\nQwen3.6-27B (and similar thinking-capable models via providers like airouter) sometimes places\ntool calls inside the `reasoning_content` (thinking block) instead of as proper `tool_calls` in the API response.\n\n- `finish_reason: \"stop\"` \u2014 model thinks it is done\n- Thinking content contains `<tool_call>` ... `</tool_call>` blocks\n- No actual `tool_calls` in response \u2014 pi does not execute them\n- No text content \u2014 user sees empty or thinking-only response\n\nKnown issue: [sgl-project/sglang#27021](https://github.com/sgl-project/sglang/issues/27021)\n\n## Root Cause\n\nProvider emits:\n```\n    reasoning_content: \"<tool_call>\n<function=read>\n<parameter=path>\n/home/reluxa/.profile\n</parameter>\n</function>\n</tool_call>\"\n    content: \"\"\n    finish_reason: \"stop\"\n```\n\nPi's OpenAI-completions parser puts thinking in `[type: \"thinking\"]`, finds no tool calls,\nand the turn ends. The model \"stopped\" from its perspective.\n\n## Solution: thinking-only-guard.ts\n\nA pi extension that detects this pattern during live streaming and sends the trapped\ntool call(s) back to the model so it can execute them properly.\n\n### Files\n\n| File | Purpose |\n|------|---------|\n| `~/.pi/agent/extensions/thinking-only-guard.ts` | The extension |\n| `~/.pi/agent/extensions/tests/thinking-only-guard.test.js` | Unit tests (14 tests) |\n\n### How It Works\n\n1. `message_update` \u2014 Accumulates `thinking_delta` tokens into `lastThinking`\n2. `message_end` \u2014 Checks if the completed assistant message matches the pattern:\n   - `toolCallCount >= 1` (one or more <tool_call> blocks in thinking)\n   - `hasText === false` (no `type: \"text\"` in content array)\n   - `hasRealToolCalls === false` (no `type: \"toolCall\"` in content array)\n   - `sawThinkingDelta === true` (only fires during live streaming, not session replay)\n3. If matched \u2014 extracts the exact tool call block(s) from thinking and sends a follow-up:\n   > Your last response had N tool call(s) inside your thinking block. Please execute them now:\n   >\n   > <tool_call>\n   <function=read>\n   <path>\n   /home/reluxa/.profile\n   </parameter>\n   </function>\n   </tool_call>\n4. `turn_end` \u2014 Resets retry counter\n5. Max 2 retries per turn before giving up\n\n### Trigger Conditions\n\n| Condition | Must be |\n|-----------|---------|\n| Tool calls in thinking | >= 1 |\n| Text blocks in content | 0 |\n| Real toolCall entries | 0 |\n| Live streaming | Yes |\n| Retry count | < maxRetries (2) |\n\n### Configuration\n\nEditable at the top of the extension file.\n\n| Setting | Default | Notes |\n|---------|---------|-------|\n| `maxRetries` | 2 | Max auto-continue per turn |\n\n### Running Tests\n\n```bash\nnode ~/.pi/agent/extensions/tests/thinking-only-guard.test.js\n```\n\n14 tests: single call, multiple calls, with text, with real toolCalls, plain thinking, empty thinking, extract N calls\n\n### Session Replay Results\n\nScanned 763 thinking-only messages across `~/.pi/agent/sessions/--home-reluxa--/`.\n4 would have triggered the guard (entries 50556cf1, 968d54e2, bf309c6e, 051b0538).\n\n## Design Decisions\n\n### Why send back as user message?\n\nThe turn is already finalized by `message_end` \u2014 pi will not re-scan for tool calls.\nSending the trapped call back triggers a fresh turn where the model executes it.\n\n### Why not modify the message in-place?\n\n`message_end` can return `{ message }` to replace it, but the turn is already done.\nConverting thinking to text only makes the calls visible, not executable.\n\n### Why not a custom provider wrapper?\n\nTechnically possible \u2014 intercept raw streaming chunks, restructure reasoning_content into tool_calls.\nHowever: significantly more engineering, fragile (depends on provider internals).\nCurrent approach works and costs one extra turn.\n\n## Related\n\n- [Qwen3.6-27B on HuggingFace](https://huggingface.co/Qwen/Qwen3.6-27B)\n- [SGLang issue: stops after thinking](https://github.com/sgl-project/sglang/issues/27021)\n- [LMStudio: thinking + tool call issue](https://github.com/lmstudio-ai/lmstudio-bug-tracker/issues/2045)",
+  "keywords": [
+    "pi-package",
+    "pi-coding-agent",
+    "qwen",
+    "thinking"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/reluxa/pi-thinking-only-guard#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/reluxa/pi-thinking-only-guard.git"
+  },
+  "pi": {
+    "extensions": [
+      "./thinking-only-guard.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-14T16:05:02.594Z",
+    "0.1.0": "2026-06-14T16:05:02.771Z",
+    "modified": "2026-06-14T16:05:02.949Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

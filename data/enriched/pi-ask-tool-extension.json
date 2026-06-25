@@ -1,0 +1,38 @@
+{
+  "name": "pi-ask-tool-extension",
+  "latest_version": "0.2.6",
+  "description": "Ask tool extension for pi with tabbed questioning and inline note editing",
+  "readme": "# Pi Ask Tool Extension\n\nAn extension for the [Pi coding agent](https://github.com/badlogic/pi-mono/) that adds a structured `ask` tool with interactive, tab-based questioning and inline note editing.\n\n```ts\nask({\n  questions: [\n    {\n      id: \"auth\",\n      question: \"Which authentication model should we use?\",\n      options: [{ label: \"JWT\" }, { label: \"Session\" }],\n      recommended: 1\n    }\n  ]\n})\n```\n\n## Why\n\nWhen an agent needs a decision from you, free-form prompts are slow and inconsistent.\nThis extension provides:\n\n- **Structured options** with clear IDs and deterministic outputs\n- **Single + multi-select** in one tool\n- **Tab-based multi-question flow** with a final submit review tab\n- **Inline note editing** (no large UI pane shifts)\n- **Question text auto-wrap** (avoids one-line `...` truncation)\n- **Optional Markdown context** for longer explanations/structure diagrams\n- **Automatic `Other (type your own)` handling**\n\n## Install\n\n### From npm\n\n```bash\npi install npm:pi-ask-tool-extension\n```\n\n### From git\n\n```bash\npi install git:github.com/devkade/pi-ask-tool@main\n# or pin a tag\npi install git:github.com/devkade/pi-ask-tool@v0.1.0\n```\n\n### Local development run\n\n```bash\npi -e ./src/index.ts\n```\n\n## Quick Start\n\n### Single question (single-select)\n\n```ts\nask({\n  questions: [\n    {\n      id: \"auth\",\n      question: \"Which auth approach?\",\n      options: [{ label: \"JWT\" }, { label: \"Session\" }],\n      recommended: 1\n    }\n  ]\n})\n```\n\nResult example:\n\n```txt\nUser answers:\nauth: Session\n\nAnswer context:\nQuestion 1 (auth)\nPrompt: Which auth approach?\nOptions:\n  1. JWT\n  2. Session\nResponse:\n  Selected: Session\n```\n\n### Single question (multi-select)\n\n```ts\nask({\n  questions: [\n    {\n      id: \"features\",\n      question: \"Which features should be enabled?\",\n      options: [{ label: \"Logging\" }, { label: \"Metrics\" }, { label: \"Tracing\" }],\n      multi: true\n    }\n  ]\n})\n```\n\nResult example:\n\n```txt\nUser answers:\nfeatures: [Logging, Metrics]\n\nAnswer context:\nQuestion 1 (features)\nPrompt: Which features should be enabled?\nOptions:\n  1. Logging\n  2. Metrics\n  3. Tracing\nResponse:\n  Selected: [Logging, Metrics]\n```\n\n### Multi-question (tab flow)\n\n```ts\nask({\n  questions: [\n    {\n      id: \"auth\",\n      question: \"Which auth approach?\",\n      options: [{ label: \"JWT\" }, { label: \"Session\" }]\n    },\n    {\n      id: \"cache\",\n      question: \"Which cache strategy?\",\n      options: [{ label: \"Redis\" }, { label: \"None\" }]\n    }\n  ]\n})\n```\n\nResult example:\n\n```txt\nUser answers:\nauth: Session\ncache: Redis\n\nAnswer context:\nQuestion 1 (auth)\nPrompt: Which auth approach?\nOptions:\n  1. JWT\n  2. Session\nResponse:\n  Selected: Session\n\nQuestion 2 (cache)\nPrompt: Which cache strategy?\nOptions:\n  1. Redis\n  2. None\nResponse:\n  Selected: Redis\n```\n\n### Question with Markdown context (long guidance / structure)\n\n```ts\nask({\n  questions: [\n    {\n      id: \"architecture\",\n      question: \"Which execution path should we prioritize?\",\n      description: `# Background\\n\\n- Current bottleneck: network I/O\\n- Goal: reduce response latency\\n\\n\\`\\`\\`text\\n[Client] -> [API] -> [Cache] -> [DB]\\n\\`\\`\\``,\n      options: [{ label: \"Cache-first\" }, { label: \"DB-first\" }],\n      recommended: 0\n    }\n  ]\n})\n```\n\n`description` accepts both Markdown and plain text, and is wrapped above options.\n\n## Interaction Model\n\n| Flow | UI style | Submit behavior |\n|---|---|---|\n| Single + `multi: false` | one-question picker | Enter submits immediately |\n| Single + `multi: true` | tab UI (`Question` + `Submit`) | Submit tab confirms |\n| Multiple questions (mixed allowed) | tab UI (`Q1..Qn` + `Submit`) | Submit tab confirms all |\n\n## Inline Notes (Minimal UI Transitions)\n\nPress `Tab` on any option to edit a note inline on that same row.\n\n- Display format: `Option \u2014 note: ...`\n- Editing cursor: inverse block on the character under caret (or space at end)\n- Notes are sanitized for inline display (line breaks/control chars)\n- Narrow-width rendering keeps the edit cursor visible\n\nFor `Other`, a note is required to become valid.\n\n## Keyboard Shortcuts\n\n- `\u2191 / \u2193`: move between options\n- `\u2190 / \u2192`: switch question tabs\n- `Enter`: select/toggle or submit (on Submit tab)\n- `Tab`: start/stop inline note editing\n- `Esc`: cancel flow\n\n## Tool Schema\n\n```ts\n{\n  questions: [\n    {\n      id: string,\n      question: string,\n      description?: string, // optional Markdown/plain context shown above options\n      options: [{ label: string }],\n      multi?: boolean,\n      recommended?: number // 0-indexed\n    }\n  ]\n}\n```\n\n> Do **not** include an `Other` option in `options`. The UI injects it automatically.\n\n## Development\n\n```bash\nnpm install\nnpm run check\n```\n\n`npm run check` runs:\n\n- TypeScript checks (`npm run typecheck`)\n- Test suite with coverage (`npm run test:coverage`)\n- Coverage gate (`npm run coverage:check`)\n\nCoverage gate defaults (override via env vars in CI if needed):\n\n- Overall: lines >= 38%, functions >= 80%\n- `src/index.ts`: lines >= 95%, functions >= 100%\n- `src/ask-logic.ts`: lines >= 95%, functions >= 100%\n- `src/ask-inline-note.ts`: lines >= 80%, functions >= 70%\n\n## Project Structure\n\n- `src/index.ts` - extension entrypoint, tool registration, and orchestration\n- `src/ask-logic.ts` - selection/result mapping helpers\n- `src/ask-inline-ui.ts` - single-question UI\n- `src/ask-tabs-ui.ts` - tabbed multi-question UI\n- `src/ask-inline-note.ts` - inline note rendering helper\n- `src/ask-text-wrap.ts` - shared line-wrapping helper for long prompts\n- `test/*.test.ts` - logic + UI mapping + integration coverage\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/devkade/pi-ask-tool#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devkade/pi-ask-tool.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-15T10:29:26.407Z",
+    "modified": "2026-05-04T04:22:10.001Z",
+    "0.1.0": "2026-02-15T10:29:26.675Z",
+    "0.1.1": "2026-02-15T10:34:13.738Z",
+    "0.1.2": "2026-02-15T10:57:18.328Z",
+    "0.1.4": "2026-02-15T11:18:51.562Z",
+    "0.1.5": "2026-02-18T16:28:56.335Z",
+    "0.2.2": "2026-02-24T08:46:17.206Z",
+    "0.2.3": "2026-03-23T17:18:17.765Z",
+    "0.2.4": "2026-03-29T15:43:13.830Z",
+    "0.2.5": "2026-05-01T06:54:15.871Z",
+    "0.2.6": "2026-05-04T04:22:09.704Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": null,
+  "download_trend": []
+}

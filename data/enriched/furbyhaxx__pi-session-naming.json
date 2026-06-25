@@ -1,0 +1,349 @@
+{
+  "name": "@furbyhaxx/pi-session-naming",
+  "latest_version": "0.2.1",
+  "description": "Pi extension for automatic session titles, rename, browsing, and session listing.",
+  "readme": "# pi-session-naming\n\nA [pi](https://github.com/earendil-works/pi) coding-agent extension for automatic session titles, manual session renaming, project session browsing, and session listing.\n\nIt uses pi's default theme tokens (`accent`, `dim`, `warning`, `selectedBg`, etc.), so rendering follows the active pi theme. No custom theme. Shocking restraint, really.\n\n## Install\n\nInstall from GitHub:\n\n```sh\npi install git:https://github.com/furbyhaxx/pi-session-naming\n```\n\nOr clone the repo and install from the local checkout:\n\n```sh\ngit clone https://github.com/furbyhaxx/pi-session-naming\ncd pi-session-naming\nnpm install\npi install path/to/cloned/repo\n```\n\nLoad directly without installing:\n\n```sh\npi -e path/to/cloned/repo\n```\n\nAfter npm publishing, the package is intended to install as:\n\n```sh\npi install npm:@furbyhaxx/pi-session-naming\n```\n\n## Features\n\n- Auto-generates a title for unnamed sessions.\n- Generates conventional-style titles such as `fix(auth): refresh token flow`.\n- Restricts scopes to a single lowercase alphanumeric word with configurable length, because `feat(pi-fancy-editor): ...` is chaos wearing a hat.\n- Uses built-in title tags plus optional user-supplied tag guidance.\n- Adds lightweight project context from common manifest files, not just npm packages.\n- Can disable tags for plain description-only titles.\n- Uses a configured lightweight model, or auto-selects a known title model.\n- Retries title generation and falls back once to the current session model when different.\n- Avoids overwriting manual titles.\n- Uses temporary datetime titles for trivial/vague prompts and retries later after meaningful activity.\n- Adds `/rename [name]` and `/rename auto`.\n- Adds `/sessions` for interactive project session browsing, switching, renaming, and deletion.\n- Adds fixed `--list-sessions [filter]` and `--json` CLI listing flags.\n\n## Commands and flags\n\n```text\n/rename                  Open an input prompt for the current session title\n/rename <title>          Set a manual session title\n/rename auto             Force title generation from current context\n/sessions                Browse project sessions interactively\n--list-sessions [filter] List project sessions and exit\n--json                   Emit session listing as JSON when listing is active\n```\n\n## Configuration\n\nConfiguration lives in pi's regular `settings.json`.\n\nGlobal settings:\n\n```text\n${PI_CODING_AGENT_DIR:-~/.pi/agent}/settings.json\n```\n\nProject settings override global settings:\n\n```text\n./.pi/settings.json\n```\n\nThis extension reads both scopes through pi's `SettingsManager` and deep-merges only its own `session.titleGeneration`, `session.rename`, and `session.browser` blocks. Snake-case aliases for the new keys are accepted (`title_generation`, `max_length`, `scope_max_length`, `use_tags`, `builtin_tags`, etc.). Unknown settings outside the current schema are ignored.\n\n### Defaults\n\n```json\n{\n  \"session\": {\n    \"titleGeneration\": {\n      \"enabled\": true,\n      \"language\": \"auto\",\n      \"model\": \"auto\",\n      \"retries\": 3,\n      \"emojis\": false,\n      \"maxLength\": 52,\n      \"scopeMaxLength\": 12,\n      \"maxMessageCount\": -1,\n      \"includeTools\": true,\n      \"useTags\": true,\n      \"builtinTags\": true,\n      \"tags\": []\n    },\n    \"browser\": {\n      \"enabled\": true,\n      \"command\": \"sessions\",\n      \"pageSize\": 12,\n      \"delete\": {\n        \"enabled\": true,\n        \"useTrash\": true,\n        \"confirmPresses\": 2\n      }\n    },\n    \"rename\": {\n      \"enabled\": true,\n      \"command\": \"rename\",\n      \"interactiveWhenEmpty\": true\n    }\n  }\n}\n```\n\n### Title generation options\n\n| Key | Default | Meaning |\n| --- | --- | --- |\n| `enabled` | `true` | Enables automatic title generation. |\n| `language` | `\"auto\"` | `auto` tells the LLM to use the user's message language; any other string instructs that language. |\n| `model` | `\"auto\"` | `auto`, or `{provider}/{model}{:thinking}` such as `deepseek/deepseek-v4-flash` or `deepseek/deepseek-v4-flash:high`. |\n| `retries` | `3` | Number of attempts for the selected title model before trying the current session model once when different. |\n| `emojis` | `false` | Allows or forbids emojis in generated titles. |\n| `maxLength` | `52` | Maximum length of the description part after the tag, e.g. only `choco cookies` in `research(recipe): choco cookies`. |\n| `scopeMaxLength` | `12` | Maximum length for optional scopes. Scopes are normalized to lowercase and must be one alphanumeric word: `auth`, not `auth-service`. |\n| `maxMessageCount` | `-1` | Maximum number of latest textified message entries from the active session branch sent inside `<session-transcript>`. `0` or `-1` sends the whole branch transcript. |\n| `includeTools` | `true` | Includes textified tool-result messages in `<session-transcript>`. When `false`, only user and assistant text messages are sent. |\n| `useTags` | `true` | Enables the prefixed tag format (`research(recipe): ...`). When `false`, titles are plain descriptions. |\n| `builtinTags` | `true` | Enables the built-in tag list. When `false`, only user-provided `tags` are available. |\n| `tags` | `[]` | Additional lowercase custom tags. Entries may be strings (`\"meet\"`) or `[\"name\", \"guidance\"]` pairs. Invalid tags are ignored. |\n\n### Built-in title tags\n\nBuilt-in tags include short model-facing guidance for when each tag should apply:\n\n```text\nfeat, add, fix, refactor, perf, style, test, bench, docs, build, ops, chore,\nonboard, scaffold, bootstrap, init, skill, analyze, audit, review, research,\ninvestigate, debug, troubleshoot, plan, design, propose, compare, evaluate,\nexplain, summarize, document, configure, migrate, prototype, validate, wire\n```\n\n### Example\n\n```json\n{\n  \"session\": {\n    \"titleGeneration\": {\n      \"language\": \"auto\",\n      \"model\": \"github-copilot/gpt-5.4-mini:low\",\n      \"retries\": 3,\n      \"emojis\": false,\n      \"maxLength\": 52,\n      \"scopeMaxLength\": 12,\n      \"maxMessageCount\": -1,\n      \"includeTools\": true,\n      \"useTags\": true,\n      \"builtinTags\": true,\n      \"tags\": [\n        [\"cook\", \"Use when cooking\"],\n        [\"book\", \"Use when reading or writing about books\"],\n        \"meet\"\n      ]\n    }\n  }\n}\n```\n\nTo use only your own tag list:\n\n```json\n{\n  \"session\": {\n    \"titleGeneration\": {\n      \"builtinTags\": false,\n      \"tags\": [[\"cook\", \"Use when cooking\"], \"book\", \"meet\"]\n    }\n  }\n}\n```\n\n## Title-generation project context\n\nFor title generation, the extension sends compact project identity metadata when it can detect it. It does **not** send full manifest files. It also sends the configured textified session branch inside `<session-transcript>`.\n\nBy default, `maxMessageCount: -1` sends all textified user/assistant/tool-result message entries from the active session branch. Set a positive `maxMessageCount` to send only the latest N entries, or set `includeTools: false` to omit tool-result messages.\n\nProject metadata is sent as a single context line like:\n\n```text\nprojects: rust:furbyhaxx-core (Cargo.toml), python:furbyhaxx-tools (pyproject.toml)\n```\n\nDetected manifests include `package.json`, `Cargo.toml`, `pyproject.toml`, `pubspec.yaml`, `go.mod`, `composer.json`, `pom.xml`, Gradle settings/build files, `.gemspec`, `mix.exs`, and `deno.json`/`deno.jsonc`.\n\n## Package manifest\n\nThe pi package manifest exposes only the session extension entry point:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./extensions/session/index.ts\"]\n  }\n}\n```\n\n## Development\n\n```sh\nnpm install\nnpm run typecheck\nnpm test\nnpm pack --dry-run\n```\n\nPi loads the TypeScript source directly; the build script only typechecks and does not emit artifacts.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "session-title",
+    "session-naming"
+  ],
+  "author": {
+    "name": "furbyhaxx"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/furbyhaxx/pi-session-naming#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/furbyhaxx/pi-session-naming.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/session/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-13T12:22:28.981Z",
+    "modified": "2026-05-13T13:43:15.769Z",
+    "0.2.0": "2026-05-13T12:22:29.250Z",
+    "0.2.1": "2026-05-13T13:43:15.676Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 21,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 34
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

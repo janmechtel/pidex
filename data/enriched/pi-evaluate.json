@@ -1,0 +1,38 @@
+{
+  "name": "pi-evaluate",
+  "latest_version": "0.1.4",
+  "description": "Adversarial post-execute evaluation skill for pi \u2014 verifies implementation against contract, GAN-inspired",
+  "readme": "# pi-evaluate\n\nAn adversarial post-execute evaluation skill for [pi](https://github.com/mariozechner/pi-coding-agent).\n\nAfter a complex execution, you're staring at a large diff and don't know where to look. `pi-evaluate` reads your contract (what you asked for) and your outputs (what was built), then tells you exactly where to focus \u2014 and what you can safely skip.\n\nInspired by the **GAN discriminator pattern**: a second agent that sees only the contract and the output, never the implementation plan, and returns a structured verdict.\n\n---\n\n## What it does\n\n`pi-evaluate` acts as an adversarial discriminator:\n\n- Reads your **contract** \u2014 brief + specs (reespec), or freeform text you paste in\n- Reads your **actual outputs** \u2014 files, test results, documents\n- Returns a **structured verdict per capability**: \u2705 SATISFIED / \u26a0\ufe0f PARTIAL / \u274c UNSATISFIED / \u2753 UNCLEAR\n- Produces a **triage summary**: safe to skip, worth a look, human call\n\nIt does NOT read `tasks.md`, `design.md`, or any implementation intent. It is blind to the \"how\" \u2014 it only judges whether the \"what\" was delivered.\n\nIt does NOT fix gaps. It reports them. You decide what to do.\n\n---\n\n## Installation\n\n```bash\nnpm install pi-evaluate\n```\n\nThen restart pi or run `/reload`. The `evaluate` skill will appear in your available skills.\n\n---\n\n## Reespec mode\n\nIf you use [reespec](https://github.com/your-org/reespec), `pi-evaluate` detects your project automatically.\n\nAfter completing an execute phase, invoke the skill:\n\n```\n/skill:evaluate\n```\n\nThe evaluator will:\n1. Detect your active reespec request\n2. Load `brief.md` and `specs/` as the contract silently\n3. Scan your outputs\n4. Return a verdict per spec capability + triage summary\n\nExample output:\n\n```\nEvaluating request: my-feature\n\n### user-auth-capability\nverdict:  \u26a0\ufe0f PARTIAL\nreason:   brief says \"support OAuth and password login\" \u2014 found OAuth handler,\n          no password login handler found in src/auth/\nfocus:    src/auth/ \u2014 password login handler is missing\n\n### error-handling-capability\nverdict:  \u2705 SATISFIED\nreason:   all error paths covered in tests/errors.test.mjs\n\n## Triage\n\u2705 Safe to skip:   error-handling, logging\n\u26a0\ufe0f  Worth a look:  user-auth (password login missing)\n```\n\n---\n\n## Standalone mode\n\nNo reespec? No problem. The skill works with any project.\n\nInvoke it:\n\n```\n/skill:evaluate\n```\n\nYou'll be asked:\n\n> \"What's the contract? Paste your original ask, acceptance criteria, or whatever defines done.\"\n\nPaste anything \u2014 a paragraph, a bullet list, a copied ticket, a Slack message. No structure required.\n\nExample:\n\n```\nWhat's the contract?\n\n> Build a user settings page. It should let users change their email and password.\n> There should be a confirmation dialog before saving. Mobile-friendly. No external\n> auth libraries.\n\n(contract: user-supplied)\n\n### change-email\nverdict:  \u2705 SATISFIED\nreason:   src/settings/email.tsx exists, email change form found with validation\n\n### change-password\nverdict:  \u26a0\ufe0f PARTIAL\nreason:   password field found but no confirmation dialog present in src/settings/\nfocus:    src/settings/ \u2014 confirmation dialog before save is missing\n\n### mobile-friendly\nverdict:  \u2753 UNCLEAR\nreason:   contract says \"mobile-friendly\" but no breakpoints or responsive tests defined \u2014\n          cannot verify without clearer criteria\nfocus:    human call \u2014 define what mobile-friendly means for this project\n\n## Triage\n\u2705 Safe to skip:   change-email\n\u26a0\ufe0f  Worth a look:  change-password (missing confirmation dialog)\n\u2753  Human call:    mobile-friendly (underspecified)\n```\n\n---\n\n## The GAN idea\n\n[GANs (Generative Adversarial Networks)](https://arxiv.org/abs/1406.2661) pit two neural networks against each other: a **generator** that creates fake data, and a **discriminator** that judges whether the data is real or fake. The discriminator never sees how the generator made the data \u2014 it only sees the output and the training data (what \"real\" looks like).\n\n`pi-evaluate` borrows this pattern:\n\n| GAN | pi-evaluate |\n|---|---|\n| Generator | Your agent (execute phase) |\n| Discriminator | The evaluator skill |\n| Training data (\"real\") | The contract (brief + specs) |\n| Generated output (\"fake\") | The implementation |\n| \"Is this real?\" | \"Does this satisfy the contract?\" |\n\nThe key insight: **the discriminator is blind to implementation intent**. It can't be charitable about what the generator \"meant to do\" \u2014 it only sees what exists. This is what makes it useful. A self-review by the same agent that built the thing will always be biased. A blind discriminator won't.\n\n---\n\n## Verdicts\n\n| Label | Meaning |\n|---|---|\n| \u2705 SATISFIED | All requirements for this capability are clearly present |\n| \u26a0\ufe0f PARTIAL | Some requirements present, some missing |\n| \u274c UNSATISFIED | No evidence of this capability in the outputs |\n| \u2753 UNCLEAR | Contract is too underspecified to judge \u2014 flag for human |\n\n---\n\n## Philosophy\n\n- **Optional** \u2014 never a hard gate. You decide what to do with the verdict.\n- **Adversarial** \u2014 looks for gaps, not confirmation. Absence of evidence is flagged.\n- **Focused** \u2014 the triage summary is the primary output. The human reads this first.\n- **Honest about uncertainty** \u2014 UNCLEAR is not failure. It means your contract needs more detail.\n\n---\n\n## License\n\nMIT\n\n---\n\nMade with [reespec](https://reespec.dev) and \u2665 in EU\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "evaluate",
+    "extension",
+    "reespec",
+    "gan",
+    "review"
+  ],
+  "author": {
+    "name": "Bogdan Nenu"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-03-31T06:23:15.796Z",
+    "modified": "2026-06-17T17:02:55.776Z",
+    "0.1.0": "2026-03-31T06:23:15.949Z",
+    "0.1.1": "2026-04-17T08:12:22.779Z",
+    "0.1.2": "2026-04-29T15:48:47.874Z",
+    "0.1.3": "2026-05-20T11:32:31.701Z",
+    "0.1.4": "2026-06-17T17:02:55.671Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 27,
+  "download_trend": []
+}

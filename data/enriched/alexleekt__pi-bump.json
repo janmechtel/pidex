@@ -1,0 +1,42 @@
+{
+  "name": "@alexleekt/pi-bump",
+  "latest_version": "0.3.2",
+  "description": "Invisible continuation for the Pi agent. Double-tap Enter on empty chat to resume the agentic loop without sending the LLM a single token.",
+  "readme": "# @alexleekt/pi-bump\n\n[![npm](https://img.shields.io/npm/v/@alexleekt/pi-bump)](https://www.npmjs.com/package/@alexleekt/pi-bump)\n[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)\n\n**Invisible continuation for the Pi agent.**\n\nResume the agentic loop without sending the LLM a single token.\n\n## Usage\n\n### Double-tap Enter (quickest)\n\n1. Make sure the chat editor is **empty**\n2. Press **Enter twice** within ~300 ms\n3. The agent continues \u2014 the LLM sees nothing\n\n### `/continue` command\n\n| Command | What it does |\n|---------|-------------|\n| `/continue` | Resume the loop invisibly (or visibly if escalated) |\n| `/continue status` | Show if the agent is idle, busy, or escalated |\n| `/continue help` | Show available commands |\n\nBoth methods only fire when the agent is idle and no messages are pending.\n\n## How it works\n\n**Default (invisible)**: A hidden `customType` message is sent with `display: false`. The `context` handler replaces it with `\"Continue\"` before the LLM sees it. The LLM receives a clean semantic nudge and the chat stays uncluttered.\n\n**Escalated (visible)**: When loop detection notices the last two assistant responses had identical tool calls (or exact text duplicates), the *next* continue sends a real visible user message like `\"What's next?\"` or `\"Keep going\"` \u2014 stronger signal, same goal.\n\nA `context` event handler proactively removes any leaked invisible markers as insurance. Real user input always resets escalation state.\n\n## Installation\n\n```bash\nnpm install -g @alexleekt/pi-bump\n```\n\nPi auto-discovers globally installed `pi-package` extensions.\n\nOr copy `index.ts` into `.pi/extensions/` (project) or `~/.pi/agent/extensions/` (global).\n\n## Debug mode\n\n```bash\nBUMP_DEBUG=1 pi\n```\n\nThen toggle per-session debugging with `/bump-debug-keypresses`:\n\n- **Enter** \u2014 triggers invisible continue + shows timing\n- **Backspace, Delete** \u2014 shows timing only\n- **Ctrl+Enter, Alt+Enter** \u2014 also monitored\n\nDebug mode resets when the session ends. Only available when `BUMP_DEBUG=1` is set.\n\n> **Note:** Debug mode monitors 5 keys (enter, backspace, delete, ctrl+enter, alt+enter). In normal mode, only Enter is monitored for performance. The other keys are only checked when debug mode is active for that session.\n\n## Performance\n\npi-bump is designed to stay out of the way:\n\n- **Minimal keystroke overhead** \u2014 In normal mode, only `Enter` is matched against incoming keystrokes. No `matchesKey()` calls for backspace, delete, or modifier keys unless debug mode is active.\n- **Zero-allocation context guard** \u2014 The `context` handler scans for invisible markers with `.some()` before allocating. In typical conversations (no invisible messages), no array is created.\n- **Synchronous state reset** \u2014 The `input` handler resets escalation state immediately (no microtask deferral), preventing false loop detection.\n\n## Hybrid Escalation Strategy (v0.3.1+)\n\n`pi-bump` uses a two-tier strategy to keep the agent moving without polluting the chat:\n\n1. **Invisible tier** (default) \u2014 sends a hidden `customType` message (`display: false`). The `context` handler replaces it with `\"Continue\"` for the LLM. Chat stays clean.\n2. **Visible tier** (escalation) \u2014 when loop detection sees identical tool calls (or exact text duplicates) across the last two assistant responses, the *next* continue sends a real visible user message with a randomized nudge like `\"Continue\"`, `\"Go deeper\"`, or `\"Show me where this leads\"`.\n3. **Auto-reset** \u2014 a non-loop assistant response or real user input resets back to the invisible tier.\n\nThe visible tier only triggers when the invisible tier isn't breaking the loop \u2014 so most continues stay silent and seamless.\n\n## Acknowledgments\n\nThe invisible continuation technique was adapted from [pi-invisible-continue](https://github.com/monotykamary/pi-invisible-continue) by Tom X Nguyen.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "bump",
+    "invisible",
+    "continue"
+  ],
+  "author": {
+    "name": "Alex Lee",
+    "email": "657215+alexleekt@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/alexleekt/pi-extensions/tree/main/packages/pi-bump#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexleekt/pi-extensions.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-16T08:46:36.404Z",
+    "modified": "2026-05-22T07:08:03.794Z",
+    "0.1.0": "2026-05-16T08:46:36.692Z",
+    "0.2.0": "2026-05-16T19:47:23.520Z",
+    "0.2.3": "2026-05-16T21:46:56.829Z",
+    "0.2.4": "2026-05-16T22:22:24.072Z",
+    "0.3.0": "2026-05-18T05:37:47.225Z",
+    "0.3.2": "2026-05-22T07:08:03.548Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 12,
+  "download_trend": []
+}

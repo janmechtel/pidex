@@ -1,0 +1,339 @@
+{
+  "name": "pi-coordinator",
+  "latest_version": "1.0.0",
+  "description": "Four-phase workflow: Research \u2192 Synthesis \u2192 Implementation \u2192 Verification, based on Claude Code coordinator feature preview.",
+  "readme": "# pi-coordinator\n\nA [pi](https://github.com/mariozechner/pi-coding-agent) extension that transforms the primary agent into a pure dispatcher/orchestrator. The coordinator is locked to one tools (`dispatch_agent`) and delegates all real work to a built-in team of three specialist subagents.\n\n## Table of Contents\n\n- [Based On](#based-on)\n- [How It Works](#how-it-works)\n- [Built-in Agent Team](#built-in-agent-team)\n- [Four-Phase Workflow](#four-phase-workflow)\n- [The `dispatch_agent` Tool](#the-dispatch_agent-tool)\n- [Scratchpad](#scratchpad)\n- [TUI Widget](#tui-widget)\n- [tmux Integration](#tmux-integration)\n- [Installation](#installation)\n- [Requirements](#requirements)\n- [Notes](#notes)\n\n---\n\n## Based On\n\n`pi-coordinator` ports the Coordinator Mode pattern from Anthropic's [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) to the `pi` coding agent.\n\nCoordinator Mode is a multi-agent orchestration feature inside Claude Code, activated via the `CLAUDE_CODE_COORDINATOR_MODE=1` environment variable. It transforms Claude Code from a single agent into a swarm orchestrator: complex tasks are broken into structured phases and delegated to specialized subagents running in parallel.\n\nThe key aspects of that design that this project replicates:\n\n- **Four-phase workflow:** Research, Synthesis, Implementation, Verification, enforced in strict order\n- **Parallelism:** The coordinator instructs subagents to run independent tasks concurrently rather than serially\n- **Shared scratchpad:** Agents communicate through a shared directory using structured file naming conventions\n- **Task decomposition:** The coordinator breaks large goals into focused per-agent tasks before any code is touched\n- **Context efficiency:** Worker agents share a prompt cache to reduce cost, branching only at task-specific instructions\n\n---\n\n## How It Works\n\nOn session start, the extension:\n\n1. Wipes agent session files and the scratchpad from any previous session.\n2. Overrides the coordinator's system prompt to enforce a strict four-phase workflow.\n3. Locks the coordinator's toolset to `dispatch_agent` only.\n4. Registers a live TUI widget showing agent status.\n5. Opens a tmux log pane if `$TMUX` is set.\n\nWhen the coordinator calls `dispatch_agent`, the extension spawns a `pi` CLI child process with `--mode json`, a restricted toolset, and a persistent session file. The subprocess streams JSON events back; the extension collects text output and returns it to the coordinator (truncated at 8,000 characters).\n\nEach agent accumulates conversation history across dispatches within a session via `--session` and `-c` flags, so context is preserved between calls.\n\n---\n\n## Built-in Agent Team\n\n| Agent | Tools | Role |\n|---|---|---|\n| `researcher` | `read, write, grep, find, ls` | Investigates the codebase; writes findings to the scratchpad. Never modifies source files. |\n| `implementer` | `read, write, edit, bash` | Writes and edits code from a coordinator-supplied spec. |\n| `verifier` | `read, write, grep, find, ls, bash` | Skeptical quality gate; runs tests and checks types. Never the same agent that implemented. |\n\nNo config files are needed. The team is hardcoded in the extension.\n\n---\n\n## Four-Phase Workflow\n\nThe injected system prompt enforces this workflow for every non-trivial task:\n\n### Phase 1: Research\n\nThe coordinator dispatches at least two `researcher` agents in parallel, each focused on a distinct concern (data model, API layer, test suite, etc.). Each researcher writes findings to the scratchpad as `research-<topic>.md`. The coordinator waits for all researchers to return before proceeding.\n\n### Phase 2: Synthesis\n\nThe coordinator personally reads the scratchpad files and writes an implementation spec to `spec-<topic>.md`. The spec must include every file to modify, exact change locations (function names, line numbers, code anchors), the exact code to add or replace, and any new files to create.\n\nThe phrase \"based on your findings\" is banned. The coordinator must quote specific paths, line numbers, and function names from the research notes to prove it has read them.\n\n### Phase 3: Implementation\n\nThe coordinator dispatches `implementer` agents with the spec path. Two implementers must not edit the same file simultaneously. Independent file sets may be dispatched in parallel; overlapping or dependent changes must be serial.\n\n### Phase 4: Verification\n\nThe coordinator dispatches the `verifier` (never the same agent that implemented) to run tests, check types, and read the actual changed code. The verifier writes a report to `verify-<topic>.md`. Verification means proving the code works, not confirming it exists.\n\n---\n\n## The `dispatch_agent` Tool\n\nThe coordinator's primary tool. Parameters:\n\n| Parameter | Type | Description |\n|---|---|---|\n| `agent` | string | Agent name, case-insensitive (e.g. `\"researcher\"`, `\"implementer\"`, `\"verifier\"`) |\n| `task` | string | Full task description for the agent |\n\nEach dispatch spawns a `pi` subprocess. On Windows, the binary is invoked as `pi.cmd`. Output longer than 8,000 characters is truncated. The coordinator is notified via TUI on completion or error.\n\n---\n\n## Scratchpad\n\nLocated at `.pi/scratchpad/` relative to the working directory. Wiped and recreated at the start of each session. All agents can read and write here freely.\n\nA `README.md` inside the scratchpad defines naming conventions:\n\n| Filename pattern | Purpose |\n|---|---|\n| `research-<topic>.md` | Researcher findings |\n| `spec-<topic>.md` | Coordinator-written implementation specs |\n| `verify-<topic>.md` | Verifier reports |\n| `notes-<anything>.md` | General session notes |\n\n---\n\n## TUI Widget\n\nA live agent-team widget is rendered in the pi TUI. For each agent it shows:\n\n- Name, status icon, and elapsed time\n- Animated dot leader when the agent is running (`\u25cb` idle, `\u25cf` running, `\u2713` done, `\u2717` error)\n\n\n---\n\n## tmux Integration\n\nIf the `$TMUX` environment variable is set, the extension opens a new split pane on session start and tails a live log of agent activity (tool calls, completions, errors).\n\n---\n\n## Installation\n\n> **Security:** pi packages run with full system access. Review the [source](https://github.com/skidvis/pi-coordinator) before installing.\n\n**Global:**\n\n```bash\npi install npm:pi-coordinator\n```\n\n**Project-local** (writes to `.pi/settings.json`):\n\n```bash\npi install -l npm:pi-coordinator\n```\n\n**Ephemeral** (current session only):\n\n```bash\npi -e npm:pi-coordinator\n```\n\n**From source:**\n\n```bash\n# Global\npi install git:github.com/skidvis/pi-coordinator\n\n# Project-local\npi install -l git:github.com/skidvis/pi-coordinator\n\n# Ephemeral\npi -e git:github.com/skidvis/pi-coordinator\n```\n\nNo build step is needed. pi compiles TypeScript automatically at install time.\n\n---\n\n## Requirements\n\n- [pi coding agent](https://github.com/mariozechner/pi-coding-agent) installed and on `PATH`\n\n---\n\n## Notes\n\n**Model inheritance:** Subagents inherit the coordinator's active model. If no model is set, they fall back to `openrouter/google/gemini-3-flash-preview`.\n\n**Session continuity:** Each agent accumulates conversation history across dispatches within a session. History is stored in `.pi/agent-sessions/<name>.json`.\n\n**Session reset:** Agent session files and the scratchpad are wiped at the start of each new coordinator session, so every session starts clean.\n\n**Windows support:** The `pi` binary is invoked as `pi.cmd` on Windows.\n\n---\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-04-02T05:29:01.230Z",
+    "1.0.0": "2026-04-02T05:29:01.355Z",
+    "modified": "2026-04-02T05:29:01.544Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 106
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 2
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

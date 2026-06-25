@@ -1,0 +1,36 @@
+{
+  "name": "@carter-mcalister/pi-protected-files",
+  "latest_version": "0.2.0",
+  "description": "Project-configurable protected file gates for Pi edits",
+  "readme": "# @carter-mcalister/pi-protected-files\n\nProject-configurable protected file gates for Pi.\n\nThis extension reads a config file from the current project and intercepts Pi tool calls before they run. Matching `write` and `edit` calls are either blocked or require explicit user approval.\n\n## Install\n\n```bash\npi install npm:@carter-mcalister/pi-protected-files\n```\n\nFor local development in this monorepo, the root `package.json` also registers the extension with Pi.\n\n## Config\n\nCreate `.agents/protected-files.jsonc` (or `.pi/protected-files.jsonc`) in your project:\n\n```jsonc\n{\n  // Defaults to \"block\" when omitted.\n  \"mode\": \"block\",\n  \"files\": [\n    \".env\",\n    \"package-lock.json\",\n    \"pnpm-lock.yaml\",\n    \"schema.ts\",\n    \"secrets/**\",\n    {\n      \"path\": \"config.ts\",\n      \"mode\": \"confirm\"\n    }\n  ]\n}\n```\n\nPi checks these files in order:\n\n1. `.agents/protected-files.jsonc`\n2. `.agents/protected-files.json`\n3. `.pi/protected-files.jsonc`\n4. `.pi/protected-files.json`\n5. `pi-protected-files.jsonc`\n6. `pi-protected-files.json`\n\n## Modes\n\n- `block`: matching edits are denied before the tool runs.\n- `confirm`: Pi prompts before allowing the edit. If Pi is running without a UI, the edit is blocked.\n\nThe top-level `mode` is the default for all files. Individual entries can override it with their own `mode`.\n\n## Commands\n\n- `/disable-protections`: disables all protected file guards for the rest of the current Pi session. Restart or reload the session to enable protections again.\n\n## Matching Rules\n\n- Plain filenames, such as `.env`, match that basename anywhere in the project.\n- Non-glob paths, such as `src/schema.ts`, are treated as filenames; only `schema.ts` is used.\n- Filename globs, such as `*.lock`, match basenames anywhere in the project.\n- Path globs with `/`, such as `secrets/**`, match project-relative paths and any nested parent folder named `secrets`.\n\n## What Is Protected\n\nThe extension protects:\n\n- Pi `write` tool calls.\n- Pi `edit` tool calls.\n- Nested `write` and `edit` calls inside `multi_tool_use.parallel`.\n- Common mutating `bash` commands that explicitly mention a protected path, such as redirection, `tee`, `sed -i`, `mv`, `cp`, `rm`, `truncate`, and `touch`.\n\nShell command protection is best-effort because arbitrary commands can modify files without naming them in the command text. For critical files, prefer `block` mode and avoid broad shell commands that may indirectly rewrite protected files.\n\n## Why This Approach\n\nPi extensions can intercept `tool_call` events before execution and return `{ \"block\": true }`. That is the safest extension-level hook for this feature because it stops edits before the filesystem tool runs while still allowing a UI confirmation flow when desired.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "protected-files",
+    "permissions"
+  ],
+  "author": {
+    "name": "Carter McAlister"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/CarterMcAlister/pi-packages/tree/main/packages/pi-protected-files#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CarterMcAlister/pi-packages.git",
+    "directory": "packages/pi-protected-files"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-10T00:02:53.473Z",
+    "0.2.0": "2026-05-10T00:02:53.713Z",
+    "modified": "2026-05-10T00:02:54.187Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

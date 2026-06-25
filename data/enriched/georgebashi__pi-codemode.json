@@ -1,0 +1,349 @@
+{
+  "name": "@georgebashi/pi-codemode",
+  "latest_version": "0.1.0",
+  "description": "Code Mode extension for Pi \u2014 execute tools via TypeScript code, with type-checking, shell via zx, and MCP integration",
+  "readme": "# pi-codemode\n\n**What if your coding agent could write real code to call its own tools \u2014 with type-checking, parallelism, and shell access \u2014 in a single round-trip?**\n\n[![npm version](https://img.shields.io/npm/v/@georgebashi/pi-codemode?style=for-the-badge)](https://www.npmjs.com/package/@georgebashi/pi-codemode)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)\n\n## Why\n\n- **Fewer round-trips** \u2014 \"read file A, grep for X, read matches, extract Y\" takes 5+ individual tool calls. In code mode, it's one call.\n- **Type-safe** \u2014 TypeScript type-checking catches wrong parameter types, missing fields, and non-existent tools *before* any code runs.\n- **Tiny context usage** \u2014 installing lots of MCP tools normally costs thousands of tokens. Code mode keeps it constant: one tool definition + compact type defs. MCP details are discovered on-demand.\n- **Any npm package as a tool** \u2014 Add `simple-git`, `octokit`, `yaml`, `csv-parse`, or any npm package to the sandbox. Auto-installed, auto-typed, available as globals.\n- **Shell built in** \u2014 zx template literals with automatic argument escaping and output truncation.\n\nInspired by Cloudflare's [Code Mode](https://blog.cloudflare.com/code-mode/) pattern.\n\n## Install\n\n```bash\npi install npm:@georgebashi/pi-codemode\n```\n\nRun once without installing:\n\n```bash\npi -e npm:@georgebashi/pi-codemode\n```\n\n> **Note:** pi-codemode bundles [pi-mcp-adapter](https://github.com/nichochar/pi-mcp-adapter) for MCP integration. If you have `pi-mcp-adapter` installed separately, uninstall it first (`pi uninstall pi-mcp-adapter`). Your MCP config files will be picked up by this extension and provided to the TypeScript sandbox.\n\n## Quick Start\n\nOnce loaded, code mode replaces Pi's individual tools with a single `execute_tools` tool. The LLM writes TypeScript that calls tools as functions:\n\n```typescript\n// Read 3 files at once\nconst [pkg, readme, config] = await Promise.all([\n  tools.read({ path: \"package.json\" }),\n  tools.read({ path: \"README.md\" }),\n  tools.read({ path: \"tsconfig.json\" }),\n]);\nreturn Object.keys(JSON.parse(pkg).dependencies || {});\n```\n\n```typescript\n// Shell commands with automatic escaping\nconst result = await $\\`grep -rn \"TODO\" --include='*.ts' src\\`;\nprint(result.stdout);\n```\n\n```typescript\n// Discover and call MCP tools\nconst details = await tools.describe_tools({ namespace: \"slack\", tool: \"post_message\" });\nawait tools.slack.post_message({ channel: \"#general\", text: \"Hello!\" });\n```\n\n## Adding Packages\n\nAny npm package can be injected into the sandbox as a global. Packages are auto-installed into a dedicated directory \u2014 your project's `node_modules` is never touched. TypeScript types are resolved automatically.\n\n**Project-local** \u2014 `.pi/codemode.json`:\n\n```jsonc\n{\n  \"packages\": {\n    \"simple-git\": { \"version\": \"^3.33.0\", \"as\": \"git\" },\n    \"yaml\": { \"version\": \"^2.8.0\", \"as\": \"YAML\" },\n    \"@octokit/graphql\": { \"version\": \"^8.0.0\", \"as\": \"graphql\" },\n    \"csv-parse\": { \"version\": \"^5.0.0\", \"as\": \"csvParse\" }\n  }\n}\n```\n\n**Global** (all projects) \u2014 `~/.pi/agent/codemode.json`, same format.\n\nThen the LLM can use them directly:\n\n```typescript\n// Git operations\nconst status = await git.status();\nconst log = await git.log({ maxCount: 5 });\n\n// YAML parsing\nconst config = YAML.parse(await tools.read({ path: \"config.yml\" }));\n\n// GitHub GraphQL API \u2014 request exactly the fields you need\nconst { repository } = await graphql(`{\n  repository(owner: \"org\", name: \"repo\") {\n    pullRequests(last: 10, states: OPEN) {\n      nodes { title, author { login }, createdAt }\n    }\n  }\n}`, { headers: { authorization: `bearer ${process.env.GITHUB_TOKEN}` } });\nreturn repository.pullRequests.nodes;\n```\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/codemode` | Toggle code mode on/off |\n| `--no-codemode` | Disable code mode entirely (CLI flag) |\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "code-mode",
+    "typescript",
+    "tools"
+  ],
+  "author": {
+    "name": "George Bashi",
+    "email": "george@bashi.co.uk"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/georgebashi/pi-codemode#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/georgebashi/pi-codemode.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-11T04:49:57.864Z",
+    "0.1.0": "2026-03-11T04:49:58.117Z",
+    "modified": "2026-03-11T04:49:58.301Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 5,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 56
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 2
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 1
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "name": "pi-image-preview",
+  "latest_version": "0.1.5",
+  "description": "Image preview extension for pi coding agent \u2014 renders inline image thumbnails above the editor using kitty graphics protocol with tmux support",
+  "readme": "# pi-image-preview\n\nImage preview extension for [pi coding agent](https://github.com/badlogic/pi-mono) \u2014 renders inline image thumbnails above the editor using the kitty graphics protocol with full tmux support.\n\n![Screenshot](screenshot.png)\n\n## Features\n\n- **Inline image preview** \u2014 paste an image (`Ctrl+V`) and a thumbnail renders above the editor\n- **Horizontal layout** \u2014 multiple images display side by side\n- **tmux support** \u2014 uses kitty's Unicode placeholder protocol (`U=1`) so images are pane-aware (no ghosting across panes)\n- **Auto-cleanup** \u2014 delete the image path from editor text and the preview disappears\n- **No editor conflicts** \u2014 works alongside vim mode and other editor extensions (does not use `setEditorComponent`)\n- **Image resizing** \u2014 leverages pi's built-in WASM image resizer for efficient thumbnails\n- **Screenshot integration** \u2014 automatically inlines images from screenshot tool results\n\n## Install\n\n```bash\npi install npm:pi-image-preview\n```\n\n## How it works\n\n1. **Paste** an image with `Ctrl+V`\n2. Pi saves the clipboard to a temp file and inserts the path into the editor\n3. The extension **detects the image path**, reads the file, and renders a thumbnail above the editor\n4. The raw file path stays in the editor \u2014 the label below the thumbnail shows a truncated version\n5. On **submit**, image paths are stripped from the text and the images are attached to your message\n\n## Prerequisites\n\n### Terminal: [Kitty](https://sw.kovidgoyal.net/kitty/) (required)\n\nThis extension uses the **kitty graphics protocol** to render images. It will **not** render images in other terminals (iTerm2, Alacritty, WezTerm, etc.) \u2014 it falls back to text labels instead.\n\n- **Minimum version**: Kitty 0.28+ (Unicode placeholder support)\n- **Recommended**: Kitty 0.35+ for best compatibility\n\nNo special kitty config is required \u2014 the extension works with default kitty settings.\n\n### tmux (optional but supported)\n\nIf you run pi inside tmux, you need **one config change** in your `~/.tmux.conf`:\n\n```tmux\nset -g allow-passthrough all\n```\n\nThen reload: `tmux source-file ~/.tmux.conf`\n\nThis allows kitty graphics escape sequences to pass through tmux to the terminal. Without it, images will not render.\n\n**tmux version**: 3.3a+ required (added `allow-passthrough` support).\n\n### pi coding agent\n\n- **Version**: Latest recommended \u2014 the extension uses `setWidget`, `getEditorText`, and the `input` event transform API\n- **No additional pi configuration needed** \u2014 just install the extension\n\n## Supported image formats\n\n- PNG\n- JPEG / JPG\n- GIF (first frame)\n- WebP\n\nMaximum file size: **50 MB** (larger files are silently skipped).\n\n## Limitations\n\n- **Kitty terminal only** \u2014 other terminals get text-only labels (no image rendering)\n- **macOS / Linux only** \u2014 kitty does not run on Windows natively\n- **tmux requires `allow-passthrough all`** \u2014 without it, images won't render inside tmux (the extension still works, but shows text fallback)\n- **No image selection/navigation** \u2014 this is a simple preview, not a gallery browser\n- **Thumbnail size is fixed** \u2014 images are scaled to fit within 25 columns; not configurable yet\n- **Images are not preserved in chat history** \u2014 after submitting, the preview clears; the image is sent as an attachment to the model\n- **GIF animation** \u2014 only the first frame is displayed\n- **SSH sessions** \u2014 kitty graphics protocol does not work over SSH unless using `kitten ssh` (kitty's SSH kitten)\n- **Multiple tmux panes showing pi** \u2014 each pane renders independently; switching panes clears/restores images correctly via Unicode placeholders, but rapid switching may briefly show artifacts\n\n## How tmux support works\n\nStandard kitty graphics render pixels at absolute terminal positions. This causes images to \"ghost\" across tmux panes \u2014 an image rendered in pane 1 is still visible when you switch to pane 2.\n\nThis extension uses kitty's **Unicode placeholder protocol** instead:\n\n1. Image data is transmitted to kitty with `U=1` flag (stored but not directly rendered)\n2. Special `U+10EEEE` characters with combining diacritics are output where the image should appear\n3. These are **regular text characters** that tmux manages per-pane\n4. Switching panes swaps the text buffer \u2192 placeholders disappear \u2192 image disappears\n5. Switching back \u2192 placeholders redrawn \u2192 image reappears\n\n## Development\n\n```bash\n# Clone\ngit clone https://github.com/rielj/pi-image-preview.git\ncd pi-image-preview\n\n# Symlink into pi extensions\nln -s \"$(pwd)\" ~/.pi/agent/extensions/image-preview\n\n# Reload pi\n# Inside pi, run: /reload\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "kitty",
+    "image",
+    "preview",
+    "tmux",
+    "terminal",
+    "graphics"
+  ],
+  "author": {
+    "name": "rielj"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/rielj/pi-image-preview#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rielj/pi-image-preview.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-27T07:08:35.302Z",
+    "modified": "2026-06-23T20:25:09.865Z",
+    "0.1.0": "2026-03-27T07:08:35.441Z",
+    "0.1.1": "2026-03-27T08:45:25.554Z",
+    "0.1.2": "2026-04-05T17:10:23.382Z",
+    "0.1.4": "2026-04-17T19:08:24.871Z",
+    "0.1.5": "2026-06-23T20:25:09.748Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": null,
+  "download_trend": []
+}

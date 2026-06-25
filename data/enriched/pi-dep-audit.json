@@ -1,0 +1,42 @@
+{
+  "name": "pi-dep-audit",
+  "latest_version": "1.0.1",
+  "description": "Audit npm dependencies for vulnerabilities, outdated packages, and license compliance \u2014 integrated into pi.dev workflow",
+  "readme": "# pi-dep-audit\n\nAudit npm dependencies for vulnerabilities, outdated packages, and license compliance \u2014 integrated into your pi.dev workflow.\n\n## Features\n\n- **CVE Scanning** \u2014 queries [OSV.dev](https://osv.dev) for known vulnerabilities (no API key needed)\n- **Outdated Detection** \u2014 semver-aware severity classification (major/minor/patch)\n- **License Compliance** \u2014 detects copyleft licenses in permissive projects\n- **Auto-Fix** \u2014 bump vulnerable packages to safe versions automatically\n- **Structured Output** \u2014 JSON report for CI integration + human-readable summary\n\n## Install\n\n```bash\npi install npm:pi-dep-audit\n```\n\nOr install from npm directly:\n\n```bash\nnpm install pi-dep-audit\n```\n\n## Usage\n\n### Slash Command\n\nType `/audit` in your pi.dev agent to run a full dependency audit:\n\n```\n> /audit\n\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n\u2551  \ud83d\udce6 DEPENDENCY AUDIT REPORT\n\u2551  Project: my-awesome-app\n\u2551  2026-06-25T12:00:00.000Z\n\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n\n\ud83d\udd12 VULNERABILITIES\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  \u2705 No known vulnerabilities found\n\n\ud83d\udcca OUTDATED PACKAGES\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  Total: 2 (1 major, 1 minor, 0 patch)\n\n  \ud83d\udd34 lodash: 4.17.20 \u2192 4.17.21 (patch)\n  \ud83d\udfe1 express: 4.18.0 \u2192 4.18.2 (patch)\n\n\ud83d\udcdc LICENSES\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  Total packages: 42\n  MIT: 38\n  ISC: 3\n  BSD-2-Clause: 1\n```\n\n### Tools\n\nThe extension registers two tools for the LLM:\n\n#### `dep-audit`\n\nRun a full dependency audit:\n\n```typescript\n// The LLM calls this when you ask about dependency health\n\"Check my dependencies for vulnerabilities\"\n```\n\n#### `dep-fix`\n\nAuto-fix vulnerabilities:\n\n```typescript\n// The LLM calls this when you ask to fix issues\n\"Fix all dependency vulnerabilities\"\n```\n\nSupports a `dry_run` parameter to preview changes without applying them.\n\n## How It Works\n\n### Vulnerability Detection\n\nUses the [OSV.dev API](https://osv.dev/docs/) \u2014 a free, open-source vulnerability database. Queries are made per-package-version, matching against the npm ecosystem.\n\n### Outdated Detection\n\nRuns `npm outdated --json` and classifies version bumps:\n\n- **Major** (\ud83d\udd34) \u2014 breaking changes likely\n- **Minor** (\ud83d\udfe1) \u2014 new features, backward compatible\n- **Patch** (\ud83d\udfe2) \u2014 bug fixes only\n\n### License Compliance\n\nScans `node_modules/*/package.json` for license fields and flags:\n\n- Copyleft licenses (GPL, AGPL, LGPL) in permissive projects (MIT, BSD, ISC)\n- Unknown or unparseable licenses\n\n### Auto-Fix Strategy\n\n1. **Security updates first** \u2014 bump packages with known CVEs to their fix version\n2. **Version updates second** \u2014 apply non-breaking updates (wanted version)\n3. Reports successes and failures separately\n\n## Requirements\n\n- Node.js 18+\n- npm project with `package.json`\n- `node_modules` installed (for license scanning)\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "audit",
+    "dependencies",
+    "vulnerabilities",
+    "licenses",
+    "security"
+  ],
+  "author": {
+    "name": "ZachDreamZ"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ZachDreamZ/pi-dep-audit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZachDreamZ/pi-dep-audit.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-25T05:18:56.229Z",
+    "modified": "2026-06-25T13:36:38.481Z",
+    "1.0.0": "2026-06-25T05:18:56.514Z",
+    "1.0.1": "2026-06-25T13:36:38.364Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

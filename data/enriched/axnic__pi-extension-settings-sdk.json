@@ -1,0 +1,361 @@
+{
+  "name": "@axnic/pi-extension-settings-sdk",
+  "latest_version": "0.2.0",
+  "description": "Type-safe SDK for interacting with the pi-extension-settings panel (for extension authors).",
+  "readme": "# pi-extension-settings SDK\n\n> A type-safe, declarative settings management SDK for pi extensions.\n> Define your schema once \u2014 get typed accessors, validation, autocompletion, live updates, and a rendered settings panel for free.\n\n---\n\n## Why this SDK?\n\nMost extensions need settings. Most extensions end up writing the same plumbing: storage, validation, change events, UI wiring, and a set of TypeScript types that drift from the storage format over time.\n\nThis SDK removes all of that. You write **one schema** and get:\n\n| Without the SDK                                 | With the SDK                                       |\n| ----------------------------------------------- | -------------------------------------------------- |\n| Hand-rolled storage keys and JSON parsing       | `settings.get(\"key\")` returns the right type       |\n| Manual validation scattered across the codebase | One `validation` field per node                    |\n| UI boilerplate for every new setting            | A settings panel rendered automatically            |\n| Silent type drift between storage and code      | `InferConfig<T>` enforces the type at compile time |\n| Wire listeners by hand, remember to clean up    | `onChange()`, session-scoped, no cleanup required  |\n\n---\n\n## Feature highlights\n\n- **End-to-end type safety.** `InferConfig<T>` derives a flat key \u2192 value map from your schema. Every `get()`, `set()`, and `onChange()` is type-checked against that map.\n- **Declarative schema.** One call to `S.settings({...})` describes defaults, validation, transformation, autocompletion, and display format.\n- **Rich node types.** `Text`, `Boolean`, `Enum`, `List` (structured rows), `Dict` (key/value pairs), and `Section` (nestable groups).\n- **20 validators, 16 transforms, 2 completers, 5 display functions** out of the box. Compose them with `v.all`, `v.any`, `t.pipe`, `t.compose`.\n- **Live updates.** Subscribe to per-key events with `onChange()`. Session-scoped \u2014 no listener cleanup required.\n- **Strict runtime checks.** `S.settings()` validates tooltip length and enum defaults at construction time, so schema bugs fail fast.\n- **Renders on GitHub and GitBook.** Documentation is pure CommonMark with Mermaid diagrams \u2014 no platform lock-in.\n\n---\n\n## Architecture at a glance\n\n```mermaid\nflowchart LR\n    Schema[\"Schema<br/>(S.settings)\"] --> ES[\"ExtensionSettings\"]\n    ES --> Storage[(\"Storage\")]\n    ES --> Panel[\"Settings Panel<br/>(auto-rendered)\"]\n    Panel -- \"user edits\" --> ES\n    ES -- \"onChange event\" --> Ext[\"Your extension\"]\n    Ext -- \"settings.set()\" --> ES\n    Ext -- \"settings.get()\" --> ES\n```\n\nYour extension never touches storage directly. It talks to `ExtensionSettings`, which brokers reads and writes, fires change events, and keeps the UI synchronized.\n\n---\n\n## 60-second example\n\n```ts\nimport { S, ExtensionSettings } from \"pi-extension-settings/sdk\";\nimport { v, t, d } from \"pi-extension-settings/sdk/hooks\";\n\n// 1. Declare the schema\nconst schema = S.settings({\n  \"api-url\": S.text({\n    tooltip: \"API base URL\",\n    default: \"https://api.example.com\",\n    validation: v.url(),\n    transform: t.normalizeUrl(),\n  }),\n  theme: S.enum({\n    tooltip: \"Color theme\",\n    default: \"dark\",\n    values: [\"dark\", \"light\", \"system\"],\n  }),\n  enabled: S.boolean({\n    tooltip: \"Enable extension\",\n    default: true,\n  }),\n});\n\n// 2. Create the accessor\nconst settings = new ExtensionSettings(pi, \"my-extension\", schema);\n\n// 3. Read \u2014 fully typed\nconst url = settings.get(\"api-url\"); // inferred as string\nconst on = settings.get(\"enabled\"); // inferred as boolean\n\n// 4. Write \u2014 fully typed\nsettings.set(\"theme\", \"light\"); // ok\n// settings.set(\"theme\", 42);          // compile error\n\n// 5. React to changes\nsettings.onChange(\"theme\", (t) => applyTheme(t));\n```\n\n> **Tip:** The settings panel UI is generated from your schema automatically. You do not write any UI code.\n\n---\n\n## Documentation map\n\n### Get going\n\n| Page                                    | What you'll learn                                                     |\n| --------------------------------------- | --------------------------------------------------------------------- |\n| [Getting Started](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/getting-started.md) | Install the SDK and ship your first integration in under five minutes |\n\n### Concepts\n\n| Page                                                  | What you'll learn                                        |\n| ----------------------------------------------------- | -------------------------------------------------------- |\n| [Concepts Overview](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/concepts/README.md)             | The three core abstractions and how they fit together    |\n| [Schema Builder](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/concepts/schema-builder.md)        | The `S` namespace, runtime validation, and `InferConfig` |\n| [Node Types](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/concepts/node-types.md)                | Every node type, field by field, with a decision tree    |\n| [ExtensionSettings](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/concepts/extension-settings.md) | Class lifecycle, `get` / `set` / `onChange` / `getAll`   |\n\n### Hooks\n\n| Page                                    | What you'll learn                                             |\n| --------------------------------------- | ------------------------------------------------------------- |\n| [Hooks Overview](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/hooks/README.md)     | The four namespaces, execution order, composition             |\n| [Validators](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/hooks/validators.md)     | All 20 built-in validators with examples                      |\n| [Transforms](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/hooks/transforms.md)     | All 16 built-in transforms with examples                      |\n| [Completers](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/hooks/completers.md)     | `c.filePath` and `c.staticList`                               |\n| [Display Functions](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/hooks/display.md) | `d.color`, `d.badge`, `d.path`, `d.dictEntry`, `d.keybinding` |\n\n### Examples\n\n| Page                                           | Complexity   | What it shows                                         |\n| ---------------------------------------------- | ------------ | ----------------------------------------------------- |\n| [Weather Widget](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/examples/weather-widget.md) | Beginner     | Text, Boolean, Enum; basic validators                 |\n| [Code Formatter](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/examples/code-formatter.md) | Intermediate | Sections, List with Struct, numeric validation        |\n| [AI Assistant](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/examples/ai-assistant.md)     | Advanced     | Nested sections, Dict, `InferConfig`, full hook stack |\n\n### Reference\n\n| Page                                     | Use when                                          |\n| ---------------------------------------- | ------------------------------------------------- |\n| [API Reference](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/reference/api.md)      | You want the full list of exports at a glance     |\n| [Type Reference](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/reference/types.md)   | You need the exact TypeScript signature of a type |\n| [Error Reference](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/reference/errors.md) | You need to catch a specific error class          |\n\n---\n\n## Quick links\n\n- Landing an extension? Start with [Getting Started](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/getting-started.md).\n- Already know the basics? Jump to the [API Reference](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/reference/api.md).\n- Looking for a specific hook? Try the [Hooks Overview](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/hooks/README.md).\n- Debugging a runtime error? See the [Error Reference](https://github.com/axnic/pi-extension-settings/blob/main/sdk/docs/reference/errors.md).\n\n---\n\n<sup>Documentation drafted with AI assistance \u2014 Claude Opus 4.6 (Anthropic). Reviewed by a human maintainer before publishing.</sup>\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "settings",
+    "sdk",
+    "extension",
+    "type-safe"
+  ],
+  "author": {
+    "name": "axnic"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/axnic/pi-extension-settings#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/axnic/pi-extension-settings.git",
+    "directory": "sdk"
+  },
+  "pi": {},
+  "time": {
+    "created": "2026-04-12T22:51:41.009Z",
+    "modified": "2026-04-23T23:04:55.757Z",
+    "0.0.0": "2026-04-12T22:51:41.310Z",
+    "0.0.2-rc.5": "2026-04-14T18:30:55.252Z",
+    "0.0.2-rc.6": "2026-04-14T18:48:22.095Z",
+    "0.0.2": "2026-04-14T19:42:17.206Z",
+    "0.0.3-rc.1": "2026-04-14T19:52:51.091Z",
+    "0.1.0": "2026-04-14T20:34:48.321Z",
+    "0.1.1": "2026-04-14T20:48:29.732Z",
+    "0.2.0-rc.1": "2026-04-16T16:27:49.980Z",
+    "0.1.2-rc.1": "2026-04-16T19:55:28.546Z",
+    "0.2.0-rc.2": "2026-04-16T19:59:11.395Z",
+    "0.2.0-rc.3": "2026-04-16T20:35:12.868Z",
+    "0.2.0-rc.4": "2026-04-17T22:49:31.180Z",
+    "0.2.0-rc.6": "2026-04-18T09:36:30.780Z",
+    "0.2.0-rc.7": "2026-04-23T22:17:48.643Z",
+    "0.2.0": "2026-04-23T23:04:55.469Z"
+  },
+  "versions_count": 15,
+  "downloads_last_week": 34,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 681
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 791
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 322
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 54
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 20
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 73
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 26
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 22
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 30
+    }
+  ]
+}

@@ -1,0 +1,356 @@
+{
+  "name": "pi-loop-police",
+  "latest_version": "1.0.3",
+  "description": "Pi extension: detects and interrupts infinite thinking-block and tool-call loops in real time before they exhaust your context window.",
+  "readme": "# pi-loop-police\n\nA [pi](https://pi.dev) extension that detects and breaks infinite loops in real time \u2014 before they waste your context window.\n\nSmall reasoning models (Qwen, DeepSeek, etc.) are prone to two kinds of loops:\n\n1. **Thinking block loop** \u2014 the model repeats the same phrases inside its `<think>` block over and over until the thinking quota is exhausted.\n2. **Tool call loop** \u2014 the model calls the same sequence of tools identically across turns, cycling indefinitely until the global context runs out.\n\nLoop Police catches both **mid-stream** (not after the fact), aborts the looping output, trims it from context, and injects a recovery message so the model can continue with a fresh perspective.\n\n## Install\n\n```bash\npi install git:github.com/sebaxzero/pi-loop-police.git\n```\n\nOr install project-locally (adds to `.pi/settings.json` only):\n\n```bash\npi install git:github.com/sebaxzero/pi-loop-police.git -l\n```\n\n## How it works\n\n### Thinking loop detection (two layers, mid-stream)\n\n**Layer 1 \u2014 character-level:** Every 50 streamed characters, the extension checks whether the last \u2265 80 characters of the thinking block appear verbatim immediately before them (exact adjacent repetition). This catches the fastest, most common form of loop mid-stream.\n\n**Layer 2 \u2014 semantic-level:** Simultaneously, the thinking text is split into paragraphs and each paragraph is fingerprinted by its first 60 characters. If the same fingerprint appears 3 or more times, the model is cycling through the same reasoning steps even if the wording varies slightly between passes.\n\nOn match (either layer):\n\n- `ctx.abort()` stops the stream immediately.\n- `message_end` trims the repeated portion and replaces it with `[THINKING LOOP \u2014 truncated by loop-police]` or `[SEMANTIC LOOP \u2014 truncated by loop-police]`.\n- A recovery message is injected into context and triggers a new turn.\n\n### Cross-turn reasoning stagnation\n\nAfter each clean (non-aborted) turn, the thinking text is stored. When the last N turns (default: 4) all have Jaccard word-set similarity \u2265 85% with their neighbor, the model is spinning without progress even though no single turn tripped the within-turn detectors. A recovery message is injected and the stagnation window is cleared.\n\n### File read repetition\n\nBefore each tool call, if the tool name looks like a file-read (`read`, `view`, `cat`, etc.) and the same path has been read 4 or more times, the call is blocked and a recovery message is injected.\n\n### Search expansion spiral\n\nBefore each search tool call (`grep`, `search`, `find`, `glob`, `rg`, etc.), the extension tracks how many distinct paths a given search pattern has been applied to. When the same pattern reaches 3 or more different paths, the call is blocked \u2014 the model is widening its search rather than acting on what it already found.\n\n### Tool call sequence loop\n\nBefore each tool executes, the extension hashes `toolName + stableStringify(args)` and appends it to a flat history. It then checks whether the last *W* calls are identical to the *W* calls immediately before them. On match:\n\n- The repeated call is blocked (`{ block: true }`).\n- A recovery message is injected explaining that the sequence is repeating and asking the model to reconsider.\n\nDetection is exact \u2014 only identical repetitions trigger it, not similar ones.\n\n## Command\n\n```\n/loop-police                   \u2014 show current detection state and all config values\n/loop-police reset             \u2014 clear all state (useful if a false positive fires)\n/loop-police set KEY=VAL       \u2014 tune a config value live, no restart needed\n/loop-police set KEY=VAL KEY=VAL ...  \u2014 set multiple values at once\n```\n\nExample: `/loop-police set FILE_READ_LIMIT=6 STAGNATION_WINDOW=5`\n\n## Configuration\n\nAll values are tunable at runtime via `/loop-police set KEY=VAL`. Defaults:\n\n```typescript\nMIN_THINKING_WINDOW: 80     // shortest repeating phrase to flag (chars)\nMAX_THINKING_WINDOW: 2000   // longest phrase checked\nCHECK_STRIDE: 50            // re-run detection every N new streamed chars\nPARA_MIN_LEN: 40            // shortest paragraph to fingerprint\nPARA_FINGERPRINT_LEN: 60    // chars used as paragraph identity key\nPARA_LOOP_THRESHOLD: 3      // same paragraph fingerprint N times \u2192 semantic loop\nSTAGNATION_WINDOW: 4        // turns of similar thinking \u2192 stagnation\nSTAGNATION_THRESHOLD: 0.85  // Jaccard similarity threshold for stagnation\nFILE_READ_LIMIT: 4          // reads of same file path before blocking\nSEARCH_EXPAND_LIMIT: 3      // unique paths for same search pattern before blocking\n```\n\nIncrease `MIN_THINKING_WINDOW` or `PARA_LOOP_THRESHOLD` if you get false positives on thinking loops. Increase `FILE_READ_LIMIT` for projects where legitimately re-reading files is common.\n\n## Compatibility\n\nDesigned for OpenAI-compatible reasoning models (Qwen3, DeepSeek-R1, etc.) used via pi. Pi normalizes all provider thinking formats to `{ type: \"thinking\", thinking: string }` content blocks, so this extension works regardless of the underlying provider.\n\nWorks alongside [pi-canary](https://github.com/sebaxzero/pi-canary), which silently verifies agent context awareness using hidden canary tokens. When loop-police aborts a turn, pi-canary yields gracefully and does not fire its own recovery.\n\n## License\n\nMIT\n\n---\n\nBuilt with [Claude](https://claude.ai).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "loop-detection",
+    "reasoning",
+    "safety",
+    "qwen",
+    "deepseek"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/sebaxzero/pi-loop-police",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sebaxzero/pi-loop-police.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-24T06:21:26.650Z",
+    "modified": "2026-06-24T18:57:53.674Z",
+    "1.0.0": "2026-06-24T06:21:26.998Z",
+    "1.0.1": "2026-06-24T06:53:40.830Z",
+    "1.0.2": "2026-06-24T07:32:23.111Z",
+    "1.0.3": "2026-06-24T18:57:53.545Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 515,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 515
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "name": "pi-mempalace-extension",
+  "latest_version": "0.2.0",
+  "description": "Lean MemPalace integration for the Pi coding agent",
+  "readme": "# pi-mempalace-extension\n\nLean MemPalace integration for the Pi coding agent.\n\nThis is a small, Windows-first TypeScript extension that connects Pi to the official MemPalace CLI.\n\n## Status\n\nThis project is in active real-world Pi integration and has reached the `0.2.0` polish milestone.\n\nThe technical concept still lives in [docs/pi-mempalace-extension-konzept.md](./docs/pi-mempalace-extension-konzept.md), and the repository now contains a Pi-facing extension entry with runtime resolution, CLI execution, agent tools, lifecycle events, logging and doctor diagnostics that have been validated against a live Pi installation.\n\n## Goals\n\n- Keep the implementation small and maintainable\n- Use the MemPalace CLI as the single transport layer\n- Preserve tool results in Pi conversation history via agent-driven workflows\n- Prioritize Windows reliability while staying compatible with Linux and macOS\n- Ship a practical MVP before adding advanced features\n\n## Implemented Scope\n\nThe current codebase already includes:\n\n- a cached Python and CLI runtime resolver\n- a single MemPalace CLI wrapper aligned with the currently documented plain-text MemPalace CLI\n- six Pi tools: `mempalace_search`, `mempalace_mine`, `mempalace_status`, `mempalace_init`, `mempalace_wake_up`, `mempalace_doctor`\n- Pi lifecycle integration via `before_agent_start`, `context`, `session_before_compact`, `session_start`, `session_shutdown`\n- autosave reminder and pre-compaction ingest logic wired through Pi events\n- a focused doctor tool for setup diagnostics\n- JSONL logging with rotation and a simple cross-process lock for safer concurrent writes\n- resolver, CLI and hook-focused tests\n\n## Project Structure\n\n```text\nsrc/\n  index.ts\n  pi-extension.ts\n  resolver.ts\n  cli.ts\n  tools.ts\n  hooks.ts\n  doctor.ts\n  config.ts\n  logger.ts\n  types.ts\ntests/\ndist/\n```\n\n## Architecture Summary\n\nThe architecture follows a few strong constraints:\n\n- Pi should discover the package through `pi.extensions` and load a dedicated extension entry.\n- MemPalace actions should be exposed as real Pi tools so the results remain in conversation context.\n- Setup feedback should be available through a direct diagnostic tool.\n- The extension should rely on the MemPalace CLI only, not MCP bridging or internal Python imports.\n- The runtime should be lazily resolved so Pi can still start even when MemPalace is not installed yet.\n\n## Installation\n\n### As a Pi package\n\nBuild and publish or pack the package, then install it into Pi:\n\n```bash\npi install npm:pi-mempalace-extension\n```\n\nThe package ships a Pi manifest in `package.json` and registers:\n\n- the extension entry at `./dist/pi-extension.js`\n\nPi discovers the extension from the manifest and loads it automatically.\n\nMake sure MemPalace is available through one of these runtime paths:\n\n- `MEMPALACE_PYTHON`\n- `MEMPALACE_VENV`\n- the default `~/.mempalace/.venv`\n- `py -3`, `python3`, `python`\n- or a standalone `mempalace` CLI\n\n### For local development\n\n```bash\nnpm install\nnpm run build\n```\n\nThe package also exports the core runtime bootstrap from `./dist/index.js` for local or non-Pi integration.\n\n## Configuration\n\nOptional project config lives in `mempalace.yaml`.\n\nSupported environment overrides:\n\n- `MEMPALACE_PYTHON`\n- `MEMPALACE_VENV`\n- `MEMPAL_DIR`\n- `MEMPALACE_LOG_LEVEL`\n- `MEMPALACE_AUTOSAVE_DISABLE=1`\n\n## Pi Tools\n\nPi should expose these directly callable tools:\n\n- `mempalace_search`\n- `mempalace_mine`\n- `mempalace_status`\n- `mempalace_init`\n- `mempalace_wake_up`\n- `mempalace_doctor`\n\nThe extension also hooks into Pi lifecycle events to:\n\n- inject `wake-up` context before agent start\n- remind the agent about autosave after repeated user turns\n- run `mine` before session compaction when enabled\n\n`mempalace_init` is intentionally executed in non-interactive mode with `--yes`, because Pi tools do not provide an interactive TTY. The other tool calls use the documented plain-text CLI flow instead of assuming a `--json` interface.\n\n## Development\n\nType-check:\n\n```bash\nnpm run check\n```\n\nRun tests:\n\n```bash\nnpm test\n```\n\nRun the optional integration suite:\n\n```bash\nMEMPALACE_INTEGRATION_TEST=1 npm test\n```\n\n## Roadmap\n\nThe original MVP roadmap is complete.\n\nCurrent follow-up work is tracked in [docs/Tasks.md](./docs/Tasks.md) and now focuses on live Pi validation, release polish and any future post-`0.2.0` enhancements.\n\n## Release Notes\n\nThe package has already been validated against live Pi tool calls for core flows such as `mempalace_init`.\n\nBefore future releases, it is still worth verifying the real MemPalace CLI subcommands against a live installation:\n\n- `search`\n- `mine`\n- `status`\n- `init`\n- `wake-up`\n\nThe package is prepared for publish with:\n\n- `npm run check`\n- `npm test`\n- `npm run build`\n- `npm publish`\n\n## Contributing\n\nContributions are welcome while the MVP is being reviewed and polished.\n\nPlease read [docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md) before opening larger changes.\n\n## Security\n\nIf you discover a security issue, please follow [docs/SECURITY.md](./docs/SECURITY.md).\n\n## License\n\nThis project is licensed under the MIT License. See [LICENSE](./LICENSE).\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "mempalace",
+    "extension",
+    "typescript"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/Auda29/pi-mempalace-extension#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Auda29/pi-mempalace-extension.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/pi-extension.js"
+    ]
+  },
+  "time": {
+    "created": "2026-04-20T11:41:44.268Z",
+    "modified": "2026-04-20T14:15:39.410Z",
+    "0.1.0": "2026-04-20T11:41:44.622Z",
+    "0.1.1": "2026-04-20T11:49:39.870Z",
+    "0.1.2": "2026-04-20T11:59:39.524Z",
+    "0.1.3": "2026-04-20T13:07:41.965Z",
+    "0.1.4": "2026-04-20T13:13:58.445Z",
+    "0.1.5": "2026-04-20T13:36:35.871Z",
+    "0.1.6": "2026-04-20T13:49:43.002Z",
+    "0.1.7": "2026-04-20T14:03:17.127Z",
+    "0.2.0": "2026-04-20T14:15:39.271Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,357 @@
+{
+  "name": "@0xkobold/pi-gateway",
+  "latest_version": "0.6.0",
+  "description": "Hermes-style messaging gateway for pi - multi-platform agent with sessions, security, and background tasks",
+  "readme": "# Pi-Gateway\n\nHermes-style messaging gateway for [pi-coding-agent](https://github.com/badlogic/pi-mono) \u2014 multi-platform session management, security, and background tasks.\n\n## Installation\n\n```bash\npi install npm:@0xkobold/pi-gateway\n```\n\nOr as part of the meta-extension:\n\n```bash\npi install npm:@0xkobold/pi-kobold\n```\n\n## Features\n\n- **Per-Chat Sessions** \u2014 Unique session ID per platform/channel with reset policies\n- **Reset Policies** \u2014 Daily (hour-based) and idle (minutes-based) session resets\n- **Session Persistence** \u2014 Sessions survive restarts via SQLite (sql.js)\n- **Background Tasks** \u2014 Isolated sessions for long-running commands\n- **Security** \u2014 Per-platform user allowlists and DM pairing flow\n- **Rate Limiting** \u2014 Configurable per-identifier rate limiting\n- **Multi-Platform Adapters** \u2014 Discord, Telegram, Slack, WhatsApp, Twitch, WebSocket\n\n## Architecture\n\n```\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502                    Pi-Gateway                         \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502  Sessions    \u2502  Security    \u2502  Background Tasks      \u2502\n\u2502  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500  \u2502  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500  \u2502  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500   \u2502\n\u2502  \u2022 Per-chat  \u2502  \u2022 Allowlist \u2502  \u2022 Isolated sessions   \u2502\n\u2502  \u2022 Reset     \u2502  \u2022 Pairing   \u2502  \u2022 Progress tracking   \u2502\n\u2502  \u2022 Persist   \u2502  \u2022 Rate limit\u2502  \u2022 Result delivery     \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502              Platform Adapters                        \u2502\n\u2502  Discord \u00b7 Telegram \u00b7 Slack \u00b7 WhatsApp \u00b7 Twitch      \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502              SQLite via sql.js                        \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/gateway start [port]` | Start the gateway |\n| `/gateway stop` | Stop the gateway |\n| `/gateway status` | Show status |\n| `/gateway restart` | Restart the gateway |\n| `/gateway pair <code>` | Approve a pairing code |\n| `/gateway allow <platform> <userId>` | Add user to allowlist |\n| `/gateway sessions` | List active sessions |\n| `/gateway tasks` | List background tasks |\n| `/gateway config` | Show configuration |\n\n## Tools\n\n| Tool | Description |\n|------|-------------|\n| `gateway_status` | Check gateway status |\n| `gateway_sessions` | List active sessions |\n| `gateway_background_tasks` | List and manage background tasks |\n| `gateway_pairing` | Generate, list, or approve pairing codes |\n\n## Programmatic API\n\nPi-gateway now exports a programmatic API so it can be started from outside a pi session:\n\n```typescript\nimport { startGateway, stopGateway, isGatewayRunning, getStatus } from '@0xkobold/pi-gateway/api';\n\n// Check if already running\nconst running = await isGatewayRunning(3847);\n\n// Start the gateway\nconst status = await startGateway({ port: 3847, host: '0.0.0.0' });\n\n// Get status\nconst current = getStatus();\n\n// Stop\nawait stopGateway();\n```\n\n| Function | Description |\n|----------|-------------|\n| `startGateway(opts?)` | Start HTTP/WS server, adapters, and cron |\n| `stopGateway()` | Stop all adapters, close server, kill RPC process |\n| `isGatewayRunning(port?)` | Check if a gateway is already running on a port |\n| `getStatus()` | Get current status (running, adapters, clients, sessions) |\n| `getConfig()` | Get current gateway config |\n| `isRunning()` | Check if gateway is running (sync) |\n| `getAdapter(platform)` | Get a platform adapter by name |\n| `getAdapters()` | Get all active adapters |\n| `sendMessage(platform, channelId, content)` | Send a message through a platform adapter |\n| `broadcast(event, data)` | Broadcast to all connected WebSocket clients |\n\n### Start Options\n\n```typescript\ninterface StartGatewayOptions {\n  port?: number;       // Override config port\n  host?: string;      // Override config host\n  noAgent?: boolean;  // Don't spawn pi RPC process (when pi is already running)\n}\n```\n\n## Session Reset Policies\n\n- **idle** \u2014 Reset after N minutes of inactivity (default: 1440 = 24h)\n- **daily** \u2014 Reset at a specific hour each day (default: 4:00)\n- **both** \u2014 Reset on either condition\n\n## Security\n\n### Allowlist Mode\n\nBy default, all users are allowed (`allowAll: true`). To restrict access:\n\n1. Set `allowAll: false` in config\n2. Use pairing codes or `/gateway allow` to grant access\n\n### Pairing Flow\n\n1. User sends a message on a platform\n2. Agent generates a pairing code via `gateway_pairing` (generate)\n3. Admin approves code via `/gateway pair <code>`\n4. User is added to the allowlist\n\n## Configuration\n\nStored at `~/.0xkobold/gateway/config.json`:\n\n```json\n{\n  \"port\": 3847,\n  \"host\": \"localhost\",\n  \"tokens\": [],\n  \"corsOrigins\": [\"*\"],\n  \"enableWebSocket\": true,\n  \"enableHttp\": true,\n  \"security\": {\n    \"allowAll\": true,\n    \"requirePairing\": false\n  },\n  \"sessions\": {\n    \"resetPolicy\": \"idle\",\n    \"dailyHour\": 4,\n    \"idleMinutes\": 1440\n  },\n  \"platforms\": {\n    \"discord\": {\n      \"enabled\": false,\n      \"botToken\": \"\"\n    }\n  }\n}\n```\n\n## Local Storage\n\nData is stored in SQLite via [sql.js](https://github.com/nicolo-ribaudo/nicolo-nicolo/tree/main/nicolo) (WebAssembly) for cross-runtime compatibility (Node.js and Bun):\n\n- `~/.0xkobold/gateway-sessions.db` \u2014 Session data\n- `~/.0xkobold/gateway-security.db` \u2014 Allowlist, pairing codes, rate limits\n- `~/.0xkobold/gateway-background-tasks.db` \u2014 Background task records\n\n## Local Development\n\n```bash\ngit clone https://github.com/0xKobold/pi-gateway\ncd pi-gateway\nnpm install\nnpm run build\npi install ./\n```\n\n## License\n\nMIT",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "gateway",
+    "messaging",
+    "hermes",
+    "multi-platform"
+  ],
+  "author": {
+    "name": "0xKobold"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/0xKobold/pi-gateway#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0xKobold/pi-gateway.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-03-24T00:30:46.009Z",
+    "modified": "2026-04-09T13:03:36.758Z",
+    "0.1.0": "2026-03-24T00:30:46.249Z",
+    "0.2.0": "2026-03-24T12:29:49.152Z",
+    "0.3.0": "2026-04-07T17:57:08.913Z",
+    "0.3.1": "2026-04-07T18:19:59.473Z",
+    "0.4.0": "2026-04-07T19:06:35.676Z",
+    "0.5.0": "2026-04-07T22:00:25.072Z",
+    "0.5.1": "2026-04-07T22:04:59.291Z",
+    "0.5.2": "2026-04-07T22:08:21.014Z",
+    "0.6.0": "2026-04-09T13:03:36.633Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": 34,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 181
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 35
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 624
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 369
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 55
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 74
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 197
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 119
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 58
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 34
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 42
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 47
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 3
+    }
+  ]
+}

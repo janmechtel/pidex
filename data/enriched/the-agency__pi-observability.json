@@ -1,0 +1,40 @@
+{
+  "name": "@the-agency/pi-observability",
+  "latest_version": "0.3.0",
+  "description": "Record tool usage, tokens, models, skills, and sessions as OpenTelemetry GenAI spans.",
+  "readme": "# @the-agency/pi-observability\n\nPi extension that emits one [OTel GenAI](https://opentelemetry.io/docs/specs/semconv/gen-ai/)-compatible span per assistant turn. Spans are always exported \u2014 to an OTLP collector when one is configured, or to local JSONL files otherwise.\n\n## What it captures\n\nEach span represents one LLM API call and includes:\n\n- OTel GenAI semantic convention attributes (`gen_ai.*`)\n- Token usage and cost per turn (`gen_ai.usage.*`, `cost.*`)\n- Full assistant text, thinking blocks, tool calls, and tool results\n- User message text (skill injection blocks stripped)\n- Session context: working directory, session file, session ID, active skills, tools, and registered commands\n- Model and provider info, thinking level, response ID\n- A stable `pi.turn.exchange_id` grouping all turns from one user prompt\n\n## Sinks\n\n### File sink (default)\n\nWhen no OTLP endpoint is configured, spans are written to daily JSONL files:\n\n```\n~/.pi/observability/YYYY-MM-DD.jsonl\n```\n\nOne JSON object per line, one file per day. Useful for local inspection with `jq` or importing into any tool that accepts JSONL.\n\nThe status bar shows `\u2b21 otlp:file`.\n\n### OTLP sink\n\nSet `OTEL_EXPORTER_OTLP_ENDPOINT` to send spans to any OTLP-compatible backend (Grafana Tempo, Jaeger, Elastic APM, Honeycomb, Datadog, etc.).\n\n| Variable | Description |\n|----------|-------------|\n| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP collector URL (e.g. `http://localhost:4318`) |\n| `OTEL_EXPORTER_OTLP_HEADERS` | Comma-separated `key=value` auth headers |\n| `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/json` (default), `http/protobuf`, or `grpc` |\n| `OTEL_SERVICE_NAME` | Overrides the default service name (`pi-coding-agent`) |\n\nThese are the standard [OpenTelemetry environment variables](https://opentelemetry.io/docs/specs/otel/protocol/exporter/) \u2014 no extension-specific configuration required.\n\nThe status bar shows `\u2b21 otlp:<host>` where `<host>` is the collector's hostname and port.\n\n## Span attributes\n\n| Attribute | Type | Description |\n|-----------|------|-------------|\n| `gen_ai.system` | keyword | Normalized provider name (e.g. `anthropic`, `openai`) |\n| `gen_ai.operation.name` | keyword | Always `chat` |\n| `gen_ai.request.model` | keyword | Model ID sent in the request |\n| `gen_ai.response.model` | keyword | Model ID returned in the response |\n| `gen_ai.response.finish_reasons` | keyword[] | Stop reason(s) from the provider |\n| `gen_ai.usage.input_tokens` | long | |\n| `gen_ai.usage.output_tokens` | long | |\n| `gen_ai.usage.cache_read_input_tokens` | long | |\n| `gen_ai.usage.cache_creation_input_tokens` | long | |\n| `gen_ai.usage.total_tokens` | long | |\n| `message.user.text` | text | User prompt text |\n| `message.assistant.text` | text | Assistant response text |\n| `message.assistant.thinking` | text | Thinking block content, if present |\n| `tool_calls` | json | `{id, name, arguments, arguments_text}` per call |\n| `tool_results` | json | `{tool_call_id, tool_name, output}` per result |\n| `turn.tool_call_count` | long | |\n| `turn.tool_result_count` | long | |\n| `pi.session.id` | keyword | Stable session UUID (also used as OTel trace ID) |\n| `pi.session.cwd` | keyword | Working directory |\n| `pi.session.start` | ISO-8601 | Session start time |\n| `pi.session.file` | keyword | Path to the `.pi` session file |\n| `pi.session.skills` | json | `{name, path, source, scope}` for each loaded skill |\n| `pi.session.skill_names` | keyword[] | Skill names only |\n| `pi.session.tools` | json | `{name, source, scope}` for each active tool |\n| `pi.session.active_tools` | keyword[] | Active tool names only |\n| `pi.session.commands` | keyword[] | Registered slash command names |\n| `pi.turn.exchange_id` | keyword | UUID shared across all turns in one user prompt |\n| `pi.model.provider` | keyword | Raw provider name from pi |\n| `pi.model.api` | keyword | API identifier |\n| `pi.thinking_level` | keyword | Thinking level if set |\n| `pi.thinking.present` | boolean | Whether a thinking block was present |\n| `pi.response_id` | keyword | Provider response ID |\n| `cost.total_usd` | float | |\n| `cost.input_usd` | float | |\n| `cost.output_usd` | float | |\n\nAttributes with no value are omitted.\n\n## Installation\n\n### Project-local\n\nAdd to `.pi/settings.json` in your project:\n\n```json\n{\n  \"packages\": [\"npm:@the-agency/pi-observability\"]\n}\n```\n\n### Global\n\n```bash\npi install npm:@the-agency/pi-observability\n```\n\n## Examples\n\n### Local file sink (no configuration needed)\n\n```bash\npi chat\n# spans written to ~/.pi/observability/YYYY-MM-DD.jsonl\n```\n\nInspect with `jq`:\n\n```bash\njq '.attributes[\"gen_ai.usage.input_tokens\"]' ~/.pi/observability/$(date +%Y-%m-%d).jsonl\n```\n\n### Send to a local OTel collector\n\n```bash\nexport OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318\npi chat\n```\n\n### Send to Elastic APM\n\n```bash\nexport OTEL_EXPORTER_OTLP_ENDPOINT=https://your-cluster.apm.us-east-1.aws.cloud.es.io\nexport OTEL_EXPORTER_OTLP_HEADERS=\"Authorization=Bearer your_secret_token\"\npi chat\n```\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "observability",
+    "opentelemetry",
+    "otel",
+    "metrics",
+    "telemetry",
+    "agents",
+    "llm"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/JoshMock/the-agency#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JoshMock/the-agency.git",
+    "directory": "packages/observability"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-15T18:27:38.162Z",
+    "modified": "2026-05-26T19:56:02.642Z",
+    "0.2.0": "2026-05-15T18:27:38.416Z",
+    "0.2.1": "2026-05-15T18:38:14.407Z",
+    "0.3.0": "2026-05-26T19:56:02.353Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 11,
+  "download_trend": []
+}

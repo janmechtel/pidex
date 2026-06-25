@@ -1,0 +1,33 @@
+{
+  "name": "@jademind/pi-telemetry",
+  "latest_version": "0.1.4",
+  "description": "Structured runtime telemetry for pi-coding-agent, optimized for external services and observability pipelines.",
+  "readme": "# @jademind/pi-telemetry\n\n> Migration: package moved from `pi-telemetry` to `@jademind/pi-telemetry`.\n\nStructured runtime telemetry for `pi-coding-agent`, designed for external services (menu bar apps, daemons, web dashboards, alerting pipelines), including the free open-source macOS app [`pi-statusbar`](https://github.com/jademind/pi-statusbar).\n\n`@jademind/pi-telemetry` publishes one JSON heartbeat file per running Pi process and ships a snapshot CLI to aggregate all active processes into a single machine-level payload.\n\n---\n\n## Highlights\n\n- **Per-process telemetry heartbeat** (PID-scoped JSON files)\n- **Session + model metadata** for each running Pi instance\n- **Activity state** (`working`, `waiting_input`, `unknown`)\n- **Context-window pressure metrics** (including near-limit detection)\n- **External-service friendly snapshot** with aggregate + grouped maps\n- **Atomic file writes** for robust consumers\n- **No daemon required**: integrate by reading files or invoking snapshot CLI\n\n---\n\n## Installation\n\n```bash\npi install npm:@jademind/pi-telemetry\n```\n\nThe extension is auto-loaded through the package `pi.extensions` manifest.\n\n---\n\n## Runtime behavior\n\nOn key Pi lifecycle events (`session_start`, `turn_start`, `turn_end`, etc.), the extension writes/updates:\n\n```text\n~/.pi/agent/telemetry/instances/<pid>.json\n```\n\nOn graceful shutdown (`session_shutdown`), the process file is removed.\n\n### Configuration\n\nEnvironment variables:\n\n- `PI_TELEMETRY_DIR` (default: `~/.pi/agent/telemetry/instances`)\n- `PI_TELEMETRY_HEARTBEAT_MS` (default: `1500`, minimum: `250`)\n- `PI_TELEMETRY_CLOSE_PERCENT` (default: `85`)\n- `PI_TELEMETRY_NEAR_PERCENT` (default: `95`)\n- `PI_TELEMETRY_STALE_MS` (used by snapshot CLI; default: `10000`)\n\nInside Pi, use:\n\n- `/pi-telemetry` to display the active telemetry file path.\n- `/pi-telemetry --data` (or `--json`) to also print the latest per-process telemetry payload.\n- Add `--pretty` for formatted JSON output.\n\n---\n\n## Snapshot CLI\n\nAggregate all live telemetry into one JSON document:\n\n```bash\npi-telemetry-snapshot --pretty\n```\n\n### CLI options\n\n- `--stale-ms <ms>`: stale threshold override\n- `--pretty`: pretty-printed JSON output\n\n### Exit behavior\n\n- Returns JSON even when no instances exist (`counts.total = 0`)\n- Skips invalid/corrupt JSON files\n\n---\n\n## Output schema\n\nTop-level snapshot (`schemaVersion: 2`) includes:\n\n- `aggregate`: `none | working | waiting_input | mixed`\n- `counts`: totals by activity\n- `context`: fleet-level context pressure summary\n- `sessions`: map keyed by `session.id`\n- `instancesByPid`: map keyed by string pid\n- `instances`: ordered array of full active records\n\n### Per-instance fields\n\n- `process`: pid/ppid/uptime/heartbeat timestamps\n- `system`: host/user/platform/arch/nodeVersion\n- `workspace`: cwd + optional git branch/commit\n- `session`: id/file/name\n- `model`: provider/id/name/thinkingLevel (if available)\n- `state`: activity and idleness flags\n- `context`: token usage and pressure classification\n- `routing`: jump-oriented metadata (tty, mux, mux session, terminal app hints, tmux pane target, zellij tab candidates/match when available)\n- `capabilities`: currently `hasUI`\n- `messages.lastAssistantText`: latest assistant response text when available via Pi API\n- `messages.lastAssistantHtml`: HTML-safe rendering of latest assistant text (`<div class=\"pi-last-assistant\"><pre>...</pre></div>`)\n- `messages.lastAssistantUpdatedAt`: timestamp (ms) for latest assistant text capture\n- `lastEvent`: most recent triggering Pi lifecycle event\n- `telemetry`: snapshot-side metadata (`alive`, `stale`, `ageMs`, source file)\n\n### Context pressure model\n\nDerived from `context.percent`:\n\n- `normal`\n- `approaching_limit` (>= `PI_TELEMETRY_CLOSE_PERCENT`)\n- `near_limit` (>= `PI_TELEMETRY_NEAR_PERCENT`)\n- `at_limit` (>= `100`)\n\nAdditional booleans are provided for easy filtering:\n\n- `closeToLimit`\n- `nearLimit`\n\n---\n\n## Example integration\n\n### macOS status bar app (open source / free)\n\n- [`pi-statusbar`](https://github.com/jademind/pi-statusbar): a free macOS status bar application for Pi built on top of `pi-telemetry`.\n\n### Poll from a daemon\n\n```bash\npi-telemetry-snapshot | jq '.aggregate, .counts, .context'\n```\n\n### Get all sessions currently near context limit\n\n```bash\npi-telemetry-snapshot | jq '\n  .sessions\n  | to_entries\n  | map(select(.value.context.nearLimit > 0))\n'\n```\n\n### Check whether any Pi is waiting for input\n\n```bash\npi-telemetry-snapshot | jq '.counts.waiting_input > 0'\n```\n\n---\n\n## Development\n\n```bash\nnpm pack --dry-run\nnode ./bin/pi-telemetry-snapshot.mjs --pretty\n```\n\nSuggested release checklist:\n\n1. Update version in `package.json`\n2. Validate tarball with `npm pack --dry-run`\n3. Verify CLI output in a live Pi session\n4. Tag and publish\n\n---\n\n## Security model\n\n- Telemetry is written to the local filesystem under your user account.\n- Consumers should treat files as untrusted input and validate JSON.\n- Snapshot CLI performs liveness/staleness filtering; downstream systems should still apply their own policy checks.\n\n---\n\n## License\n\nMIT \u2014 see [LICENSE](./LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "telemetry",
+    "observability"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/jademind/pi-telemetry#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jademind/pi-telemetry.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-02-24T15:29:18.962Z",
+    "0.1.4": "2026-02-24T15:29:19.213Z",
+    "modified": "2026-02-24T15:29:19.445Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 14,
+  "download_trend": []
+}

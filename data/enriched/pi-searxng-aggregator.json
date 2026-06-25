@@ -1,0 +1,30 @@
+{
+  "name": "pi-searxng-aggregator",
+  "latest_version": "0.0.5",
+  "description": "Search via a local SearXNG instance and aggregate results into per-topic JSON files",
+  "readme": "# pi-searxng-aggregator\n\nA [pi](https://github.com/mariozechner/pi-coding-agent) extension that queries a SearXNG search instance and aggregates results into per-topic JSON files. Results from repeated searches with the same query are appended to the same file, and can be read back using `mode='list'`.\n\n## Prerequisites\n\nA SearXNG instance must be running and reachable. The extension uses the following priority chain to determine the base URL:\n\n1. **`SEARXNG_BASE_URL`** environment variable (highest priority)\n2. **`searxng.baseUrl`** in `~/.pi/agent/settings.json`\n3. **`http://localhost:8080`** (default fallback)\n\n### Environment variable\n\n```bash\nexport SEARXNG_BASE_URL=https://your-searxng.example.com\n```\n\n### Settings file\n\nAdd the `searxng.baseUrl` key to your global settings file (`~/.pi/agent/settings.json`):\n\n```json\n{\n  \"searxng\": {\n    \"baseUrl\": \"https://your-searxng.example.com\"\n  }\n}\n```\n\n> **Note:** Non-local SearXNG instances (public instances, remote servers, etc.) are fully supported.\n\n## Local SearXNG Setup (Docker)\n\nThe simplest way to run SearXNG locally is with the official Docker image:\n\n```bash\n# Create data and config directories\nmkdir -p ~/.config/searxng/{data,config}\n\n# Run the container\ndocker run -d \\\n  --name searxng \\\n  -p 8080:8080 \\\n  -v ~/.config/searxng/data:/var/cache/searxng \\\n  -v ~/.config/searxng/config:/etc/searxng \\\n  searxng/searxng:latest\n```\n\nVerify it's running:\n\n```bash\ncurl http://localhost:8080/search?q=test\n```\n\nThe container persists data in `~/.config/searxng/`, so your settings and cache survive restarts.\n\n## Quick Start\n\n### Install via npm (recommended)\n\n```bash\npi install npm:pi-searxng-aggregator\n```\n\n## Usage\n\nAsk pi to search with SearXNG. Results are saved to a per-topic JSON file in the system temp directory.\n\n### Parameters\n\n- **`query`** (required): The search query text\n- **`engines`** (optional): Search engines, e.g. `[\"google\", \"duckduckgo\"]`\n- **`categories`** (optional): Result categories, e.g. `[\"general\", \"images\", \"news\"]`\n- **`language`** (optional): Language code, e.g. `\"en\"`\n- **`filename`** (optional): Override the auto-generated filename slug for explicit grouping. Related searches share the same file.\n- **`mode`** (optional): `\"search\"` (default) queries SearXNG; `\"list\"` reads a previously aggregated file without searching\n\n### Examples\n\n- Search a query: `\"Search for latest AI news using searxng\"`\n- Group related searches: `\"Search for Rust async and Tokio benchmarks, filename: 'async-rust'\"`\n- Read previous results: `\"List aggregated results for async-rust\"`\n\n### Aggregated File Format\n\nResults are saved as JSON in the system temp directory (e.g. `/tmp/pi-searxng/`). Each file has this structure:\n\n```json\n{\n  \"filename\": \"async-rust\",\n  \"queries\": [\n    {\n      \"id\": \"a3f1b2c4-...\",\n      \"originalQuery\": \"Rust async benchmarks\",\n      \"timestamp\": 1715420000000,\n      \"params\": { \"engines\": [\"google\"], \"language\": \"en\" },\n      \"results\": [\n        { \"title\": \"...\", \"url\": \"...\", \"content\": \"...\", \"engine\": \"google\", \"category\": \"general\", \"score\": 0.95 }\n      ]\n    }\n  ],\n  \"totalQueries\": 1,\n  \"totalResults\": 1\n}\n```\n\n- **`filename`** \u2014 slug for the file\n- **`queries`** \u2014 array of all searches under this topic (appended on repeated searches)\n- **`totalQueries`** / **`totalResults`** \u2014 summary counts\n- Each **`result`** contains `title`, `url`, `content`, `engine`, `category`, `score`\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-05-11T06:56:44.749Z",
+    "modified": "2026-05-11T09:01:13.383Z",
+    "0.0.1": "2026-05-11T06:56:44.976Z",
+    "0.0.2": "2026-05-11T08:11:55.787Z",
+    "0.0.3": "2026-05-11T08:32:45.628Z",
+    "0.0.4": "2026-05-11T08:45:57.631Z",
+    "0.0.5": "2026-05-11T09:01:13.286Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 9,
+  "download_trend": []
+}

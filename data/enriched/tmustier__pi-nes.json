@@ -1,0 +1,386 @@
+{
+  "name": "@tmustier/pi-nes",
+  "latest_version": "0.2.42",
+  "description": "NES emulator extension for pi",
+  "readme": "# pi-nes\n\nPlay NES games in your terminal. A [Pi](https://pi.dev/) extension that runs a full NES emulator with Kitty graphics support.\n\n![pi-nes demo](assets/demo.gif)\n\n## Installation\n\n```bash\npi install npm:@tmustier/pi-nes\n```\n\nOr from git:\n```bash\npi install git:github.com/tmustier/pi-nes\n```\n\n## Updating\n\nIf you installed from npm:\n\n```bash\npi update npm:@tmustier/pi-nes\n```\n\nThen fully restart `pi`.\n\n### Updating from older versions\n\n- No config migration is required.\n- On Kitty-compatible terminals (Ghostty, Kitty, WezTerm), image mode now opens in pi's main custom UI instead of an overlay.\n- Text mode still uses the classic overlay experience.\n\n## Quick Start\n\n```bash\n/nes              # Pick a ROM from your library\n/nes ~/roms/smb.nes   # Load a specific ROM\n```\n\nOn first run, you'll be prompted to set your ROM directory and display quality. When launching `/nes` without a path, type to filter the ROM list while you navigate.\n\n## Controls\n\n### Game Controls\n\n| Action | Keys |\n|--------|------|\n| D-pad | Arrow keys or WASD |\n| A button | Z |\n| B button | X |\n| Start | Enter or Space |\n| Select | Tab |\n\n### Emulator Controls\n\n| Action | Key |\n|--------|-----|\n| Detach (keep running) | Ctrl+Q |\n| Quit | Q |\n\n**Tip:** Detach with `Ctrl+Q` to return to pi, then run `/nes` to reattach to your game.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/nes` | Pick a ROM or reattach to running session |\n| `/nes <path>` | Load a specific ROM file |\n| `/nes config` | Quick setup (ROM directory + audio) |\n| `/nes-config` | Toggle audio, quality, and display style + advanced options |\n| `/nes debug` | Show FPS and memory stats |\n\n## Configuration\n\nConfig is stored at `~/.pi/nes/config.json`. Use `/nes config` for quick setup (ROM dir + audio), or `/nes-config` to toggle audio/quality/style inline and access advanced options.\n\n```json\n{\n  \"romDir\": \"/roms/nes\",\n  \"saveDir\": \"/roms/nes/saves\",\n  \"renderer\": \"image\",\n  \"imageQuality\": \"balanced\",\n  \"videoFilter\": \"ntsc-composite\",\n  \"enableAudio\": false,\n  \"pixelScale\": 1.0,\n  \"keybindings\": {\n    \"up\": [\"up\", \"w\"],\n    \"down\": [\"down\", \"s\"],\n    \"left\": [\"left\", \"a\"],\n    \"right\": [\"right\", \"d\"],\n    \"a\": [\"z\"],\n    \"b\": [\"x\"],\n    \"start\": [\"enter\", \"space\"],\n    \"select\": [\"tab\"]\n  }\n}\n```\n\n### Options\n\n| Option | Default | Description |\n|--------|---------|-------------|\n| `romDir` | `/roms/nes` | Where to look for ROM files |\n| `saveDir` | `/roms/nes/saves` | Where to store battery saves (defaults to `<romDir>/saves`) |\n| `renderer` | `\"image\"` | `\"image\"` (Kitty graphics) or `\"text\"` (ANSI) |\n| `imageQuality` | `\"balanced\"` | `\"balanced\"` (30 fps) or `\"high\"` (60 fps) |\n| `videoFilter` | `\"ntsc-composite\"` | `\"off\"`, `\"ntsc-composite\"`, `\"ntsc-svideo\"`, `\"ntsc-rgb\"` |\n| `enableAudio` | `false` | Enable audio output (requires native core built with `audio-cpal`) |\n| `pixelScale` | `1.0` | Display scale (0.5\u20134.0) |\n\n`videoFilter` applies a lightweight CRT/NTSC-inspired pass (horizontal bleed + scanlines). It runs in the native core and is optional.\n\n## Saves\n\nBattery-backed SRAM is saved to `<saveDir>/<rom-name>-<hash>.sav` where the hash is derived from the full ROM path to avoid collisions. Old `<rom-name>.sav` files are ignored.\n\nSaves are flushed on quit and periodically during play.\n\n## Terminal Support\n\n**Best experience:** a Kitty-protocol terminal like Ghostty, Kitty, or WezTerm (image protocol + key-up events).\n\n- **Kitty-protocol terminals** \u2014 Full graphics via image protocol (shared memory or file transport). Image mode opens in pi's main custom UI instead of an overlay to avoid Ghostty black-screen rendering issues.\n- **Other terminals** \u2014 Falls back to ANSI half-block characters (`\u2580\u2584`)\n\nSet `\"renderer\": \"text\"` if you prefer the ANSI renderer or want the classic overlay experience.\n\n## Audio after npm install or update\n\nThe published package works without audio by default. To enable audio, rebuild the native core with the `audio-cpal` feature.\n\nFirst, find the installed `@tmustier/pi-nes` path:\n\n```bash\npi list\n```\n\nThen `cd` into the printed install path plus `extensions/nes/native/nes-core`, and rebuild:\n\n```bash\nnpm install\nnpm run build:audio\n```\n\nFor a standard global npm install, that path is typically:\n\n```bash\ncd \"$(npm root -g)/@tmustier/pi-nes/extensions/nes/native/nes-core\"\n```\n\nThen enable audio in `/nes-config`.\n\nIf you update `@tmustier/pi-nes` later, run `build:audio` again because the native binary may be replaced during the update.\n\n## Limitations\n\n- **Audio is opt-in** \u2014 Requires building the native core with `audio-cpal` and setting `enableAudio: true`\n- **No auto-save** \u2014 Save manually just like you would with the original NES (battery-backed SRAM)\n\n## Vendored Dependencies\n\n- `nes_rust` is vendored under `extensions/nes/native/nes-core/vendor/nes_rust`.\n- Fork: https://github.com/tmustier/nes-rust (upstream: https://github.com/takahirox/nes-rust)\n- Update helper: `scripts/update-vendor-nes-rust.sh`\n\n---\n\n## Building from Source\n\nRequires Rust toolchain (cargo + rustc).\n\n```bash\ngit clone https://github.com/tmustier/pi-nes\ncd pi-nes\nnpm install\n\n# Build the NES core (required)\ncd extensions/nes/native/nes-core\nnpm install && npm run build\n\n# Build the NES core with audio (optional)\nnpm run build:audio\n\n# Build shared memory renderer (optional, faster on Kitty)\ncd ../kitty-shm\nnpm install && npm run build\n```\n\nRun locally:\n```bash\npi --extension /path/to/pi-nes\n```\n\n## Troubleshooting\n\n### `/nes` or `/nes-config` shows up twice\n\nYou likely have both an npm install and a local/path install enabled.\n\nCheck installed packages:\n\n```bash\npi list\n```\n\nThen remove the extra one:\n\n```bash\npi remove <source>      # for entries under \"User packages\"\npi remove -l <source>   # for entries under \"Project packages\"\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "nes",
+    "emulator"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/tmustier/pi-nes#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tmustier/pi-nes.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/nes"
+    ],
+    "image": "https://raw.githubusercontent.com/tmustier/pi-nes/main/assets/demo.gif"
+  },
+  "time": {
+    "created": "2026-01-28T02:35:53.322Z",
+    "modified": "2026-05-07T16:17:25.829Z",
+    "0.2.2": "2026-01-28T02:35:55.073Z",
+    "0.2.3": "2026-01-28T02:38:11.613Z",
+    "0.2.4": "2026-01-28T08:00:28.567Z",
+    "0.2.5": "2026-01-28T08:28:43.089Z",
+    "0.2.6": "2026-01-28T12:09:31.626Z",
+    "0.2.7": "2026-01-28T12:52:17.066Z",
+    "0.2.8": "2026-01-28T12:54:56.848Z",
+    "0.2.9": "2026-01-28T12:59:06.306Z",
+    "0.2.10": "2026-01-28T13:03:18.782Z",
+    "0.2.11": "2026-01-28T13:18:39.916Z",
+    "0.2.12": "2026-01-28T13:22:54.527Z",
+    "0.2.13": "2026-01-28T14:31:25.458Z",
+    "0.2.14": "2026-01-28T15:05:04.936Z",
+    "0.2.15": "2026-01-28T15:50:19.888Z",
+    "0.2.16": "2026-01-28T18:52:03.312Z",
+    "0.2.17": "2026-02-02T10:41:21.655Z",
+    "0.2.18": "2026-02-02T10:53:56.989Z",
+    "0.2.19": "2026-02-02T11:13:13.452Z",
+    "0.2.20": "2026-02-02T11:26:18.667Z",
+    "0.2.21": "2026-02-02T11:36:53.516Z",
+    "0.2.22": "2026-02-02T12:20:08.954Z",
+    "0.2.23": "2026-02-02T12:57:41.322Z",
+    "0.2.24": "2026-02-02T13:21:03.378Z",
+    "0.2.25": "2026-02-02T13:22:59.776Z",
+    "0.2.26": "2026-02-02T14:08:15.864Z",
+    "0.2.27": "2026-02-02T14:12:19.619Z",
+    "0.2.28": "2026-02-02T14:13:27.925Z",
+    "0.2.29": "2026-02-02T14:59:45.810Z",
+    "0.2.30": "2026-02-02T15:33:07.334Z",
+    "0.2.31": "2026-02-02T16:19:07.064Z",
+    "0.2.32": "2026-02-02T16:38:08.848Z",
+    "0.2.33": "2026-02-02T17:13:43.979Z",
+    "0.2.34": "2026-02-02T17:14:20.040Z",
+    "0.2.35": "2026-02-02T17:36:14.421Z",
+    "0.2.36": "2026-02-02T17:39:26.854Z",
+    "0.2.37": "2026-02-02T19:33:52.907Z",
+    "0.2.38": "2026-02-03T01:15:59.395Z",
+    "0.2.39": "2026-04-07T11:52:30.253Z",
+    "0.2.40": "2026-04-07T12:55:19.927Z",
+    "0.2.41": "2026-04-07T13:43:34.443Z",
+    "0.2.42": "2026-05-07T16:17:25.732Z"
+  },
+  "versions_count": 41,
+  "downloads_last_week": 111,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 3521
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 307
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 105
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 43
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 62
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 61
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 394
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 106
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 42
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 49
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 90
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 196
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 101
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 82
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 40
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 62
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 34
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 71
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 40
+    }
+  ]
+}

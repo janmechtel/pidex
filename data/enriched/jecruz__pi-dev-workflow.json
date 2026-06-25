@@ -1,0 +1,39 @@
+{
+  "name": "@jecruz/pi-dev-workflow",
+  "latest_version": "1.0.1",
+  "description": "Multi-stage development workflow for pi \u2014 automated write/test/review/fix/verify cycle with coverage gates and auto-commits",
+  "readme": "# pi-dev-workflow\n\nAutomated code development pipeline for the pi coding agent.\n\n```\nWrite \u2192 Test \u2192 Review \u2192 Fix \u2192 Verify \u2192 Done\n```\n\n## Quick Start\n\n```\n/workflow my-project strict create a password hasher with bcrypt... fixes #42\n/workflow quick utils create helper functions\n/workflow strict auth-service build login API with JWT tokens\n```\n\n## Modes\n\n| Mode | Pipeline | Gate |\n|------|----------|------|\n| default | Write \u2192 Test \u2192 Review \u2192 Fix \u2192 Verify \u2192 Done | Coverage \u226580% |\n| `quick` | Write \u2192 Test \u2192 Verify \u2192 Done | None |\n| `strict` | Write \u2192 Test \u2192 Review \u2192 Fix \u2192 Verify \u2192 Done | Coverage \u226590% |\n\n## Usage\n\n```\n/workflow [name] [quick|strict] <spec>\n```\n\n- **name** \u2014 optional project name (auto-generated from spec if omitted)\n- **mode** \u2014 optional mode prefix (`quick` or `strict`)\n- **spec** \u2014 feature description, or path to `.md`/`.txt` file\n\n### Examples\n\n```bash\n# Full cycle with custom name\n/workflow markdown-parser in @tests create a heading parser...\n\n# Strict mode with linked issue\n/workflow strict auth-service create login API with JWT tokens fixes #42\n\n# Quick mode, auto-named\n/workflow quick create a set of math utility functions\n\n# From file\n/workflow ./specs/feature.md\n```\n\n## Pipeline Stages\n\n### 1. Write\nAgent creates implementation in `projects/<name>/src/` and tests in `projects/<name>/tests/`. Commits with `wip:` prefix.\n\n### 2. Test\nAgent runs test suite. Exit code parsed deterministically \u2014 0 = pass. Commits with `test:` prefix.\n\n### 3. Review\nAgent reviews code with domain-specific checklist injected based on spec keywords:\n\n| Spec keywords | Checklist items |\n|---|---|\n| auth, password, login, token | Security: injection, hashing, token safety |\n| api, fetch, http, request | API: error handling, timeouts, response validation |\n| file, fs, read, write, save | I/O: error recovery, missing files, encoding |\n| async, promise, await | Async: error propagation, unhandled rejections |\n| ui, component, render, dom | UI: a11y, loading/empty states, error boundaries |\n| db, database, sql, query | Data: injection, transactions, connection handling |\n\n### 4. Fix\nAgent addresses review findings. Commits with `fix:` prefix. Returns to test stage.\n\n### 5. Verify\nAgent runs tests + coverage. Must meet coverage threshold (80% default, 90% strict). Gate status shown in completion.\n\n### 6. Done\nWorkflow finalizes \u2014 the completion banner (project name, location, tests, coverage, linked issues) is returned as tool result content from `workflow_complete`. README, changelog entry, and final commit are generated.\n\n## Directory Structure\n\n```\nprojects/<name>/\n\u251c\u2500\u2500 src/\n\u2502   \u2514\u2500\u2500 <module>.ts\n\u251c\u2500\u2500 tests/\n\u2502   \u2514\u2500\u2500 <module>.test.ts\n\u251c\u2500\u2500 README.md          \u2190 generated on completion\n\u2514\u2500\u2500 POSTMORTEM.md      \u2190 generated on failure\n```\n\n## Tools\n\n| Tool | Stage | Description |\n|------|-------|-------------|\n| `workflow_next` | all | Advance to next stage |\n| `workflow_test_result` | test, verify | Report test exit code |\n| `workflow_review_result` | review | Report review findings |\n| `workflow_verify_result` | verify | Report type-check, lint, coverage |\n| `workflow_complete` | verify, done | Finalize workflow |\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/workflow [name] [mode] <spec>` | Start workflow |\n| `/workflow:status` | Show current stage, gates, issues |\n| `/workflow:cancel` | Cancel workflow |\n\n## Git Integration\n\nAuto-commits after each stage with structured messages:\n\n```\nwip: project-name \u2014 implementation + tests\ntest: all passing\nfix: project-name \u2014 address review feedback\nchore: workflow complete \u2014 project-name\n```\n\n## Issue Linking\n\nExtracts issue references from spec and displays them in completion:\n\n```\ncloses #42, resolves RM-123, GH-789\n```\n\nLinked issues appear in the completion banner, README, and changelog.\n\n## Changelog\n\nAppends to `CHANGELOG.md` on completion:\n\n```markdown\n## 2026-05-09 \u2014 markdown-parser: fixed trailing whitespace in headings (fixes #42)\n```\n\n## Output Artifacts\n\n| File | When | Contents |\n|------|------|----------|\n| `projects/<name>/README.md` | Completion | Summary, spec, results table, stats |\n| `CHANGELOG.md` (root) | Completion | Date, project, summary, linked issues |\n| `projects/<name>/POSTMORTEM.md` | Failure | Timeline, root cause, spec |\n\n## Completion Banner\n\nReturned as tool result content from `workflow_complete`:\n\n```\n\u2705 **markdown-parser** is complete\n\n\ud83d\udcc1 **Location:** `projects/markdown-parser/`\n\ud83e\uddea **Tests:** All passing\n\ud83d\udcca **Coverage:** 94% \u2713 (\u226580% required)\n\nLinked: fixes #42\n```\n\n## State Persistence\n\nWorkflow state persists in session branch entries. Survives context compaction. Restored on session restart.\n\n## Installation\n\nCopy `index.ts` to `~/.pi/agent/extensions/dev-workflow.ts`. Restart pi.\n\n```bash\ncp index.ts ~/.pi/agent/extensions/dev-workflow.ts\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "workflow",
+    "tdd",
+    "code-review",
+    "automation",
+    "pipeline"
+  ],
+  "author": {
+    "name": "Jeffrey Cruz"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/jecruz/pi-dev-workflow#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jecruz/pi-dev-workflow.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-10T05:33:03.898Z",
+    "modified": "2026-05-10T05:40:32.860Z",
+    "1.0.0": "2026-05-10T05:33:04.106Z",
+    "1.0.1": "2026-05-10T05:40:32.736Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

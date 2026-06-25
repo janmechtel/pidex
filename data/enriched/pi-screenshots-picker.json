@@ -1,0 +1,68 @@
+{
+  "name": "pi-screenshots-picker",
+  "latest_version": "1.2.2",
+  "description": "Screenshot picker extension for pi coding agent - quickly select and attach screenshots to your prompts",
+  "readme": "# pi-screenshots-picker\n\nA [pi coding agent](https://github.com/badlogic/pi-mono/) extension for quickly selecting and attaching screenshots to your prompts. Works on **macOS** and **Linux**. Browse recent screenshots with thumbnail previews, stage multiple images, then type your message - screenshots attach automatically when you send.\n\n\n\nhttps://github.com/user-attachments/assets/365f6fa8-0922-4172-8611-141300aed7f6\n\n\n\n## Why\n\nAttaching screenshots during development is tedious. You're constantly:\n- Dragging files from Desktop/Finder\n- Losing track of which screenshot is which\n- Breaking your flow to find the right image\n\npi-screenshots-picker gives you a visual screenshot browser right in your terminal:\n\n```\n/ss\n```\n\n## Install\n\n```bash\npi install npm:pi-screenshots-picker\n```\n\n## Quick Start\n\n1. Press `Ctrl+Shift+S` or type `/ss` to open the picker\n2. Navigate with `\u2191\u2193`, press `s` or `space` to stage screenshots (\u2713 appears)\n3. Press `Enter` to close the picker\n4. Type your message in the prompt\n5. Press `Enter` to send - staged images attach automatically\n\n## Commands\n\n### `/ss`\n\nOpens the interactive screenshot picker UI. Browse your recent screenshots with thumbnail previews.\n\n**Keys:**\n- **\u2191\u2193** - Navigate through screenshots\n- **Ctrl+T** - Cycle through source tabs (when multiple sources configured)\n- **z** - Toggle zoom inspector mode\n- **+ / -** - Zoom in/out (inspector mode)\n- **\u2190\u2191\u2192\u2193** - Pan image in inspector mode (Kitty/Ghostty/WezTerm); falls back to nav otherwise\n- **[ / ]** - Previous/next screenshot in inspector mode\n- **0** - Reset inspector zoom + pan (only after this you can select other screenshots)\n- **s / space** - Stage/unstage current screenshot (\u2713 indicator appears)\n- **x** - Clear all staged screenshots\n- **o** - Open in Preview.app\n- **d** - Delete screenshot from disk\n- **Enter** - Close picker\n- **Esc** - Cancel\n\n### `/ss-clear`\n\nClear all staged screenshots without sending.\n\n### `Ctrl+Shift+S`\n\nKeyboard shortcut to open the picker (same as `/ss`).\n\n### `Ctrl+Shift+X`\n\nKeyboard shortcut to clear all staged screenshots (same as `/ss-clear`).\n\n## Features\n\n- **Multiple sources with tabs** - Configure multiple directories/patterns, switch with Ctrl+T\n- **Glob pattern support** - Use patterns like `**/*.png` to match files flexibly\n- **Thumbnail previews** - See what you're selecting (Kitty/iTerm2/Ghostty/WezTerm)\n- **Zoom inspector mode** - Press `z`, then pan with arrows and zoom with +/-\n- **Multi-select** - Stage multiple screenshots, they all attach when you send\n- **Relative timestamps** - \"2 minutes ago\", \"yesterday\", etc.\n- **File sizes** - Know what you're attaching\n- **Delete screenshots** - Press `d` to remove unwanted screenshots from disk\n- **Staged indicator** - Widget shows `\ud83d\udcf7 N screenshots staged` below the editor\n- **Auto-detection** - Finds your screenshot folder automatically when no config\n\n## Configuration\n\nBy default, the extension auto-detects your screenshot location based on your platform.\n\n### Multiple Sources with Tabs\n\nConfigure multiple screenshot sources in `~/.pi/agent/settings.json`. Each source becomes a tab in the picker UI - use **Ctrl+T** to cycle through them:\n\n```json\n{\n  \"pi-screenshots\": {\n    \"sources\": [\n      \"~/Desktop/ss\",\n      \"~/Pictures/Screenshots\",\n      \"/path/to/comfyui/output/**/thumbnail_*.png\"\n    ]\n  }\n}\n```\n\n### Source Types\n\n**Plain directories** - Scans for screenshot-named PNG files:\n```json\n\"~/Desktop/ss\"\n```\n\n**Glob patterns** - Matches any image file (PNG, JPG, WebP) matching the pattern:\n```json\n\"/path/to/images/**/*.png\"\n\"/mnt/Store/ComfyUI/Output/**/thumbnail_*.png\"\n```\n\nGlob patterns support:\n- `*` - Match any characters in a filename\n- `**` - Match any directories recursively\n- `?` - Match a single character\n- `[abc]` - Match any character in brackets\n\n### Default Locations (when no config)\n\n**macOS:**\n1. System preferences (`defaults read com.apple.screencapture location`)\n2. `~/Desktop`\n\n**Linux:**\n1. `~/Pictures/Screenshots`\n2. `~/Pictures`\n3. `~/Screenshots`\n4. `~/Desktop`\n\n### Environment Variable\n\nYou can also use the `PI_SCREENSHOTS_DIR` environment variable as a fallback:\n\n```bash\nexport PI_SCREENSHOTS_DIR=\"/path/to/screenshots\"\n```\n\n### Priority\n\n1. Config in `~/.pi/agent/settings.json` (`pi-screenshots.sources`)\n2. Environment variable (`PI_SCREENSHOTS_DIR`)\n3. Platform default (see above)\n\n## Remote Development\n\nWhen developing on a remote machine via SSH, you need a way to get screenshots from your local machine to the remote. Use one of these external tools:\n\n### Option 1: SSHFS (Simplest)\n\nMount a remote folder locally. Screenshots you take locally appear on the remote instantly.\n\n**On your local machine:**\n\n```bash\n# Install sshfs\n# macOS: brew install macfuse sshfs\n# Linux: sudo apt install sshfs\n\n# Create mount point\nmkdir -p ~/remote-screenshots\n\n# Mount (replace with your remote)\nsshfs user@remote:~/Screenshots ~/remote-screenshots\n\n# Configure macOS to save screenshots there\ndefaults write com.apple.screencapture location ~/remote-screenshots\nkillall SystemUIServer\n```\n\n**On the remote**, configure pi-screenshots to read from `~/Screenshots`:\n\n```json\n{\n  \"pi-screenshots\": {\n    \"sources\": [\"~/Screenshots\"]\n  }\n}\n```\n\n### Option 2: Syncthing (Most Robust)\n\n[Syncthing](https://syncthing.net/) provides continuous, bidirectional file sync. Better for unreliable connections.\n\n1. Install Syncthing on both machines\n2. Share your local screenshot folder with the remote\n3. Configure pi-screenshots to read from the synced folder\n\n### Thumbnail Previews over SSH\n\nTo enable thumbnail previews over SSH, add your terminal to the remote's shell profile:\n\n```bash\n# Add to remote ~/.bashrc or ~/.zshrc\nexport TERM_PROGRAM=ghostty  # or: kitty, WezTerm, iTerm.app\n```\n\nRestart pi after (can't use `!` inside pi).\n\n## Supported Screenshot Formats\n\nThe extension recognizes screenshots from various tools:\n\n**macOS:**\n- English: `Screenshot ...`\n- French: `Capture ...`\n- German: `Bildschirmfoto ...`\n- Spanish: `Captura ...`\n- Italian: `Istantanea ...`\n- Dutch: `Scherm...`\n\n**Linux:**\n- GNOME Screenshot: `2024-01-30_12-30-45.png`\n- Flameshot: `flameshot...`\n- KDE Spectacle: `spectacle...`\n- Scrot: `scrot...`\n- Maim: `maim...`\n- Grim (Wayland): `grim...`\n- Generic: `screenshot...`\n\nOnly PNG files matching these patterns are shown.\n\n## Requirements\n\n- macOS or Linux\n- Terminal with image support for thumbnails (Kitty, iTerm2, Ghostty, WezTerm)\n  - Falls back gracefully on unsupported terminals\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "screenshots",
+    "macos",
+    "linux",
+    "image",
+    "attachment",
+    "picker",
+    "tui",
+    "claude",
+    "gemini",
+    "codex"
+  ],
+  "author": {
+    "name": "Graffioh"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Graffioh/pi-screenshots-picker#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Graffioh/pi-screenshots-picker.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "video": "https://raw.githubusercontent.com/Graffioh/pi-screenshots-picker/main/demo.mp4"
+  },
+  "time": {
+    "created": "2026-01-31T09:19:28.361Z",
+    "modified": "2026-04-28T20:42:27.187Z",
+    "1.0.0": "2026-01-31T09:19:28.501Z",
+    "1.0.1": "2026-01-31T09:42:39.598Z",
+    "1.0.2": "2026-01-31T10:39:34.402Z",
+    "1.0.3": "2026-01-31T14:06:45.509Z",
+    "1.0.4": "2026-02-01T09:10:16.606Z",
+    "1.0.5": "2026-02-01T09:26:40.064Z",
+    "1.0.6": "2026-02-01T09:40:01.131Z",
+    "1.0.7": "2026-02-01T09:43:56.128Z",
+    "1.0.8": "2026-02-01T09:46:27.319Z",
+    "1.0.9": "2026-02-01T09:59:32.788Z",
+    "1.1.0": "2026-02-01T10:06:46.961Z",
+    "1.1.1": "2026-02-01T10:21:03.923Z",
+    "1.1.2": "2026-02-01T10:22:52.178Z",
+    "1.1.3": "2026-02-01T10:28:10.563Z",
+    "1.1.4": "2026-02-01T10:30:39.610Z",
+    "1.1.5": "2026-02-02T06:45:21.353Z",
+    "1.1.6": "2026-02-02T19:23:32.729Z",
+    "1.1.7": "2026-02-03T08:02:10.787Z",
+    "1.1.8": "2026-02-03T13:17:17.672Z",
+    "1.1.9": "2026-02-04T06:43:39.560Z",
+    "1.1.10": "2026-02-04T06:47:38.416Z",
+    "1.2.0": "2026-02-06T13:02:45.548Z",
+    "1.2.1": "2026-02-07T08:56:51.167Z",
+    "1.2.2": "2026-04-28T20:42:27.064Z"
+  },
+  "versions_count": 24,
+  "downloads_last_week": null,
+  "download_trend": []
+}

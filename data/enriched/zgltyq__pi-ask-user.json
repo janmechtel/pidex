@@ -1,0 +1,41 @@
+{
+  "name": "@zgltyq/pi-ask-user",
+  "latest_version": "0.7.0",
+  "description": "Interactive ask_user tool for pi-coding-agent with searchable split-pane selection UI, multi-select, and freeform input",
+  "readme": "# @zgltyq/pi-ask-user\n\nA fork of [pi-ask-user](https://github.com/edlsh/pi-ask-user) with critical bug fixes and UX improvements for the interactive `ask_user` tool.\n\n## What's fixed in this fork\n\nThis fork addresses several issues found in the original extension:\n\n1. **Full-screen mode instead of overlay** \u2014 Switches from a floating overlay (`overlay: true`) to a full-screen `custom()` component. This eliminates image overlap issues in terminals using persistent graphics layers (Kitty, Ghostty, WezTerm).\n\n2. **Selection not lost / LLM sees the answer** \u2014 Adds a `safeOnDone` guard that prevents `done()` from being called multiple times due to key-repeat, buffered escape sequences, or trailing input events. Previously, a valid selection could be silently overwritten with `null` (cancelled).\n\n3. **Timeout race condition fixed** \u2014 Adds a `safeDone` wrapper at the factory level that clears the timeout and removes the abort listener as soon as the user answers. Previously, answering before the timeout expired could still result in the timeout callback overwriting the answer with `null`.\n\n4. **Abort listener memory leak** \u2014 The abort signal listener is now explicitly removed when `safeDone` resolves, preventing accumulation across tool calls.\n\n5. **Performance: cached box borders** \u2014 `BoxBorderTop` and `BoxBorderBottom` are created once in the constructor and reused, instead of being allocated on every `render()` frame (which happens on every keystroke during search).\n\n6. **Multi-select uses full terminal height** \u2014 Removed the hardcoded 10-row cap on `MultiSelectList`. Now dynamically computes available rows from terminal height, same as single-select.\n\n7. **Removed all `as any` casts** \u2014 Editor methods (`getText`, `setText`, `focused`) now use the properly typed public API instead of runtime reflection.\n\n8. **`dispose()` cleanup** \u2014 Added a `dispose()` method that nulls out all callbacks (`onSubmit`, `onCancel`, `onEnterFreeform`) when the component closes, preventing closure references from leaking.\n\n9. **Number keys work for 10+ options** \u2014 Regex changed from `/^[1-9]$/` to `/^[1-9][0-9]?$/` with bounds checking, so options beyond 9 can be selected by typing their number.\n\n10. **Cleaned up unused code** \u2014 Removed `ASK_USER_VERSION`, `createRequire`, overlay constants, and the version label from the bottom border (saves one row of vertical space).\n\n## Demo\n\n![ask_user demo](./media/ask-user-demo.gif)\n\nHigh-quality video: [ask-user-demo.mp4](./media/ask-user-demo.mp4)\n\n## Fork notice\n\nThis is a maintained fork of the original [edlsh/pi-ask-user](https://github.com/edlsh/pi-ask-user). All fixes above are applied on top of v0.6.1. If you are using the original package, consider switching to this fork for the stability improvements.\n\n## Features\n\n- **Full-screen interactive UI** \u2014 replaces the terminal, no overlay compositing issues with persistent images (e.g. Kitty graphics protocol)\n- Searchable single-select option lists with wrapped titles and descriptions\n- Responsive split-pane details preview on wide terminals with single-column fallback on narrow terminals\n- Multi-select option lists with full terminal height utilization\n- Optional freeform responses\n- User-toggleable extra context on structured selections\n- Context display support\n- Pi-TUI-aligned keybinding and editor behavior\n- Custom TUI rendering for tool calls and results\n- System prompt integration via `promptSnippet` and `promptGuidelines`\n- Optional timeout for auto-dismiss in both full-screen and fallback input modes\n- Structured `details` on all results for session state reconstruction\n- Graceful fallback when interactive UI is unavailable\n- Bundled `ask-user` skill for mandatory decision-gating in high-stakes or ambiguous tasks\n\n## Bundled skill: `ask-user`\n\nThis package now ships a skill at `skills/ask-user/SKILL.md` that nudges/mandates the agent to use `ask_user` when:\n\n- architectural trade-offs are high impact\n- requirements are ambiguous or conflicting\n- assumptions would materially change implementation\n\nThe skill follows a \"decision handshake\" flow:\n\n1. Gather evidence and summarize context\n2. Ask one focused question via `ask_user`\n3. Wait for explicit user choice\n4. Confirm the decision, then proceed\n\nSee: `skills/ask-user/references/ask-user-skill-extension-spec.md`.\n\n## Install\n\n```bash\npi install npm:pi-ask-user\n```\n\n## Tool name\n\nThe registered tool name is:\n\n- `ask_user`\n\n## Parameters\n\n| Parameter | Type | Default | Description |\n|-----------|------|---------|-------------|\n| `question` | `string` | *required* | The question to ask the user |\n| `context` | `string?` | \u2014 | Relevant context summary shown before the question |\n| `options` | `(string \\| {title, description?})[]?` | `[]` | Multiple-choice options |\n| `allowMultiple` | `boolean?` | `false` | Enable multi-select mode |\n| `allowFreeform` | `boolean?` | `true` | Add a \"Type something\" freeform option |\n| `allowComment` | `boolean?` | `false` | Expose a user-toggleable extra-context option in the overlay (`ctrl+g` or the toggle row) and collect an optional comment in fallback dialogs |\n| `timeout` | `number?` | \u2014 | Auto-dismiss after N ms and return `null` if the prompt times out |\n\n## Example usage shape\n\n```json\n{\n  \"question\": \"Which option should we use?\",\n  \"context\": \"We are choosing a deploy target.\",\n  \"options\": [\n    \"staging\",\n    { \"title\": \"production\", \"description\": \"Customer-facing\" }\n  ],\n  \"allowMultiple\": false,\n  \"allowFreeform\": true,\n  \"allowComment\": true\n}\n```\n\n## Result details\n\nAll tool results include a structured `details` object for rendering and session state reconstruction:\n\n```typescript\ntype AskResponse =\n  | { kind: \"selection\"; selections: string[]; comment?: string }\n  | { kind: \"freeform\"; text: string };\n\ninterface AskToolDetails {\n  question: string;\n  context?: string;\n  options: QuestionOption[];\n  response: AskResponse | null;\n  cancelled: boolean;\n}\n```\n\n## Changelog\n\nSee [CHANGELOG.md](./CHANGELOG.md).",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "ask",
+    "ask_user",
+    "interactive"
+  ],
+  "author": {
+    "name": "Enzo Lucchesi",
+    "email": "enzo@edl.sh"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ZGltYQ/pi-ask-user#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZGltYQ/pi-ask-user.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-04-27T14:00:18.717Z",
+    "0.7.0": "2026-04-27T14:00:18.934Z",
+    "modified": "2026-04-27T14:00:19.075Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

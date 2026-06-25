@@ -1,0 +1,37 @@
+{
+  "name": "@paulrobello/par-tts-core-ts",
+  "latest_version": "0.1.2",
+  "description": "Provider-neutral TypeScript text-to-speech library for Node, browsers via proxy, and pi extensions",
+  "readme": "# @paulrobello/par-tts-core-ts\n\nProvider-neutral TypeScript text-to-speech library for Node, browsers through a proxy, and pi extensions.\n\n## Install\n\n```bash\nbun add @paulrobello/par-tts-core-ts\n```\n\n## Pipeline-first usage\n\nThe root API is browser-safe and does not read `process.env`. In Node/server code, pass credentials explicitly:\n\n```ts\nimport { createSpeechPipeline } from \"@paulrobello/par-tts-core-ts\";\n\nconst pipeline = createSpeechPipeline({\n  provider: \"openai\",\n  apiKey: process.env.OPENAI_API_KEY!,\n});\n\nconst result = await pipeline.synthesize(\"Hello from @paulrobello/par-tts-core-ts\", {\n  voice: \"nova\",\n  options: { format: \"mp3\" },\n});\n```\n\nFor browser apps, do not ship provider API keys. Use the proxy transport shown below.\n\n## Node env, save, and playback\n\nNode-only helpers can read provider settings from environment variables, save audio, and play audio with a local command (`afplay`, `ffplay`, or `mpg123`):\n\n```ts\nimport { createSpeechPipelineFromEnv, saveSpeechResult } from \"@paulrobello/par-tts-core-ts/node\";\nimport { playFile, playSpeechResult } from \"@paulrobello/par-tts-core-ts/playback\";\n\nconst pipeline = createSpeechPipelineFromEnv({ provider: \"openai\" });\nconst result = await pipeline.synthesize(\"Saved and played from Node.\");\n\nconst filePath = await saveSpeechResult(result, \"speech.mp3\");\nawait playFile(filePath);\n\n// Or save and play in one call:\nawait playSpeechResult(result, \"speech-again.mp3\");\n```\n\n## Browser proxy usage\n\n`createTtsProxyHandler` is a low-level transport proxy, not a provider-level synthesis endpoint. Browser code still creates a normal speech pipeline, but sends provider transport requests to your server. The server forwards allowlisted provider requests and injects server-side credentials.\n\nBrowser:\n\n```ts\nimport { createProxyTransport, createSpeechPipeline } from \"@paulrobello/par-tts-core-ts\";\n\nconst pipeline = createSpeechPipeline({\n  provider: \"openai\",\n  // Placeholder only: never put a real provider key in browser code.\n  apiKey: \"proxy\",\n  transport: createProxyTransport(\"/api/tts\"),\n});\n\nconst result = await pipeline.synthesize(\"Hello through a proxy.\");\n```\n\nServer route:\n\n```ts\nimport { createTtsProxyHandler } from \"@paulrobello/par-tts-core-ts/proxy\";\n\nexport const POST = createTtsProxyHandler({\n  providers: {\n    openai: { apiKey: process.env.OPENAI_API_KEY },\n  },\n});\n```\n\nThe proxy strips sensitive client headers, validates upstream provider hosts, and applies the configured server credential for the requested provider.\n\n## pi extension example\n\nSee `examples/pi-extension` for a pi extension that registers a `tts_speak` tool. It can be loaded directly during development, or copied into `.pi/extensions/tts` for local pi extension use.\n\n## Providers\n\nCanonical provider names:\n\n- `openai`\n- `elevenlabs`\n- `deepgram`\n- `gemini`\n- `kokoro-onnx`\n\n`kokoro` is accepted as an alias for `kokoro-onnx`. Kokoro ONNX support is available from `@paulrobello/par-tts-core-ts/node` and uses the optional `kokoro-js` dependency. Long Kokoro text is split into bounded sentence/word chunks before synthesis to avoid the model/tokenizer truncating oversized inputs.\n\n## Environment variables\n\nCloud providers:\n\n- OpenAI: `OPENAI_API_KEY`, optional `OPENAI_VOICE_ID`\n- ElevenLabs: `ELEVENLABS_API_KEY`, optional `ELEVENLABS_VOICE_ID`\n- Deepgram: `DEEPGRAM_API_KEY` or `DG_API_KEY`, optional `DEEPGRAM_VOICE_ID`\n- Gemini: `GEMINI_API_KEY` or `GOOGLE_API_KEY`, optional `GEMINI_VOICE_ID`\n\nKokoro ONNX:\n\n- `KOKORO_MODEL_PATH`\n- `KOKORO_VOICE_PATH`\n- `KOKORO_VOICE_ID`\n\n## Development\n\n```bash\nbun install\nbun run check\n```\n",
+  "keywords": [
+    "tts",
+    "text-to-speech",
+    "openai",
+    "elevenlabs",
+    "deepgram",
+    "gemini",
+    "kokoro",
+    "pi-package"
+  ],
+  "author": {
+    "name": "Paul Robello",
+    "email": "probello@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/paulrobello/par-tts-core-ts#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulrobello/par-tts-core-ts.git"
+  },
+  "pi": {},
+  "time": {
+    "created": "2026-04-27T15:55:04.819Z",
+    "modified": "2026-05-27T05:05:50.842Z",
+    "0.1.0": "2026-04-27T15:55:05.087Z",
+    "0.1.1": "2026-04-27T16:57:46.104Z",
+    "0.1.2": "2026-05-27T05:05:50.535Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

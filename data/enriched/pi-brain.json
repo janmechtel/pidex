@@ -1,0 +1,44 @@
+{
+  "name": "pi-brain",
+  "latest_version": "0.1.7",
+  "description": "Versioned memory extension for the pi coding agent",
+  "readme": "<p align=\"center\">\n  <img src=\"./banner.png\" alt=\"pi-brain banner\" width=\"720\" />\n</p>\n\n# pi-brain\n\nVersioned memory for the [pi coding agent](https://github.com/badlogic/pi-mono). Agents commit decisions and reasoning to a `.memory/` directory, preserving context across sessions, compactions, and model switches.\n\nCredit: This project is my implementation for Pi of this paper [Git Context Controller: Manage the Context of LLM-based Agents like Git](https://arxiv.org/html/2508.00031v1)\n\n## Getting Started\n\n```bash\npi install npm:pi-brain\n```\n\nOpen pi in any project and say \"initialize Brain\" (or run `/skill:brain`). The agent creates `.memory/` and starts remembering.\n\nThat's it. The agent decides when to commit, branch, and merge \u2014 you don't **need** to manage anything. However, you can always prompt the agent to remember something specific if you'd like.\n\n## How It Works\n\nBrain adds five tools and a few lifecycle hooks to pi. The design is simple: the agent works normally, and Brain records what happens in the background.\n\n**Every turn**, Brain appends a structured log entry to `.memory/branches/<branch>/log.md`. This happens automatically via the `turn_end` hook \u2014 the agent doesn't call anything.\n\n**When the agent reaches a milestone**, it calls `memory_commit` with a short summary. Brain spawns a subagent in a fresh context window that reads the raw log, distills it into a structured commit (decisions, rationale, what was tried and rejected), and appends it to `commits.md`. The log is then cleared.\n\n**Each commit is self-contained.** It includes a rolling summary of all prior commits, so the latest commit always tells the full branch story. A new session can read one commit and know everything.\n\n**Branching and merging** work like you'd expect. The agent branches to explore alternatives without contaminating the main line, then merges conclusions back with a synthesis.\n\n### The Five Tools\n\n| Tool            | What it does                                                     |\n| --------------- | ---------------------------------------------------------------- |\n| `memory_status` | Quick status overview \u2014 active branch, latest commit, turn count |\n| `memory_commit` | Checkpoint a milestone (subagent distills the log)               |\n| `memory_branch` | Create a branch for exploration                                  |\n| `memory_switch` | Switch between branches                                          |\n| `memory_merge`  | Merge insights from one branch into another                      |\n\nFor deep retrieval, the agent uses pi's built-in `read` tool on `.memory/` files directly. No special API needed.\n\n## Prompt Cache Safety\n\nLLM providers cache the prefix of each request. If the prefix changes between turns, the cache misses and you pay full latency and cost. Many memory systems break this by injecting dynamic state into the system prompt.\n\nBrain avoids this entirely:\n\n- **Static AGENTS.md** \u2014 Written once at init, never updated. No branch names, no commit counts, no dynamic state. The system prompt prefix stays identical across every turn and session.\n- **No per-turn prompt mutation** \u2014 Brain does not rewrite `systemPrompt` between turns. Status context is appended as message content, keeping the cached prefix stable.\n- **Fixed tool definitions** \u2014 Tool schemas are static at startup. No tools are added or removed mid-conversation.\n- **Subagent isolation** \u2014 Commit distillation runs in a separate API call with its own cache. The main agent's cache is never touched.\n- **Regression-tested safety** \u2014 Prompt-cache safety invariants are covered in `src/cache-safety.test.ts` (property tests for append-only prompt behavior, lifecycle-gated status injection, and deterministic status rendering).\n\nThe result: Brain adds zero overhead to your prompt cache hit rate.\n\n## What Gets Created\n\n```\n.memory/\n\u251c\u2500\u2500 AGENTS.md                      # Protocol reference\n\u251c\u2500\u2500 main.md                        # Project roadmap (agent-authored)\n\u251c\u2500\u2500 state.yaml                     # Active branch, session tracking\n\u2514\u2500\u2500 branches/\n    \u2514\u2500\u2500 main/\n        \u251c\u2500\u2500 commits.md             # Distilled milestone snapshots\n        \u251c\u2500\u2500 log.md                 # Raw turn log (gitignored)\n        \u2514\u2500\u2500 metadata.yaml          # Structured context\n```\n\nEverything in `.memory/` is tracked in git except `log.md` (transient working state). This means memory is shared across machines and team members.\n\n## Install Options\n\n```bash\n# From npm (recommended)\npi install npm:pi-brain\n\n# From git (latest)\npi install git:github.com/Whamp/pi-brain\n\n# Pinned version (npm)\npi install npm:pi-brain@0.1.0\n\n# Pinned version (git)\npi install git:github.com/Whamp/pi-brain@v0.1.0\n\n# Project-local (shared via .pi/settings.json)\npi install -l npm:pi-brain\n\n# Try without installing\npi -e npm:pi-brain\n```\n\n## Development\n\n```bash\ngit clone https://github.com/Whamp/pi-brain.git\ncd pi-brain\npnpm install --prod=false\npnpm run check               # lint + typecheck + format + tests + deadcode + secrets\n\npi -e ./src/index.ts          # run pi with extension loaded from source\n```\n\n| Command            | Purpose         |\n| ------------------ | --------------- |\n| `pnpm run check`   | Full validation |\n| `pnpm run test`    | Tests only      |\n| `pnpm run release` | Bump, tag, push |\n\n## License\n\nMIT\n",
+  "keywords": [
+    "agent-memory",
+    "brain",
+    "context",
+    "memory",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/Whamp/pi-brain#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Whamp/pi-brain.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-02-27T21:13:07.021Z",
+    "modified": "2026-03-01T18:45:27.475Z",
+    "0.1.1": "2026-02-27T21:13:07.185Z",
+    "0.1.2": "2026-02-27T21:16:59.378Z",
+    "0.1.4": "2026-02-28T17:38:23.331Z",
+    "0.1.5": "2026-02-28T22:47:33.028Z",
+    "0.1.6": "2026-03-01T18:15:06.993Z",
+    "0.1.7": "2026-03-01T18:45:27.355Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,42 @@
+{
+  "name": "@claaslange/pi-progress-bar",
+  "latest_version": "1.0.0",
+  "description": "Native terminal progress indicator support for pi via OSC 9;4",
+  "readme": "# @claaslange/pi-progress-bar\n\nA small [pi](https://pi.dev) package that emits terminal progress updates via `OSC 9;4`.\n\n## Why this package exists\n\nThis package was inspired by [HazAT/pi-ghostty](https://github.com/HazAT/pi-ghostty).\n\nThat extension combines terminal titles and progress indicators in one package. For this package, we wanted to split those concerns on purpose:\n\n- progress updates should be usable on their own\n- terminal title behavior should stay configurable elsewhere\n- users should be able to combine this with their own title workflow or another title-focused extension\n\nSo `@claaslange/pi-progress-bar` only handles `OSC 9;4` progress signaling and intentionally leaves terminal titles untouched.\n\n## Behavior\n\n- \ud83d\udd35 Indeterminate pulse while the agent is thinking or running tools\n- \ud83d\udd34 Red error state when a tool finishes with an error\n- \ud83d\udd35 Error state resets back to indeterminate progress after the next non-error tool completion\n- \ud83d\udfe2 Green 100% completion flash when the agent finishes cleanly\n- Clears the progress indicator on shutdown\n- Does **not** modify the terminal title\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:@claaslange/pi-progress-bar\n```\n\nFrom GitHub:\n\n```bash\npi install git:github.com/claaslange/pi-progress-bar\n```\n\nFrom a local checkout:\n\n```bash\npi install /absolute/path/to/pi-progress-bar\n```\n\nOr run it directly without installing:\n\n```bash\npi -e /absolute/path/to/pi-progress-bar\n```\n\n## Compatibility and detection\n\nThis extension uses an optimistic runtime check before writing `OSC 9;4` sequences.\n\nFor local testing, you can force it on with:\n\n```bash\nPI_PROGRESS_BAR_FORCE=1 pi -e /absolute/path/to/pi-progress-bar\n```\n\nIf you want to disable it even in a supported terminal, use:\n\n```bash\nPI_PROGRESS_BAR_DISABLE=1 pi -e /absolute/path/to/pi-progress-bar\n```\n\nAt the moment that includes common terminal markers for Ghostty, WezTerm, iTerm, Windows Terminal, ConEmu, and tmux passthrough.\n\nA good reference for terminal compatibility and detection is the tracking work in [jdx/mise#7485](https://github.com/jdx/mise/pull/7485).\n\n## How it works\n\nThe extension listens to pi lifecycle events and writes `OSC 9;4` sequences directly to `/dev/tty`:\n\n| Pi event | Action |\n| --- | --- |\n| `agent_start` | start indeterminate progress |\n| `tool_execution_end` / `tool_result` with `isError: true` | show red error state |\n| `tool_execution_end` / `tool_result` with `isError: false` after an error | switch back to indeterminate progress |\n| `agent_end` | flash green 100% completion, then clear if no error is active; otherwise clear |\n| `session_shutdown` | clear progress |\n\nBecause it writes directly to the terminal, it stays out of pi's normal TUI rendering.\n\n## Development\n\nRun a local manual check that exercises busy \u2192 error \u2192 reset \u2192 success:\n\n```bash\nnpm run check\nnpm run test:manual\n```\n\n## Package contents\n\nThis package exposes a single extension entrypoint at `./extensions/index.ts` through the `pi` manifest in `package.json`.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "terminal",
+    "progress",
+    "osc-9-4",
+    "pi-extension",
+    "ghostty",
+    "wezterm",
+    "iterm2"
+  ],
+  "author": {
+    "name": "Claas Lange"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/claaslange/pi-progress-bar#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/claaslange/pi-progress-bar.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-01T14:48:58.029Z",
+    "modified": "2026-06-08T10:02:24.213Z",
+    "0.1.0": "2026-04-01T14:48:58.272Z",
+    "0.1.1": "2026-04-01T14:53:55.687Z",
+    "0.1.2": "2026-04-01T19:08:20.731Z",
+    "0.1.3": "2026-04-08T10:10:12.950Z",
+    "1.0.0": "2026-06-08T10:02:23.938Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 17,
+  "download_trend": []
+}

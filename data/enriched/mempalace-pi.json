@@ -1,0 +1,41 @@
+{
+  "name": "mempalace-pi",
+  "latest_version": "0.2.6",
+  "description": "MemPalace extension package for pi, adding commands, tools, and save reminders for memory workflows.",
+  "readme": "# MemPalace pi extension\n\nA pi package that brings core MemPalace workflows to pi.\n\n## What it adds\n\n- Slash commands:\n  - `/mempalace:help`\n  - `/mempalace:init`\n  - `/mempalace:search <query>`\n  - `/mempalace:mine [path]`\n  - `/mempalace:status`\n  - `/mempalace:doctor` (custom rendered status panel)\n- Agent tools:\n  - `mempalace_instructions` (prefers CLI-backed upstream instructions, falls back to bundled help)\n  - `mempalace_init`\n  - `mempalace_search`\n  - `mempalace_mine`\n  - `mempalace_status`\n- MCP bridge:\n  - starts `python3 -m mempalace.mcp_server` when available\n  - enforces bounded MCP startup and request timeouts so stalled MCP calls fail fast instead of hanging the agent indefinitely\n  - dynamically exposes the MemPalace MCP tool surface to the agent, including write and system tools when the installed server provides them\n  - discovers the same MemPalace tool surface directly from the local Python package so dynamic tools remain available even when the MCP transport is unavailable\n  - synthesizes local fallback responses for MemPalace operator/system tools when the installed package does not expose those controls outside MCP\n  - uses MCP for `mempalace_status` and `mempalace_search` when possible, with CLI fallback; other dynamically surfaced MemPalace tools fall back to the local Python backend when MCP fails\n  - fails gracefully when Python or the `mempalace` Python package is missing, without crashing pi\n  - shows an in-app setup notice when MemPalace cannot start because dependencies are missing\n- Session hooks:\n  - auto-save reminder every 15 non-command user messages using the upstream-style memory filing protocol (`mempalace_diary_write`, `mempalace_add_drawer`, optional `mempalace_kg_add`)\n  - explicit UI toasts when auto-save or pre-compaction checkpoints trigger\n  - if `mempalace_hook_settings` is available, Pi maps `silent_save=true` to silent autosave checkpoints and `desktop_toast` to Pi toast visibility\n  - background auto-ingest on save checkpoints using `MEMPAL_DIR`, current session file directory, or `cwd`\n  - synchronous pre-compaction ingest; if that cannot preserve context, Pi falls back to a one-time blocking save reminder\n\n## Requirements\n\nTo actually use MemPalace features from Pi, you need:\n\n- Python 3.9+\n- the `mempalace` Python package installed in the Python environment visible to `python3`, `python`, or the `mempalace` executable\n\nTypical setup:\n\n```bash\npython3 -m pip install mempalace\n```\n\nIf Python is not installed, or if the `mempalace` Python package is missing:\n\n- pi will still start normally\n- this extension will still load and register its slash commands/tools\n- `mempalace_instructions` will still work because it is bundled in this package\n- backend-dependent tools such as status/search/init/mine will be marked unavailable and will return a friendly setup message instead of crashing pi\n\n## Install in pi\n\n### Local package\n\nFrom the package directory:\n\n```bash\npi install .\n```\n\nOr add the local path to `.pi/settings.json` / `~/.pi/agent/settings.json`.\n\n### From npm\n\n```bash\npi install npm:mempalace-pi\n```\n\n## Usage\n\nAfter installation, restart pi or run `/reload`, then use:\n\n- `/mempalace:help`\n- `/mempalace:init`\n- `/mempalace:status`\n- `/mempalace:doctor`\n- `/mempalace:search auth token rotation`\n- `/mempalace:mine .`\n\nUse `/mempalace:doctor` to see whether CLI/bundled help is available, whether the MCP bridge is connected, whether the MCP circuit breaker is open, whether the local fallback backend is ready, which memory-filing/system tools are reachable, whether recent auto-ingest ran, whether `memories_filed_away` acknowledged a silent checkpoint, whether reconnect was recently needed after CLI writes, which fallback path ran most recently, and which upstream-documented tools are missing from the currently installed MemPalace server.\n\nSee [`docs/claude-plugin-parity.md`](docs/claude-plugin-parity.md) for the current Claude-plugin parity matrix and documented Pi-specific deviations.\n\n## Publish to npm\n\nBefore publishing, confirm the package name is available:\n\n```bash\nnpm view mempalace-pi name\n```\n\nThen publish:\n\n```bash\nnpm publish\n```\n\nPi will discover the package through the `pi` manifest in `package.json`.\n\n## Package structure\n\nThis package now follows a simple library-style layout:\n\n```text\nmempalace-pi/\n  src/\n    index.ts        # pi extension entrypoint\n    commands.ts     # slash commands\n    hooks.ts        # session and compaction hooks\n    renderers.ts    # custom UI renderers\n    runtime.ts      # shared runtime / MCP state\n    tools.ts        # core tool registrations\n    utils.ts        # CLI helpers and shared utilities\n    constants.ts    # package constants\n    mcp-client.ts   # internal MCP bridge helper\n  README.md\n  LICENSE\n  package.json\n```\n\nThis avoids putting helper modules inside an auto-discovered `extensions/` directory, which can cause pi to try loading non-extension files as extension entrypoints, and keeps the package closer to normal library structure best practices.\n\n## Notes\n\nThis extension includes a built-in MCP bridge for `mempalace.mcp_server`, so Pi agents can use the structured MemPalace tool surface when the MCP server is available. For compatibility, the package keeps CLI-backed fallbacks for setup, mining, instructions, and for status/search if MCP cannot be started, and it can execute dynamically surfaced MemPalace tools directly through the local Python package when the MCP transport fails or is unavailable.\n\nOn save checkpoints and pre-compaction, the extension tries to preserve memory by mining the best available target in this order:\n1. `MEMPAL_DIR`\n2. the current Pi session file directory\n3. the current working directory\n\nThat keeps Pi close to the upstream Claude plugin's transcript-aware save behavior, while documenting the remaining Pi-specific hook differences in the parity doc.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "mempalace",
+    "memory",
+    "rag"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/juhas96/mempalace-pi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juhas96/mempalace-pi.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-12T10:10:47.841Z",
+    "modified": "2026-05-15T08:45:02.443Z",
+    "0.1.0": "2026-04-12T10:10:48.134Z",
+    "0.1.1": "2026-04-14T05:21:26.801Z",
+    "0.1.2": "2026-04-15T15:42:43.251Z",
+    "0.2.0": "2026-04-16T06:20:17.621Z",
+    "0.2.1": "2026-04-16T22:55:47.898Z",
+    "0.2.2": "2026-04-17T06:56:56.753Z",
+    "0.2.3": "2026-04-28T19:26:08.337Z",
+    "0.2.5": "2026-04-28T20:26:23.273Z",
+    "0.2.6": "2026-05-15T08:45:02.325Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": null,
+  "download_trend": []
+}

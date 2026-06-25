@@ -1,0 +1,33 @@
+{
+  "name": "pi-searxng-search",
+  "latest_version": "0.1.0",
+  "description": "Local SearXNG web_search tool for pi.",
+  "readme": "# pi-searxng-search\n\nLocal SearXNG-backed `web_search` tool for [pi](https://github.com/earendil-works/pi-coding-agent).\n\nThis package only searches. It returns compact Google-style results with titles, URLs, and snippets.\n\n**Important:** this package does not fetch or extract page contents. For a useful search workflow, install a separate fetch plugin too. [`pi-smart-fetch`](https://www.npmjs.com/package/pi-smart-fetch) is recommended, but any plugin that provides `web_fetch` / `batch_web_fetch` can work.\n\n## Why this exists\n\nMost web search tools for coding agents rely on an API key, hosted account, or vendor-specific search backend such as Brave, Google, or Ollama's account-backed web search.\n\n`pi-searxng-search` is built for a different workflow:\n\n- local-first search through your own SearXNG instance\n- no API key\n- no account signup\n- no hosted search dependency\n- simple search-only behavior\n- clean pairing with whichever `web_fetch` plugin you prefer\n\nThe intended agent workflow is:\n\n1. `web_search` discovers relevant URLs.\n2. `web_fetch` or `batch_web_fetch` reads selected pages as a separate step.\n\n## Install\n\n```sh\npi install npm:pi-searxng-search\n```\n\nRecommended companion fetch plugin:\n\n```sh\npi install npm:pi-smart-fetch\n```\n\nWhy fetch is separate: some users may already have another fetch plugin installed. Keeping fetch separate avoids duplicate `web_fetch` registrations and lets this package stay focused on local SearXNG search.\n\n## Local development install\n\n```sh\npi install ~/github/pi-searxng-search\n```\n\nOr try it for one run:\n\n```sh\npi -e ~/github/pi-searxng-search\n```\n\n## Local SearXNG\n\nA working local SearXNG compose setup is included in [`searxng/`](./searxng/).\n\n```sh\ncd searxng\npodman compose up -d\ncurl 'http://127.0.0.1:8080/search?q=searxng&format=json'\n```\n\nDocker Compose works too:\n\n```sh\ncd searxng\ndocker compose up -d\n```\n\nOfficial SearXNG docs:\n\n- [Container installation](https://docs.searxng.org/admin/installation-docker.html)\n- [settings.yml](https://docs.searxng.org/admin/settings/settings.html)\n- [Search API](https://docs.searxng.org/dev/search_api.html)\n\nJSON output must be enabled in SearXNG. The included config does this with:\n\n```yaml\nsearch:\n  formats:\n    - html\n    - json\n```\n\n## Configuration\n\nBy default, the tool queries:\n\n```text\nhttp://127.0.0.1:8080\n```\n\nIf your SearXNG instance runs somewhere else, set `SEARXNG_URL` before starting pi:\n\n```sh\nexport SEARXNG_URL='http://127.0.0.1:8888'\npi\n```\n\nExamples:\n\n```sh\n# Different local port\nexport SEARXNG_URL='http://127.0.0.1:8888'\n\n# LAN or remote host\nexport SEARXNG_URL='http://192.168.1.50:8080'\n\n# Reverse-proxied HTTPS instance\nexport SEARXNG_URL='https://search.example.com'\n```\n\nThe tool also accepts a per-call `base_url` argument, but `SEARXNG_URL` is the recommended persistent configuration.\n\nIf you use the included compose setup and want to change its local port, copy `.env.example` to `.env` inside `searxng/` and edit `SEARXNG_PORT`:\n\n```sh\ncd searxng\ncp .env.example .env\n$EDITOR .env\npodman compose up -d\n```\n\nExample `searxng/.env`:\n\n```env\nSEARXNG_PORT=8888\nSEARXNG_BASE_URL=http://localhost:8888/\n```\n\nThen configure pi to match:\n\n```sh\nexport SEARXNG_URL='http://127.0.0.1:8888'\n```\n\n### Persist `SEARXNG_URL`\n\nThe `export ...` command above only affects the current terminal session. To make it stick, add it to your shell config.\n\nFor **bash**, add this to `~/.bashrc`:\n\n```sh\necho \"export SEARXNG_URL='http://127.0.0.1:8888'\" >> ~/.bashrc\n```\n\nThen restart your terminal, or run:\n\n```sh\nsource ~/.bashrc\n```\n\nFor **zsh**, add this to `~/.zshrc`:\n\n```sh\necho \"export SEARXNG_URL='http://127.0.0.1:8888'\" >> ~/.zshrc\n```\n\nThen restart your terminal, or run:\n\n```sh\nsource ~/.zshrc\n```\n\nFor **fish**, run:\n\n```fish\nset -Ux SEARXNG_URL 'http://127.0.0.1:8888'\n```\n\nFish stores universal variables automatically, so you do not need to edit a config file.\n\nReplace `http://127.0.0.1:8888` with your actual SearXNG URL.\n\n## Tool\n\nRegisters:\n\n- `web_search`\n\nParameters:\n\n- `query` \u2014 search query\n- `max_results` \u2014 maximum results to return, default `5`, clamped to `1..50`\n- `categories` \u2014 optional comma-separated SearXNG categories\n- `engines` \u2014 optional comma-separated SearXNG engines\n- `language` \u2014 optional language code, for example `en` or `auto`\n- `time_range` \u2014 optional `day`, `month`, or `year`\n- `safesearch` \u2014 optional `0`, `1`, or `2`\n- `page` \u2014 optional page number, default `1`\n- `base_url` \u2014 optional SearXNG base URL\n- `timeout_ms` \u2014 optional request timeout, default `15000`\n\nDefault SearXNG URL resolution:\n\n1. `base_url` tool argument\n2. `SEARXNG_URL` environment variable\n3. `http://127.0.0.1:8080`\n\nExample result format:\n\n```text\nSearch results for: leptos server functions\n\n1. Server Functions - book.leptos.dev\n   URL: https://book.leptos.dev/server/25_server_functions.html\n   Leptos is one of a number of modern frameworks that introduce...\n   google \u00b7 general\n```\n\n## Development\n\n```sh\nnpm install\nnpm run typecheck\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "searxng",
+    "web-search",
+    "local-search"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/alexykn/pi-searxng-search#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/alexykn/pi-searxng-search.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-24T09:12:20.965Z",
+    "0.1.0": "2026-05-24T09:12:21.156Z",
+    "modified": "2026-05-24T09:12:21.341Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 50,
+  "download_trend": []
+}

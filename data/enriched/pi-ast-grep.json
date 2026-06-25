@@ -1,0 +1,32 @@
+{
+  "name": "pi-ast-grep",
+  "latest_version": "0.1.0",
+  "description": "A Pi extension that adds a read-only ast-grep structural search tool.",
+  "readme": "# pi-ast-grep\n\n`pi-ast-grep` is a Pi extension package that adds an `ast_grep` custom tool for syntax-aware structural search.\n\nIt wraps the official `@ast-grep/cli` binary instead of a text grep. This gives Pi a compact, read-only interface to `ast-grep run` and `ast-grep scan` across the languages supported by the ast-grep CLI.\n\n## Features\n\n- Registers one Pi tool: `ast_grep`.\n- Supports ad-hoc structural search with `command: \"run\"` and `pattern` or `kind`.\n- Supports rule/config scanning with `command: \"scan\"` and ast-grep YAML rules or `sgconfig.yml`.\n- Uses argument arrays, not shell command strings.\n- Strips accidental leading `@` from path-like inputs, matching common Pi file-reference behavior.\n- Produces a concise match summary with one-based file locations.\n- Truncates LLM-visible output to Pi's standard limits and writes full output to a temp file when truncated.\n- Read-only in v0: no rewrite, interactive edit, or update-all mode is exposed.\n\n## Installation\n\nFrom npm, once published:\n\n```bash\npi install npm:pi-ast-grep\n```\n\nFrom a local checkout:\n\n```bash\ncd pi-ast-grep\nnpm install\npi -e ./src/index.ts\n```\n\nOr install it as a local Pi package from a parent project:\n\n```bash\npi install ./pi-ast-grep\n```\n\n## Tool parameters\n\n| Parameter | Mode | Description |\n| --- | --- | --- |\n| `command` | both | `\"run\"` or `\"scan\"`. Defaults to `\"run\"`. |\n| `pattern` | run | ast-grep pattern, for example `console.log($A)`. |\n| `kind` | run | AST node kind, for example `call_expression`. Use instead of `pattern`. |\n| `language` | run | Optional ast-grep language, for example `ts`, `tsx`, `js`, `python`, `rust`, `go`. |\n| `paths` | both | Files/directories to search. Defaults to `[\".\"]`. |\n| `globs` | both | Include/exclude patterns passed as repeated `--globs` flags. |\n| `config` | both | Optional `sgconfig.yml` path passed as top-level `--config`. |\n| `rule` | scan | Rule YAML file path passed as `--rule`. |\n| `inlineRules` | scan | Inline YAML passed as `--inline-rules`. |\n| `selector` | run | Optional `--selector` AST kind. |\n| `strictness` | run | `\"cst\"`, `\"smart\"`, `\"ast\"`, `\"relaxed\"`, or `\"signature\"`. |\n| `context` | run | Context lines around each match. Mutually exclusive with `before`/`after`. |\n| `before` / `after` | run | Lines before/after each match. |\n| `json` | both | `\"compact\"` or `\"stream\"`. Defaults to `\"compact\"`. |\n| `maxResults` | both | Maximum matches shown in the summary. Defaults to `200`. |\n| `timeoutMs` | both | Subprocess timeout. Defaults to `30000`. |\n| `includeRaw` | both | Append raw ast-grep JSON. Defaults to `false`. |\n\n## Examples\n\nAsk Pi to search TypeScript call sites structurally:\n\n```text\nUse ast_grep with pattern \"console.log($A)\", language \"ts\", and paths [\"src\"].\n```\n\nEquivalent tool input:\n\n```json\n{\n  \"command\": \"run\",\n  \"pattern\": \"console.log($A)\",\n  \"language\": \"ts\",\n  \"paths\": [\"src\"]\n}\n```\n\nSearch by AST kind:\n\n```json\n{\n  \"command\": \"run\",\n  \"kind\": \"call_expression\",\n  \"language\": \"ts\",\n  \"paths\": [\"src\"],\n  \"maxResults\": 50\n}\n```\n\nScan with a rule file:\n\n```json\n{\n  \"command\": \"scan\",\n  \"rule\": \"rules/no-console.yml\",\n  \"paths\": [\"src\"],\n  \"globs\": [\"*.ts\", \"!*.test.ts\"]\n}\n```\n\nScan using project `sgconfig.yml` discovery:\n\n```json\n{\n  \"command\": \"scan\",\n  \"paths\": [\".\"]\n}\n```\n\n## Blocking behavior\n\n`ast_grep` is a normal Pi custom tool call:\n\n- Pi waits for the ast-grep subprocess to finish before the tool result is finalized.\n- The tool honors Pi cancellation through `AbortSignal` and also enforces `timeoutMs`.\n- The extension does **not** register a permission gate or block other Pi tools.\n- The extension is read-only; it does not apply rewrites or mutate repository files.\n\nIf you meant \"blocking\" as in a permission/safety gate, that is intentionally out of scope for v0. Pair this extension with a permission/sandbox package if you need enforcement around later edit/write/bash operations.\n\n## Blockers and limitations\n\nKnown blockers for v0 are tracked in [`docs/BLOCKERS.md`](docs/BLOCKERS.md).\n\nImportant limitations:\n\n- Native binary availability depends on `@ast-grep/cli` installing correctly for the user's platform.\n- Very large result sets may hit the subprocess capture limit, Pi truncation, or `timeoutMs`.\n- This tool intentionally does not expose ast-grep rewrite/apply flags.\n- JSON output shape is owned by ast-grep CLI and may change across ast-grep versions; this package pins `@ast-grep/cli` to `0.43.0`.\n- Language support and pattern syntax are exactly the ast-grep CLI behavior, not custom Pi behavior.\n\n## Development\n\n```bash\nnpm install\nnpm run check\nnpm pack --dry-run\n```\n\nSmoke-test the extension in Pi:\n\n```bash\npi -e ./src/index.ts\n```\n\nThen ask Pi to use `ast_grep` against `test/fixtures` or another small project.\n\n## Project structure\n\n```text\npi-ast-grep/\n  src/\n    index.ts    # Pi extension entrypoint and tool registration\n    schema.ts   # TypeBox schema, input normalization, validation\n    cli.ts      # ast-grep binary resolution, argv construction, process execution\n    output.ts   # JSON parsing, match summary, truncation, temp output files\n  test/         # Node test runner tests\n  docs/         # English project notes and blockers\n```\n\n## Security notes\n\nThe tool runs the bundled `ast-grep` binary with explicit argv arrays. It does not concatenate user input into a shell command. It is read-only by design, but it can still read files reachable from the Pi working directory and any paths supplied by the model.\n\nReview third-party Pi packages before installing them. Pi extensions run with your user permissions.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "ast-grep",
+    "structural-search",
+    "codemod"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-15T03:31:17.452Z",
+    "0.1.0": "2026-06-15T03:31:17.624Z",
+    "modified": "2026-06-15T03:31:17.816Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 22,
+  "download_trend": []
+}

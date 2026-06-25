@@ -1,0 +1,39 @@
+{
+  "name": "pi-context-zone",
+  "latest_version": "0.1.1",
+  "description": "Visual context health bar for the Pi coding agent \u2014 see your smart/warm/dumb zone at a glance",
+  "readme": "# pi-context-zone \ud83e\udde0\u26a0\ufe0f\ud83e\udddf\n\n**Visual context health bar for the [Pi coding agent](https://github.com/badlogic/pi-mono) \u2014 see your smart/warm/dumb zone at a glance.**\n\nInspired by [Dex Horthy's \"No Vibes Allowed\"](https://www.youtube.com/watch?v=rmvDxxNubIg) talk and the concept of **context rot** in AI coding agents.\n\n```\n\ud83e\udde0 \u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2502\u2591\u2591\u2591\u2591\u2591\u2502\u2591\u2591\u2591\u2591\u2591 smart 36% left\n```\n\n## Install\n\n```bash\npi install npm:pi-context-zone\n```\n\nOr load directly:\n\n```bash\npi -e ./index.ts\n```\n\n## What It Does\n\nAdds a single visual status line to your Pi footer showing:\n\n- **Progress bar** with zone dividers at 40% and 70%\n- **Color gradient** \u2014 green \u2192 yellow \u2192 red as context fills\n- **Zone label** \u2014 which zone you're in (smart / warm / dumb)\n- **Remaining %** \u2014 how much room before the next zone\n\nUpdates automatically after each turn, compaction, and session start.\n\n## Why This Matters\n\n### The Context Rot Problem\n\nLLMs don't degrade gracefully as their context fills up \u2014 they hit cliffs. This isn't about forgetting a fact buried in the middle (needle-in-a-haystack); it's about **reasoning quality collapse**. The model starts cutting corners, ignoring instructions, repeating mistakes, and hallucinating with full confidence.\n\nDex Horthy (HumanLayer) coined the term **\"Dumb Zone\"** after analyzing 100,000+ developer sessions. His framework identifies ~40% context utilization as the inflection point where AI coding agents transition from sharp, capable assistants to confused, error-prone machines.\n\n### The Zones\n\n| Zone | Context Used | What Happens |\n|---|---|---|\n| \ud83e\udde0 **Smart** | 0 \u2013 40% | Peak reasoning. Follows instructions, catches edge cases, accurate tool selection. |\n| \u26a0\ufe0f **Warm** | 40 \u2013 70% | Degrading. F1 scores drop ~45%. Instruction drift, shallow pattern matching, starts relying on pre-training over your actual context. |\n| \ud83e\udddf **Dumb** | 70%+ | Broken. Hallucination rates spike to 40%. Infinite debug loops. Confidently wrong. Auto-compaction triggers here but it's lossy. |\n\n### How Models Actually Perform (March 2026)\n\nThe \"dumb zone\" threshold varies by model. Here's how current frontier models handle long context on the MRCR v2 (8-needle) benchmark \u2014 the gold standard for measuring **reasoning quality** (not just retrieval) across context lengths:\n\n| Model | Context Window | MRCR @ 128K | MRCR @ 256K | MRCR @ 1M | Smart Zone Ends |\n|---|---|---|---|---|---|\n| Claude Opus 4.6 | 1M | ~94% | 93% | **78%** | ~70% (most resilient) |\n| Claude Sonnet 4.6 | 1M | \u2014 | \u2014 | 65% | ~50-60% |\n| GPT-5.4 | 1M | 86% | 79% | 37% | ~30-40% |\n| Gemini 3.1 Pro | 2M | 85% | ~50% | 26% | ~25-30% |\n| MiniMax M2.1 | 1M | ~73% | \u2014 | ~32% | ~30-40% |\n| Grok 3 | 1M | \u2014 | \u2014 | \u2014 | ~50% (severe distractor susceptibility) |\n| DeepSeek V3 | 128K | **95%** | N/A | N/A | Near 100% (within its window) |\n| Llama 4 Scout | 10M | \u2014 | \u2014 | \u2014 | Unknown (no MRCR published) |\n\n> **Key insight**: Claude Opus 4.6's Context Compaction architecture genuinely resists context rot better than any other model \u2014 it maintains 78% reasoning accuracy at 1M tokens where GPT-5.4 drops to 37% and Gemini 3.1 to 26%. But even Opus degrades. The 40% rule is conservative and works well as a universal default.\n\n### What Causes Context Rot\n\n1. **Attention dilution** \u2014 Transformer attention is a fixed budget. More tokens = less focus per token.\n2. **Lost in the middle** \u2014 Models remember the beginning and end of context but forget the middle (U-shaped curve).\n3. **Trajectory poison** \u2014 Your conversation history is full of the model's own mistakes and your corrections. The model learns to predict more mistakes.\n4. **KV cache compression** \u2014 At high utilization, models compress older context, losing the \"why\" behind decisions.\n\n### What To Do About It\n\nWhen the bar turns yellow or red:\n\n1. **Compact** \u2014 Use `/compact` or let auto-compaction handle it\n2. **New session** \u2014 Start fresh with a clean context (RPI workflow: Research \u2192 Plan \u2192 Implement)\n3. **Sub-agents** \u2014 Delegate heavy exploration to isolated contexts\n\nThis extension simply makes the problem **visible** so you can act before quality degrades.\n\n## Configuration\n\nThe extension uses sensible defaults based on the research:\n\n| Setting | Value | Rationale |\n|---|---|---|\n| Smart \u2192 Warm | 40% | Dex Horthy's inflection point, validated across models |\n| Warm \u2192 Dumb | 70% | Where hallucination rates spike and auto-compaction triggers |\n| Bar width | 20 chars | Fits comfortably in most terminal widths |\n\nThese thresholds are intentionally model-agnostic. While Claude Opus 4.6 can push further into the warm zone without degrading, the 40% threshold is the safe universal default that works across all providers.\n\n## References\n\n- **\"No Vibes Allowed: Solving Hard Problems in Complex Codebases\"** \u2014 Dex Horthy, AI Engineer 2025 ([YouTube](https://www.youtube.com/watch?v=rmvDxxNubIg))\n- **Context Rot: How Increasing Input Tokens Impacts LLM Performance** \u2014 Chroma Research, 2025\n- **MRCR v2 (8-needle) benchmark** \u2014 Multi-Round Coreference Resolution, the gold standard for long-context reasoning evaluation\n- **\"Lost in the Middle\"** \u2014 Stanford, 2023 \u2014 U-shaped retrieval accuracy in long-context LLMs\n- **Claude Opus 4.6 technical report** \u2014 Anthropic, Feb 2026 \u2014 Context Compaction architecture\n- **12-Factor Agents** \u2014 Dex Horthy / HumanLayer \u2014 Framework for building reliable AI agents\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "pi-package",
+    "context",
+    "compaction",
+    "zone",
+    "visual"
+  ],
+  "author": {
+    "name": "arpagon"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/arpagon/pi-context-zone",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arpagon/pi-context-zone.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-27T04:39:53.510Z",
+    "modified": "2026-03-27T04:46:17.463Z",
+    "0.1.0": "2026-03-27T04:39:53.645Z",
+    "0.1.1": "2026-03-27T04:46:17.170Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 18,
+  "download_trend": []
+}

@@ -1,0 +1,47 @@
+{
+  "name": "@fractary/pi-claude-code",
+  "latest_version": "1.0.3",
+  "description": "Pi extensions that shim Claude Code's tool API, letting agents, skills, and prompts built for Claude Code run in pi without modification.",
+  "readme": "# pi-claude-code\n\nPi extensions that shim Claude Code's tool API, letting agents, skills, and commands built for Claude Code run inside [pi](https://shittycodingagent.ai) without modification.\n\n## Background\n\nI had invested a lot of time building agents, skills, and workflow commands inside Claude Code. When I discovered [pi](https://shittycodingagent.ai) and its advantages as an agent harness \u2014 better session management, branching, extensibility, multi-provider support \u2014 I wanted to switch. But I didn't want to throw away everything I had built.\n\nThe good news: the two systems are structurally very similar. Both have the concept of agents, skills, and commands. Skills are essentially a 1:1 mapping. The main friction point was the **tool API** \u2014 Claude Code exposes a specific set of named tools (`Grep`, `Glob`, `TaskCreate`, `WebFetch`, etc.) and my agents called those by name. Pi has equivalent capabilities but uses different tool names or different conventions.\n\nRather than rewriting all my agents to call pi's tools, I shimmed Claude Code's tool names as pi extensions. With those shims in place, every agent, skill, and command I had built continued to work unchanged \u2014 they still called `Grep(...)` and `TaskCreate(...)` and `WebFetch(...)`, and pi now knew what to do with those calls.\n\n**The goal was not to replicate Claude Code inside pi.** It was to make the tools that Claude Code agents expect to exist actually exist in pi, so the agents could run without modification. A thin compatibility layer, not a full reimplementation.\n\nThis package is the result of that work, extracted and generalized so others can do the same thing.\n\n## What's included\n\n| Tool | Extension | Description |\n|------|-----------|-------------|\n| `Grep` | `Grep.ts` | Pattern search in files \u2192 ripgrep / grep fallback |\n| `Glob` | `Glob.ts` | Find files by glob pattern \u2192 rg --files / find fallback |\n| `LS` | `LS.ts` | List directory contents \u2192 ls -la |\n| `AskUserQuestion` | `AskUserQuestion.ts` | Interactive choice picker with free-text fallback |\n| `todo` | `Task.ts` | pi-native task list (add / toggle / list / clear) |\n| `TodoWrite` | `Task.ts` | Replace entire task list (CC non-interactive mode) |\n| `TodoRead` | `Task.ts` | Read task list in CC JSON format |\n| `TaskCreate` | `Task.ts` | Create a task, returns `{ taskId }` |\n| `TaskUpdate` | `Task.ts` | Update task status / subject by taskId |\n| `TaskList` | `Task.ts` | List all tasks as `Array<{ id, subject, status, metadata }>` |\n| `TaskGet` | `Task.ts` | Get full details for one task |\n| `TaskStop` | `Task.ts` | Stop/cancel a task |\n| `WebFetch` | `WebFetch.ts` | Fetch URL as clean markdown (Jina Reader, no API key needed) |\n| `WebSearch` | `WebSearch.ts` | Web search via Brave Search API (requires `BRAVE_API_KEY`) |\n| `Skill` | `Skill.ts` | Execute a pi skill by name \u2014 loads SKILL.md, returns content |\n| `EnterPlanMode` | `PlanMode.ts` | Enter read-only analysis mode |\n| `ExitPlanMode` | `PlanMode.ts` | Present plan for user approval, restore full tools |\n| `Agent` | `Agent.ts` | Delegate to a pi agent by name (requires `pi-subagents`) |\n\n**Slash commands:** `/todos`, `/tasks` (task list viewer) \u00b7 `/plan` (toggle plan mode)  \n**Keyboard:** `Ctrl+Alt+P` toggles plan mode\n\n## Install\n\n```bash\n# Global install \u2014 available in all projects\npi install npm:@fractary/pi-claude-code\n\n# Project-only install\npi install -l npm:@fractary/pi-claude-code\n```\n\nOr pin to a specific version:\n\n```bash\npi install npm:@fractary/pi-claude-code@1.0.0\n```\n\n### Optional dependencies\n\n**`WebSearch`** requires a Brave Search API key (free tier):\n```bash\nexport BRAVE_API_KEY=\"your-key-here\"   # add to ~/.profile or ~/.zprofile\n```\n\n**`Agent`** requires [pi-subagents](https://github.com/nicobailon/pi-subagents):\n```bash\npi install npm:pi-subagents\n```\n\nBoth tools load and register cleanly without their dependencies \u2014 they only return a setup message when actually invoked.\n\n## Selective loading\n\nEach extension is a separate file, so you can load only what you need using pi's [package filtering](https://shittycodingagent.ai/docs/packages#package-filtering):\n\n```json\n{\n  \"packages\": [{\n    \"source\": \"npm:@fractary/pi-claude-code\",\n    \"extensions\": [\"!extensions/Agent.ts\"]\n  }]\n}\n```\n\nCommon patterns:\n\n| Goal | Filter |\n|------|--------|\n| Everything except Agent shim | `[\"!extensions/Agent.ts\"]` |\n| Task management only | `[\"extensions/Task.ts\"]` |\n| Filesystem tools only | `[\"extensions/Grep.ts\", \"extensions/Glob.ts\", \"extensions/LS.ts\"]` |\n| Plan mode only | `[\"extensions/PlanMode.ts\"]` |\n\n## Documentation\n\n- **[Converting Claude Code plugins to pi packages](docs/converting-claude-plugins.md)** \u2014 how to add a `pi` section to `package.json` to map skills, commands, extensions, and agents (`pi.agents` is handled automatically by `Agent.ts`); covers single plugins and monorepos\n- **[Migrating from Claude Code](docs/migrating-from-claude-code.md)** \u2014 how to structure agents, skills, and commands so they work in both harnesses; naming conventions and the namespace problem\n- **[Filesystem tools](docs/filesystem-tools.md)** \u2014 Grep, Glob, LS vs pi's built-in grep / find / ls; differences and tips\n- **[Task management](docs/task-management.md)** \u2014 TodoWrite vs TaskCreate; how shared state works; the /todos and /tasks commands\n- **[Web tools](docs/web-tools.md)** \u2014 WebFetch via Jina Reader; WebSearch via Brave API; setup and differences from Claude Code\n- **[Plan mode](docs/plan-mode.md)** \u2014 EnterPlanMode / ExitPlanMode tools; /plan command; differences from Claude Code's plan mode\n\n## Contributing\n\nWhen adding a new Claude Code tool shim:\n\n1. Create `extensions/ToolName.ts` \u2014 file name must match the Claude Code tool name exactly\n2. Match the parameter schema from the [Claude Code tools reference](https://docs.anthropic.com/en/docs/claude-code/tools-reference)\n3. Store a full state snapshot in `details{}` for stateful tools (see `Task.ts` for the pattern)\n4. Add the file to `pi.extensions` in `package.json`\n5. Add a row to the tools table in this README\n6. Bump the minor version and add a CHANGELOG entry\n\n**Staying in sync:** Each extension file has a `Derived from:` and `On Claude Code update:` header comment pointing to the relevant schema source. When Claude Code updates a tool signature, update the corresponding extension and bump the version.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "claude-code",
+    "compatibility",
+    "shim"
+  ],
+  "author": {
+    "name": "Fractary"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/fractary/pi-claude-code#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fractary/pi-claude-code.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/Grep.ts",
+      "./extensions/Glob.ts",
+      "./extensions/LS.ts",
+      "./extensions/AskUserQuestion.ts",
+      "./extensions/Task.ts",
+      "./extensions/WebFetch.ts",
+      "./extensions/WebSearch.ts",
+      "./extensions/Skill.ts",
+      "./extensions/PlanMode.ts",
+      "./extensions/Agent.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-27T23:27:41.663Z",
+    "modified": "2026-03-30T14:14:11.698Z",
+    "1.0.0": "2026-03-27T23:27:41.864Z",
+    "1.0.2": "2026-03-29T02:30:24.077Z",
+    "1.0.3": "2026-03-30T14:14:11.579Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 36,
+  "download_trend": []
+}

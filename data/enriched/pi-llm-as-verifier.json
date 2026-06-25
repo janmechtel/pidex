@@ -1,0 +1,40 @@
+{
+  "name": "pi-llm-as-verifier",
+  "latest_version": "0.2.2",
+  "description": "Pi skill + extension for llm-as-verifier style pairwise, repeated, criteria-decomposed candidate selection.",
+  "readme": "# pi-llm-as-verifier\n\nPi package for `llm-as-verifier` style selection and auditing.\n\nIt bundles:\n- a Pi skill: `llm-as-verifier`\n- a Pi extension tool: `llm_as_verifier`\n- reusable prompt templates for common verifier workflows\n\n## Install\n\n```bash\npi install npm:pi-llm-as-verifier\n```\n\nOr test without installing globally:\n\n```bash\npi -e npm:pi-llm-as-verifier\n```\n\n## What it does\n\nThis package helps Pi choose among multiple candidate artifacts using:\n- pairwise comparison\n- criteria decomposition\n- repeated verification\n- round-robin winner selection\n\nIt supports three backends:\n- `gemini-python` - Python runner inspired by the upstream paper/repo\n- `zai-coding-plan` - single ZAI model through Pi's model registry\n- `pi-model-ensemble` - multiple Pi models rotated across repeated attempts\n\n## Tool usage\n\nUse the `llm_as_verifier` tool with:\n- `task`\n- `candidates`\n- `criteria`\n- optional `context`\n- optional `evidencePaths`\n- optional `outputPath`\n\n### Multi-model repeated attempts\n\nFor mixed-model verification, use:\n- `backend: \"pi-model-ensemble\"`\n- `models: [\"openai:gpt-5.4\", \"google:gemini-2.5-flash\", \"minimax:MiniMax-M2.7-highspeed\"]`\n\nIf `nVerifications` is omitted in ensemble mode, it defaults to the number of configured verifier models so each model gets one pass.\n\n### Weighted voting by model\n\nFor ensemble runs, you can bias some verifier models more strongly:\n\n```json\n{\n  \"backend\": \"pi-model-ensemble\",\n  \"models\": [\n    \"openai:gpt-5.4\",\n    \"google:gemini-2.5-flash\",\n    \"minimax:MiniMax-M2.7-highspeed\"\n  ],\n  \"modelWeights\": [\n    { \"model\": \"openai:gpt-5.4\", \"weight\": 1.5 },\n    { \"model\": \"google:gemini-2.5-flash\", \"weight\": 1.0 },\n    { \"model\": \"minimax:MiniMax-M2.7-highspeed\", \"weight\": 0.8 }\n  ]\n}\n```\n\n### Confidence reporting\n\nEnsemble and ZAI-backed runs now return richer breakdowns in `details`, including:\n- criterion confidence\n- pairwise confidence\n- disagreement scores\n- per-model breakdowns\n- weighted model metadata\n\n### Example\n\n```json\n{\n  \"backend\": \"pi-model-ensemble\",\n  \"task\": \"Choose the strongest patch for the bug fix.\",\n  \"models\": [\n    \"openai:gpt-5.4\",\n    \"google:gemini-2.5-flash\",\n    \"minimax:MiniMax-M2.7-highspeed\"\n  ],\n  \"modelWeights\": [\n    { \"model\": \"openai:gpt-5.4\", \"weight\": 1.3 },\n    { \"model\": \"google:gemini-2.5-flash\", \"weight\": 1.0 },\n    { \"model\": \"minimax:MiniMax-M2.7-highspeed\", \"weight\": 0.9 }\n  ],\n  \"candidates\": [\n    {\n      \"id\": \"patch-a\",\n      \"content\": \"...\"\n    },\n    {\n      \"id\": \"patch-b\",\n      \"content\": \"...\"\n    }\n  ],\n  \"criteria\": [\n    {\n      \"name\": \"Correctness\",\n      \"description\": \"Check whether the patch directly fixes the requested behavior.\"\n    },\n    {\n      \"name\": \"Requirements adherence\",\n      \"description\": \"Check whether exact task constraints are satisfied.\"\n    },\n    {\n      \"name\": \"Empirical verification\",\n      \"description\": \"Check whether the candidate is supported by concrete test or runtime evidence.\"\n    }\n  ]\n}\n```\n\n## Prompt templates\n\nThis package also ships prompt templates:\n- `/compare-patches`\n- `/audit-candidate`\n- `/ensemble-verifier`\n\nThese expand into ready-made instructions for common verifier workflows.\n\n## Auth and setup\n\n### Gemini Python backend\n\nInstall:\n\n```bash\npip install google-genai\n```\n\nProvide one of:\n- `GEMINI_API_KEY`\n- `GOOGLE_API_KEY`\n- `VERTEX_API_KEY`\n\n### Pi registry backends\n\nFor `zai-coding-plan` and `pi-model-ensemble`, configure model auth in Pi for whichever providers you want to use.\n\n## Smoke tests\n\nPython-runner smoke test:\n\n```bash\n/lav-smoke\n```\n\nWeighted ensemble smoke test:\n\n```bash\n/lav-ensemble-smoke\n```\n\n## Package contents\n\n- `.pi/extensions/llm-as-verifier/index.ts`\n- `.agents/skills/llm-as-verifier/SKILL.md`\n- `.agents/skills/llm-as-verifier/scripts/lav_runner.py`\n- `.agents/skills/llm-as-verifier/examples/code-patch-selection.json`\n- `.agents/skills/llm-as-verifier/examples/weighted-ensemble-selection.json`\n- `prompts/*.md`\n- bundled references and examples\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "verifier",
+    "llm-as-a-verifier",
+    "evaluation",
+    "ranking"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./.pi/extensions"
+    ],
+    "skills": [
+      "./.agents/skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-15T07:31:22.484Z",
+    "modified": "2026-04-15T08:45:42.385Z",
+    "0.1.0": "2026-04-15T07:31:22.848Z",
+    "0.2.0": "2026-04-15T07:44:39.671Z",
+    "0.2.1": "2026-04-15T08:30:41.640Z",
+    "0.2.2": "2026-04-15T08:45:42.265Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": null,
+  "download_trend": []
+}

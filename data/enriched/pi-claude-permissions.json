@@ -1,0 +1,41 @@
+{
+  "name": "pi-claude-permissions",
+  "latest_version": "0.3.1",
+  "description": "Claude-style allow/deny/ask permission lists for Pi tool calls",
+  "readme": "# pi-claude-permissions\n\nClaude-style allow/deny/ask lists for Pi tool calls.\n\nStandalone repo. Runtime gate only. Built to coexist with `pi-lazy-tools`.\n\nDesign tuned after studying `claw-code` permission flow:\n- `deny` wins over `ask`, `ask` wins over `allow`\n- session rules override project rules override global rules\n- `ask` falls back to block in non-interactive mode\n\nBuilt to work with `pi-lazy-tools`:\n- does **not** touch `setActiveTools`\n- does **not** replace `tool_search`\n- does not include `tool_search` defaults because it belongs to user-installed tool-search extensions\n\n## Install\n\n```bash\npi install /absolute/path/to/pi-claude-permissions\n```\n\nOr load without installing:\n\n```bash\npi -e /absolute/path/to/pi-claude-permissions/extensions/index.ts\n```\n\n## Behavior\n\n- intercepts `tool_call`\n- evaluates rules in this order:\n  1. session rules\n  2. project config: `.pi/tool-permissions.json`\n  3. global config: `~/.pi/agent/tool-permissions.json`\n  4. fallback `defaultAction`\n- source precedence: project overrides global\n- action precedence inside each source: `deny` \u2192 `ask` \u2192 `allow`\n- no extension-specific built-in allow rules\n- default fallback: `allow`\n\n## Rule format\n\nEach rule is string pattern:\n\n- `tool_name` \u2192 match all calls for tool\n- `tool_name:target-pattern` \u2192 match tool + target\n- `*` \u2192 match any tool\n- `*:target-pattern` \u2192 match any tool with target\n\nWildcard `*` supported.\n\n### Targets by tool\n\n- `bash` \u2192 command string\n  - for matching, extension also normalizes known RTK rewrites like `RTK_DB_PATH=... rtk git push` back to `git push`\n  - user `!` / `!!` bash commands are not affected; extension only gates agent tool calls\n- `read` / `write` / `edit` \u2192 `path`\n- `mcp` \u2192 tool name if `input.tool` exists, else forms like `connect:github`, `search:foo`, `describe:bar`\n- other tools \u2192 compact JSON of input\n\n## Example config\n\nProject file: `.pi/tool-permissions.json`\n\nGlobal file: `$(getAgentDir)/tool-permissions.json` in Pi terms, usually `~/.pi/agent/tool-permissions.json`\n\n```json\n{\n  \"defaultAction\": \"allow\",\n  \"allow\": [\n    \"read:*\",\n    \"ls\",\n    \"grep\",\n    \"find\",\n    \"bash:git status*\",\n    \"bash:git diff*\"\n  ],\n  \"ask\": [\n    \"write:*\",\n    \"edit:*\",\n    \"bash:*\",\n    \"mcp:*\"\n  ],\n  \"deny\": [\n    \"bash:rm -rf*\",\n    \"bash:sudo *\",\n    \"write:.env*\",\n    \"edit:.env*\"\n  ]\n}\n```\n\n## Interactive choices\n\nWhen rule says `ask`, extension prompts with:\n\n- Allow once\n- Allow for session\n- Allow for project\n- Allow globally\n- Deny for session\n- Deny for project\n- Deny globally\n- Cancel\n\nSession decisions live only in memory. Project/global decisions append rule to config file.\n\n## Commands\n\n- `/permissions` \u2014 show active config summary + paths\n- `/permissions:on` \u2014 enable permission checks for current session\n- `/permissions:off` \u2014 disable permission checks for current session\n- `/permissions:ask` \u2014 set fallback mode to ask for current session\n- `/permissions:allow` \u2014 set fallback mode to allow for current session\n- `/permissions:deny` \u2014 set fallback mode to deny for current session\n- `/permissions:init` \u2014 create starter project config at `.pi/tool-permissions.json`\n- `/permissions:init force` \u2014 overwrite project config with starter config\n- `/permissions:help` \u2014 show rule help and config example\n\nArgument-style aliases also work: `/permissions on`, `/permissions off`, `/permissions mode ask`, `/permissions init`, `/permissions help`.\n\n## Footer status\n\nExtension writes footer status via `ctx.ui.setStatus(\"claude-permissions\", ...)` unless disabled in config:\n\n```json\n{\n  \"footerStatus\": false\n}\n```\n\n- `permissions:on` \u2014 checks enabled\n- `permissions:off` \u2014 checks disabled for current session\n\n## Notes\n\n- In non-interactive mode, `ask` becomes block.\n- File rules match both raw path and resolved absolute path.\n- Bash rules match normalized command candidates so common wrappers like RTK git rewrites still hit intended rules.\n- This extension only gates agent tool calls, not user `!` / `!!` shell commands.\n- Default behavior is broad allow with targeted prompts: `defaultAction: \"allow\"` plus `ask` / `deny` lists.\n- If you want stricter Claude-like behavior, set `defaultAction: \"ask\"` and grow `allow` / `deny` over time.\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "permissions",
+    "claude",
+    "allowlist",
+    "denylist",
+    "ask"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/tuansondinh/pi-claude-permissions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tuansondinh/pi-claude-permissions.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-23T10:24:03.119Z",
+    "modified": "2026-04-24T07:31:57.522Z",
+    "0.2.0": "2026-04-23T10:24:03.293Z",
+    "0.2.1": "2026-04-23T10:41:05.365Z",
+    "0.2.2": "2026-04-23T19:14:56.049Z",
+    "0.3.0": "2026-04-24T07:25:19.692Z",
+    "0.3.1": "2026-04-24T07:31:57.424Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 161,
+  "download_trend": []
+}

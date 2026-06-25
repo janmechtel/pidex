@@ -1,0 +1,39 @@
+{
+  "name": "pi-surf",
+  "latest_version": "0.1.0",
+  "description": "Surf the web from pi \u2014 clean URL fetching, pluggable search, and scout subagent that keeps noise out of your context",
+  "readme": "# \ud83c\udfc4 pi-surf\n\nSurf the web from [pi](https://github.com/mariozechner/pi-coding-agent). Clean URL fetching, pluggable search, and a scout subagent that keeps noise out of your context.\n\n## Install\n\n```bash\npi install npm:pi-surf\n```\n\nOr try it without installing:\n\n```bash\npi -e npm:pi-surf\n```\n\n## What You Get\n\nThree tools:\n\n### `fetch_url`\n\nFetch any URL and get clean Markdown. Uses Mozilla Readability (the same engine behind Firefox Reader View) to strip navigation, ads, and boilerplate, then converts to Markdown via Turndown.\n\n```\nFetch https://docs.example.com/api and extract the main content\n```\n\n- CSS selector support (`selector: \"main\"`, `\".docs-content\"`, `\"#api-reference\"`)\n- Links stripped by default (saves ~50 tokens per link) \u2014 set `includeLinks: true` to keep them\n- Images stripped (not useful in LLM context)\n- Configurable length limit (`maxLength`, default 15000 chars)\n\n### `web_search`\n\nSearch the web using a pluggable backend. Returns titles, URLs, and snippets.\n\n```\nSearch for \"pulumi rds proxy typescript example\"\n```\n\nCurrently supported providers:\n- **Brave Search** \u2014 auto-detected via `BRAVE_API_KEY` env var\n- **Custom providers** \u2014 register your own (see below)\n\n### `web_research`\n\nThe flagship tool. Spawns a lightweight scout subagent that:\n\n1. Searches the web (if a search provider is configured)\n2. Fetches and reads relevant pages\n3. Analyzes the content\n4. Returns **only** what's relevant to your task\n\nAll the noise (raw HTML, navigation, ads, irrelevant sections) stays in the scout's disposable context and never enters your main session.\n\n```\nResearch how to configure RDS Proxy with PostgreSQL and Django,\nfocusing on connection pooling settings and session pinning\n```\n\n**Auto-detected scout model:** The scout automatically uses a small/cheap model matching your current provider:\n\n| Your Provider | Scout Uses |\n|--------------|------------|\n| Anthropic | `claude-haiku-4-5` |\n| OpenAI | `gpt-4.1-mini` |\n| Google | `gemini-2.0-flash` |\n| Groq | `llama-3.3-70b-versatile` |\n| xAI | `grok-3-mini-fast` |\n| Mistral | `mistral-small-latest` |\n| OpenRouter | `anthropic/claude-haiku-4-5` |\n\nOverride per-call with the `model` parameter.\n\n## Search Providers\n\n### Brave Search (built-in)\n\nSet the environment variable:\n\n```bash\nexport BRAVE_API_KEY=\"your-key-here\"\n```\n\nGet a key at [brave.com/search/api](https://brave.com/search/api/). The free tier gives 2000 queries/month.\n\n### Custom Providers\n\nThree ways to add your own search engine:\n\n#### 1. From another pi extension (event bus)\n\n```typescript\npi.events.emit(\"web-research:register-provider\", {\n  name: \"my-search\",\n  description: \"My custom search engine\",\n  isAvailable: () => Boolean(process.env.MY_API_KEY),\n  search: async (query, opts) => {\n    // call your API\n    return [{ title: \"...\", url: \"...\", snippet: \"...\" }];\n  },\n});\n```\n\n#### 2. File-based discovery\n\nDrop a `.ts` or `.js` file in `~/.pi/agent/search-providers/` or `.pi/search-providers/`:\n\n```typescript\n// ~/.pi/agent/search-providers/serper.ts\nexport default {\n  name: \"serper\",\n  description: \"Serper.dev Google Search API\",\n  isAvailable: () => Boolean(process.env.SERPER_API_KEY),\n  search: async (query, opts) => {\n    const res = await fetch(\"https://google.serper.dev/search\", {\n      method: \"POST\",\n      headers: {\n        \"X-API-KEY\": process.env.SERPER_API_KEY!,\n        \"Content-Type\": \"application/json\",\n      },\n      body: JSON.stringify({ q: query, num: opts?.count ?? 5 }),\n    });\n    const data = await res.json();\n    return data.organic.map((r) => ({\n      title: r.title,\n      url: r.link,\n      snippet: r.snippet,\n    }));\n  },\n};\n```\n\n#### 3. Built-in auto-detect\n\nSet the right env var and the built-in provider activates automatically:\n\n| Provider | Env Var | Status |\n|----------|---------|--------|\n| Brave Search | `BRAVE_API_KEY` | \u2705 Built-in |\n\n### Check available providers\n\nUse the `/search-providers` command in pi to list what's configured.\n\n## Works Without Search\n\nNo API key? No problem. `fetch_url` always works \u2014 just give it URLs directly. And `web_research` works with explicit URLs too:\n\n```\nResearch these pages about RDS Proxy:\n- https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html\n- https://www.pulumi.com/registry/packages/aws/api-docs/rds/proxy/\n```\n\n## Development\n\n```bash\ngit clone https://github.com/iaptsiauri/pi-surf\ncd pi-surf\nnpm install\n\n# Run unit tests (no network)\nnpm test\n\n# Run live fetch tests (requires internet)\nnpm run test:live\n\n# Run SDK integration tests (requires pi installed)\nnpm run test:sdk\n\n# Run everything\nnpm run test:all\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "web-research",
+    "web-search",
+    "web-fetch",
+    "readability",
+    "brave-search",
+    "subagent",
+    "surf"
+  ],
+  "author": {
+    "name": "Ilia"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/iaptsiauri/pi-surf#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iaptsiauri/pi-surf.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-02-19T11:32:43.643Z",
+    "0.1.0": "2026-02-19T11:32:43.900Z",
+    "modified": "2026-02-19T11:32:44.076Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 17,
+  "download_trend": []
+}

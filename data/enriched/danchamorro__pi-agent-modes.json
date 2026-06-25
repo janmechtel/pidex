@@ -1,0 +1,365 @@
+{
+  "name": "@danchamorro/pi-agent-modes",
+  "latest_version": "1.1.3",
+  "description": "Agent modes for pi - switch between code, architect, debug, ask, and review modes with enforced tool and bash restrictions",
+  "readme": "# @danchamorro/pi-agent-modes\n\nAgent modes for [pi](https://github.com/badlogic/pi-mono). Switch between focused operational modes with enforced tool restrictions and distinct behavioral prompts.\n\n## Modes\n\n| Mode | Built-in tools | Bash | Edits | Purpose |\n|------|---------------|------|-------|---------|\n| **Code** | All | Unrestricted | All files | Default. Write, modify, or refactor code. |\n| **Architect** | read, bash, edit, write, grep, find, ls | Read-only allowlist | `.md`, `.mdx` only | Plan, design, and strategize before implementation. |\n| **Debug** | All | Unrestricted | All files | Systematic problem diagnosis and resolution. |\n| **Ask** | read, bash, grep, find, ls | Read-only allowlist | None | Q&A: explanations, research, and documentation. |\n| **Review** | read, bash, grep, find, ls | Review-safe allowlist | None | Code review with structured feedback. |\n\nEach mode has a distinct PI persona, a short description shown on the status card, and mode-specific custom instructions that guide the agent's behavior.\n\nThe table above covers Pi's built-in tools. Extension tools and MCP tools remain visible, so information-gathering integrations continue to work inside restricted modes.\n\n### Status card\n\nThe active mode displays a status card in the UI:\n\n```\n  CODE mode\n  Write, modify, or refactor code\n  bash:all | edit:all\n```\n\nThe first line shows the mode name. The second line is a built-in description summarizing the mode's purpose. The third line shows the current tool restrictions. When model or thinking-level overrides are active, those appear as additional entries on the restrictions line.\n\n## Install\n\n```bash\npi install npm:@danchamorro/pi-agent-modes\n```\n\nOr add to `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\"npm:@danchamorro/pi-agent-modes\"]\n}\n```\n\n## Usage\n\n**Command:**\n\n```\n/agent-mode              Show mode selector\n/agent-mode code         Switch to code mode\n/agent-mode architect    Switch to architect mode\n/agent-mode debug        Switch to debug mode\n/agent-mode ask          Switch to ask mode\n/agent-mode review       Switch to review mode\n/agent-mode off          Disable agent modes and restore default behavior\n/agent-mode setup        Assign models and thinking levels per mode\n```\n\n**Keyboard shortcut:**\n\n`Ctrl+Shift+M` cycles through all modes, then `off`.\n\n**CLI flag:**\n\n```bash\npi --agent-mode architect\n```\n\n## How enforcement works\n\nEnforcement is layered, not just prompt guidance:\n\n1. **Tool visibility:** `setActiveTools()` controls which built-in tools the model can see. In ask mode, `edit` and `write` do not exist for the model. `bash` remains available, but only through the restricted allowlist. Extension and MCP tools remain visible.\n2. **Bash restrictions:** For architect, ask, and review modes, bash commands are validated against an allowlist at the `tool_call` level. Destructive commands (rm, git push, npm install, etc.) are blocked before execution. Piped and chained commands are also checked.\n3. **File restrictions:** In architect mode, edit and write are restricted to markdown files (`.md`, `.mdx`). Other file types are blocked at the `tool_call` level.\n4. **Prompt injection:** Each mode appends a behavioral prompt to the system prompt via `before_agent_start`, setting the agent's persona and custom instructions.\n\n## Model setup\n\nBy default, all modes use whatever model is active in your session. To assign specific models and thinking levels per mode, run:\n\n```\n/agent-mode setup\n```\n\nThis walks through each mode, letting you pick a model and thinking level from your available models. Pressing Escape at any point cancels the setup. The configuration is saved to `~/.pi/agent/agent-modes.json`.\n\nYou can re-run setup at any time to change assignments. Selecting \"No override\" for a mode clears any previous assignment.\n\n## Configuration\n\nOverride mode defaults with JSON config files. Project overrides take precedence over global, which take precedence over built-in defaults.\n\n**Global:** `~/.pi/agent/agent-modes.json`\n**Project:** `.pi/agent-modes.json`\n\n### Example: assign models to modes\n\n```json\n{\n  \"architect\": {\n    \"provider\": \"openai\",\n    \"model\": \"o3\",\n    \"thinkingLevel\": \"high\"\n  },\n  \"code\": {\n    \"provider\": \"anthropic\",\n    \"model\": \"claude-sonnet-4-5\",\n    \"thinkingLevel\": \"medium\"\n  },\n  \"debug\": {\n    \"provider\": \"anthropic\",\n    \"model\": \"claude-sonnet-4-5\",\n    \"thinkingLevel\": \"high\"\n  }\n}\n```\n\n### Example: customize architect to allow shell scripts\n\n```json\n{\n  \"architect\": {\n    \"editableExtensions\": [\".md\", \".mdx\", \".sh\"]\n  }\n}\n```\n\n### Override fields\n\nEach mode supports these overrides:\n\n| Field | Type | Description |\n|-------|------|-------------|\n| `tools` | `string[]` or `\"all\"` | Tools visible to the model |\n| `bash` | `\"all\"`, `\"none\"`, `\"restricted\"` | Bash access level |\n| `editableExtensions` | `string[]` | File extensions allowed for edit/write |\n| `prompt` | `string` | System prompt addition |\n| `provider` | `string` | Model provider name |\n| `model` | `string` | Model ID |\n| `thinkingLevel` | `string` | `\"off\"`, `\"minimal\"`, `\"low\"`, `\"medium\"`, `\"high\"`, `\"xhigh\"` |\n\n## State persistence\n\nThe active mode, including `off`, is persisted across session restarts via `appendEntry`. When you resume a session, the mode state you last used is automatically restored.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "agent-modes",
+    "modes",
+    "architect",
+    "debug",
+    "review",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "Daniel Chamorro"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/danchamorro/pi-agent-toolkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danchamorro/pi-agent-toolkit.git",
+    "directory": "packages/agent-modes"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-18T00:05:14.178Z",
+    "modified": "2026-04-03T19:40:22.191Z",
+    "1.0.0": "2026-03-18T00:05:14.422Z",
+    "1.0.1": "2026-03-18T00:54:31.818Z",
+    "1.0.2": "2026-03-18T01:09:55.221Z",
+    "1.0.3": "2026-03-18T16:43:35.141Z",
+    "1.0.4": "2026-03-18T22:31:01.195Z",
+    "1.0.5": "2026-03-19T00:04:13.188Z",
+    "1.0.6": "2026-03-19T02:39:30.246Z",
+    "1.0.7": "2026-03-24T01:14:52.779Z",
+    "1.0.8": "2026-03-24T21:24:54.663Z",
+    "1.1.0": "2026-03-24T21:45:57.423Z",
+    "1.1.1": "2026-03-28T04:04:17.640Z",
+    "1.1.2": "2026-03-29T17:43:23.140Z",
+    "1.1.3": "2026-04-03T19:40:22.051Z"
+  },
+  "versions_count": 13,
+  "downloads_last_week": null,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 932
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 306
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 163
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 126
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 31
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 60
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 30
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 71
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 57
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 43
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 47
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 42
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 20
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 66
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

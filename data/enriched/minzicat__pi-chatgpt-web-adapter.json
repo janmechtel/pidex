@@ -1,0 +1,36 @@
+{
+  "name": "@minzicat/pi-chatgpt-web-adapter",
+  "latest_version": "0.1.1",
+  "description": "Use ChatGPT web's gpt-5.5-pro inside Pi via a managed-browser OpenAI-compatible adapter.",
+  "readme": "# @minzicat/pi-chatgpt-web-adapter\n\nUse ChatGPT web's **`gpt-5-5-pro`** (and `gpt-5-5-thinking`, `gpt-5-5`) inside\n[Pi](https://github.com/earendil-works/pi) as first-class, switchable models \u2014\nriding your own ChatGPT Plus/Pro subscription.\n\n`gpt-5-5-pro` is not exposed by the OpenAI Responses API or the Codex CLI at\nplan pricing. The only way to drive it from your subscription is the\n`chatgpt.com` web app. This adapter does that through a managed browser, then\nre-exposes it as a local OpenAI-compatible endpoint that Pi consumes like any\nother provider.\n\n> **Personal-use tool.** It automates *your own* ChatGPT account on *your own*\n> machine. Single-account, single-machine. See [docs/TOS-NOTES.md](docs/TOS-NOTES.md).\n\n## How it works\n\n```\nPi session  \u2500\u2500/models chatgpt-web/gpt-5-5-pro\u2500\u2500\u25b6  pi openai-completions streamer\n                                                       \u2502  http://127.0.0.1:1456/v1\n                                                       \u25bc\n                                        pi-chatgpt-web daemon (this package)\n                                          \u251c\u2500 managed Chromium (login + sentinel)\n                                          \u251c\u2500 chatgpt.com/backend-api/f/conversation\n                                          \u2514\u2500 OpenAI \u21c4 web-protocol translation\n```\n\n- **Auth** is a real browser login (Google / Microsoft / email \u2014 your choice).\n  No HAR import, no pasted tokens. The JWT auto-refreshes from the long-lived\n  session cookie.\n- **Sentinel/Turnstile** tokens are minted by the live page, so the adapter\n  survives ChatGPT frontend rotations far better than pure-HTTP reimplementations.\n- **Pro turns** stream on a separate channel; the adapter polls the conversation\n  to completion so you always get the full answer.\n\n## Install\n\nRequires Node \u2265 20.12 and a Chromium-family browser (Chrome / Chromium / Brave / Edge).\n\n```bash\nnpm install -g @minzicat/pi-chatgpt-web-adapter\n```\n\n## Quick start\n\n```bash\n# 1. Log in (opens a browser window once)\npi-chatgpt-web auth login\n\n# 2. Verify\npi-chatgpt-web doctor\n\n# 3. In any Pi session\n/models chatgpt-web/gpt-5-5-pro\n```\n\nWhen installed as a Pi package, the extension registers the `chatgpt-web`\nprovider automatically and starts the daemon on demand \u2014 no manual `serve`\nneeded.\n\n## CLI\n\n| Command | Purpose |\n|---|---|\n| `pi-chatgpt-web auth login` | Browser login; captures + persists the session |\n| `pi-chatgpt-web auth status` | Account + token expiry |\n| `pi-chatgpt-web auth refresh` | Force a token refresh |\n| `pi-chatgpt-web serve [--port N]` | Run the OpenAI-compatible daemon (default 1456) |\n| `pi-chatgpt-web chat \"<prompt>\" [--model M] [--effort standard\\|extended]` | One-shot |\n| `pi-chatgpt-web doctor` | Health: auth, browser, daemon |\n| `pi-chatgpt-web install-agent` | Install a macOS LaunchAgent for the daemon |\n\n## OpenAI-compatible endpoints\n\nThe daemon serves `POST /v1/chat/completions`, `POST /v1/responses`,\n`GET /v1/models`, `GET /health`, `GET /doctor`. Point any OpenAI client at it:\n\n```bash\nOPENAI_BASE_URL=http://127.0.0.1:1456/v1 OPENAI_API_KEY=x \\\n  curl -s $OPENAI_BASE_URL/chat/completions \\\n  -d '{\"model\":\"gpt-5-5-pro\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}'\n```\n\n## Limitations (v0.1)\n\n- **Text only** \u2014 no tool/function calling, images, or attachments yet.\n- **Stateless** \u2014 each turn replays the conversation as a fresh tree.\n- **Pro latency** \u2014 Pro turns take minutes; the stream sends keep-alives.\n- **Quota** \u2014 each Pro turn consumes one Pro use from your plan.\n\n## Configuration (env)\n\n| Var | Default | Meaning |\n|---|---|---|\n| `PI_CHATGPT_WEB_PORT` | `1456` | Daemon port |\n| `PI_CHATGPT_WEB_CHROME` | auto | Path to Chromium executable |\n| `PI_CHATGPT_WEB_HEADFUL` | unset | Run the browser visibly (debugging) |\n| `PI_CHATGPT_WEB_PROFILE_DIR` | `~/.cache/pi-chatgpt-web/profile` | Browser profile |\n| `PI_CHATGPT_WEB_AUTH_FILE` | `~/.pi/agent/chatgpt-web-auth.json` | JWT hot cache (mode 600) |\n| `PI_CHATGPT_WEB_LOG_LEVEL` | `info` | `debug\\|info\\|warn\\|error` |\n\n## Troubleshooting\n\n- **`doctor` says not logged in** \u2192 `pi-chatgpt-web auth login`.\n- **401 on chat** \u2192 session cookie expired; re-run `auth login`.\n- **`no Chromium found`** \u2192 install Chrome or set `PI_CHATGPT_WEB_CHROME`.\n- **Empty answers / sentinel errors after a ChatGPT update** \u2192 the frontend\n  rotated; restart the daemon. If it persists, the in-page mint may need an\n  update (`docs/ARCHITECTURE.md`).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "chatgpt",
+    "gpt-5-5-pro",
+    "openai",
+    "adapter"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/minzique/dotfiles-agents/tree/main/packages/pi-chatgpt-web-adapter",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/minzique/dotfiles-agents.git",
+    "directory": "packages/pi-chatgpt-web-adapter"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-18T05:46:38.427Z",
+    "modified": "2026-06-18T05:48:32.687Z",
+    "0.1.0": "2026-06-18T05:46:38.728Z",
+    "0.1.1": "2026-06-18T05:48:32.559Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 236,
+  "download_trend": []
+}

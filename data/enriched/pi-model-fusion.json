@@ -1,0 +1,43 @@
+{
+  "name": "pi-model-fusion",
+  "latest_version": "1.0.5",
+  "description": "Pi extension for model-fusion coding tasks with automatic judging and optional merge synthesis",
+  "readme": "# pi-model-fusion\n\nA TypeScript extension for [pi.dev](https://pi.dev/) that runs one coding task across multiple models, evaluates them against user-defined criteria using a judge model, and applies the selected patch.\n\n## Features\n\n- Run **2+ candidate models** against one coding task in parallel.\n- **Branch-first architecture**: each candidate runs in its own git branch worktree \u2014 no separate \"workspace\" + \"branch materialization\" steps.\n- Diffs are **captured directly from git** after candidate execution (not parsed from model output), ensuring accuracy.\n- Judge reads real git-captured diffs for reliable evaluation.\n- For `best_only` mode, the winner's branch diff is used directly \u2014 no round-trip through the judge's diff output.\n- For `merge_with_top` mode, the judge synthesizes a merged diff, materialized to its own final branch.\n- All branches persist after the run for easy inspection: `git diff main..<branch>`, `git log <branch>`, `git checkout <branch>`.\n- Stream live per-model progress updates during execution.\n- Show judge scoring with per-criterion breakdowns for each candidate model.\n- Expose a `/model-fusion-monitor` command that opens a local browser dashboard.\n- Applies resulting diff with `git apply --3way` to the original `cwd`.\n- Ships a `model-fusion` skill and `/model-fusion` prompt template for discoverability.\n\n## Install\n\nFrom npm:\n```bash\npi install pi-model-fusion\n```\n\nOr directly from git:\n```bash\npi install git:https://github.com/Deasel011/pi-model-fusion-extension/\n```\n\n## Prompt-driven usage\n\nOnce installed, you can request model fusion directly in chat:\n\n- `Use model fusion to add retries to the API client. Compare openai/gpt-5, anthropic/claude-sonnet-4, and google/gemini-2.5-pro. Judge with openai/gpt-5 on correctness, tests, and minimal risk.`\n- `/model-fusion add retries to the API client`\n\nTo monitor live runs in a browser:\n\n- `/model-fusion-monitor`\n\n## Tool\n\n### `model_fusion`\n\nParameters:\n\n- `task` (string): coding task prompt.\n- `candidateModels` (string[]): at least two models.\n- `judgeModel` (string): model that performs ranking/selection.\n- `criteria` (string[]): scoring criteria.\n- `mergeMode` (`best_only` | `merge_with_top`): selection behavior.\n- `cwd` (optional string): source working directory (must be inside a git repo).\n\nExample call:\n\n```json\n{\n  \"task\": \"Add retries to the API client and unit tests\",\n  \"candidateModels\": [\n    \"openai/gpt-5\",\n    \"anthropic/claude-sonnet-4\",\n    \"google/gemini-2.5-pro\"\n  ],\n  \"judgeModel\": \"openai/gpt-5\",\n  \"criteria\": [\n    \"correctness\",\n    \"test coverage\",\n    \"minimal risk\",\n    \"code clarity\"\n  ],\n  \"mergeMode\": \"merge_with_top\"\n}\n```\n\n## Architecture\n\n### Branch-first workflow\n\n```\n1. Capture uncommitted state (tracked diff + untracked files)\n2. For each candidate (in parallel):\n   a. git worktree add -b pi-model-fusion/<runId>/candidate-<model> <path> HEAD\n   b. Apply uncommitted state \u2192 commit as \"base\"\n   c. Run pi (model makes file edits directly)\n   d. git add -A && git commit \u2192 capture diff from git\n3. Judge runs in its own branch worktree, reads git-captured diffs\n4. Final branch:\n   - best_only \u2192 winner's existing branch\n   - merge_with_top \u2192 new branch with judge's synthesized diff\n5. Apply final diff to original cwd\n6. Cleanup worktree directories (branches remain)\n```\n\nEach candidate's changes are real git commits on named branches. The monitor and judge both read diffs from git, not from parsed model output.\n\n### Inspecting results\n\nAfter a run, all branches remain in your repo:\n\n```bash\n# List all fusion branches\ngit branch --list 'pi-model-fusion/*'\n\n# Compare a candidate's changes\ngit diff main..pi-model-fusion/<runId>/candidate-1-<model>\n\n# Check out the final result\ngit checkout pi-model-fusion/<runId>/final-<model>\n\n# Clean up old branches\ngit branch -D $(git branch --list 'pi-model-fusion/*' | tr -d ' ')\n```\n\n## Notes\n\n- **Requires git**: `cwd` must be inside a git repository.\n- Candidate models are instructed to make file edits directly. Diffs are captured from git after execution (not from `<diff>` tags in output).\n- Each candidate branch has two commits: \"base\" (uncommitted state) + \"candidate changes\".\n- Worktree directories are cleaned up automatically after the run. Set `PI_MODEL_FUSION_KEEP_WORKSPACES=1` to keep them.\n- Set `PI_MODEL_FUSION_WORKSPACE_DIR=/short/path` to override the worktree root (useful for Windows path-length issues).\n- Live run state is persisted to `~/.pi/agent/extensions/model-fusion/monitor-state.json`.\n- The monitor dashboard shows branch names with copy-pasteable git commands for each candidate and the final selection.\n- If patch apply fails, output still includes ranking, reasoning, and branch references so you can apply manually.\n- Have fun!",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "model-fusion",
+    "llm"
+  ],
+  "author": {
+    "name": "deasel011"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Deasel011/pi-model-fusion-extension#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Deasel011/pi-model-fusion-extension.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-15T20:45:02.968Z",
+    "modified": "2026-04-15T23:22:50.839Z",
+    "0.1.0": "2026-04-15T20:45:03.276Z",
+    "1.0.1": "2026-04-15T23:08:34.157Z",
+    "1.0.5": "2026-04-15T23:22:50.226Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

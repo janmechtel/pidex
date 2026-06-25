@@ -1,0 +1,36 @@
+{
+  "name": "pi-litellm",
+  "latest_version": "1.1.1",
+  "description": "LiteLLM integration for Pi \u2014 dynamic model sync, accurate cost tracking, and session grouping",
+  "readme": "# pi-litellm\n\nLiteLLM integration extensions for [Pi](https://github.com/earendil-works/pi-coding-agent). Provides model sync, accurate cost tracking, and session grouping when routing Pi through a LiteLLM proxy.\n\n## Features\n\n### Model Sync (`litellm-sync.ts`)\n\nKeeps the Pi model selector in sync with LiteLLM's live model list. On startup (and on `/reload`), fetches `GET /v1/models` from LiteLLM and registers the provider with the exact model IDs that LiteLLM exposes.\n\n**Before:** `claude-opus-4.6 [litellm]` (stale, doesn't match LiteLLM routing names)\n**After:** `bedrock/claude-opus-4.6 [litellm]`, `openrouter/claude-sonnet-4.6 [litellm]`\n\nModel capabilities (reasoning, context window, max tokens, thinking levels) are auto-detected from the model ID.\n\n### Cost Tracking (`litellm-cost.ts`)\n\nOverrides Pi's static cost calculation with accurate pricing from LiteLLM:\n\n1. **Response header** \u2014 Reads `x-litellm-response-cost` from each LLM response for exact per-request cost.\n2. **Model pricing fallback** \u2014 At startup, fetches model pricing from LiteLLM's `/model/info` endpoint. When the response header isn't available (e.g., streaming), calculates cost from token counts \u00d7 per-token rates.\n\n### Session Grouping (`litellm-session.ts`)\n\nInjects `litellm_session_id` into every outgoing request payload so all API calls within one Pi session are grouped in LiteLLM's session logs. The session ID is derived from the Pi session filename.\n\nRequires `drop_params: true` in your LiteLLM `litellm_settings` config.\n\n## Installation\n\n```bash\npi install npm:pi-litellm\n```\n\nOr in `.pi/settings.json`:\n\n```json\n{\n  \"packages\": [\"npm:pi-litellm\"]\n}\n```\n\n## Configuration\n\nSet environment variables (or configure in `~/.pi/agent/models.json`):\n\n| Variable | Default | Description |\n|----------|---------|-------------|\n| `LITELLM_BASE_URL` | `http://localhost:4000` | LiteLLM proxy URL |\n| `LITELLM_API_KEY` | `sk-cedar-local` | LiteLLM API key |\n\n### models.json (optional)\n\nIf you prefer file-based config over env vars, add a `litellm` provider entry to `~/.pi/agent/models.json`:\n\n```json\n{\n  \"providers\": {\n    \"litellm\": {\n      \"baseUrl\": \"http://localhost:4000\",\n      \"api\": \"anthropic-messages\",\n      \"apiKey\": \"sk-cedar-local\"\n    }\n  }\n}\n```\n\nThe sync extension reads `baseUrl`, `apiKey`, and `api` from this config. You do **not** need to define models here \u2014 they're populated dynamically from LiteLLM.\n\nPriority: environment variables > models.json > defaults.\n\n## LiteLLM Setup\n\nYour LiteLLM `config.yaml` should include:\n\n```yaml\nlitellm_settings:\n  drop_params: true\n```\n\nThis ensures:\n- `litellm_session_id` is stripped before forwarding to upstream providers\n- Unknown params from Pi don't cause upstream errors\n\n## How Model Sync Works\n\n1. Extension loads as an async factory (runs before `session_start`)\n2. Fetches `GET /v1/models` from LiteLLM \u2192 returns `model_name` values from config.yaml\n3. Calls `pi.registerProvider(\"litellm\", { models: [...] })` with those exact IDs\n4. On `/reload`, re-fetches and re-registers to pick up config changes\n\nIf LiteLLM is unreachable at startup, the extension logs a warning and skips registration \u2014 Pi continues with whatever models are already configured.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "litellm",
+    "cost-tracking",
+    "session-grouping",
+    "model-sync"
+  ],
+  "author": {
+    "name": "abailey"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/xec-abailey/pi-litellm#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xec-abailey/pi-litellm.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-05-07T22:32:32.956Z",
+    "modified": "2026-05-07T22:39:57.257Z",
+    "1.1.0": "2026-05-07T22:32:33.202Z",
+    "1.1.1": "2026-05-07T22:39:57.126Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

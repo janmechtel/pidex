@@ -1,0 +1,350 @@
+{
+  "name": "pi-mpc",
+  "latest_version": "1.0.0",
+  "description": "MPC (Mental Preview & Correction) extension for pi coding agent \u2014 rehearse and verify before any code is written",
+  "readme": "# pi-mpc\n\n> **MPC \u2014 Mental Preview & Correction** for [pi coding agent](https://github.com/mariozechner/pi-coding-agent)\n\nA pi extension that forces the LLM to fully rehearse a task before touching a single file. It explores the codebase, dry-runs every change, hunts for type errors and broken imports, backtracks to fix them, and only then surfaces a structured **Verified Plan** for you to approve \u2014 or discard.\n\n---\n\n## Why MPC?\n\nNormal agents interleave thinking and writing. They guess, edit, re-guess, and leave a trail of partial fixes behind. MPC introduces a mandatory **rehearse \u2192 verify** loop:\n\n```\nexplore \u2192 dryrun \u2192 issues \u2192 (backtrack \u2192) verified \u2192 execute\n```\n\nAll tool calls before `execute` are **read-only**. Nothing is written until the plan passes verification and you say go.\n\n---\n\n## Phases\n\n| # | Phase | What happens | Tools |\n|---|-------|-------------|-------|\n| 1 | **explore** | Read files, grep patterns, identify everything that needs to change | read-only |\n| 2 | **dryrun** | Narrate each edit step-by-step; predict the result of every change | read-only |\n| 3 | **issues** | Actively check for type errors, broken imports, failing tests, wrong assumptions | read-only |\n| 4 | **backtrack** | Fix identified issues, revise the plan (up to 2 rounds) | read-only |\n| 5 | **verified** | Output a structured final plan with Assumptions, Steps, Risks, and Confidence | read-only |\n| 6 | **execute** | User confirms \u2192 execute the verified plan with full tool access | full |\n\n### Automatic phase transitions\n\nEach phase ends when the LLM emits a phase marker; the extension detects it and advances automatically:\n\n| Marker | Transition |\n|--------|-----------|\n| `EXPLORATION COMPLETE: \u2026` | \u2192 dryrun |\n| `DRY RUN COMPLETE: \u2026` | \u2192 issues |\n| `NO ISSUES FOUND` | \u2192 verified (skips backtrack) |\n| `ISSUE N: \u2026` | \u2192 backtrack (or force \u2192 verified after max retries) |\n| `REVISED PLAN: \u2026` | \u2192 verified |\n\n---\n\n## Install\n\n```bash\npi install npm:pi-mpc\n```\n\nOr add to your project settings (`.pi/settings.json`) so teammates get it automatically:\n\n```json\n{\n  \"packages\": [\"npm:pi-mpc\"]\n}\n```\n\n---\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/mpc` | Toggle MPC mode on / off |\n| `/mpc-next` | Manually advance to the next phase (fallback when the LLM misses a marker) |\n| `/mpc-resume` | Resume the most recent in-progress plan from disk |\n| `/mpc-status` | Show current phase and plan file path |\n\n**Shortcut:** `Ctrl + Alt + M` \u2014 toggle MPC mode\n\n---\n\n## Typical workflow\n\n```\n1.  /mpc                      \u2190 enable MPC\n2.  Refactor UserService to support async interfaces\n     \u2502\n     \u251c\u2500 [explore]   reads files, maps dependencies\n     \u251c\u2500 [dryrun]    narrates every edit, traces types\n     \u251c\u2500 [issues]    finds a missing export in utils.ts \u2192 ISSUE 1\n     \u251c\u2500 [backtrack] revises plan to add the export\n     \u2514\u2500 [verified]  outputs structured plan + confidence rating\n     \u2502\n3.  \u276f  Execute the plan   \u2190 you pick one\n       Refine further\n       Abort\n```\n\n---\n\n## Safety \u2014 read-only phases\n\nDuring phases 1\u20134, `edit` and `write` are unavailable. `bash` calls are intercepted and must match a safe-command allowlist (`cat`, `grep`, `git status`, `ls`, etc.). Destructive patterns are blocked:\n\n- File writes (`>`, `>>`, `tee`, `truncate`)\n- File mutations (`rm`, `mv`, `cp`, `mkdir`)\n- Package installs (`npm install`, `pip install`, `brew install`, \u2026)\n- Git writes (`commit`, `push`, `merge`, `rebase`, \u2026)\n- System ops (`sudo`, `kill`, `reboot`, \u2026)\n\nAny blocked command returns an error explaining why, with a hint to use `/mpc-next` or `/mpc` to abort.\n\n---\n\n## Plan persistence\n\nEvery MPC session is saved to disk automatically:\n\n```\n<project>/.pi/mpc/<timestamp>-<task-slug>.md\n```\n\nThe file is human-readable Markdown (with phase outputs) plus a machine-readable JSON block at the bottom. Use `/mpc-resume` in any new session to pick up where you left off \u2014 the LLM skips completed phases and continues from the breakpoint.\n\n---\n\n## Verified Plan format\n\nWhen the LLM reaches phase 5 it outputs a structured plan:\n\n```markdown\n## Verified Plan\n\n### Summary\nOne paragraph: what this does and why.\n\n### Assumptions Verified\n- [assumption]: [how it was verified]\n\n### Steps\n1. **[File / Action]**: [what and why]\n2. \u2026\n\n### Potential Risks\n- [remaining unknowns or caveats]\n\n### Confidence\nHIGH / MEDIUM / LOW: [reason]\n```\n\n---\n\n## Mode comparison\n\n| Feature | Normal agent | Plan mode | MPC |\n|---------|-------------|-----------|-----|\n| Trigger | direct chat | `/plan` \u00b7 `Ctrl+Alt+P` | `/mpc` \u00b7 `Ctrl+Alt+M` |\n| Workflow | think \u2192 act (interleaved) | explore \u2192 plan \u2192 execute | explore \u2192 dryrun \u2192 issues \u2192 (backtrack) \u2192 verified \u2192 execute |\n| Phases | none | 2 | up to 6, auto-advancing |\n| Tool lock | full always | read-only during explore | read-only until execute |\n| Issue detection | \u2717 | \u2717 | \u2713 dedicated phase |\n| Auto-backtrack | \u2717 | \u2717 | \u2713 up to 2 rounds |\n| Plan format | none | numbered list | structured (Assumptions / Risks / Confidence) |\n| Plan persisted | \u2717 | session only | \u2713 `.pi/mpc/*.md`, cross-session resume |\n| Confirm before execute | \u2014 | Execute / Stay / Refine | Execute / Refine / Abort |\n| Best for | quick edits | medium complexity | high-risk \u00b7 multi-file \u00b7 unfamiliar codebases |\n\n---\n\n## File structure\n\n```\nmpc/\n\u251c\u2500\u2500 index.ts      # entry point: commands, events, state machine\n\u251c\u2500\u2500 phases.ts     # phase labels + per-phase LLM prompts\n\u251c\u2500\u2500 persist.ts    # plan persistence (.pi/mpc/*.md read/write)\n\u2514\u2500\u2500 utils.ts      # types, marker detection, text helpers\n```\n\n---\n\n## Package this for npm\n\nTo publish as an npm package so others can `pi install npm:pi-mpc`:\n\n**`package.json`**\n\n```json\n{\n  \"name\": \"pi-mpc\",\n  \"version\": \"1.0.0\",\n  \"description\": \"MPC (Mental Preview & Correction) extension for pi coding agent\",\n  \"type\": \"module\",\n  \"license\": \"MIT\",\n  \"keywords\": [\"pi-package\", \"pi-extension\", \"mpc\", \"plan-mode\", \"coding-agent\"],\n  \"pi\": {\n    \"extensions\": [\"./index.ts\"]\n  },\n  \"files\": [\n    \"index.ts\",\n    \"phases.ts\",\n    \"persist.ts\",\n    \"utils.ts\",\n    \"README.md\"\n  ],\n  \"peerDependencies\": {\n    \"@mariozechner/pi-coding-agent\": \"*\",\n    \"@mariozechner/pi-tui\": \"*\"\n  }\n}\n```\n\nThen:\n\n```bash\nnpm publish --access public\n```\n\nConsumers install with:\n\n```bash\npi install npm:pi-mpc\n```\n\n---\n\n## Contributing\n\nIssues and PRs welcome at [github.com/ShawnRong/pi-mpc](https://github.com/ShawnRong/pi-mpc).\n\n---\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "mpc",
+    "plan-mode",
+    "dry-run",
+    "coding-agent",
+    "verification"
+  ],
+  "author": {
+    "name": "ShawnRong"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ShawnRong/pi-mpc#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShawnRong/pi-mpc.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-22T03:05:44.571Z",
+    "1.0.0": "2026-04-22T03:05:44.876Z",
+    "modified": "2026-04-22T03:05:45.144Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 8,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 128
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 33
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

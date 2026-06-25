@@ -1,0 +1,32 @@
+{
+  "name": "vite-plugin-agent-presence",
+  "latest_version": "0.0.3",
+  "description": "Vite dev overlay for Pi agent presence",
+  "readme": "# vite-plugin-agent-presence\n\nDev-only Vite overlay that shows when a Pi coding agent is active in your project.\n\n## Install\n\n```sh\npnpm add -D vite-plugin-agent-presence\n```\n\n## Vite setup\n\n```ts\n// vite.config.ts\nimport { defineConfig } from \"vite\";\nimport agentPresence from \"vite-plugin-agent-presence\";\n\nexport default defineConfig({\n  plugins: [agentPresence()],\n});\n```\n\nThe plugin only applies during `vite serve`. It registers JSON endpoints under `/__agent_presence`, keeps active agents in memory, broadcasts updates through Vite HMR (`server.ws.send`), and injects a small browser overlay.\n\n## Pi extension setup\n\nInstall the extension as a Pi package from npm:\n\n```sh\npi install npm:vite-plugin-agent-presence\n```\n\nFor project-local installation, add `-l`:\n\n```sh\npi install -l npm:vite-plugin-agent-presence\n```\n\nThe package declares a Pi manifest:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./dist/pi/index.js\"]\n  }\n}\n```\n\nYou can also wire it manually:\n\n```ts\n// .pi/extensions/agent-presence.ts\nexport { default } from \"vite-plugin-agent-presence/pi\";\n```\n\nOr customize options:\n\n```ts\nimport { piAgentPresence } from \"vite-plugin-agent-presence/pi\";\nexport default piAgentPresence({ heartbeatMs: 5000, ttlMs: 15000 });\n```\n\nThe extension uses Pi lifecycle hooks. It sends `start` on agent start, `update` for turns/tool calls/edits, periodic `heartbeat`, and `done` on agent end or session shutdown. The LLM never needs to call a tool.\n\n## Discovery\n\nWhen Vite starts, the plugin writes:\n\n```txt\nnode_modules/.vite/agent-presence.json\n```\n\nExample:\n\n```json\n{\n  \"url\": \"http://localhost:5173/__agent_presence\",\n  \"projectRoot\": \"/absolute/path/to/project\",\n  \"pid\": 12345,\n  \"token\": \"random-dev-token\"\n}\n```\n\nPi discovery order:\n\n1. `VITE_AGENT_PRESENCE_URL` environment variable (`VITE_AGENT_PRESENCE_TOKEN` optional)\n2. `node_modules/.vite/agent-presence.json` in the current workspace\n3. fallback scan of `localhost` ports `5173-5183`\n\nIf no Vite dev server is running, the extension fails silently.\n\n## HTTP protocol\n\nPayload:\n\n```ts\nexport type AgentPresence = {\n  id: string;\n  name?: string;\n  tool?: string;\n  task?: string;\n  status?: \"working\" | \"thinking\" | \"editing\" | \"done\";\n  startedAt?: number;\n  updatedAt?: number;\n  ttlMs?: number;\n};\n```\n\nEndpoints:\n\n- `POST /__agent_presence/start`\n- `POST /__agent_presence/update`\n- `POST /__agent_presence/heartbeat`\n- `POST /__agent_presence/done`\n- `GET /__agent_presence/state`\n\nPi sends IDs like `pi:<sessionId>` and `{ \"name\": \"Pi\", \"tool\": \"pi-agent\" }`.\n\n## Security\n\nThis is dev-only and localhost-oriented. POST endpoints require the random token from the discovery file when available. Do not expose your Vite dev server publicly.\n",
+  "keywords": [
+    "vite",
+    "vite-plugin",
+    "pi-package",
+    "pi-extension",
+    "agent-presence"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./dist/pi/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-05-18T22:45:23.040Z",
+    "modified": "2026-05-18T23:18:12.255Z",
+    "0.0.1": "2026-05-18T22:45:23.354Z",
+    "0.0.2": "2026-05-18T23:02:50.418Z",
+    "0.0.3": "2026-05-18T23:18:12.148Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,54 @@
+{
+  "name": "@bytesbrains/pi-telegram-bridge",
+  "latest_version": "1.4.0",
+  "description": "Telegram bot bridge for pi agents \u2014 send messages, ask questions, and listen for human replies via Telegram.",
+  "readme": "# pi-telegram-bridge\n\nTelegram bot bridge for pi agents \u2014 send messages, ask questions, and listen for human replies via Telegram.\n\n## Install\n\n```bash\npi install npm:@bytesbrains/pi-telegram-bridge\n```\n\n## Configuration\n\nSet the following environment variables:\n\n```bash\nexport TELEGRAM_BOT_TOKEN=\"123456:ABC-DEF1234ghikl-zyx57W2v1u123ew11\"\nexport TELEGRAM_CHAT_ID=\"123456789\"\n```\n\n| Variable | Required | Description |\n|----------|----------|-------------|\n| `TELEGRAM_BOT_TOKEN` | \u2705 | Bot token from [@BotFather](https://t.me/BotFather) |\n| `TELEGRAM_CHAT_ID` | \u2705 | Target chat ID (your personal chat or a group) |\n\n## Tools\n\n### telegram_listen\n\nCheck for new inbound messages from the human.\n\n```\ntelegram_listen()\n```\n\n### telegram_send\n\nSend a one-way message. Use for status updates and progress reports.\n\n```\ntelegram_send(message=\"Build completed successfully \u2705\")\n```\n\n### telegram_ask\n\nAsk a question with inline keyboard options and **wait** for a human reply. Blocks until answered or timeout (default 30 min).\n\n```\ntelegram_ask(question=\"Deploy to production?\")\ntelegram_ask(question=\"Which branch?\", options=[\"main\", \"staging\", \"dev\"])\ntelegram_ask(question=\"Approve this change?\", options=[\"Approve\", \"Reject\", \"Need changes\"], timeoutMinutes=5)\n```\n\n### telegram_override\n\nAsk a human to approve or reject a blocked action (force push, destructive git ops, file deletion, etc.). Designed for supervisor override flows. Returns `details.action = \"proceed\"|\"abort\"|\"explain\"` so the agent can call `supervisor_override()` or abort.\n\n```\ntelegram_override(\n  command=\"git push gitea feat/add-check --force\",\n  reason=\"Force push can overwrite remote history\"\n)\n\ntelegram_override(\n  command=\"rm -rf node_modules\",\n  reason=\"Recursive deletion outside project boundary\",\n  context=\"User requested a clean reinstall of dependencies\",\n  options=[\"Yes, it's fine\", \"No, cancel\", \"Use npx instead\", \"Explain more\"],\n  timeoutMinutes=10\n)\n```\n\n**Parameters:**\n| Param | Required | Default | Description |\n|-------|----------|---------|-------------|\n| `command` | \u2705 | \u2014 | The blocked command or action |\n| `reason` | \u2705 | \u2014 | Why it was blocked by the supervisor |\n| `context` | \u274c | \u2014 | Additional context (what the user asked for, etc.) |\n| `options` | \u274c | `[\"Yes, proceed\", \"No, cancel\", \"Explain more\"]` | Custom button labels |\n| `timeoutMinutes` | \u274c | `30` | How long to wait for a response |\n\n**Returns `details`:**\n| Field | Type | Description |\n|-------|------|-------------|\n| `choice` | `string` | The exact button label the human clicked |\n| `action` | `string` | `\"proceed\"` (first option), `\"abort\"` (second option), or `\"explain\"` (anything else) |\n| `command` | `string` | The original blocked command |\n| `timedOut` | `boolean` | Whether the request timed out |\n\n**Agent workflow:**\n1. Agent gets blocked by supervisor\n2. Calls `telegram_override(command, reason, context)`\n3. Checks `details.action`:\n   - `\"proceed\"` \u2192 call `supervisor_override(reason, command)`\n   - `\"abort\"` \u2192 tell user action was cancelled\n   - `\"explain\"` \u2192 call `telegram_send(message=\"...\")` with more context, then re-ask\n4. If `details.timedOut` \u2192 abort the action\n\n### telegram_status\n\nCheck if the bridge is configured and running.\n\n```\ntelegram_status()\n```\n\n## Background Listener\n\nThe extension starts a background listener on session start that polls for incoming Telegram messages. Any non-bot text message in the configured chat is forwarded to the agent as a user message. The agent responds with a confirmation.\n\nThe listener runs automatically \u2014 no manual setup needed.\n\n## How It Works\n\n1. **Session start**: The bridge restores the last processed update ID from session state and starts polling\n2. **Inbound messages**: Non-bot text messages in the configured chat are forwarded to the agent\n3. **Session end**: The listener stops cleanly on session shutdown\n4. **Update ID is persisted** across sessions to avoid processing duplicate messages\n\n## Get a Bot Token\n\n1. Open Telegram and chat with [@BotFather](https://t.me/BotFather)\n2. Send `/newbot` and follow the prompts\n3. Copy the token and set `TELEGRAM_BOT_TOKEN`\n4. Send a message to your bot, then visit:\n   `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates`\n5. Copy the `chat.id` from the response and set `TELEGRAM_CHAT_ID`\n\n## Requirements\n\n- Node.js >= 18\n- A Telegram bot token\n- A chat ID to send/receive messages\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "telegram",
+    "bot",
+    "bridge",
+    "messaging"
+  ],
+  "author": {
+    "name": "nandal",
+    "email": "nandal@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/nandal/pi-ext/tree/main/telegram-bridge",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nandal/pi-ext.git",
+    "directory": "telegram-bridge"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-15T20:42:40.050Z",
+    "modified": "2026-05-17T17:03:06.267Z",
+    "1.0.0": "2026-05-15T20:42:40.349Z",
+    "1.0.1": "2026-05-15T21:05:34.647Z",
+    "1.0.2": "2026-05-15T21:17:23.611Z",
+    "1.1.0": "2026-05-15T23:03:13.618Z",
+    "1.1.1": "2026-05-15T23:21:05.371Z",
+    "1.1.2": "2026-05-15T23:33:01.442Z",
+    "1.1.3": "2026-05-15T23:45:06.855Z",
+    "1.1.4": "2026-05-15T23:59:13.453Z",
+    "1.1.5": "2026-05-16T00:09:29.938Z",
+    "1.1.6": "2026-05-16T03:08:26.579Z",
+    "1.2.0": "2026-05-16T10:25:55.623Z",
+    "1.3.0": "2026-05-16T11:58:54.304Z",
+    "1.3.1": "2026-05-17T15:48:03.267Z",
+    "1.4.0": "2026-05-17T17:03:06.139Z"
+  },
+  "versions_count": 14,
+  "downloads_last_week": 46,
+  "download_trend": []
+}

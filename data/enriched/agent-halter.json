@@ -1,0 +1,31 @@
+{
+  "name": "agent-halter",
+  "latest_version": "0.0.1",
+  "description": "Session-budget extension for AI coding agents.",
+  "readme": "<p align=\"center\"><img src=\"logo.png\" width=\"128\" alt=\"agent-halter logo\" /></p>\n\n# agent-halter\n\nA session-budget extension for AI coding agents. Set a wall-clock time, a turn count, or both. The agent gets a soft nudge as the budget approaches and stops responding for the current turn when it runs out. Budget state survives reload.\n\nToday this ships as a [pi-coding-agent](https://github.com/badlogic/pi-mono) extension. A Claude Code adapter is planned next; see [FUTURE-CLAUDE.md](./FUTURE-CLAUDE.md).\n\n## Status\n\nv0.0.1: Core logic is fully tested (100% coverage) and has been tested against a few pi sessions. It's also worth noting that some models might simply ignore the \"time to wrap up nudges\" sent by the extension, something I'm still investigating.\n\n## Installation\n\n### Option 1: from npm (recommended)\n\n```bash\npi install npm:agent-halter\n```\n\nThis installs the latest published version from npm. Run `pi update` to get new versions.\n\n### Option 2: from git\n\n```bash\npi install git:github.com/fgrehm/agent-halter\n```\n\nThis clones the repo to `~/.pi/agent/git/` and adds it to your settings.\n\nFor project-local install (stored in `.pi/git/`):\n\n```bash\npi install git:github.com/fgrehm/agent-halter --local\n```\n\n### Option 3: `-e` flag (try without installing)\n\n```bash\npi -e npm:agent-halter\n```\n\n### Option 4: Clone manually (if you want to make changes and \"try it live\")\n\nPi auto-discovers subdirectories under `~/.pi/agent/extensions/`:\n\n```bash\ngit clone git@github.com:fgrehm/agent-halter.git ~/.pi/agent/extensions/agent-halter\n```\n\n## Usage (pi)\n\n```sh\n# from inside a pi session\n/timebox 15m                            # 15-minute budget\n/timebox turns:5                        # 5-turn budget\n/timebox 15m turns:3                    # combined; whichever fires first wins\n/timebox 15m -- lmk -m \"Timebox done\"   # also run a shell command on hard stop\n/timebox status                         # show remaining budget\n/timebox off                            # disable\n```\n\nAnything after `--` is the literal command. It runs detached via `/bin/sh -c`, so quoting, pipes, and env vars work as in your shell. It fires once on hard stop (not on the soft nudge or on `/timebox off`). [lmk](https://github.com/fgrehm/lmk) is a good fit since it pops a blocking desktop dialog. For tests / CI you can neutralize lmk with `LMK_DRY_RUN=1`.\n\nWhile active, a status-bar entry under the `timebox` key updates every second:\n\n```\nTimebox: 12m 34s left (15m budget) | 3 turns left (2/5)\n```\n\nAt 80% of either dimension the user gets a one-shot warning notification, and every subsequent agent turn has a budget-warning block appended to the system prompt. At 100%, the next agent turn is blocked with an error notification. The chat continues; the user can set a new timebox or keep talking.\n\nFor the full behavior contract, see [SPEC.md](./SPEC.md).\n\n## Project layout\n\n```\nsrc/\n  core/               host-agnostic logic\n    parse.ts          /timebox argument parsing\n    decide.ts         budget decisions (ok / nudge / stop)\n    format.ts         status string + system-prompt suffix\n    persist.ts        record-based restore on reload\n    types.ts          shared types\n  adapters/\n    pi/               pi-coding-agent adapter\n      index.ts        default-export factory\n      controller.ts   in-memory budget state\n      command.ts      /timebox handler\n      events.ts       session_start / turn_start / before_agent_start / session_shutdown\n      entries.ts      custom session-entry helpers\n      status-timer.ts setInterval-based status refresher\ntests/\n  core/               unit tests for pure helpers\n  adapters/pi/        integration tests with a fake ExtensionAPI\nSPEC.md               full behavioral spec\nFUTURE-CLAUDE.md      Claude Code adapter sketch\n```\n\n## Development\n\n```sh\nnpm install\nnpm test                # vitest\nnpm run test:coverage   # v8 coverage with thresholds\nnpm run check           # biome --write + tsc --noEmit\nnpm run lint            # biome (no writes)\n```\n\nThe host runtime, the network, and any LLM provider are fully faked. The test suite is hermetic and runs in under a second.\n\n## Roadmap\n\n- [x] pi adapter\n- [ ] polish + make it work properly for less capable models\n- [ ] Claude Code adapter (see [FUTURE-CLAUDE.md](./FUTURE-CLAUDE.md)).\n\n## License\n\nMIT. Copyright (c) Fabio Rehm.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "Fabio Rehm"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/fgrehm/agent-halter#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fgrehm/agent-halter.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/adapters/pi/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-05T13:03:37.816Z",
+    "0.0.1": "2026-05-05T13:03:38.113Z",
+    "modified": "2026-05-05T13:03:38.740Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

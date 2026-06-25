@@ -1,0 +1,350 @@
+{
+  "name": "pi-provider-env",
+  "latest_version": "1.0.5",
+  "description": "Pi extension: registers OpenAI-completions and/or Anthropic-messages providers from environment variables (OPENAI_ENV_*, ANTHROPIC_ENV_*)",
+  "readme": "# pi-provider-env\n\nPi extension that registers up to **two independent providers** from environment variables:\n\n- **`OPENAI_ENV_*`** \u2192 an OpenAI Chat Completions compatible provider (default id `openai-env`). Standard `openai-completions` streaming (no custom stream handler). Opus 4.7/4.8 and GPT reasoning models are exposed here **without thinking** (Opus thinking needs the Anthropic adaptive endpoint; GPT `reasoning_effort` + function tools is rejected on this gateway's `/v1/chat/completions`). Use `anthropic-env` if you want Opus reasoning.\n- **`ANTHROPIC_ENV_*`** \u2192 an Anthropic Messages compatible provider (default id `anthropic-env`). All models go through pi's built-in `anthropic-messages` API (streaming, thinking, prompt caching handled natively \u2014 no custom stream handler).\n\nThe two providers are fully independent: each reads only its own variables (no cross-fallback) and is registered only when its `BASE_URL` + credential are present. Set one, the other, or both at the same time.\n\n## Environment Variables\n\n### OpenAI-completions provider (`OPENAI_ENV_*`)\n\n| Variable | Required | Default | Description |\n|----------|----------|---------|-------------|\n| `OPENAI_ENV_BASE_URL` | Yes | \u2014 | Gateway base URL (with or without `/v1`) |\n| `OPENAI_ENV_API_KEY` | Yes | \u2014 | Gateway API key (sent as `Authorization: Bearer`). If missing, this provider is skipped. |\n| `OPENAI_ENV_MODEL_ID` | No | \u2014 | Specific model ID. If unset, fetches all models from `/v1/models`. |\n| `OPENAI_ENV_MODEL_EXTRA` | No | \u2014 | Extra config as JSON (`contextWindow`, `maxTokens`) |\n| `OPENAI_ENV_PROVIDER_ID` | No | `openai-env` | Provider ID |\n| `OPENAI_ENV_PROVIDER_NAME` | No | `OpenAI (Environment)` | Provider display name |\n\n### Anthropic-messages provider (`ANTHROPIC_ENV_*`)\n\n| Variable | Required | Default | Description |\n|----------|----------|---------|-------------|\n| `ANTHROPIC_ENV_BASE_URL` | Yes | \u2014 | Gateway base URL (with or without `/v1`; the SDK appends `/v1/messages`) |\n| `ANTHROPIC_ENV_AUTH_TOKEN` | Yes | \u2014 | Gateway auth token (alias: `ANTHROPIC_ENV_API_KEY`). If missing, this provider is skipped. |\n| `ANTHROPIC_ENV_MODEL_ID` | No | \u2014 | Specific model ID. If unset, fetches all models from `/v1/models`. |\n| `ANTHROPIC_ENV_MODEL_EXTRA` | No | \u2014 | Extra config as JSON (`contextWindow`, `maxTokens`) |\n| `ANTHROPIC_ENV_PROVIDER_ID` | No | `anthropic-env` | Provider ID |\n| `ANTHROPIC_ENV_PROVIDER_NAME` | No | `Anthropic (Environment)` | Provider display name |\n\n## Auth\n\n- **OpenAI provider:** `Authorization: Bearer <OPENAI_ENV_API_KEY>` (pi's built-in OpenAI auth).\n- **Anthropic provider:** the token is sent two ways so it works with gateways that expect either scheme:\n  - `x-api-key: <token>` \u2014 pi's built-in Anthropic auth (from `apiKey`)\n  - `Authorization: Bearer <token>` \u2014 added via custom headers\n\n## Model Discovery\n\nBoth providers discover models from the OpenAI-compatible `GET {base}/v1/models` endpoint (authenticated with `Authorization: Bearer`).\n\nClaude Opus 4.7/4.8 are special-cased: the **Anthropic provider** uses adaptive thinking with `maxTokens` capped at 128000 (gateway returns 400 above this) and the `off`/`minimal` thinking levels suppressed; the **OpenAI provider** exposes them as non-reasoning models (their thinking can't be expressed over `openai-completions` on this gateway). The OpenAI provider additionally carries per-vendor `compat`/`thinkingLevelMap` tuning (Qwen, DeepSeek, Kimi, MiniMax, GPT) for Chat Completions quirks.\n\n### max_tokens caps (per endpoint \u00d7 vendor / category)\n\nThe gateway does not report `max_tokens` in `/v1/models`, and the output-token ceiling differs **both by vendor and by endpoint**. Each provider applies its own endpoint-specific cap table as the default upper limit (all values measured against the live gateway):\n\n| Vendor / category (`owned_by` / id) | OpenAI (Chat Completions) | Anthropic (Messages) |\n|-------------------------------------|---------------------------|----------------------|\n| Claude Opus 4.7/4.8 | 128000 | 128000 |\n| Claude (other, `AMAZON_AI`) | 65536 | 65536 |\n| GPT (id contains `gpt`) | 128000 | \u2014 (skipped) |\n| DeepSeek-Pro | 65536 | 8192 |\n| DeepSeek (other, e.g. Flash) | 65536 | 65536 |\n| GLM (`OTHER`) | 65536 | 8192 |\n| Qwen (`ALI_QWEN`) | 65536 | 65536 |\n| Kimi (`MOONSHOT_AI`) | 65536 | 65536 |\n| MiniMax (`MINIMAX`) | 65536 | 65536 |\n| unmatched | `*_ENV_MODEL_EXTRA.maxTokens` or 65536 | same |\n\nOnly **DeepSeek-Pro** and **GLM** actually differ by endpoint (the Anthropic endpoint caps them at ~8192, while Chat Completions accepts 65536). Claude is capped at 65536 on the Anthropic endpoint because above that the gateway drops `usage` and crashes the client. If the gateway ever reports a positive `max_tokens` for a model, that value takes priority. `*_ENV_MODEL_EXTRA={\"maxTokens\":N}` sets the fallback for *unmatched* vendors only.\n\nGPT models are **skipped** by the Anthropic provider: this gateway's Anthropic adapter returns empty content and omits `usage`, which crashes the client. Use the OpenAI provider (`OPENAI_ENV_*`) for GPT instead.\n\n## Install\n\n```bash\npi install npm:pi-provider-env\n```\n\nOr try without persisting:\n\n```bash\npi -e npm:pi-provider-env\n```\n\n## Usage\n\nOpenAI-completions provider:\n\n```bash\nexport OPENAI_ENV_BASE_URL=\"https://gateway.example.com\"\nexport OPENAI_ENV_API_KEY=\"sk-xxx\"\nexport OPENAI_ENV_MODEL_ID=\"gpt-4o\"        # optional\npi\n```\n\nAnthropic-messages provider:\n\n```bash\nexport ANTHROPIC_ENV_BASE_URL=\"https://gateway.example.com\"\nexport ANTHROPIC_ENV_AUTH_TOKEN=\"sk-xxx\"\nexport ANTHROPIC_ENV_MODEL_ID=\"claude-opus-4-8\"  # optional\npi\n```\n\nBoth at once (two providers appear in `/model` or `Ctrl+P`):\n\n```bash\nexport OPENAI_ENV_BASE_URL=\"https://gateway.example.com\"\nexport OPENAI_ENV_API_KEY=\"sk-xxx\"\nexport ANTHROPIC_ENV_BASE_URL=\"https://gateway.example.com\"\nexport ANTHROPIC_ENV_AUTH_TOKEN=\"sk-xxx\"\npi\n```\n\n## System CA Trust\n\nOn Node 22.15+ / 23.9+, this extension also merges system root CAs (macOS Keychain / Windows cert store / Linux system CA) into Node's default trust set. This enables TLS verification for internally-signed or custom certificates without disabling verification entirely (`NODE_TLS_REJECT_UNAUTHORIZED=0`).\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "Simon Shi",
+    "email": "simonsmh@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/simonsmh/pi-provider-env#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/simonsmh/pi-provider-env.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-01T05:15:04.784Z",
+    "modified": "2026-06-24T06:41:20.197Z",
+    "1.0.0": "2026-06-01T05:15:04.975Z",
+    "1.0.1": "2026-06-22T12:44:52.476Z",
+    "1.0.2": "2026-06-23T13:04:39.723Z",
+    "1.0.3": "2026-06-23T15:09:21.132Z",
+    "1.0.4": "2026-06-23T16:28:34.852Z",
+    "1.0.5": "2026-06-24T06:41:19.891Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 640,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 157
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 496
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 148
+    }
+  ]
+}

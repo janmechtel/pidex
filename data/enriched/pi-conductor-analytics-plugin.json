@@ -1,0 +1,34 @@
+{
+  "name": "pi-conductor-analytics-plugin",
+  "latest_version": "0.1.0",
+  "description": "Pi extension that reports pi-conductor run telemetry to an external HTTP endpoint.",
+  "readme": "# pi-conductor-analytics-plugin\n\nPi extension that reports [pi-conductor](https://github.com/lynellf/pi-conductor) run telemetry to an external HTTP endpoint.\n\n## Overview\n\nThis plugin hooks into pi-conductor's `pi.events.on(\"conductor:record\", ...)` event to receive persisted run records (`session_started`, `session_ended`, `transition_accepted`, `transition_rejected`, `checkpoint_snapshot`, etc.) and forwards them to a configured HTTP(S) endpoint in a **non-blocking, best-effort** fashion.\n\n## Installation\n\n```bash\n# From the plugin directory\npi install /path/to/pi-conductor-analytics-plugin\n\n# Or via npm/pnpm\npnpm add pi-conductor-analytics-plugin\npi install ./node_modules/pi-conductor-analytics-plugin\n```\n\n> **Prerequisites:** pi-conductor must also be installed as a pi extension. The plugin listens for events emitted by pi-conductor's extension; if pi-conductor is not loaded, the plugin will be inactive.\n\n## Configuration\n\nConfig lookup order (first existing file wins):\n\n1. `<cwd>/.pi-conductor-analytics.json`\n2. `<cwd>/.pi/conductor-analytics.json`\n3. `$HOME/.pi-conductor-analytics.json`\n4. `$HOME/.config/pi-conductor/analytics.json`\n\n### Example config\n\n```json\n{\n  \"enabled\": true,\n  \"endpoint\": \"https://analytics.example.com/pi-conductor/events\",\n  \"headers\": {\n    \"Authorization\": \"Bearer ${PI_CONDUCTOR_ANALYTICS_TOKEN}\"\n  },\n  \"batch\": {\n    \"enabled\": true,\n    \"maxRecords\": 25,\n    \"flushIntervalMs\": 1000\n  },\n  \"request\": {\n    \"timeoutMs\": 5000,\n    \"maxRetries\": 2\n  }\n}\n```\n\n### Config fields\n\n| Field | Default | Description |\n|---|---|---|\n| `enabled` | `true` | Master switch |\n| `endpoint` | *required* | HTTP(S) URL to POST records to |\n| `headers` | `{}` | Custom HTTP headers with `${ENV_VAR}` interpolation |\n| `batch.enabled` | `true` | Enable batch delivery |\n| `batch.maxRecords` | `25` | Max records per batch POST |\n| `batch.flushIntervalMs` | `1000` | Flush interval (ms) for partial batches |\n| `request.timeoutMs` | `5000` | Request timeout (ms) |\n| `request.maxRetries` | `2` | Max retries per failed request |\n\n## Delivery behavior\n\n- **Non-blocking:** Record handlers only enqueue work synchronously. Network I/O happens in the background.\n- **Bounded queue:** Pending records are capped at 500 to prevent unbounded memory growth. Oldest records are dropped on overflow.\n- **Retries:** Failed requests are retried up to `maxRetries` times with exponential backoff. Retryable statuses: `408`, `429`, `5xx`. Non-retryable `4xx` errors are accepted and dropped.\n- **Shutdown flush:** On `session_shutdown`, the plugin does a best-effort flush of remaining records (2-second timeout).\n\n## JSONL backstop / watermark\n\nOn `session_start`, the plugin scans `<cwd>/.pi-conductor/runs/*.jsonl` for records that haven't been sent yet (tracked via per-run `.watermark.json` sidecar files). This ensures records are not lost if:\n\n- The plugin loads after a run has already started\n- There was a network outage during the run\n- The plugin was installed after previous runs\n\nThe backstop runs once per session start (first `session_start` event only).\n\n## Privacy\n\n- This plugin sends **only** pi-conductor's persisted run telemetry records.\n- It does **not** read or upload full role-session transcript files (the JSONL files at `<session_file>` paths).\n- Custom HTTP headers with `${ENV_VAR}` interpolation are expanded at config load time. The expanded values are **never** logged.\n\n## Development\n\n```bash\n# Install dependencies\npnpm install\n\n# Build\npnpm build\n\n# Typecheck\npnpm typecheck\n\n# Test\npnpm test\n\n# Lint\npnpm lint\n```\n\n## Project structure\n\n```\n\u251c\u2500\u2500 package.json             Package metadata, pi extension registration\n\u251c\u2500\u2500 extensions/analytics.ts  Extension entrypoint (loaded by pi)\n\u251c\u2500\u2500 src/\n\u2502   \u251c\u2500\u2500 index.ts             Public API exports\n\u2502   \u251c\u2500\u2500 types.ts             Internal types\n\u2502   \u251c\u2500\u2500 config.ts            Config discovery, validation, env interpolation\n\u2502   \u251c\u2500\u2500 envelope.ts          Envelope creation (legacy)\n\u2502   \u251c\u2500\u2500 queue.ts             Bounded async delivery queue, POST logic\n\u2502   \u2514\u2500\u2500 watermark.ts         JSONL backstop / per-run watermark tracking\n\u2514\u2500\u2500 tests/\n    \u251c\u2500\u2500 config.test.ts\n    \u251c\u2500\u2500 envelope.test.ts\n    \u251c\u2500\u2500 queue.test.ts\n    \u251c\u2500\u2500 extension.test.ts\n    \u2514\u2500\u2500 watermark.test.ts\n```\n\n## Behavior notes\n\n- **Warning surfaces:** Factory/setup context uses `console.warn` (no `ctx` available). `session_start` / `session_shutdown` handlers use `ctx.ui.notify`. The `conductor:record` event handler receives only data and uses `console.warn`.\n- **No `pi-conductor` peer dependency:** The plugin depends only on `@earendil-works/pi-coding-agent`. It uses `pi.events` (the shared event bus) for the `conductor:record` bridge, avoiding a direct import of pi-conductor internals.\n- **`session_shutdown`:** This is a first-class typed event (`ExtensionAPI.on(\"session_shutdown\", ...)`) and is used for the typed handler form.\n",
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "pi-package",
+    "pi-conductor",
+    "analytics",
+    "telemetry"
+  ],
+  "author": {
+    "name": "Ezell",
+    "email": "lynellf@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-25T00:24:26.633Z",
+    "0.1.0": "2026-06-25T00:24:26.919Z",
+    "modified": "2026-06-25T00:24:27.164Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

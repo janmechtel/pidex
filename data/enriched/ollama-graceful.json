@@ -1,0 +1,36 @@
+{
+  "name": "ollama-graceful",
+  "latest_version": "0.2.3",
+  "description": "Pi extension that gracefully starts and stops the Ollama service on demand when switching between local and cloud models",
+  "readme": "# ollama-graceful\n\nPi extension that gracefully manages the Ollama process lifecycle when switching between local and cloud models in [pi](https://github.com/badlogic/pi-mono).\n\nOllama is great for running local models, but leaving it running wastes GPU memory and power when you're using cloud models. This extension starts `ollama serve` automatically when you select a local model and kills it when you switch away \u2014 so your GPU is only busy when it needs to be.\n\n[![demo](https://raw.githubusercontent.com/3mrgnc3/ollama-graceful/master/demo.gif)](https://asciinema.org/a/4gxbFvYYxGPQdcZ6)\n\n## Features\n\n- **Auto-start** \u2014 spawns `ollama serve` when you switch to a local model via `/model` or `Ctrl+P`\n- **Auto-stop** \u2014 kills the process when you switch to a cloud model, freeing GPU/RAM\n- **Shutdown cleanup** \u2014 stops Ollama when pi exits (if this extension started it)\n- **Readiness check** \u2014 waits for Ollama API to be ready before the model is used (up to 30s)\n- **Status notifications** \u2014 shows start/stop/ready status via pi's notification system\n- **Footer widget** \u2014 displays `\ud83e\udd99 Ollama running` in the pi status bar while active\n- **Manual commands** \u2014 `/ollama-start`, `/ollama-stop`, `/ollama-status` for on-demand control\n- **No-op safety** \u2014 never kills Ollama if it was already running before pi started\n- **No root required** \u2014 runs entirely in user space, no sudo or systemd\n\n## Installation\n\n```bash\npi install npm:ollama-graceful\n```\n\nOr from GitHub:\n\n```bash\npi install git:github.com/3mrgnc3/ollama-graceful\n```\n\n## Setup\n\n### 1. Configure local models\n\nCreate or edit `~/.pi/agent/models.json` to register your Ollama models:\n\n```json\n{\n  \"providers\": {\n    \"ollama\": {\n      \"baseUrl\": \"http://localhost:11434/v1\",\n      \"api\": \"openai-completions\",\n      \"apiKey\": \"ollama\",\n      \"compat\": {\n        \"supportsDeveloperRole\": false,\n        \"supportsReasoningEffort\": false,\n        \"supportsUsageInStreaming\": false,\n        \"maxTokensField\": \"max_tokens\",\n        \"supportsStrictMode\": false\n      },\n      \"models\": [\n        { \"id\": \"qwen3.5:latest\" }\n      ]\n    }\n  }\n}\n```\n\n### 2. Pull a model\n\n```bash\nollama serve &\nollama pull qwen3.5\nkill %1\n```\n\n### 3. Use\n\nOpen `/model` in pi and pick an Ollama model \u2014 the extension handles the rest. Switch to a cloud model and Ollama stops automatically.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/ollama-start` | Manually start the Ollama server |\n| `/ollama-stop` | Manually stop the Ollama server |\n| `/ollama-status` | Show current Ollama state |\n\n## How it works\n\n```\n/model \u2192 select ollama model\n  \u2502\n  \u251c\u2500\u25ba model_select fires\n  \u251c\u2500\u25ba extension detects provider = \"ollama\"\n  \u251c\u2500\u25ba spawns `ollama serve` as child process\n  \u251c\u2500\u25ba polls localhost:11434 until ready (up to 30s)\n  \u251c\u2500\u25ba notify: \"\ud83e\udd99 Ollama ready\"\n  \u2514\u2500\u25ba widget: \"\ud83e\udd99 Ollama running\"\n\n/model \u2192 select cloud model (or exit pi)\n  \u2502\n  \u251c\u2500\u25ba model_select fires (or session_shutdown)\n  \u251c\u2500\u25ba extension detects provider \u2260 \"ollama\"\n  \u251c\u2500\u25ba sends SIGTERM to child process (SIGKILL after 5s)\n  \u251c\u2500\u25ba notify: \"\ud83e\udd99 Ollama stopped\"\n  \u2514\u2500\u25ba widget cleared\n```\n\nThe extension tracks whether it started Ollama itself. If Ollama was already running when you launched pi, the extension won't kill it \u2014 it only cleans up what it started.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "ollama",
+    "local-models",
+    "lifecycle"
+  ],
+  "author": {
+    "name": "mrgnc"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./ollama-graceful.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-19T10:39:05.512Z",
+    "modified": "2026-04-19T11:27:43.927Z",
+    "0.1.0": "2026-04-19T10:39:05.635Z",
+    "0.2.0": "2026-04-19T11:08:42.295Z",
+    "0.2.1": "2026-04-19T11:18:59.003Z",
+    "0.2.2": "2026-04-19T11:24:40.358Z",
+    "0.2.3": "2026-04-19T11:27:43.795Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 16,
+  "download_trend": []
+}

@@ -1,0 +1,363 @@
+{
+  "name": "@ersintarhan/pi-auto-context",
+  "latest_version": "0.2.7",
+  "description": "Automatic context management for pi sessions: anchors, pivots, and cross-session recall \u2014 with a status line and auto-truncation of stale tool results.",
+  "readme": "# pi-auto-context\n\n[![npm](https://img.shields.io/npm/v/@ersintarhan/pi-auto-context.svg)](https://www.npmjs.com/package/@ersintarhan/pi-auto-context)\n[![license](https://img.shields.io/npm/l/@ersintarhan/pi-auto-context.svg)](./LICENSE)\n\nA [pi](https://pi.dev) package that gives the agent **automatic context management** \u2014 anchors, pivots, cross-session recall \u2014 through tool calls.\n\nTrimmed-down fork of [tshu-w/pi-control](https://github.com/tshu-w/pi-control) focused purely on context discipline. The session/tree/model routers from upstream are intentionally removed; the agent uses pi's built-in slash commands for those.\n\n## What's in the box\n\n**Tool** (extension)\n\n| Tool | Actions |\n|---|---|\n| `context` | `view`, `recall`, `anchor`, `pivot` |\n\n**Skill**\n\n`context-management` \u2014 teaches the agent when and how to use the tool: anchor at task boundaries, pivot before changing direction, recall prior sessions.\n\n**Automatic behaviors**\n\n- **Status line** \u2014 appended after the last user message every turn:\n  ```\n  [pi-auto-context] model=<provider/id> | context=<n>% | tool=<n>% | anchor=<name> (-<dist>)\n  ```\n  `tool=` is the share of active context occupied by tool results. `anchor=` shows the most recent on-branch anchor and how many entries back it lives.\n- **Auto-truncation** \u2014 tool results older than the last anchor are clipped to ~100 chars to keep the window lean. Anchors themselves stay verbatim.\n- **Anchor reminder** \u2014 once per session, after 10+ entries with no anchors, the status line gets a `hint=no-anchors-yet` flag.\n- **Anchor-aware prompt cache** (Anthropic only) \u2014 attaches a `cache_control` marker with 1-hour TTL to the last on-branch anchor's `tool_result` block so the prefix from the request boundary up to the anchor stays cache-hit indefinitely. Without this, auto-truncation between anchors invalidates the rolling `last_user` marker and every turn pays full prefix cost.\n\n## How the anchor-aware cache works\n\nAnthropic's Messages API allows at most 4 `cache_control` breakpoints per request, with a 20-block lookback window per breakpoint (counted across `tools` + `system` + `messages`). pi's default layout uses 3 \u2014 system, tools, last_user \u2014 none of which are anchored to a stable point in the conversation, so heavy auto-context truncation between anchors causes the lookback window to miss prior writes and full re-process the prefix every turn.\n\npi-auto-context inspects every outgoing Anthropic-shaped payload in `before_provider_request` and rewrites the markers:\n\n| Mode | Trigger | Marker layout |\n|---|---|---|\n| **aggressive** | `system + tools \u2264 17` blocks | `[tools (covers system via lookback, 5m), mid_anchor (1h), last_anchor (1h), last_tool_use (5m)]` |\n| **safe-shift** | `system + tools > 17` blocks | `[system (5m), tools (5m), last_anchor (1h), last_tool_use (5m)]` |\n\nThe rolling `last_user` marker that pi adds by default is sacrificed in both modes \u2014 it overlaps with `last_tool_use` from the same turn, so cache value is duplicate.\n\nDetection of OAuth mode (Claude Code) is automatic. The OAuth adapter's billing-header block stays in the payload even when its marker is dropped, so billing claims still work.\n\n### Coexistence with pi-better-messages-cache\n\n[`@mcowger/pi-better-messages-cache`](https://www.npmjs.com/package/@mcowger/pi-better-messages-cache) is a sibling extension that adds an extra rolling marker on the last assistant `tool_use` block. It also fixes a streaming JSON parse bug in the Anthropic SDK that is valuable on its own. Both extensions coexist:\n\n- better-cache loads alphabetically first (`@mcowger/...` < `pi-auto-context`), so its `before_provider_request` handler runs before ours.\n- We inspect the payload it produces, add the anchor marker, and let our 4-marker enforcement evict the oldest **foreign** message marker first \u2014 our anchor markers are protected.\n- Net 4-marker layout with both installed (native Anthropic): `[system, tools, last_anchor, last_tool_use]`.\n\nKeep both installed. Removing better-cache costs you the streaming JSON parse fix and dual-cache wins on MiniMax/Kimi-style Anthropic-compatible APIs.\n\n### Verifying it works\n\nAnthropic responses include `usage.cache_read_input_tokens` and `usage.cache_creation_input_tokens`. After 2-3 anchored turns:\n\n- `cache_read_input_tokens` should grow steadily (prefix is being read from cache).\n- `cache_creation_input_tokens` should stay near zero on turns without new anchors.\n\nSet `PI_ANCHOR_CACHE_DEBUG=1` in your environment to print the chosen mode and final marker layout to stderr on every request.\n\n## Install\n\n```bash\npi install @ersintarhan/pi-auto-context\n```\n\n## Heads-up: private API hack\n\nTo execute `pivot` from a tool call, pi-auto-context patches `ExtensionRunner.prototype.bindCommandContext` at runtime \u2014 pi does not yet expose `navigateTree` as a public API.\n\nThe patch is idempotent and applied once on activation. If it fails (pi internal drift, version mismatch), `pivot` falls back to printing the equivalent slash command and the rest of the tool surface keeps working. Compatibility is therefore tighter than a normal extension; tested against `@earendil-works/pi-coding-agent` 0.74.x.\n\nWhen pi adds a first-class API, the hack goes away. Tracking upstream at [earendil-works/pi#2023](https://github.com/earendil-works/pi/issues/2023).\n\n## License\n\nMIT. Originally based on [tshu-w/pi-control](https://github.com/tshu-w/pi-control).\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "pi-skill",
+    "context-management",
+    "anchor",
+    "pivot"
+  ],
+  "author": {
+    "name": "Ersin Tarhan",
+    "email": "ersintarhan@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ersintarhan/pi-auto-context#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ersintarhan/pi-auto-context.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-16T22:31:38.295Z",
+    "modified": "2026-05-18T00:00:21.036Z",
+    "0.1.0": "2026-05-16T22:31:38.620Z",
+    "0.1.1": "2026-05-16T22:42:12.589Z",
+    "0.2.0": "2026-05-17T00:11:32.804Z",
+    "0.2.1": "2026-05-17T00:22:15.862Z",
+    "0.2.2": "2026-05-17T00:33:07.827Z",
+    "0.2.3": "2026-05-17T00:43:07.641Z",
+    "0.2.4": "2026-05-17T01:12:17.295Z",
+    "0.2.5": "2026-05-17T01:33:25.450Z",
+    "0.2.6": "2026-05-17T03:22:22.208Z",
+    "0.2.7": "2026-05-18T00:00:20.745Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": 44,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 1362
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 80
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 38
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 54
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 27
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 43
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

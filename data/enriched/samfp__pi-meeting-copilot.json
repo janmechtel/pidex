@@ -1,0 +1,36 @@
+{
+  "name": "@samfp/pi-meeting-copilot",
+  "latest_version": "0.1.0",
+  "description": "Live meeting transcription copilot for pi \u2014 captures audio via whisper-cpp on Mac, streams transcripts to your dev machine, and gives pi real-time meeting context.",
+  "readme": "# pi-meeting-copilot\n\nLive meeting transcription copilot for [pi](https://github.com/mariozechner/pi-coding-agent). Tracks a transcript file in real time, giving pi meeting context for questions, note-taking, and summarization.\n\n## Install\n\n```bash\npi install git:github.com/samfoy/pi-meeting-copilot\n```\n\nThis gives you:\n- `meeting_copilot` tool \u2014 start/stop tracking, read incremental updates, read full transcript\n- `/meeting` command \u2014 quick shortcuts for start/stop/status\n- Skill file so the LLM knows when and how to use it\n\n## Usage\n\n```\n> I'm joining a standup, start the meeting copilot\n# pi calls meeting_copilot(action: \"start\")\n\n> what's been discussed so far?\n# pi calls meeting_copilot(action: \"read_new\") and summarizes\n\n> meeting's over, give me notes\n# pi calls meeting_copilot(action: \"read_all\") and produces structured notes\n```\n\nOr use the command shortcut:\n```\n/meeting start\n/meeting stop\n/meeting status\n```\n\n## Feeding It a Transcript\n\nThe extension reads a plain text file that grows over time \u2014 one line per utterance. It doesn't capture audio itself. Anything that appends text to a file works.\n\n**Default path:** `/tmp/live-transcript.txt`\n\nOverride with `MEETING_TRANSCRIPT_PATH` env var or pass `path` to the tool.\n\n### Example Sources\n\n**whisper.cpp** (local, Mac/Linux \u2014 best for real-time):\n```bash\nbrew install whisper-cpp blackhole-2ch  # macOS\nwhisper-stream --model ~/.whisper-models/ggml-medium.en.bin \\\n  --capture 0 --file /tmp/live-transcript.txt \\\n  --step 5000 --length 10000 --vad-thold 0.8\n```\nUse [BlackHole](https://github.com/ExistentialAudio/BlackHole) to route system audio (Zoom, Meet, etc.) to whisper as input.\n\n**Otter.ai / Zoom / Teams** (cloud transcription):\nExport or copy the transcript to a file. For live use, some tools let you sync captions to a local file.\n\n**Any speech-to-text CLI** that writes to stdout:\n```bash\nmy-stt-tool --input mic >> /tmp/live-transcript.txt\n```\n\n**Remote machine?** If your transcription runs on a laptop but pi runs on a remote dev box, sync the file:\n```bash\n# From laptop, sync every 3 seconds\nwatch -n3 scp ~/transcript.txt devbox:/tmp/live-transcript.txt\n\n# Or stream it\ntail -f ~/transcript.txt | ssh devbox \"cat >> /tmp/live-transcript.txt\"\n```\n\n### Format\n\nNo special format required. The copilot reads plain text, one line at a time. Timestamps are nice but optional:\n\n```\n[09:01:15] Let's start with the status update\n[09:01:22] The deploy went out yesterday, no issues\nwe can also handle lines without timestamps\n```\n\n## Configuration\n\n| Env Var | Default | Description |\n|---------|---------|-------------|\n| `MEETING_TRANSCRIPT_PATH` | `/tmp/live-transcript.txt` | Where pi reads the transcript |\n\n## How It Works\n\n1. A transcription source appends lines to a text file\n2. `meeting_copilot` tracks your read position \u2014 `read_new` returns only lines since your last check\n3. State persists across pi turns via session entries, so position survives context compaction\n4. At meeting end, `read_all` gets the full transcript for summarization\n\n## Files\n\n```\npi-meeting-copilot/\n\u251c\u2500\u2500 package.json              # Pi package manifest\n\u251c\u2500\u2500 src/\n\u2502   \u2514\u2500\u2500 index.ts              # Extension \u2014 meeting_copilot tool + /meeting command\n\u2514\u2500\u2500 skills/\n    \u2514\u2500\u2500 meeting-copilot/\n        \u2514\u2500\u2500 SKILL.md          # Skill file for LLM context\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "meeting",
+    "transcription",
+    "whisper",
+    "copilot"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/samfoy/pi-meeting-copilot#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/samfoy/pi-meeting-copilot.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-04-23T18:48:11.254Z",
+    "0.1.0": "2026-04-23T18:48:11.759Z",
+    "modified": "2026-04-23T18:48:11.996Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 6,
+  "download_trend": []
+}

@@ -1,0 +1,43 @@
+{
+  "name": "@ogulcancelik/pi-model-agents",
+  "latest_version": "0.1.0",
+  "description": "Load model-specific AGENTS.md instructions in pi",
+  "readme": "# pi-model-agents\n\nSteer different model families through custom AGENTS.md instructions in pi.\n\n`pi-model-agents` keeps your normal `AGENTS.md` as the shared instruction file, then inserts an additional file based on the active model before each agent run. This lets different model families receive different behavioral guidance without changing the shared prompt.\n\n## Install\n\n```bash\npi install npm:@ogulcancelik/pi-model-agents\n```\n\nFor local development:\n\n```bash\npi install ~/Projects/pi-extensions/packages/pi-model-agents\n```\n\n## How it works\n\nOn every `before_agent_start` event, the extension resolves an alias for the current model and inserts matching instruction files into the system prompt.\n\nAlias resolution order:\n\n1. Exact model key from `model-agents.json`: `models[\"<provider>/<model id>\"]`\n2. Provider alias from `model-agents.json`: `providers[\"<provider>\"]`\n3. Raw provider name\n\nThe first matching alias wins. If its file is missing, the extension reports the missing file in `/model-agents` instead of silently falling back to a broader alias.\n\nThe resolved alias loads files named:\n\n```text\nAGENTS_<alias>.md\n```\n\nFor example, alias `kimi` loads `AGENTS_kimi.md`.\n\nThe section is inserted after the last loaded `AGENTS.md` context block when possible. If Pi changes the prompt format or another extension rewrites that section, `pi-model-agents` safely falls back to appending the section at the end.\n\n## Zero-config usage\n\nWithout a config file, the extension uses the provider name directly.\n\nIf the active model provider is `openai-codex`, it looks for:\n\n```text\nAGENTS_openai-codex.md\n```\n\nIt searches beside loaded context files, including the real target of a symlinked global `~/.pi/agent/AGENTS.md`, plus `~/.pi/agent` and the project `.pi` directory.\n\n## Config\n\nCreate `model-agents.json` beside your global `AGENTS.md`, or at `~/.pi/agent/model-agents.json`, or in the project `.pi/model-agents.json`.\n\nConfig precedence is: `PI_MODEL_AGENTS_CONFIG`, project `.pi/model-agents.json`, config beside the real global `AGENTS.md`, then `~/.pi/agent/model-agents.json`.\n\nYou can also set an explicit path:\n\n```bash\nexport PI_MODEL_AGENTS_CONFIG=/path/to/model-agents.json\n```\n\nWhen `PI_MODEL_AGENTS_CONFIG` is set, that file is authoritative. If it is missing or invalid, the extension reports the error and does not fall back to zero-config lookup.\n\nExample:\n\n```json\n{\n  \"models\": {\n    \"fireworks/accounts/fireworks/routers/kimi-k2p6-turbo\": \"kimi\",\n    \"openrouter/openai/gpt-5.1\": \"openai\"\n  },\n  \"providers\": {\n    \"openai-codex\": \"openai\",\n    \"anthropic\": \"anthropic\"\n  }\n}\n```\n\nWith that config:\n\n```text\nfireworks/accounts/fireworks/routers/kimi-k2p6-turbo -> AGENTS_kimi.md\nopenai-codex/* -> AGENTS_openai.md\nanthropic/* -> AGENTS_anthropic.md\n```\n\n## Custom paths\n\nUse `directories` to control where files are searched. Relative paths are resolved from the config file directory.\n\nGlobal config and `PI_MODEL_AGENTS_CONFIG` are trusted and may point anywhere. Project-local `.pi/model-agents.json` is restricted to files inside the project directory, including symlink targets, so an untrusted repository cannot make the extension load arbitrary local files into the model prompt. The default project `.pi` search directory is also ignored if it is a symlink outside the project.\n\n```json\n{\n  \"directories\": [\".\", \"./model-agents\"],\n  \"filenamePattern\": \"{alias}.md\",\n  \"models\": {\n    \"fireworks/accounts/fireworks/routers/kimi-k2p6-turbo\": \"kimi\"\n  }\n}\n```\n\nUse `files` for explicit alias-to-file mapping. Explicit file mappings are authoritative for that alias; if the configured file is missing or blocked, the extension reports the error instead of falling back to `filenamePattern` lookup.\n\n```json\n{\n  \"files\": {\n    \"kimi\": \"./families/kimi.md\",\n    \"openai\": \"./families/openai.md\"\n  },\n  \"models\": {\n    \"fireworks/accounts/fireworks/routers/kimi-k2p6-turbo\": \"kimi\"\n  },\n  \"providers\": {\n    \"openai-codex\": \"openai\"\n  }\n}\n```\n\n## Debugging\n\nRun:\n\n```text\n/model-agents\n```\n\nIt shows the current provider, model key, resolved alias, config file, loaded instruction files, searched paths, and any config or file errors.\n\n## Notes\n\nThe extension does not mutate session history, so repeated prompts with the same model keep the same system prompt and can still get cache hits. Pi calls `before_agent_start` with the base system prompt for each new user prompt, so switching models mid-session naturally swaps the appended model-specific instructions. That switch would miss cache anyway because the provider or model changed.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "agents",
+    "agents-md",
+    "model-agents",
+    "model-specific",
+    "system-prompt",
+    "prompt",
+    "context",
+    "instructions",
+    "model-routing",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "Can Celik"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ogulcancelik/pi-extensions/tree/main/packages/pi-model-agents#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ogulcancelik/pi-extensions.git",
+    "directory": "packages/pi-model-agents"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-13T17:11:23.170Z",
+    "0.1.0": "2026-05-13T17:11:23.461Z",
+    "modified": "2026-05-13T17:11:23.767Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

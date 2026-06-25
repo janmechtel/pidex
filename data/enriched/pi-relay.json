@@ -1,0 +1,342 @@
+{
+  "name": "pi-relay",
+  "latest_version": "0.1.0",
+  "description": "Discord bridge extension for pi \u2014 route messages, spawn sessions, stream output",
+  "readme": "# pi-relay\n\nA [pi](https://github.com/mariozechner/pi-coding-agent) extension that bridges Discord and pi. Each machine runs its own instance, owns its Discord channel(s), and connects independently \u2014 no hub or routing layer.\n\n## Design\n\n### Per-machine isolation\n\nMultiple machines can share the same Discord bot token. Each pi-relay instance is configured with specific channel IDs and only responds to messages in those channels. Discord's gateway delivers all events to every connection, but each instance filters to its own channels and ignores everything else.\n\n```\nMachine A (workstation)           Machine B (HPC cluster)\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510         \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 pi (interactive)     \u2502         \u2502 pi (interactive)     \u2502\n\u2502  \u2514\u2500 pi-relay         \u2502         \u2502  \u2514\u2500 pi-relay         \u2502\n\u2502     #workstation     \u2502         \u2502     #hpc-cluster     \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518         \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n           \u2502                                \u2502\n           \u25bc                                \u25bc\n     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n     \u2502            Discord Gateway                  \u2502\n     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\n### Master and spawned sessions\n\nThe master pi session runs interactively (TUI) and owns all Discord I/O. Messages in configured channels are forwarded to the master session directly.\n\nWhen the master spawns a child session (via the `spawn_session` tool), it:\n\n1. Creates a Discord thread in the channel\n2. Starts a `pi --mode rpc` child process with its own working directory\n3. Routes all thread messages to the child via stdin JSONL\n4. Routes child output back to the thread\n\n```\nMaster pi (interactive, runs pi-relay)\n\u251c\u2500\u2500 Discord client (single connection)\n\u2502   \u251c\u2500\u2500 #channel messages  \u2192  master pi session\n\u2502   \u251c\u2500\u2500 thread-1 messages  \u2192  RPC child A (stdin/stdout)\n\u2502   \u251c\u2500\u2500 thread-2 messages  \u2192  RPC child B (stdin/stdout)\n\u2502   \u2514\u2500\u2500 thread-3 messages  \u2192  RPC child C (stdin/stdout)\n\u2502\n\u251c\u2500\u2500 RPC Child A: pi --mode rpc --cwd /project-a\n\u251c\u2500\u2500 RPC Child B: pi --mode rpc --cwd /project-b\n\u2514\u2500\u2500 RPC Child C: pi --mode rpc --cwd /project-c\n```\n\nChildren die when the master restarts \u2014 no session persistence.\n\n### Stream coalescing\n\nDiscord rate-limits message sends and edits. Instead of sending every text delta as a new message, the `StreamCoalescer` buffers streaming output and periodically edits a single Discord message in place (~800ms intervals). When the message nears Discord's 2000-char limit, it finalizes the current message and starts a new one. On turn end, any remaining buffer is flushed.\n\nThis applies to both the master session and all RPC children.\n\n### Extension UI forwarding\n\nRPC children may trigger interactive prompts (confirm, select, input, editor) that normally appear in the TUI. Since children have no TUI, these are forwarded to Discord:\n\n- **confirm** \u2192 \"Reply `yes` or `no`\"\n- **select** \u2192 numbered list, \"Reply with a number\"\n- **input / editor** \u2192 \"Reply with your text, or `/cancel`\"\n\nThe child is paused until the Discord user responds. Any message in the thread while a UI prompt is pending is treated as the response.\n\n### Proxy support\n\nDiscord connections (both WebSocket gateway and REST API) can be routed through HTTP/HTTPS/SOCKS proxies. The `proxy` config option patches both `undici` (used by `@discordjs/rest`) and `ws` (used by `@discordjs/ws`) before Discord.js is loaded.\n\n## Modules\n\n| File | Purpose |\n|---|---|\n| `src/index.ts` | Extension entry \u2014 registers events, tools, commands; routes messages between Discord and pi |\n| `src/discord.ts` | Discord client \u2014 connect, send, edit, typing, threads, image attachments |\n| `src/rpc-child.ts` | RPC child process wrapper \u2014 spawn, JSONL protocol, event routing, Extension UI |\n| `src/stream.ts` | `StreamCoalescer` \u2014 batches streaming text into Discord message edits |\n| `src/formatter.ts` | Format messages between pi and Discord (tool call summaries, message splitting) |\n| `src/config.ts` | Load and validate config from YAML |\n| `src/proxy.ts` | Patch undici/ws for proxy support |\n| `src/types.ts` | Shared type definitions |\n\n## Install\n\n```bash\npi install npm:pi-relay\n```\n\nOr from git:\n\n```bash\npi install https://github.com/nicehiro/pi-relay\n```\n\n## Setup\n\n1. Create a Discord bot and invite it to your server with `Send Messages`, `Read Message History`, `View Channels`, and `Create Public Threads` permissions.\n\n2. Create the config at `~/.pi/agent/relay.yaml`:\n\n```yaml\ndiscord:\n  token: \"BOT_TOKEN\"       # or set env DISCORD_BOT_TOKEN\n\nmachine:\n  name: \"workstation\"\n\nchannels:\n  - \"123456789012345678\"    # channel IDs this machine responds to\n\nauth:\n  users: []                 # Discord user IDs allowed (empty = all)\n\nproxy: \"socks5://127.0.0.1:1080\"  # optional, or set HTTPS_PROXY env\n```\n\n## Usage\n\n### Commands\n\n| Command | Description |\n|---|---|\n| `/relay` or `/relay status` | Connection status, machine name, channels, active child sessions |\n| `/relay reconnect` | Reconnect to Discord (kills all child sessions) |\n| `/relay disconnect` | Disconnect from Discord |\n\n### Tools\n\n**`discord_send`** \u2014 Send a message to the first configured channel:\n```\ndiscord_send({ message: \"Training complete!\" })\n```\n\n**`spawn_session`** \u2014 Spawn a new pi session in a Discord thread:\n```\nspawn_session({ cwd: \"/path/to/project\", name: \"my-task\", task: \"fix the tests\" })\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/nicehiro/pi-relay#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicehiro/pi-relay.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-03-16T14:49:50.782Z",
+    "0.1.0": "2026-03-16T14:49:50.943Z",
+    "modified": "2026-03-16T14:49:51.121Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 10,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 87
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "name": "@the-agency/pi-spec-kit",
+  "latest_version": "0.2.5",
+  "description": "A [Pi](https://github.com/mariozechner/pi-coding-agent) package that integrates GitHub's [Spec Kit](https://github.com/github/spec-kit) in a Pi-native way, to support a spec-driven development workflow for planning and building features in a software repo",
+  "readme": "# @the-agency/pi-spec-kit\n\nA [Pi](https://github.com/mariozechner/pi-coding-agent) package that integrates GitHub's [Spec Kit](https://github.com/github/spec-kit) in a Pi-native way, to support a spec-driven development workflow for planning and building features in a software repository.\n\n## Overview\n\nThis extension provides a set of slash commands, meant to be executed mostly in order, that guide you through a repeatable feature development lifecycle, from writing specs, generating implementation tasks and then executing implementation tasks. Configuration and templates live in a `.specify/` directory at your repo root, while feature artifacts (specs, plans, tasks) are stored in a `specs/` directory \u2014 both are version-controllable and shareable with your team.\n\n## Installation\n\n```bash\npi install @the-agency/pi-spec-kit\n```\n\n## Workflow\n\nThe typical flow for a new feature:\n\n```sh\n# one-time setup per repo\n/speckit-init\n\n# write the spec for a new feature\n/speckit-specify\n\n# analyze the spec and resolve any ambiguities\n/speckit-clarify\n\n# create the technical plan\n/speckit-plan\n\n# break the plan down into tasks\n/speckit-tasks\n\n# consistency check before coding\n/speckit-analyze\n\n# execute the tasks\n/speckit-implement\n```\n\n## Commands\n\nRead the [Spec Kit README](https://github.com/github/spec-kit) for a more detailed introduction to the workflow.\n\n### `/speckit-init`\n\nInitialize the `.specify/` workspace in the current repository. Must be run once before using any other command.\n\n### `/speckit-constitution <project description>`\n\nCreate or update the project constitution at `.specify/memory/constitution.md`. The constitution defines project-level principles that all specs and plans must respect.\n\n### `/speckit-checklist <domain>`\n\nGenerate a domain-specific requirements-quality checklist. Validates completeness, clarity, and consistency of requirements rather than checking implementation.\n\n### `/speckit-specify <feature description>`\n\nCreate or update a feature specification from a plain-language description. No technical implementation details yet. Generates a feature branch and a `spec.md` from the built-in spec template.\n\n### `/speckit-clarify`\n\nAnalyze the current `spec.md` for ambiguities and ask targeted clarification questions. Encodes your answers directly back into the spec. Run this before `/speckit-plan` to reduce downstream rework.\n\n### `/speckit-plan <technical implementation details>`\n\nGenerate a technical implementation plan (`plan.md`) from the current feature spec. Produces supporting design artifacts (data models, API contracts, quickstart guide) and validates against the project constitution.\n\n### `/speckit-tasks`\n\nBreak down the `plan.md` into a dependency-ordered `tasks.md` ready for implementation.\n\n### `/speckit-analyze`\n\nPerform a read-only cross-artifact analysis of `spec.md`, `plan.md`, and `tasks.md` to surface inconsistencies, duplications, and constitution violations before you start coding.\n\n### `/speckit-implement`\n\nExecute the implementation plan by working through all tasks defined in `tasks.md`.\n\n### `/speckit-taskstoissues`\n\nConvert the tasks in `tasks.md` into GitHub Issues on the repository's remote. Requires the GitHub MCP server tool.\n\n## Artifacts\n\nConfiguration and templates are stored under `.specify/`. Feature artifacts are stored under `specs/`:\n\n| Path | Description |\n|---|---|\n| `.specify/memory/constitution.md` | Project principles that govern all specs |\n| `.specify/scripts/bash/` | Helper scripts used by the skills |\n| `.specify/templates/` | Source templates for all artifacts |\n| `specs/<branch>/plan.md` | Technical implementation plan |\n| `specs/<branch>/spec.md` | Feature specification |\n| `specs/<branch>/tasks.md` | Ordered implementation tasks |\n\n## Hooks\n\n`.specify/hooks.yml` lets you customize the shell-level operations that the workflow scripts perform at key points. It ships with seven built-in hooks:\n\nAll hooks are optional. If `hooks.yml` is missing entirely, or a hook has no commands defined, the scripts silently skip it and continue.\n\n| Hook | When it runs | Default command |\n|---|---|---|\n| `fetch_remotes` | Before auto-numbering a new feature branch | `git fetch --all --prune` |\n| `list_branches` | To enumerate existing branches for auto-numbering | `git branch -a` |\n| `create_branch` | After a new feature is initialized | `git checkout -b \"{{branch_name}}\"` |\n| `get_current_feature` | To determine the active feature identifier | `git rev-parse --abbrev-ref HEAD` |\n| `verify_vcs_ready` | To confirm VCS is initialized before running scripts | `git rev-parse --show-toplevel` |\n| `format_feature_id` | To build a feature identifier from its components | `echo \"{{feature_num}}-{{short_name}}\"` |\n| `get_feature_dir` | To resolve the path to a feature's directory in `specs/` | `echo \"{{repo_root}}/specs/{{feature_id}}\"` |\n\nEach hook is a named list of shell commands. Use `{{variable_name}}` in a command string to interpolate values passed by the calling script (e.g. `{{branch_name}}` is replaced with the computed branch name like `003-user-auth`).\n\n```yaml\nhooks:\n  # Fetch remotes before auto-numbering a new branch.\n  fetch_remotes:\n    - git fetch --all --prune\n\n  # List branches for auto-numbering.\n  list_branches:\n    - git branch -a\n\n  # Create the feature branch.\n  create_branch:\n    - git checkout -b \"{{branch_name}}\"\n    - git push -u origin \"{{branch_name}}\"  # optional: push immediately\n\n  # Get the active feature identifier (branch name by default).\n  # Override SPECIFY_FEATURE env var to use a fixed identifier.\n  get_current_feature:\n    - |\n      if [[ -n \"${SPECIFY_FEATURE:-}\" ]]; then\n        echo \"$SPECIFY_FEATURE\"\n      else\n        git rev-parse --abbrev-ref HEAD\n      fi\n\n  # Verify VCS is initialized; exit code 0 = ready, 1 = not ready.\n  verify_vcs_ready:\n    - git rev-parse --show-toplevel >/dev/null 2>&1\n\n  # Format a feature identifier from {{feature_num}} and {{short_name}}.\n  format_feature_id:\n    - echo \"{{feature_num}}-{{short_name}}\"\n\n  # Resolve the path to a feature's directory under specs/.\n  get_feature_dir:\n    - echo \"{{repo_root}}/specs/{{feature_id}}\"\n```\n\nTo add extra steps, append more commands under the relevant hook. To disable a hook, remove or comment out its commands.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "spec-kit",
+    "specification",
+    "pi",
+    "agents"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/JoshMock/the-agency#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JoshMock/the-agency.git",
+    "directory": "packages/spec-kit"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-03-25T03:45:00.467Z",
+    "modified": "2026-05-15T17:50:59.581Z",
+    "0.1.0": "2026-03-25T03:45:00.682Z",
+    "0.2.0": "2026-03-26T20:03:36.188Z",
+    "0.2.1": "2026-03-27T14:57:27.830Z",
+    "0.2.3": "2026-03-31T04:25:05.365Z",
+    "0.2.4": "2026-04-16T23:25:15.130Z",
+    "0.2.5": "2026-05-15T17:50:59.279Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 29,
+  "download_trend": []
+}

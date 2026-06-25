@@ -1,0 +1,353 @@
+{
+  "name": "@jordyvd/pi-mcp-adapter",
+  "latest_version": "2.3.0",
+  "description": "MCP (Model Context Protocol) adapter extension for Pi coding agent",
+  "readme": "<p>\n  <img src=\"banner.png\" alt=\"pi-mcp-adapter\" width=\"1100\">\n</p>\n\n# Pi MCP Adapter\n\nUse MCP servers with [Pi](https://github.com/badlogic/pi-mono/) without burning your context window.\n\nhttps://github.com/user-attachments/assets/4b7c66ff-e27e-4639-b195-22c3db406a5a\n\n## Why This Exists\n\nMario wrote about [why you might not need MCP](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/). The problem: tool definitions are verbose. A single MCP server can burn 10k+ tokens, and you're paying that cost whether you use those tools or not. Connect a few servers and you've burned half your context window before the conversation starts.\n\nHis take: skip MCP entirely, write simple CLI tools instead.\n\nBut the MCP ecosystem has useful stuff - databases, browsers, APIs. This adapter gives you access without the bloat. One proxy tool (~200 tokens) instead of hundreds. The agent discovers what it needs on-demand. Servers only start when you actually use them.\n\n## Install\n\n```bash\npi install npm:pi-mcp-adapter\n```\n\nRestart Pi after installation.\n\n## Quick Start\n\nCreate `~/.pi/agent/mcp.json`:\n\n```json\n{\n  \"mcpServers\": {\n    \"chrome-devtools\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"chrome-devtools-mcp@latest\"]\n    }\n  }\n}\n```\n\nServers are **lazy by default** \u2014 they won't connect until you actually call one of their tools. The adapter caches tool metadata so search and describe work without live connections.\n\n```\nmcp({ search: \"screenshot\" })\n```\n```\nchrome_devtools_take_screenshot\n  Take a screenshot of the page or element.\n\n  Parameters:\n    format (enum: \"png\", \"jpeg\", \"webp\") [default: \"png\"]\n    fullPage (boolean) - Full page instead of viewport\n```\n```\nmcp({ tool: \"chrome_devtools_take_screenshot\", args: '{\"format\": \"png\"}' })\n```\n\nNote: `args` is a JSON string, not an object.\n\nTwo calls instead of 26 tools cluttering the context.\n\n## Config\n\n### Server Options\n\n```json\n{\n  \"mcpServers\": {\n    \"my-server\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"some-mcp-server\"],\n      \"lifecycle\": \"lazy\",\n      \"idleTimeout\": 10\n    }\n  }\n}\n```\n\n| Field | Description |\n|-------|-------------|\n| `command` | Executable for stdio transport |\n| `args` | Command arguments |\n| `env` | Environment variables (`${VAR}` interpolation) |\n| `cwd` | Working directory |\n| `url` | HTTP endpoint (auth-aware StreamableHTTP; falls back to SSE only for transport incompatibility) |\n| `auth` | `\"bearer\"`, `\"oauth\"`, or an auth object (`{ type: \"oauth\" | \"bearer\", ... }`) for HTTP auth, browser OAuth, or `client_credentials` |\n| `bearerToken` / `bearerTokenEnv` | Token or env var name |\n| `lifecycle` | `\"lazy\"` (default), `\"eager\"`, or `\"keep-alive\"` |\n| `idleTimeout` | Minutes before idle disconnect (overrides global) |\n| `exposeResources` | Expose MCP resources as tools (default: true) |\n| `directTools` | `true`, `string[]`, or `false` \u2014 register tools individually instead of through proxy |\n| `debug` | Show server stderr (default: false) |\n\n### OAuth and HTTP Auth\n\nFor static bearer tokens, keep using either `auth: \"bearer\"` or the object form:\n\n```json\n{\n  \"mcpServers\": {\n    \"internal-api\": {\n      \"url\": \"https://api.example.com/mcp\",\n      \"auth\": {\n        \"type\": \"bearer\",\n        \"tokenEnv\": \"INTERNAL_API_TOKEN\"\n      }\n    }\n  }\n}\n```\n\nOAuth is available for HTTP transports only. Pi now uses the MCP SDK's auth-aware HTTP flow. Use either the legacy shorthand `auth: \"oauth\"` or the richer object form. The shorthand remains a compatibility alias for browser-based `authorization_code` with automatic registration (`grantType: \"authorization_code\"`, `registration.mode: \"auto\"`). For interactive auth, Pi reuses durable auth state and silent refresh first, then intentionally opens your system browser and completes the flow through a local `127.0.0.1` loopback callback if fresh sign-in is still required. There is no embedded browser or manual token copy/paste path.\n\nIf an HTTP MCP server omits `auth` entirely, Pi now follows a Codex-style fallback: explicit bearer config still wins, but otherwise Pi will treat the server as OAuth-capable when durable OAuth tokens already exist or the server advertises OAuth metadata/protected-resource metadata.\n\nThe auth object also accepts `scope` and `resource` when the upstream server requires them. `resource` overrides the RFC 8707 resource indicator selection, as long as it remains compatible with the MCP server URL / protected resource metadata. `issuer` is reserved for future auth-server discovery overrides and should be omitted for now.\n\n```json\n{\n  \"mcpServers\": {\n    \"github\": {\n      \"url\": \"https://mcp.example.com\",\n      \"auth\": {\n        \"type\": \"oauth\",\n        \"scope\": \"read:org repo\",\n        \"client\": {\n          \"metadata\": {\n            \"clientName\": \"Pi MCP Adapter\"\n          }\n        }\n      }\n    }\n  }\n}\n```\n\n`registration.mode` controls how Pi identifies or registers the OAuth client:\n\n- `auto` (default) \u2014 prefer static `client.information`, then `client.metadataUrl` / published client metadata (CIMD), then dynamic client registration\n- `static` \u2014 use only `client.information`\n- `metadata-url` \u2014 use `client.metadataUrl`\n- `dynamic` \u2014 always attempt dynamic client registration\n\n`auto` is the recommended default because it preserves explicit client identity when you have it, reuses published metadata when the server provides it, and only falls back to dynamic client registration when needed.\n\n`client_credentials` is also supported for non-interactive machine auth. Prefer env-backed secrets over checking credentials into `mcp.json`:\n\n```json\n{\n  \"mcpServers\": {\n    \"service-account\": {\n      \"url\": \"https://mcp.example.com\",\n      \"auth\": {\n        \"type\": \"oauth\",\n        \"grantType\": \"client_credentials\",\n        \"registration\": { \"mode\": \"static\" },\n        \"client\": {\n          \"information\": {\n            \"clientIdEnv\": \"SERVICE_ACCOUNT_CLIENT_ID\",\n            \"clientSecretEnv\": \"SERVICE_ACCOUNT_CLIENT_SECRET\"\n          }\n        }\n      }\n    }\n  }\n}\n```\n\nBehavior notes:\n\n- `/mcp auth` shows OAuth status, flow, registration strategy, and storage hints. `/mcp auth <server>` intentionally starts or retries auth for a specific server. `/mcp-auth` remains a compatibility launcher for the same flow. In the `/mcp` panel, `Ctrl+R` does the same for the selected server.\n- `authorization_code` always uses your system browser with a `127.0.0.1` loopback callback. The SDK handles PKCE, validates a single-use state, and only opens the browser when stored credentials or silent refresh are not enough.\n- Tokens, client registration, and callback session state are stored under `~/.pi/agent/mcp-auth` and reused across restarts with silent refresh when possible.\n- `client_credentials` stays non-interactive. Pi never opens a browser for that flow and can reuse durable auth state when the provider allows it.\n- Background health checks and keep-alive reconnects never open a browser. They only use stored tokens / silent refresh and mark the server as needing auth if user interaction is required.\n- HTTP auth uses auth-aware StreamableHTTP first and only falls back to SSE when the transport itself is incompatible. `401`/`403`, refresh failures, and other auth problems stay auth failures.\n- Legacy tokens from `~/.pi/agent/mcp-oauth/<server>/tokens.json` are imported into the durable auth store on first use when possible.\n\n### Lifecycle Modes\n\n- **`lazy`** (default) \u2014 Don't connect at startup. Connect on first tool call. Disconnect after idle timeout. Cached metadata keeps search/list working without connections.\n- **`eager`** \u2014 Connect at startup but don't auto-reconnect if the connection drops. No idle timeout by default (set `idleTimeout` explicitly to enable).\n- **`keep-alive`** \u2014 Connect at startup. Auto-reconnect via health checks. No idle timeout. Use for servers you always need available.\n\n### Settings\n\n```json\n{\n  \"settings\": {\n    \"toolPrefix\": \"server\",\n    \"idleTimeout\": 10\n  },\n  \"mcpServers\": { }\n}\n```\n\n| Setting | Description |\n|---------|-------------|\n| `toolPrefix` | `\"server\"` (default), `\"short\"` (strips `-mcp` suffix), or `\"none\"` |\n| `idleTimeout` | Global idle timeout in minutes (default: 10, 0 to disable) |\n| `directTools` | Global default for all servers (default: false). Per-server overrides this. |\n\nPer-server `idleTimeout` overrides the global setting.\n\n### Direct Tools\n\nBy default, all MCP tools are accessed through the single `mcp` proxy tool. This keeps context small but means the LLM has to discover tools via search. If you want specific tools to show up directly in the agent's tool list \u2014 alongside `read`, `bash`, `edit`, etc. \u2014 add `directTools` to your config.\n\nPer-server:\n\n```json\n{\n  \"mcpServers\": {\n    \"chrome-devtools\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"chrome-devtools-mcp@latest\"],\n      \"directTools\": true\n    },\n    \"github\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"@modelcontextprotocol/server-github\"],\n      \"directTools\": [\"search_repositories\", \"get_file_contents\"]\n    },\n    \"huge-server\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"mega-mcp@latest\"]\n    }\n  }\n}\n```\n\n| Value | Behavior |\n|-------|----------|\n| `true` | Register all tools from this server as individual Pi tools |\n| `[\"tool_a\", \"tool_b\"]` | Register only these tools (use original MCP names) |\n| Omitted or `false` | Proxy only (default) |\n\nTo set a global default for all servers:\n\n```json\n{\n  \"settings\": {\n    \"directTools\": true\n  },\n  \"mcpServers\": {\n    \"huge-server\": {\n      \"directTools\": false\n    }\n  }\n}\n```\n\nPer-server `directTools` overrides the global setting. The example above registers direct tools for every server except `huge-server`.\n\nEach direct tool costs ~150-300 tokens in the system prompt (name + description + schema). Good for targeted sets of 5-20 tools. For servers with 75+ tools, stick with the proxy or pick specific tools with a `string[]`.\n\nDirect tools register from the metadata cache (`~/.pi/agent/mcp-cache.json`), so no server connections are needed at startup. On the first session after adding `directTools` to a new server, the cache won't exist yet \u2014 tools fall back to proxy-only and the cache populates in the background. Restart Pi and they'll be available. To force it: `/mcp reconnect <server>` then restart.\n\n**Interactive configuration:** Run `/mcp` to open an interactive panel showing all servers with connection status, tools, and direct/proxy toggles. You can reconnect servers, intentionally start or retry auth for needs-auth servers with `Ctrl+R`, and toggle tools between direct and proxy \u2014 all from one overlay. `Ctrl+R` uses the same auth-aware reconnect path as `/mcp auth <server>`: system-browser `authorization_code` with a `127.0.0.1` callback when needed, non-interactive `client_credentials` when configured, and no surprise browser launches during background reconnects. Changes are written to your config file; restart Pi to apply.\n\n**Subagent integration:** If you use the subagent extension, agents can request direct MCP tools in their frontmatter with `mcp:server-name` syntax. See the subagent README for details.\n\n### MCP UI Integration\n\nMCP servers can ship interactive UIs via the [MCP UI](https://github.com/MCP-UI-Org/mcp-ui) standard. When you call a tool that has a UI resource, the adapter opens it in a native macOS window via [Glimpse](https://github.com/hazat/glimpse) if available, otherwise falls back to the browser.\n\n**How it works:**\n\n1. Agent calls a tool like `launch_dashboard`\n2. The tool's metadata includes `_meta.ui.resourceUri` pointing to a UI resource\n3. pi-mcp-adapter fetches the UI HTML and opens it in an iframe\n4. The UI can call MCP tools and send messages back to the agent\n\n**Native rendering:** On macOS, if [Glimpse](https://github.com/hazat/glimpse) is installed (`pi install npm:glimpseui`), UIs open in a native WKWebView window instead of a browser tab. Set `MCP_UI_VIEWER=browser` to force the browser, or `MCP_UI_VIEWER=glimpse` to require native rendering.\n\n**Bidirectional communication:** The UI talks back. When it sends a prompt or intent, the message is stored and `triggerTurn()` wakes the agent. The agent retrieves messages via `mcp({ action: \"ui-messages\" })` and responds, enabling conversational UIs where the app and agent collaborate in real-time.\n\n**Session reuse:** When the agent calls the same tool again while its UI is already open, the adapter pushes the new result to the existing window instead of replacing it. This enables live updates \u2014 the agent can refine a chart, add data, or respond to user input without losing the current view. Different tools still replace the session as before.\n\n**Message types from UI:**\n\n| Type | Purpose |\n|------|---------|\n| `prompt` | User message that triggers an agent response |\n| `intent` | Structured action with name + params |\n| `notify` | Fire-and-forget notification |\n| `message` | Generic message payload |\n| (custom) | Any other type forwarded as intent |\n\n**Retrieving UI messages:**\n\n```\nmcp({ action: \"ui-messages\" })\n```\n\nReturns accumulated messages from UI sessions. Each message includes `type`, `sessionId`, `serverName`, `toolName`, and `timestamp`. Prompt messages include `prompt`, intent messages include `intent` and `params`.\n\n**Browser controls:**\n\n- **Cmd/Ctrl+Enter** \u2014 Complete and close\n- **Escape** \u2014 Cancel and close\n- **Done/Cancel buttons** \u2014 Same as keyboard shortcuts\n\n**Technical notes:**\n\n- Tool consent gates whether UIs can call MCP tools (never/once-per-server/always)\n- Works with both stdio and HTTP MCP servers\n- Uses a local 408KB AppBridge bundle (MCP SDK + Zod) for browser\u2194server communication\n\n### Local Example: Interactive Visualizer\n\nA minimal MCP UI example at `examples/interactive-visualizer` demonstrating charts, bidirectional messaging, and streaming. From that directory:\n\n```bash\nnpm install\nnpm run build\nnpm run install-local\n```\n\nRestart pi, then ask the agent to show a chart \u2014 it calls `show_chart` and opens the UI in Glimpse (macOS) or the browser. Use `npm run uninstall-local` to remove the MCP entry.\n\n### Import Existing Configs\n\nAlready have MCP set up elsewhere? Import it:\n\n```json\n{\n  \"imports\": [\"cursor\", \"claude-code\", \"claude-desktop\"],\n  \"mcpServers\": { }\n}\n```\n\nSupported: `cursor`, `claude-code`, `claude-desktop`, `vscode`, `windsurf`, `codex`\n\n### Project Config\n\nAdd `.pi/mcp.json` in a project root for project-specific servers. Project config overrides global and imported servers.\n\n## Usage\n\n| Mode | Example |\n|------|---------|\n| Status | `mcp({ })` |\n| List server | `mcp({ server: \"name\" })` |\n| Search | `mcp({ search: \"screenshot navigate\" })` |\n| Describe | `mcp({ describe: \"tool_name\" })` |\n| Call | `mcp({ tool: \"...\", args: '{\"key\": \"value\"}' })` |\n| Connect | `mcp({ connect: \"server-name\" })` |\n| UI messages | `mcp({ action: \"ui-messages\" })` |\n\nSearch includes both MCP tools and Pi tools (from extensions). Pi tools appear first with `[pi tool]` prefix. Space-separated words are OR'd.\n\nTool names are fuzzy-matched on hyphens and underscores \u2014 `context7_resolve_library_id` finds `context7_resolve-library-id`.\n\n## Commands\n\n| Command | What it does |\n|---------|--------------|\n| `/mcp` | Interactive panel (server status, tool toggles, reconnect/auth via `Ctrl+R`, auth notices) |\n| `/mcp tools` | List all tools |\n| `/mcp reconnect` | Reconnect all servers |\n| `/mcp reconnect <server>` | Connect or reconnect a single server |\n| `/mcp auth` | Show OAuth status, flow, registration strategy, storage hints, and browser/no-browser behavior |\n| `/mcp auth <server>` | Intentionally start or retry auth for one OAuth-configured HTTP server (`authorization_code` browser flow or `client_credentials` token exchange) |\n| `/mcp-auth` | Compatibility launcher for `/mcp auth` |\n| `/mcp-auth <server>` | Compatibility launcher for `/mcp auth <server>` |\n\n## How It Works\n\n- One `mcp` tool in context (~200 tokens) instead of hundreds\n- Servers are lazy by default \u2014 they connect on first tool call, not at startup\n- Tool metadata is cached to disk so search/list/describe work without live connections\n- Idle servers disconnect after 10 minutes (configurable), reconnect automatically on next use\n- npx-based servers resolve to direct binary paths, skipping the ~143 MB npm parent process\n- MCP server validates arguments, not the adapter\n- Keep-alive servers get health checks and auto-reconnect, but browser-based reauth only happens on intentional retries\n- HTTP auth uses StreamableHTTP first and only falls back to SSE when the transport is incompatible, not when auth fails\n- Auth-aware fallback preserves `needs-auth` state instead of misclassifying `401`/`403`, refresh failures, or rejected browser flows as transport incompatibility\n- Specific tools can be promoted from the proxy to first-class Pi tools via `directTools` config, so the LLM sees them directly instead of having to search\n\n## Limitations\n\n- Cross-session server sharing not yet implemented (each Pi session runs its own server processes)\n- OAuth auth is only available for HTTP/SSE transports, not stdio-only servers\n- Interactive `authorization_code` currently requires your system browser and an auth provider that accepts a `127.0.0.1` loopback redirect; embedded/copy-paste auth is not supported\n- Background reconnects intentionally avoid surprise browser launches; if silent refresh is not possible, the server stays in a needs-auth state until you retry interactively\n\n## OAuth Troubleshooting\n\n| Symptom | What to do |\n|---------|------------|\n| Browser did not open during a reconnect | Expected for background reconnects. Run `/mcp auth <server>` (or `/mcp-auth <server>`) or highlight the server in `/mcp` and press `Ctrl+R` to start an intentional browser flow. |\n| Browser sign-in opened but never completed | Make sure the browser can reach a local callback on `127.0.0.1`, the auth server allows loopback redirects, and your system browser is the one completing the flow, then retry `/mcp auth <server>` (or `/mcp-auth <server>`). |\n| Provider rejects the redirect URI or callback | Confirm the provider allows `http://127.0.0.1:<port>/...` loopback redirects. Pi uses the system browser + loopback callback only; there is no manual copy/paste fallback. |\n| Server stays in `needs-auth` after a failed sign-in | Retry `/mcp auth <server>` (or `/mcp-auth <server>`). Cancelled, expired, rejected, or callback-failed browser attempts intentionally stay in `needs-auth` until you retry. |\n| `client_credentials` keeps failing | Check `clientId` / `clientSecret`, env var names, and any required `scope` or `resource` hints. Pi will not open a browser for this flow. |\n| `registration.mode: \"auto\"` picked the wrong strategy | Set `registration.mode` explicitly to `static`, `metadata-url`, or `dynamic`. The default order is static client info -> metadata URL/CIMD -> dynamic registration. |\n| You had old tokens under `~/.pi/agent/mcp-oauth/...` | They are imported into `~/.pi/agent/mcp-auth` on first use when possible. If migration cannot be used, rerun `/mcp auth <server>` (or `/mcp-auth <server>`) to establish fresh auth. |\n| An HTTP server reports auth errors | Treat it as auth, not transport selection. StreamableHTTP only falls back to SSE for transport incompatibility, not `401`/`403` or refresh failures. |\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "coding-agent",
+    "extension",
+    "claude",
+    "llm"
+  ],
+  "author": {
+    "name": "Nico Bailon, Jordy van Domselaar"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/jordyvandomselaar/pi-mcp-adapter#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jordyvandomselaar/pi-mcp-adapter.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-21T02:11:25.780Z",
+    "modified": "2026-04-02T19:12:25.861Z",
+    "2.2.0": "2026-03-21T02:11:26.077Z",
+    "2.3.0": "2026-04-02T19:12:25.727Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 7,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 66
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 134
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

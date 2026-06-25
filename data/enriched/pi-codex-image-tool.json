@@ -1,0 +1,38 @@
+{
+  "name": "pi-codex-image-tool",
+  "latest_version": "0.1.1",
+  "description": "Pi extension exposing a gpt-5.5+ image generation tool backed by gpt-image-2.",
+  "readme": "# pi-codex-image-tool\n\nPi extension that exposes a `codex_image` wrapper tool for `gpt-5.5+` models. The wrapper lets Pi ask Codex/GPT-5.5 to use its native hosted image-generation capability and save the streamed image bytes to disk.\n\n> GitHub link: https://github.com/ross-jill-ws/pi-codex-image-tool\n\n## Why this exists\n\nGPT-5.5+ can generate images through its own API-side hosted tool. This is **not** a normal Pi function tool named `generate_image`; the request must include OpenAI/Codex's native tool shape:\n\n```json\n{\n  \"tools\": [\n    {\n      \"type\": \"image_generation\",\n      \"model\": \"gpt-image-2\",\n      \"size\": \"1024x1024\"\n    }\n  ],\n  \"tool_choice\": { \"type\": \"image_generation\" }\n}\n```\n\nThis extension registers a Pi wrapper tool named `codex_image`. When GPT-5.5 calls that wrapper, the wrapper sends a separate request to the current GPT-5.5/Codex model using only the native `image_generation` hosted tool above, parses the streamed response, and writes the image to disk.\n\n## Authentication: no `OPENAI_API_KEY` required\n\nYou do **not** need to set `OPENAI_API_KEY` for this extension if you already use Pi with a Codex/ChatGPT subscription.\n\nAs long as your current Pi model is `gpt-5.5` or another matching `gpt-5.x` model where `x >= 5`, the extension uses Pi's existing model auth/session. In other words, your existing Codex subscription is enough.\n\n## Usage\n\nSwitch Pi to a matching model such as `gpt-5.5`, then ask naturally:\n\n```text\nGenerate an image of an orange cat sitting by a window\n```\n\nIf you have other image tools installed, such as Nano Banana, be explicit:\n\n```text\nGenerate an image of an orange cat sitting by a window using codex_image tool\n```\n\nYou can also specify a save location:\n\n```text\nGenerate an image of a panda using codex_image tool and save it to ./panda-images\n```\n\n### Image size\n\nMention the image size in the prompt with `widthxheight`, for example:\n\n```text\nGenerate an image of a futuristic city using codex_image tool at 1024x1536\n```\n\nSize notes:\n\n- One dimension must be larger than `1024`.\n- Both width and height must be multiples of `16`.\n- Examples: `1024x1536`, `1536x1024`, `1088x1440`.\n\n## Examples\n\nTool result in Pi:\n\n![codex_image tool result in Pi](media/codex-image-tool-result.png)\n\nGenerated image:\n\n![Generated orange cat](media/codex-image-cat.png)\n\n## Pi Package Info\n\nThis repository is a Pi package. Its `package.json` contains:\n\n- `keywords: [\"pi-package\", ...]` for Pi package discoverability\n- `peerDependencies` for Pi-provided runtime packages\n- a `pi.extensions` manifest pointing to `extensions/index.ts`\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"extensions/index.ts\"]\n  }\n}\n```\n\n## Extension behavior\n\n### `codex_image` tool\n\nThe extension exposes the `codex_image` Pi wrapper tool only when Pi's current model matches `gpt-5.x` with `x >= 5` (for example `gpt-5.5` or `gpt-5.10`). It syncs this on session start and whenever the user switches models. For any other model, the wrapper is removed from the active tool list so it does not appear in the LLM prompt.\n\nThe OpenAI/Codex API request does **not** define a `generate_image` function tool. It only sends the native hosted image tool as `type: \"image_generation\"`.\n\nTool parameters:\n\n| Parameter | Type | Required | Description |\n|---|---:|---:|---|\n| `prompt` | string | yes | Detailed prompt describing the image to generate |\n| `size` | enum | yes | Image size requested from `gpt-image-2` |\n| `target-path` | string | yes | Directory where streamed image data is saved. Defaults to `/tmp/pi-codex-image-tool` |\n\nFixed API tool settings:\n\n- `type`: `image_generation`\n- `model`: `gpt-image-2`\n\nThe extension parses streamed SSE `data:` events, including `partial_image_b64` / `result` image payloads, and saves the first image payload to `target-path` as soon as it arrives. The generated image is also returned inline to Pi.\n\n## Install / Use Locally\n\nFrom this repository:\n\n```bash\nbun install\npi -e .\n```\n\nOr install it globally from npm:\n\n```bash\npi install npm:pi-codex-image-tool\n```\n\nFor project-local installation in another repo, run:\n\n```bash\npi install -l npm:pi-codex-image-tool\n```\n\n## Verify\n\nStart Pi with the extension loaded, switch to a matching model such as `gpt-5.5`, then prompt:\n\n```text\nGenerate an image of a tiny robot painting a sunset using codex_image tool at 1024x1536 and save it under /tmp/pi-images\n```\n\nThe agent should call `codex_image`, then return the generated image and saved file path.\n\n## Development\n\nThis scaffold was initialized with Bun:\n\n```bash\nbun init -y\n```\n\nUseful commands:\n\n```bash\nbun install\nbun run check\n```\n\n## Requirements\n\n- Pi installed and configured\n- Current Pi model set to `gpt-5.5+`\n- Existing Codex/ChatGPT subscription auth in Pi\n- Bun for local development\n\n## Security\n\nPi extensions run with your full system permissions. Review extension source before installing or sharing.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "image-generation",
+    "gpt-image-2",
+    "gpt-5.5"
+  ],
+  "author": {
+    "name": "Ross Z"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ross-jill-ws/pi-codex-image-tool#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ross-jill-ws/pi-codex-image-tool.git"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/index.ts"
+    ],
+    "image": "https://github.com/ross-jill-ws/pi-codex-image-tool/blob/main/media/codex-image-cat.png?raw=true"
+  },
+  "time": {
+    "created": "2026-05-07T01:39:48.679Z",
+    "modified": "2026-05-07T01:43:40.298Z",
+    "0.1.0": "2026-05-07T01:39:48.902Z",
+    "0.1.1": "2026-05-07T01:43:40.188Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

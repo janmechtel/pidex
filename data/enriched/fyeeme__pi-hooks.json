@@ -1,0 +1,37 @@
+{
+  "name": "@fyeeme/pi-hooks",
+  "latest_version": "1.0.0",
+  "description": "Claude Code-compatible hooks runner for pi. Reads .pi/hooks.json and maps SessionStart, PreToolUse, and Stop events to pi lifecycle events.",
+  "readme": "# pi-hooks\n\nA Claude Code-compatible hooks runner for [pi](https://pi.dev). Reads `.pi/hooks.json` from your project and maps `SessionStart`, `PreToolUse`, and `Stop` events to pi lifecycle events \u2014 matching Claude Code's hooks protocol including stdin JSON and stdout `additionalContext` capture.\n\n## Install\n\nRequires the [pi](https://pi.dev) CLI.\n\n### From npm (recommended)\n\n```bash\n# Global (user) install \u2014 available in every project\npi install npm:@fyeeme/pi-hooks\n\n# Project-local \u2014 written to .pi/settings.json, shareable with your team\npi install -l npm:@fyeeme/pi-hooks\n\n# Pinned version \u2014 skipped by `pi update`\npi install npm:@fyeeme/pi-hooks@1.0.0\n\n# Try it once without saving (current run only)\npi -e npm:@fyeeme/pi-hooks\n```\n\n### From GitHub\n\nSource: [`fyeeme/pi-packages`](https://github.com/fyeeme/pi-packages).\n\n```bash\n# HTTPS shorthand\npi install git:github.com/fyeeme/pi-packages\n# Pin to a tag or commit (skipped by `pi update`)\npi install git:github.com/fyeeme/pi-packages@v1.0.0\n# Raw URL form\npi install https://github.com/fyeeme/pi-packages\n```\n\nSee the Pi Packages guide on [pi.dev](https://pi.dev) for the full list of source types, scopes, and `pi update` behavior.\n\n## Configuration\n\nCreate `.pi/hooks.json` in your project root:\n\n```json\n{\n  \"hooks\": {\n    \"SessionStart\": [\n      {\n        \"matcher\": \"\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"serena-hooks activate --client=claude-code\"\n          }\n        ]\n      }\n    ],\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"serena-hooks remind --client=claude-code\"\n          }\n        ]\n      },\n      {\n        \"matcher\": \"plugin_serena_serena_*\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"serena-hooks auto-approve --client=claude-code\"\n          }\n        ]\n      }\n    ],\n    \"Stop\": [\n      {\n        \"matcher\": \"\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"serena-hooks cleanup --client=claude-code\"\n          }\n        ]\n      }\n    ]\n  }\n}\n```\n\n## Event Mapping\n\n| hooks.json event | pi event | Notes |\n|---|---|---|\n| `SessionStart` | `session_start` | Runs on startup. `additionalContext` sent via `sendUserMessage`. |\n| `PreToolUse` (empty matcher) | `tool_call` | Runs before every tool with real `tool_name`. `additionalContext` injected before next LLM call. |\n| `PreToolUse` (pattern matcher) | `tool_call` | Glob match against pi tool name (e.g. `plugin_serena_serena_*`). |\n| `Stop` | `session_shutdown` | Runs on exit. |\n\n## Protocol\n\nCommands receive Claude Code-compatible JSON on stdin:\n\n```json\n{ \"type\": \"session_start\", \"session_id\": \"...\", \"transcript_path\": \"...\" }\n{ \"type\": \"pre_tool_use\", \"session_id\": \"...\", \"tool_name\": \"bash\", \"tool_input\": {} }\n{ \"type\": \"stop\", \"session_id\": \"...\" }\n```\n\nCommands may return JSON on stdout:\n\n```json\n{ \"hookSpecificOutput\": { \"additionalContext\": \"...\" } }\n```\n\nThe `additionalContext` is injected into the pi conversation.\n\n## MCP Tool Names\n\nPi names MCP tools as `<serverName>_<toolName>` (not `mcp__server__tool` like Claude Code). Check your actual tool names with `/mcp` in pi to set the correct `matcher`.\n\n## Config Override\n\nSet `PI_HOOKS_CONFIG` env var to point to a custom config path.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "hooks",
+    "claude-code",
+    "serena",
+    "automation",
+    "lifecycle"
+  ],
+  "author": {
+    "name": "fyeeme"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/fyeeme/pi-packages#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fyeeme/pi-packages.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-15T17:50:35.110Z",
+    "1.0.0": "2026-06-15T17:50:35.401Z",
+    "modified": "2026-06-15T17:50:35.610Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 11,
+  "download_trend": []
+}

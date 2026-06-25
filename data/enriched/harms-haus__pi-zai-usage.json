@@ -1,0 +1,31 @@
+{
+  "name": "@harms-haus/pi-zai-usage",
+  "latest_version": "0.1.0",
+  "description": "Z.ai API quota monitor extension for pi-coding-agent",
+  "readme": "# pi-zai-usage\n\n> A lightweight [pi coding agent](https://pi.dev) extension that monitors your Z.ai token quota in real time and displays a color-coded progress bar in the terminal footer via [pi-powerline](https://github.com/harms-haus/pi-powerline).\n\n## Features\n\n- Fetches Z.ai token quota usage from the official API\n- Displays a color-coded progress bar in the pi-powerline footer (Line 2, right-aligned)\n- Caches responses for 60 seconds to minimize API calls\n- Automatically activates only when a Z.ai provider is selected\n- Gracefully handles network errors, missing API keys, and headless sessions\n\n## Installation\n\n```bash\npi install git:github.com/harms-haus/pi-zai-usage\n```\n\nThen restart pi or run `/reload`.\n\n## How It Works\n\nWhen a Z.ai model is selected (provider name starts with `\"zai\"`), this extension:\n\n1. Fetches your current token quota from `GET https://api.z.ai/api/monitor/usage/quota/limit`\n2. Extracts the `TOKENS_LIMIT` entry from the response\n3. Publishes the usage percentage and reset time to the UI via `ctx.ui.setStatus()`\n\nThe published status is consumed by [pi-powerline](https://github.com/harms-haus/pi-powerline), which renders it as a color-coded progress bar on footer **Line 2**, right-aligned.\n\n### Caching\n\nResponses are cached for **60 seconds**. Within the TTL, cached data is returned immediately without an API call. The cache is cleared when the selected provider changes (e.g., switching from Z.ai to another provider). Switching between Z.ai models preserves the cache.\n\n## Events\n\nThe extension listens to the following pi lifecycle events:\n\n| Event              | Behavior                                                                        |\n| ------------------ | ------------------------------------------------------------------------------- |\n| `session_start`    | Fetches and publishes usage data                                                |\n| `model_select`     | Clears the cache if the provider changed, then fetches and publishes usage data |\n| `turn_end`         | Fetches and publishes usage data (respects cache TTL)                           |\n| `session_shutdown` | Clears the status display                                                       |\n\nWhen no UI is available, all events return early. When the active provider is not Z.ai, the handlers clear any previously published status rather than fetching new data.\n\n## Status Payload\n\nThe extension publishes under the status key `\"zai-usage\"`:\n\n```json\n{ \"percentage\": 42.5, \"resetTimeMs\": 1719360000000 }\n```\n\n| Field         | Type                  | Description                                                            |\n| ------------- | --------------------- | ---------------------------------------------------------------------- |\n| `percentage`  | `number`              | Token quota used, rounded to one decimal place and clamped to [0, 100] |\n| `resetTimeMs` | `number \\| undefined` | Unix timestamp (ms) when the quota resets                              |\n\n## Requirements\n\n- **Z.ai API key** \u2014 configure via `/login` for the `zai` provider in pi\n- **pi-powerline** \u2014 renders the progress bar in the footer (optional; without it the status is still published but not displayed)\n\n## Integration with pi-powerline\n\nThe progress bar is rendered by [pi-powerline](https://github.com/harms-haus/pi-powerline) on footer **Line 2**, right-aligned. Install both extensions for the full experience:\n\n```bash\npi install git:github.com/harms-haus/pi-powerline\npi install git:github.com/harms-haus/pi-zai-usage\n```\n\n## License\n\nMIT\n\n## Contributing\n\nSee [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and PR guidelines.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "harms-haus"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/harms-haus/pi-zai-usage#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/harms-haus/pi-zai-usage.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-25T23:40:50.239Z",
+    "0.1.0": "2026-05-25T23:40:50.541Z",
+    "modified": "2026-05-25T23:40:50.788Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 19,
+  "download_trend": []
+}

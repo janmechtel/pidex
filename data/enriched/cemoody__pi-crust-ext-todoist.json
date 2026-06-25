@@ -1,0 +1,351 @@
+{
+  "name": "@cemoody/pi-crust-ext-todoist",
+  "latest_version": "0.1.1",
+  "description": "Interactive, mobile-friendly Todoist widget for pi-crust \u2014 the LLM drives your task list via tools while you edit/complete tasks inline in the sidebar.",
+  "readme": "# @cemoody/pi-crust-ext-todoist\n\nAn interactive, **mobile-friendly Todoist widget** for pi-crust. The LLM drives\nyour task list with tools; you edit, complete, and reschedule tasks inline in\nthe sidebar. Both surfaces operate on the **same Todoist account**, so changes\nthe agent makes show up immediately in the widget and vice-versa.\n\n> Without a `TODOIST_API_TOKEN` the extension runs against a fully-interactive\n> in-memory mock (create / edit / complete / reopen / delete all work) so you\n> can try it offline. Set the token to talk to your real account.\n\n## Three surfaces, one client\n\nThis package wires three pi-crust/pi entry points to a single shared Todoist\nREST client (`todoist-client.mjs`):\n\n| File                | Manifest key            | Role |\n|---------------------|-------------------------|------|\n| `pi.mjs`            | `pi.extensions`         | LLM-facing tools \u2014 the agent driving surface |\n| `server.mjs`        | `piCrust.extension`     | Registers the **Todoist** sidebar activity + `/api/ext/todoist/*` REST routes |\n| `web.mjs`           | `piCrust.web`           | The interactive React widget mounted in the sidebar |\n\nThe widget calls the server routes; the agent tools call Todoist directly.\nBoth go through the same client, so there's no state to keep in sync \u2014 Todoist\n(or the mock store) is the single source of truth.\n\n## The UI paradigm\n\nA deliberately **focused subset** of Todoist rather than a full clone \u2014 what you\nactually want inline in a session:\n\n- **Project chips** across the top scope the list (`All` + each project, with\n  live open-task counts). Horizontally scrollable on phones.\n- A **sticky quick-add bar** creates tasks into the active project (Inbox by\n  default). Enter or the **Add** button.\n- Each task row is a large tap target:\n  - a **round complete checkbox** colored by priority (P1 red \u2192 P4 grey) with a\n    satisfying strike-and-remove animation,\n  - the **title is tap-to-edit inline** (Enter saves, Esc cancels),\n  - a **due-date chip** (overdue = red, today = green, otherwise a friendly date),\n  - **project dot** (in the `All` view) and **@label** pills,\n  - row actions to **cycle priority** and **delete** (hover-revealed on desktop,\n    always visible on phones).\n- Every mutation is **optimistic** and reconciles against the server response.\n\nIt collapses to a single comfortable column with 44px+ tap targets under 640px,\nand reuses the host design tokens so it matches the rest of pi-crust.\n\n## Agent tools\n\n| Tool               | Description |\n|--------------------|-------------|\n| `todoist_list`     | List active tasks (by `projectId` or a Todoist `filter` query like `today`, `overdue`, `@work & p1`) |\n| `todoist_projects` | List projects with ids |\n| `todoist_add`      | Create a task (`content`, `dueString` natural language, `priority` 1\u20134, `labels`, `projectId`) |\n| `todoist_update`   | Edit a task (`content`, `dueString`, `clearDue`, `priority`, `labels`, `projectId`) |\n| `todoist_complete` | Complete (close) a task |\n| `todoist_reopen`   | Reopen a completed task |\n| `todoist_delete`   | Delete a task |\n\nPriority follows the Todoist REST convention: **4 = P1 (urgent)** \u2026 **1 = P4**.\n\n### Inline tool-call cards\n\nEvery agent tool call renders a compact Todoist summary **inline in the\nconversation timeline** (not just a line of text). The tools attach a\n`details.piRemoteControlArtifact` of **kind `markdown`** to their result;\npi-crust renders it natively in the timeline. We use markdown (not HTML) on\npurpose: HTML artifacts are wrapped in a bordered `figure` **and** a bordered,\n320px-min sandboxed `iframe`, which double-boxes a small task list, leaves dead\nwhitespace, and can't run scripts anyway. Markdown renders organically in a\nsingle box with the host's own typography.\n\nWhen the agent runs `todoist_list`, `todoist_add`, `todoist_complete`, or\n`todoist_update`, you see the affected list right in the chat \u2014 a just-added task\nis **bolded**, completed tasks are struck through, and a status line\n(`Added \u00b7 Work`, `Completed \u00b7 3 still open`) heads the card.\n\n> The inline card is a **read-only snapshot**. pi-crust sandboxes artifact\n> iframes (`sandbox=\"\"`, no scripts), so inline items can't be tapped to mutate.\n> The interactive surface is the **sidebar panel**.\n\n### Editing in the sidebar (interactive)\n\nThe sidebar Todoist panel is where you work with tasks directly:\n\n- **Tap the round check** \u2192 completes the task (with strike animation).\n- **Tap the title** \u2192 inline text editor; Enter saves, Esc cancels.\n- **Tap the priority flag** \u2192 cycles P1\u2192P4 (`todoist_update priority`).\n- **Tap the due chip** (or the faint `\ud83d\udcc5 Due` on undated tasks) \u2192 a natural-language\n  due editor (\u201ctomorrow 9am\u201d, \u201cnext monday\u201d); clear it to remove the date.\n- **Quick-add** at the top; **trash** to delete.\n\nAll mutations are optimistic and proxied to the `/api/ext/todoist/*` routes.\n\n## Tests\n\nBuilt test-first (vitest + jsdom + Testing Library):\n\n```bash\nnpm test\n```\n\nCovers the inline-artifact builder (`test/artifact.test.mjs` \u2014 markdown shape,\nhighlight, status, due labels), the agent tools' artifact wiring\n(`test/pi-tools.test.mjs`), and the sidebar widget interactions\n(`test/widget.test.mjs` \u2014 complete, title edit, priority cycle, **due-date\nediting**, quick-add).\n\n## Connecting your account\n\nTwo ways to provide a Todoist personal API token (Todoist \u2192 Settings \u2192\nIntegrations \u2192 Developer \u2192 API token):\n\n1. **In-app (recommended)** \u2014 open the Todoist panel and use the **Connect your\n   Todoist account** banner. The token is saved via `prc.storage` to\n   `\u2026/todoist.json` and survives restarts. A **Disconnect** link clears it.\n2. **Env var** \u2014 set `TODOIST_API_TOKEN` (handy for headless/server/CI). \n\n**Token resolution precedence:** an in-app (stored) token wins; otherwise the\nenv var; otherwise the interactive in-memory **demo** store. The connection\nstatus endpoint returns only a masked hint (`\u2026cdef`) \u2014 the raw token is never\nsent to the browser.\n\n| Env var             | Purpose |\n|---------------------|---------|\n| `TODOIST_API_TOKEN` | Optional fallback token. In-app token takes precedence; when neither is set the in-memory mock is used. |\n\nConfig routes: `GET /api/ext/todoist/config`, `POST /api/ext/todoist/token`\n`{token}`, `POST /api/ext/todoist/token/delete`. Full surface + edge cases:\n[`docs/SPEC-token-config.md`](docs/SPEC-token-config.md).\n\n## Publishing\n\nShips an allow-listed tarball (9 files; verify with `npm pack --dry-run`).\n`prepublishOnly` runs the test suite. To publish:\n\n```bash\nnpm version patch        # or minor/major\nnpm publish --access public\n# or: push a vX.Y.Z tag and let .github/workflows/publish.yml do it (needs NPM_TOKEN)\n```\n\nUntil published, install from a path or git URL:\n\n```bash\nPI_CRUST_EXTENSIONS=/path/to/pi-crust-ext-todoist npx pi-crust\n# or add the path/git url to packages[] in your pi-crust settings.json\n```\n\n## Install\n\nPi-crust discovers any installed package whose `package.json` carries a\n`piRemoteControl` / `piCrust` field; pi discovers the `pi.extensions` entry.\n\n```bash\nTODOIST_API_TOKEN=xxxx PI_CRUST_EXTENSIONS=/path/to/pi-crust-ext-todoist npx pi-crust\n```\n\n## REST surface (used by the widget)\n\n```\nGET  /api/ext/todoist/state?projectId=        -> { projects, tasks, live }\nPOST /api/ext/todoist/tasks                    { content, projectId? } -> { task }\nPOST /api/ext/todoist/tasks/:id/update         { content?, priority?, dueString?, ... } -> { task }\nPOST /api/ext/todoist/tasks/:id/close          -> { ok }\nPOST /api/ext/todoist/tasks/:id/reopen         -> { ok }\nPOST /api/ext/todoist/tasks/:id/delete         -> { ok }\n```\n\n## Preview\n\n`node preview/shoot.mjs` renders the widget against an in-memory mock and writes\n`preview/desktop.png` + `preview/mobile.png` (requires `playwright-core`).\n\n## License\n\nMIT.\n",
+  "keywords": [
+    "pi-crust",
+    "pi-crust-extension",
+    "pi-package",
+    "pi.dev",
+    "todoist",
+    "todo",
+    "tasks"
+  ],
+  "author": {
+    "name": "cemoody"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/cemoody/pi-crust-ext-todoist#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cemoody/pi-crust-ext-todoist.git"
+  },
+  "pi": {
+    "extensions": [
+      "./pi.mjs"
+    ]
+  },
+  "time": {
+    "created": "2026-06-19T17:16:28.380Z",
+    "modified": "2026-06-19T17:23:36.673Z",
+    "0.1.0": "2026-06-19T17:16:28.729Z",
+    "0.1.1": "2026-06-19T17:23:36.552Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 274,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 274
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

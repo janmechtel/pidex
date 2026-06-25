@@ -1,0 +1,351 @@
+{
+  "name": "@wassname2/pi-lgtm",
+  "latest_version": "0.4.2",
+  "description": "A pi extension providing goal tracking with structural sign-off and LGTM workflow.",
+  "readme": "# @wassname/pi-lgtm\n\nHelp your agent track goals and aim for human sign off.\n\nA [pi](https://pi.dev) extension that adds structured human sign-off to task tracking. Fork of [@tintinweb/pi-tasks](https://github.com/tintinweb/pi-tasks) with a minimal LGTM layer.\n\nThe core idea: agents cannot mark tasks complete themselves. They must call `lgtm_ask` with auditable evidence and explicit failure-mode analysis, then a human signs off via `/lgtm <id>`.\n\nTasks can also carry a separate fresh-perspective robot review from a subagent or other model family. Robot reviews can iterate: if the latest review says the evidence is incomplete or unconvincing, human sign-off is held back until the agent strengthens the evidence and reruns review.\n\n## Install\n\n```bash\npi install npm:@wassname2/pi-lgtm\n```\n\nOr for development:\n\n```bash\npi -e ./src/index.ts\n```\n\n![example](media/screenshot.png)\n![alt text](img/README-1776381151332-image.png)\n\n## What is different from pi-tasks\n\n| pi-tasks | pi-lgtm |\n|---|---|\n| Agent calls `TaskUpdate { status: \"completed\" }` | Blocked -- throws error |\n| No evidence required | `lgtm_ask` requires evidence, 2 failure modes, falsification test |\n| Tasks complete immediately | Agent sets `pending_approval`, human runs `/lgtm <id>` |\n| No done criterion | `done_criterion` required on create: falsifiable observation |\n\nStripped: `TaskExecute`, `TaskOutput`, `TaskStop`, `process-tracker.ts`, subagent RPC, settings menu.\n\n## Widget\n\n```\n\u25cf 3 tasks (1 done, 1 in progress, 1 open)\n  \u2714 #1 Design schema\n  \u2733 #2 Implementing cache layer\u2026 (2m 49s \u00b7 \u2191 4.1k \u2193 1.2k)\n  \u25fb #3 Load test \ud83d\udee0 \ud83e\udd16 \ud83d\udc40\n```\n\nBadges:\n\n- `\ud83d\udee0` tool evidence attached via `lgtm_ask`\n- `\ud83e\udd16` one or more robot review iterations attached\n- `\ud83d\udc40` pending human sign-off via `/lgtm`\n\n## Tools\n\n### `TaskCreate`\n\n```\nsubject, description, done_criterion (required), progress_label (optional)\n```\n\n`done_criterion` must be a falsifiable observation: what you expect to see AND what you would see if it is wrong. Example: `\"All 92 tests pass. If wrong: type errors in build or failures in task-store.test.ts.\"`\n\n### `TaskList`\n\nLists all tasks. `\ud83d\udc40` indicates pending sign-off.\n\n### `TaskGet`\n\nFull task details including `done_criterion` and approval state.\n\n### `TaskUpdate`\n\nUpdate status (`pending | in_progress | deleted`), subject, description, done_criterion, dependencies. Cannot set `completed` -- use `/lgtm`.\n\n### `lgtm_ask`\n\nThe epistemic gate. Required fields:\n\n| Field | Description |\n|---|---|\n| `taskId` | Task to submit |\n| `evidence` | Exact command run + output, commit hash, config/seeds, file paths. \"I ran X and got Y\" not \"I wrote X\". |\n| `failure_likely` | Most likely way this is wrong despite evidence |\n| `failure_sneaky` | Perverse/silent failure that looks like success superficially |\n| `falsification_test` | What you ran and what you got, so both you and the human can sanity-check it. Why that result could not occur if a failure mode were real. |\n| `verification_hints` | Where to look and what to check. Descriptions of evidence locations. |\n| `remaining_uncertainty` | What is NOT tested, deferred edge cases, known limitations |\n\nAfter calling this, the task shows `\ud83d\udc40` and is only completable via `/lgtm <id>`. Evidence is stored on the task so the human can review it hours later without scrolling back.\n\nThe tool result includes a non-blocking self-check prompt asking whether the evidence directly addresses the `done_criterion` and whether a skeptical reviewer would find it convincing.\n\n`lgtm_ask` always runs the robot-review stage immediately after storing evidence. A failing or errored robot review clears `pending_approval` until the evidence is strengthened and reviewed again.\n\n### `robot_review_ask`\n\nAttach a fresh-perspective robot review to a task.\n\nRequired fields:\n\n| Field | Description |\n|---|---|\n| `taskId` | Task to annotate |\n| `reviewer` | Model/provider/family/class used for the review |\n| `scope` | What the reviewer inspected |\n| `observations` | Concrete observations only. No advice, verdicts, or editorial |\n| `blind_spots` | What the reviewer did not inspect or could not verify |\n| `accepted` | Overall accept/reject decision for whether the task is ready to advance |\n| `evidence_complete` | Whether the supplied evidence actually covers the done criterion |\n| `evidence_convincing` | Whether the supplied evidence would convince a skeptical reviewer |\n| `missing_evidence` | Concrete missing checks or artifacts needed before human sign-off |\n\nUse this from a separate subagent or other model when possible. Reviews append as iterations; the latest one is what gates human sign-off.\n\n### `robot_review_run`\n\nRun the configured automatic robot reviewer against the current task evidence.\n\nDefault reviewer stage:\n\n```bash\npi --mode json -p --no-session\n```\n\nOverride with:\n\n```bash\nPI_LGTM_ROBOT_REVIEW_MODEL='openai/gpt-5'\n```\n\nThis appends a new robot-review iteration. The reviewer returns an explicit `accepted` boolean as well as detailed observations, blind spots, and missing evidence. If the latest robot review rejects the evidence, `/lgtm` is blocked until stronger evidence is submitted and reviewed again.\n\n## Commands\n\n### `/lgtm <id>`\n\nHuman-only sign-off. Shows stored evidence, failure modes, and remaining uncertainty for review, then asks for confirmation. Without `<id>`, shows a list of pending-approval tasks.\n\n### `/tasks`\n\nInteractive menu: view tasks, create task, clear completed/all.\n\n## Task lifecycle\n\n```\npending -> in_progress -> (lgtm_ask)\n                       -> robot review iteration(s) \ud83e\udd16\n                       -> pending_approval \ud83d\udc40   if latest robot review passes or no robot review is required\n                       -> strengthen evidence + rerun review   if latest robot review fails\n                       -> (/lgtm) -> completed\n                       -> deleted\n```\n\n## Storage\n\nControlled by `taskScope` in `.pi/tasks-config.json`:\n\n| Mode | File | Behaviour |\n|---|---|---|\n| `memory` | none | In-memory, lost on session end |\n| `session` (default) | `.pi/tasks/tasks-<sessionId>.json` | Per-session, survives resume |\n| `project` | `.pi/tasks/tasks.json` | Shared across all sessions |\n\nOverride via env:\n\n```bash\nPI_TASKS=off          # in-memory (CI)\nPI_TASKS=sprint-1     # named shared list at ~/.pi/tasks/sprint-1.json\nPI_TASKS=/abs/path    # explicit path\nPI_TASKS_DEBUG=1      # trace to stderr\n```\n\n## Architecture\n\n```\nsrc/\n\u251c\u2500\u2500 index.ts        # 7 tools + /tasks + /lgtm commands + widget + event handlers\n\u251c\u2500\u2500 review-badges.ts # Review badge helpers for tool/robot/human lanes\n\u251c\u2500\u2500 robot-review.ts # Robot review iteration storage + compatibility helpers\n\u251c\u2500\u2500 types.ts        # Task, TaskStatus types\n\u251c\u2500\u2500 task-store.ts   # File-backed store with CRUD, locking, complete() method\n\u251c\u2500\u2500 auto-clear.ts   # Turn-based auto-clearing of completed tasks\n\u251c\u2500\u2500 tasks-config.ts # Config persistence -> .pi/tasks-config.json\n\u2514\u2500\u2500 ui/\n    \u2514\u2500\u2500 task-widget.ts  # Widget with status icons, spinner, \ud83d\udc40 indicator\n```\n\n## Development\n\n```bash\nnpm install\nnpm run typecheck\nnpm test            # 92 tests\nnpm run build\n```\n\n## License\n\nMIT -- based on [tintinweb/pi-tasks](https://github.com/tintinweb/pi-tasks) (MIT)\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "lgtm",
+    "sign-off",
+    "goal-tracking"
+  ],
+  "author": {
+    "name": "wassname"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/wassname/pi-lgtm#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wassname/pi-lgtm.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "video": "",
+    "image": ""
+  },
+  "time": {
+    "created": "2026-06-02T05:39:25.748Z",
+    "0.4.2": "2026-06-02T05:39:26.107Z",
+    "modified": "2026-06-02T05:39:26.313Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 16,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 52
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 22
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

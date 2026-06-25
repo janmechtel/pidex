@@ -1,0 +1,44 @@
+{
+  "name": "@estebanforge/pi-ts-review",
+  "latest_version": "1.0.0",
+  "description": "TypeScript / React code-review tool for Pi. Grades your git diffs against a focused TS + React rubric (2 sections, 14 entries: TypeScript type-system + React/JSX semantic mistakes). Targets .ts/.mts/.cts/.tsx. Each entry has a bad/good pair; the LLM propo",
+  "readme": "# @estebanforge/pi-ts-review\n\nTypeScript / React code review against a focused **TS + React rubric**. Registers a `ts_review` tool that reads git diffs, filters to `.ts`/`.mts`/`.cts`/`.tsx`, and attaches the rubric (14 entries across 2 sections: TypeScript types + React/JSX). The rubric targets flaws that **typescript-eslint** (strict) and **eslint-plugin-react-hooks** do *not* reliably catch. Every rule is grounded in a confirmed online source \u2014 see [Sources](#sources).\n\nSibling to [`@estebanforge/pi-go-review`](https://github.com/EstebanForge/pi-go-review), [`pi-php-review`](https://github.com/EstebanForge/pi-php-review), [`pi-rust-review`](https://github.com/EstebanForge/pi-rust-review), and [`pi-js-review`](https://github.com/EstebanForge/pi-js-review). Pair with `typescript-eslint` and `eslint-plugin-react-hooks` for lint coverage; this tool focuses on the semantic mistakes those linters may not flag.\n\n## Install\n\n```\npi install npm:@estebanforge/pi-ts-review\n```\n\n## Usage\n\nAsk Pi: **\"review my TypeScript changes\"** or **\"review my React changes.\"**\n\nThe tool runs `git` in one of five modes:\n\n| Mode | Description | Needs `ref` |\n| --- | --- | --- |\n| `working` | Unstaged changes | No |\n| `staged` | Staged (cached) changes | No |\n| `all` | All changes vs HEAD | No |\n| `commit` | A specific commit | Yes (SHA) |\n| `range` | A commit range | Yes (e.g. `main..HEAD`) |\n\nNarrow scope with `path` (a file or directory).\n\n## What it does\n\n1. Reads the git diff filtered to `*.ts` / `*.mts` / `*.cts` / `*.tsx`.\n2. Attaches the TS + React rubric (14 entries, 2 sections).\n3. The LLM reviews the diff and returns findings that **propose a corrected snippet**:\n\n| Severity | Meaning |\n| --- | --- |\n| Bug / Critical | Must fix |\n| Suggestion | Should consider |\n| Nit | Minor improvement |\n| Good pattern | Well done |\n\nEach finding cites the entry number (e.g. **#6**), the file + code fragment, and a corrected snippet. Ends with a **Verdict**: Approve / Request Changes / Needs Discussion.\n\n## Rubric sections\n\n| Section | Entries |\n| --- | --- |\n| 1. TypeScript Types | #1 - #3 |\n| 2. React / JSX | #4 - #14 |\n\nScope note: this rubric deliberately **excludes** mistakes that `typescript-eslint` (strict) and `eslint-plugin-react-hooks` already enforce (e.g. `any`, non-null `!`, Rules of Hooks, `exhaustive-deps`, `@ts-expect-error` via `ban-ts-comment`). It targets the semantic gaps those linters miss: effect cleanup, fetch races, unstable effect deps, derived state, direct state mutation, stale updaters, unsafe `as` casts, falsy `&&` render, `dangerouslySetInnerHTML`.\n\n## Sources\n\nThe rubric's rules were validated against confirmed online sources during research (searched via Exa and Brave). The sources live here in the README (not embedded in the rubric) to keep the per-call prompt lean.\n\n| # | Entry | Source |\n| --- | --- | --- |\n| 1 | Unsafe `as` assertion | Effective TS \u2014 [Item 9: Prefer annotations to assertions](https://github.com/danvk/effective-typescript/blob/main/samples/ch-types/prefer-declarations-to-assertions.md) \u00b7 basarat \u2014 [type-assertion](https://github.com/basarat/typescript-book/blob/master/docs/types/type-assertion.md) |\n| 2 | `unknown` not narrowed | Total TypeScript \u2014 [Narrowing unknown](https://www.totaltypescript.com/workshops/typescript-pro-essentials/unions-and-narrowing/narrowing-unknown-in-a-large-conditional-statement/solution) |\n| 3 | Missing return types | typescript-eslint \u2014 [explicit-module-boundary-types](https://typescript-eslint.io/rules/explicit-module-boundary-types/) |\n| 4 | Effect without cleanup | React \u2014 [Lifecycle of Reactive Effects](https://react.dev/learn/lifecycle-of-reactive-effects) |\n| 5 | Direct state mutation | React \u2014 [Updating Objects in State](https://react.dev/learn/updating-objects-in-state) |\n| 6 | Stale state update | React \u2014 [Queueing a Series of State Updates](https://react.dev/learn/queueing-a-series-of-state-updates) |\n| 7 | `dangerouslySetInnerHTML` | React \u2014 [dangerouslySetInnerHTML](https://github.com/facebook/react/blob/main/docs/tips/19--dangerouslySetInnerHTML.md) \u00b7 OWASP [XSS Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html) |\n| 8 | Derived state via effect | React \u2014 [You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect) |\n| 9 | Fetch-in-effect race | React \u2014 [Synchronizing with Effects](https://react.dev/learn/synchronizing-with-effects) \u00b7 [Lifecycle of Reactive Effects](https://react.dev/learn/lifecycle-of-reactive-effects) |\n| 10 | Controlled value/onChange | React \u2014 [`<input>` reference](https://react.dev/reference/react-dom/components/input) |\n| 11 | `&&` falsy render | React \u2014 [Conditional Rendering](https://react.dev/learn/conditional-rendering) |\n| 12 | Index-as-key | React \u2014 [Rendering Lists](https://react.dev/learn/rendering-lists) |\n| 13 | setState in render loop | React \u2014 [Components and Hooks must be pure](https://react.dev/reference/rules/components-and-hooks-must-be-pure) |\n| 14 | Unstable value in deps array | React \u2014 [Removing Effect Dependencies](https://react.dev/learn/removing-effect-dependencies) |\n\nPrimary authorities: [Effective TypeScript (Dan Vanderkam)](https://github.com/danvk/effective-typescript), [typescript-eslint](https://typescript-eslint.io/), [React docs (react.dev)](https://react.dev/), [Total TypeScript](https://www.totaltypescript.com/).\n\n## TUI rendering\n\nCustom rendering for both the tool call and its result: mode, file count, insertions/deletions, and truncation status at a glance.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "typescript",
+    "react",
+    "tsx",
+    "jsx",
+    "code-review",
+    "code-reviewer",
+    "anti-patterns",
+    "code-smells",
+    "rubric",
+    "git-diff"
+  ],
+  "author": {
+    "name": "EstebanForge",
+    "email": "esteban@attitude.cl",
+    "url": "https://actitud.xyz"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/EstebanForge/pi-ts-review#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EstebanForge/pi-ts-review.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-24T16:21:28.375Z",
+    "1.0.0": "2026-06-24T16:21:28.681Z",
+    "modified": "2026-06-24T16:21:28.948Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 45,
+  "download_trend": []
+}

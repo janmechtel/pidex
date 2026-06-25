@@ -1,0 +1,39 @@
+{
+  "name": "pi-dev-loop",
+  "latest_version": "0.1.2",
+  "description": "Autonomous development loop engine for pi \u2014 verify-driven iteration with subagent isolation and error tracking",
+  "readme": "# pi-dev-loop\n\nAutonomous development loop engine for [pi](https://github.com/earendil-works/pi-coding-agent) \u2014 verify-driven iteration with error tracking and regression detection.\n\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)\n\n## Prerequisites\n\n- [pi](https://github.com/earendil-works/pi-coding-agent)\n- **Subagent capability** (recommended) \u2014 the dev loop uses `subagent()` for\n  process isolation. Install [pi-subagents](https://github.com/nicobailon/pi-subagents):\n\n  ```bash\n  pi add npm:pi-subagents\n  ```\n\n  Without it, the dev loop still works \u2014 the orchestrator does the work directly.\n\n## Architecture\n\nThree-layer isolation (with subagents):\n\n```\n\u250c\u2500 Orchestrator (main session) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502  Tracks error registry, dispatches work,         \u2502\n\u2502  never writes code directly.                     \u2502\n\u251c\u2500 Impl Subagents (forked) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502  Follow TDD: failing test \u2192 implement \u2192 verify   \u2502\n\u251c\u2500 Review Subagents (fresh, read-only) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502  Independently evaluate code with zero context   \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\n## Quick Start\n\nStart a loop from conversation (the agent picks it up):\n```\nloop_start({ goal: \"Fix type errors in src/user.ts\" })\n```\n\nOr via commands:\n```\n/loop goal \"Implement registration module\"\n```\n\n## Subcommands\n\n| Command | Description |\n|---------|-------------|\n| `/loop goal <desc> [options]` | Start a verification-driven loop |\n| `/loop stop` | Stop active loop |\n| `/loop pause` | Pause loop (preserve state) |\n| `/loop resume` | Resume paused loop |\n| `/loop status` | Show loop state + error registry |\n| `/loop history` | Show iteration history |\n\nOptions for `/loop goal`:\n- `--verify <cmd>` \u2014 add verification command (repeatable; auto-detected otherwise)\n- `--max-iterations <N>` \u2014 max iterations before auto-pause (default 20)\n\n## Verification-Driven Stopping\n\nThe dev loop **requires** verification commands to pass before advancing.\nErrors are tracked across iterations with SHA-256 fingerprinting, detecting:\n\n- **Regressed errors** \u2014 previously fixed errors that reappeared\n- **New errors** \u2014 introduced by the current iteration's changes\n- **Persistent errors** \u2014 unresolved across multiple iterations\n\nThe engine auto-rollbacks on regression when git snapshots are enabled.\n\n## Project Layout\n\n```\npi-dev-loop/\n\u251c\u2500\u2500 src/                     # Core modules\n\u2502   \u251c\u2500\u2500 state.ts             # DevLoopState, ErrorRecord types + serialization\n\u2502   \u251c\u2500\u2500 error-registry.ts    # Fingerprinting, mergeRegistry, parseOutput\n\u2502   \u251c\u2500\u2500 verify-config.ts     # --verify arg parsing, buildConfig\n\u2502   \u251c\u2500\u2500 git.ts               # Snapshot, rollback, pruning\n\u2502   \u251c\u2500\u2500 subagent-task.ts     # Context packing for impl/review subagents\n\u2502   \u251c\u2500\u2500 session-prompt.ts    # Iteration prompt builder\n\u2502   \u2514\u2500\u2500 auto-detect.ts       # Auto-detect verify commands from project\n\u251c\u2500\u2500 extensions/pi-dev-loop/  # pi extension entry point\n\u2502   \u2514\u2500\u2500 index.ts             # Commands, tools, events, decision engine\n\u251c\u2500\u2500 skills/pi-dev-loop/      # Agent behavior guide\n\u251c\u2500\u2500 prompts/                 # Prompt templates\n\u251c\u2500\u2500 tests/                   # Bun test suite\n\u2514\u2500\u2500 docs/\n    \u251c\u2500\u2500 specs/               # Design documents\n    \u2514\u2500\u2500 plans/               # Implementation plans\n```\n\n## Development\n\n```bash\nbun test              # Run all tests\nbun run typecheck     # TypeScript check\n```\n\nThis project follows [design-confirm-implement \u2192 TDD \u2192 planned execution \u2192 review \u2192 verify](AGENTS.md).\n\n## License\n\n[MIT](LICENSE) \u00a9 2026 Sason Wong\n",
+  "keywords": [
+    "pi-package",
+    "dev-loop",
+    "agent-loop"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/sasonwong/pi-dev-loop#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sasonwong/pi-dev-loop.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/pi-dev-loop/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-16T07:28:26.090Z",
+    "modified": "2026-06-24T07:06:42.842Z",
+    "0.1.0": "2026-06-16T07:28:26.280Z",
+    "0.1.1": "2026-06-16T07:38:23.803Z",
+    "0.1.2": "2026-06-24T07:06:42.729Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

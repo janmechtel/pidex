@@ -1,0 +1,36 @@
+{
+  "name": "@panzenbaby/pi-secure-extension",
+  "latest_version": "0.1.3",
+  "description": "A Pi extension that performs security audits on other extensions before install or update. Uses the currently selected AI model to analyze extension source code against configurable audit rules.",
+  "readme": "# pi-secure-extension\n\nA Pi extension that performs security audits on other extensions before install or update. Uses the currently selected AI model to analyze extension source code against configurable audit rules.\n\n## Installation\n\n```bash\npi install ./path/to/pi-secure-extension\n# or after publishing:\npi install npm:@panzenbaby/pi-secure-extension\n\n# wann try and run a security audith first?\npi -e npm:@panzenbaby/pi-secure-extension\n/secure:install npm:@panzenbaby/pi-secure-extension\n```\n\n## Commands\n\n### `/secure:install <source> [-l]`\n\nAudit an extension, then install it if you approve.\n\n```\n/secure:install npm:@foo/bar\n/secure:install git:github.com/user/repo\n/secure:install ./local/path\n/secure:install npm:@foo/bar -l   # install locally\n```\n\n### `/secure:update <source>`\n\nAudit an extension source, then update it if you approve.\n\n- For npm sources without a pinned version (e.g. `npm:@foo/bar`), the audit resolves the current registry version.\n- If you pin a version (e.g. `npm:@foo/bar@1.2.3`), that exact version is audited.\n\n```\n/secure:update npm:@foo/bar\n```\n\n### `/secure:update-all`\n\nCheck which installed extensions are outdated, audit each available update, and prompt to update.\n\n```\n/secure:update-all\n```\n\n### `/secure:rules`\n\nEdit the security audit rules. Opens a selector to choose:\n- **Edit global rules** \u2014 applies to all projects\n- **Edit local rules** \u2014 applies to the current project only\n- **Reset to defaults** \u2014 restore the bundled audit rules\n\n## How It Works\n\n1. Resolves the extension source (npm, git, or local path)\n2. Reads all source files **in memory** (temp files are cleaned up immediately)\n3. Sends the source code + audit rules to the currently selected AI model\n4. Displays the audit results with risk assessment and integrity hash\n5. Asks for confirmation before proceeding with install/update\n\n## Audit Rules\n\nThe audit checks for:\n- **Data exfiltration** \u2014 network requests sending data to external servers\n- **File system access** \u2014 reading sensitive files (.env, SSH keys, credentials)\n- **Code execution** \u2014 eval, child_process, dynamic imports\n- **Supply chain risks** \u2014 suspicious dependencies, postinstall scripts\n- **Permission escalation** \u2014 modifying other extensions' behavior\n- **Obfuscation** \u2014 minified/encoded code\n- **Privacy violations** \u2014 undisclosed telemetry\n- **Denial of service** \u2014 resource exhaustion patterns\n\n### Customizing Rules\n\nThe audit rules are defined in a markdown file. The extension looks for rules in this order:\n\n1. `.pi/extensions/secure-extension-audit-rules.md` (project-local, **requires user confirmation**)\n2. `~/.pi/agent/extensions/secure-extension-audit-rules.md` (global)\n3. Bundled `audit-rules/default.md` (built-in)\n\nUse `/secure:rules` to edit them, or manually create/edit the markdown file.\n\n## Requirements\n\n- A model must be selected in Pi (Ctrl+P or /model)\n- `npm` must be available for auditing npm packages\n- `git` must be available for auditing git packages\n\n## Limitations & Threat Model\n\nThis extension is an **additional safety layer**, not a security guarantee.\n\n- **LLM-based analysis is fallible.** The AI model can miss obfuscated code, sophisticated prompt injection within source comments, or novel attack vectors. It may also produce false positives.\n- **Not a substitute for human code review.** For high-security environments, always pair this audit with manual review by a qualified developer.\n- **Binary and oversized files are flagged but not analyzed.** Non-text files (`.wasm`, `.node`, `.so`, etc.) appear as metadata entries with SHA-256 hashes. Files exceeding 5 MB are included as size-only placeholders. The LLM sees that these exist but cannot inspect their contents.\n- **Project-local audit rules require explicit user confirmation.** A malicious project could ship custom audit rules designed to suppress findings. The extension prompts the user before applying any project-local rules.\n- **Audit and install are separate downloads.** The extension audits a snapshot of the package, but `pi install` downloads independently from the registry. If the package was updated between audit and install, the installed version may differ. The integrity hash (SHA-256 for npm, commit hash for git) is shown so you can verify consistency.\n- **Prompt injection via source code is mitigated but not eliminated.** The audited source is wrapped in `<UNTRUSTED_CODE>` markers and the system prompt instructs the model to treat all source content as data. However, sufficiently creative injection attempts may still affect model behavior.\n- **npm lifecycle scripts are suppressed during audit** (`--ignore-scripts`), but `pi install` runs them normally. A malicious `postinstall` script would execute during installation even if the audit flagged it.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "security",
+    "audit"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/Panzenbaby/pi-secure-extension#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Panzenbaby/pi-secure-extension.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-17T15:06:36.165Z",
+    "modified": "2026-04-25T20:22:52.648Z",
+    "0.1.0": "2026-04-17T15:06:36.471Z",
+    "0.1.1": "2026-04-17T15:54:03.178Z",
+    "0.1.2": "2026-04-17T20:34:25.742Z",
+    "0.1.3": "2026-04-25T20:22:52.519Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 17,
+  "download_trend": []
+}

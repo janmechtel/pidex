@@ -1,0 +1,352 @@
+{
+  "name": "pi-quiet-tools",
+  "latest_version": "0.2.0",
+  "description": "Pi extension that automatically compacts large tool outputs before they enter the model context window, saving tokens while preserving full output as recoverable local artifacts.",
+  "readme": "# Pi Quiet Tools\n\nA [Pi](https://github.com/nichochar/pi) extension that automatically compacts large tool outputs before they enter the model's context window, saving tokens without losing information.\n\n## The Problem\n\nWhen Pi's agent calls tools like `bash`, `read`, or subagents, the full output becomes part of the conversation context. A single `find` command or verbose log dump can add thousands of tokens that the model pays for on every subsequent turn \u2014 even if only a few lines matter.\n\nHiding output in the UI doesn't help: the model still sees (and pays for) the full text in its context window. Quiet Tools intercepts tool results *before* they reach the model, replacing large outputs with a head/tail preview and saving the full text to a local artifact file the agent can read on demand.\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:pi-quiet-tools\n```\n\nFor local development:\n\n```bash\npi install /path/to/pi-quiet-tools\n```\n\nOr load for a single session:\n\n```bash\npi -e /path/to/pi-quiet-tools\n```\n\n## How It Works\n\n1. Every tool result passes through the extension's `tool_result` handler.\n2. If the output is below the threshold, it passes through unchanged.\n3. If it exceeds the threshold (default: 12,000 chars or 240 lines):\n   - The full text is saved to a timestamped artifact file.\n   - The model receives a compact preview: the first 100 lines, the last 60 lines, and an omission marker in between.\n   - The preview includes the artifact path so the agent can `read` the full output if it needs a detail from the omitted middle.\n4. Error outputs get a larger preview budget (160 head + 120 tail lines) since diagnostic context matters more.\n\nThe extension also caps `read` tool calls to 120 lines by default (when no explicit `limit` is set), preventing accidental full-file reads from flooding context.\n\n## Commands\n\nControl the extension during a Pi session:\n\n| Command | Effect |\n|---------|--------|\n| `/quiet-tools status` | Show current state: enabled, thresholds, artifact directory |\n| `/quiet-tools on` | Enable compaction |\n| `/quiet-tools off` | Disable compaction |\n| `/quiet-tools bypass-next` | Skip compaction for the next tool result only |\n| `/quiet-tools last [n]` | List the last *n* artifact paths (default: 5) |\n\n## Prompt Template\n\nThe included `/quiet` prompt template encourages focused, low-noise workflows:\n\n```text\n/quiet <task>\n```\n\nThis guides the agent to skip narration, use targeted reads, and give concise final answers. The prompt is guidance only \u2014 the extension enforces compaction regardless of prompt.\n\n## Configuration\n\nAll settings are controlled via environment variables. Defaults work well for most projects.\n\n### Thresholds\n\n| Variable | Default | Description |\n|----------|---------|-------------|\n| `QUIET_TOOLS_ENABLED` | `true` | Master switch |\n| `QUIET_TOOLS_MAX_CHARS` | `12000` | Compact if output exceeds this character count |\n| `QUIET_TOOLS_MAX_LINES` | `240` | Compact if output exceeds this line count |\n\n### Preview Size\n\n| Variable | Default | Description |\n|----------|---------|-------------|\n| `QUIET_TOOLS_HEAD_LINES` | `100` | Lines to keep from the start of output |\n| `QUIET_TOOLS_TAIL_LINES` | `60` | Lines to keep from the end of output |\n| `QUIET_TOOLS_ERROR_HEAD_LINES` | `160` | Head lines for error output |\n| `QUIET_TOOLS_ERROR_TAIL_LINES` | `120` | Tail lines for error output |\n\n### Per-Tool Toggles\n\n| Variable | Default | Description |\n|----------|---------|-------------|\n| `QUIET_TOOLS_COMPACT_READ` | `true` | Compact `read` tool results |\n| `QUIET_TOOLS_COMPACT_BASH` | `true` | Compact `bash` tool results |\n| `QUIET_TOOLS_COMPACT_SUBAGENT` | `true` | Compact subagent results |\n| `QUIET_TOOLS_READ_DEFAULT_LIMIT` | `120` | Default line limit injected into `read` calls that don't specify one (0 to disable) |\n\n### Artifact Storage\n\n| Variable | Default | Description |\n|----------|---------|-------------|\n| `QUIET_TOOLS_ARTIFACT_DIR` | `.pi/quiet-tools/outputs` | Directory for full output files |\n| `QUIET_TOOLS_INDEX` | `.pi/quiet-tools/index.jsonl` | JSONL index of all saved artifacts |\n\n## Artifacts\n\nFull outputs are saved as timestamped text files under `.pi/quiet-tools/outputs/`. A JSONL index at `.pi/quiet-tools/index.jsonl` tracks every artifact with metadata (timestamp, tool name, path, line/char counts).\n\nThe agent can recover any compacted detail by reading the artifact path included in every compacted preview.\n\n**Security note:** Artifacts contain the raw tool output. If a command prints secrets or credentials, those will be in the artifact files. Add the artifact directory to `.gitignore`:\n\n```gitignore\n.pi/quiet-tools/\n```\n\n## Tuning Guide\n\n**If the agent misses details from compacted output:**\n- Raise `QUIET_TOOLS_HEAD_LINES` and `QUIET_TOOLS_TAIL_LINES`\n- Raise `QUIET_TOOLS_MAX_CHARS` or `QUIET_TOOLS_MAX_LINES`\n- Disable compaction for specific tools (e.g., `QUIET_TOOLS_COMPACT_READ=false`)\n- Use `/quiet-tools bypass-next` before a specific command\n\n**If output is still too noisy:**\n- Lower the thresholds\n- Lower `QUIET_TOOLS_READ_DEFAULT_LIMIT`\n- Enable subagent compaction if not already on\n\n## Design Notes\n\n- **Deterministic compaction.** No AI summarization \u2014 the preview is always the literal first and last lines of output. This makes behavior predictable and debuggable.\n- **Fail-open.** If artifact writing or compaction throws an error, the original output passes through unchanged. The extension notifies once and stays out of the way.\n- **Non-text content preserved.** Image blocks, tool-use blocks, and other non-text content in tool results are never modified.\n- **Additive metadata.** The extension adds a `details.quietTools` object to tool results without replacing existing detail fields.\n\n## License\n\nMIT \u2014 see [LICENSE](LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "quiet-tools",
+    "tool-output",
+    "compaction"
+  ],
+  "author": {
+    "name": "Bruno Orsolon"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/brunoorsolon/pi-quiet-tools#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brunoorsolon/pi-quiet-tools.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-08T09:20:18.852Z",
+    "modified": "2026-05-08T13:11:30.695Z",
+    "0.1.0": "2026-05-08T09:20:19.154Z",
+    "0.2.0": "2026-05-08T13:11:30.586Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 261
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 28
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 37
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 7
+    }
+  ]
+}

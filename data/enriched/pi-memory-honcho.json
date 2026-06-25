@@ -1,0 +1,39 @@
+{
+  "name": "pi-memory-honcho",
+  "latest_version": "0.3.3",
+  "description": "Honcho-backed persistent memory extension for PI coding agent.",
+  "readme": "# pi-memory-honcho\n\nHoncho-backed persistent memory extension for the [PI coding agent](https://github.com/badlogic/pi-mono). Persistent user context, cross-workspace memory sharing, and dialectic reasoning across sessions.\n\n> **Renamed:** this package was previously published as `pi-honcho-memory`. Use `pi install npm:pi-memory-honcho` going forward.\n\n## Install\n\n```bash\npi install npm:pi-memory-honcho\n# or from git\npi install https://github.com/acsezen/pi-memory-honcho\n```\n\n## Setup\n\n1. Get a Honcho API key from [honcho.dev](https://honcho.dev) or self-host.\n2. Run `/honcho:setup` inside PI to configure your key, workspace, and peer names.\n3. Verify with `/honcho:doctor`.\n\nOr create `~/.honcho/config.json` manually:\n\n```json\n{\n  \"apiKey\": \"hch-v3-...\",\n  \"peerName\": \"yourname\",\n  \"hosts\": {\n    \"pi\": {\n      \"workspace\": \"pi\",\n      \"aiPeer\": \"pi\",\n      \"recallMode\": \"hybrid\"\n    }\n  }\n}\n```\n\n## Features\n\n### Memory tools\n\n| Tool | Description |\n|------|-------------|\n| `honcho_profile` | Retrieve user profile from this and linked workspaces |\n| `honcho_search` | Search durable memory across all linked workspaces |\n| `honcho_context` | Synthesize memory context via dialectic reasoning across all linked workspaces |\n| `honcho_conclude` | Store a durable preference, fact, or decision (primary workspace only) |\n| `honcho_seed_identity` | Seed the AI peer's identity representation (primary workspace only) |\n\n### Commands\n\n| Command | Description |\n|---------|-------------|\n| `/honcho:setup` | Interactive first-time configuration |\n| `/honcho:status` | Show connection, cache, and config status |\n| `/honcho:config` | Show effective config (redacted API key) |\n| `/honcho:doctor` | Preflight check for config, connectivity, session |\n| `/honcho:interview` | Save a preference or working style insight |\n| `/honcho:mode` | Switch recall mode (hybrid / context / tools) |\n| `/honcho:sync` | Force context refresh and flush pending uploads |\n| `/honcho:map` | Map current directory to a custom session name |\n\n### Lifecycle\n\n- **Session start**: Bootstraps Honcho connection, fetches context, migrates legacy memory files (MEMORY.md, USER.md, SOUL.md)\n- **Before agent start**: Injects persistent memory into the system prompt (user profile, peer cards, AI profile, project summary)\n- **Agent end**: Uploads conversation messages to Honcho\n- **Session shutdown/switch/fork/compact**: Flushes pending uploads\n\n## Configuration\n\nAll fields can be set via `~/.honcho/config.json` (under `hosts.pi`) or environment variables.\n\n| Field | Env var | Default | Description |\n|-------|---------|---------|-------------|\n| `recallMode` | `HONCHO_RECALL_MODE` | `hybrid` | `hybrid` / `context` / `tools` |\n| `sessionStrategy` | `HONCHO_SESSION_STRATEGY` | `per-directory` | `per-directory` / `git-branch` / `pi-session` / `per-repo` / `global` |\n| `writeFrequency` | `HONCHO_WRITE_FREQUENCY` | `async` | `async` / `turn` / `session` / N (number) |\n| `injectionFrequency` | `HONCHO_INJECTION_FREQUENCY` | `every-turn` | `every-turn` / `first-turn` |\n| `saveMessages` | `HONCHO_SAVE_MESSAGES` | `true` | Upload conversation messages to Honcho |\n| `dialecticDynamic` | `HONCHO_DIALECTIC_DYNAMIC` | `true` | Auto-bump reasoning level by query length |\n| `dialecticMaxChars` | `HONCHO_DIALECTIC_MAX_CHARS` | `600` | Truncate dialectic results |\n| `dialecticMaxInputChars` | `HONCHO_DIALECTIC_MAX_INPUT_CHARS` | `10000` | Truncate dialectic queries |\n| `reasoningLevel` | `HONCHO_REASONING_LEVEL` | `low` | Base reasoning level for dialectic |\n| `reasoningLevelCap` | `HONCHO_REASONING_LEVEL_CAP` | none | Hard cap on reasoning level |\n| `contextTokens` | `HONCHO_CONTEXT_TOKENS` | `1200` | Token budget for injected context |\n| `contextRefreshTtlSeconds` | `HONCHO_CONTEXT_REFRESH_TTL_SECONDS` | `300` | TTL before re-fetching context |\n| `maxMessageLength` | `HONCHO_MAX_MESSAGE_LENGTH` | `25000` | Max chars per message chunk |\n| `searchLimit` | `HONCHO_SEARCH_LIMIT` | `8` | Max search results |\n| `sessionPeerPrefix` | `HONCHO_SESSION_PEER_PREFIX` | `false` | Prefix session keys with peer name |\n| `observationMode` | `HONCHO_OBSERVATION_MODE` | `directional` | `directional` / `unified` |\n| `contextCadence` | `HONCHO_CONTEXT_CADENCE` | `1` | Min turns between context API calls |\n| `dialecticCadence` | `HONCHO_DIALECTIC_CADENCE` | `1` | Min turns between dialectic calls |\n| `environment` | `HONCHO_ENVIRONMENT` | `production` | `local` / `production` |\n| `logging` | `HONCHO_LOGGING` | `true` | Enable console logging |\n\n### Manual session mappings\n\nAdd `sessions` to your `~/.honcho/config.json` to map directories to specific session names:\n\n```json\n{\n  \"sessions\": {\n    \"/home/user/project-a\": \"my-project-a\",\n    \"/home/user/project-b\": \"my-project-b\"\n  }\n}\n```\n\n### Linked hosts\n\nShare memory across AI tools by linking their workspaces. Read tools (`honcho_profile`, `honcho_search`, `honcho_context`) fan out to all linked workspaces and merge results. Write tools (`honcho_conclude`, `honcho_seed_identity`) stay in the primary workspace, following Honcho's workspace isolation design.\n\nLinked host SDK clients are created once at startup and cached, not per tool call. Profile reads from linked workspaces use `peer.representation()` (no reasoning tokens) instead of dialectic calls.\n\n```json\n{\n  \"hosts\": {\n    \"pi\": {\n      \"workspace\": \"pi\",\n      \"aiPeer\": \"pi\",\n      \"linkedHosts\": [\"claude_code\", \"codex\", \"cursor\"]\n    },\n    \"claude_code\": {\n      \"workspace\": \"claude_code\",\n      \"aiPeer\": \"claude\"\n    },\n    \"codex\": {\n      \"workspace\": \"codex\",\n      \"aiPeer\": \"codex\"\n    },\n    \"cursor\": {\n      \"workspace\": \"cursor\",\n      \"aiPeer\": \"cursor\"\n    }\n  }\n}\n```\n\nEach linked host must have `workspace` and `aiPeer` defined. Results are labeled by source workspace (e.g., `=== [cursor] ===`).\n\n## Development\n\n```bash\ngit clone https://github.com/acsezen/pi-memory-honcho.git\ncd pi-memory-honcho\nnpm install\nnpm run typecheck\nnpm test\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "honcho",
+    "memory",
+    "persistent-memory",
+    "ai-agent"
+  ],
+  "author": {
+    "name": "acsezen"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/acsezen/pi-memory-honcho#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/acsezen/pi-memory-honcho.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-04-08T20:09:18.549Z",
+    "modified": "2026-04-11T20:27:25.494Z",
+    "0.3.0": "2026-04-08T20:09:18.762Z",
+    "0.3.1": "2026-04-10T23:47:34.037Z",
+    "0.3.2": "2026-04-11T18:09:00.190Z",
+    "0.3.3": "2026-04-11T20:27:25.217Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": null,
+  "download_trend": []
+}

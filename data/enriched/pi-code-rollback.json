@@ -1,0 +1,36 @@
+{
+  "name": "pi-code-rollback",
+  "latest_version": "0.1.1",
+  "description": "Claude Code-style restore for pi with automatic git-backed code snapshots and restore mode selection",
+  "readme": "# pi-code-rollback\n\nAutomagic code and conversation restore for [Pi](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) coding agent.\n\n`pi-code-rollback` automatically snapshots your workspace as you work, then lets you restore either:\n- the conversation,\n- the code,\n- or both.\n\n\n\n<p align=\"center\">\n  <a href=\"https://github.com/sudodaksh/pi-code-rollback/blob/main/docs/demo.mp4\">\n    <img src=\"https://raw.githubusercontent.com/sudodaksh/pi-code-rollback/main/docs/demo-preview.gif\" alt=\"pi-code-rollback demo\" />\n  </a>\n</p>\n\n\nThe restore UX is built around **prompt boundaries**, which makes it much easier to understand what you are restoring.\n\n## Install in pi\n\n### Install from npm for all projects\n\n```bash\npi install npm:pi-code-rollback\n```\n\nThis writes to your global pi settings, so the extension is available in every repo.\n\n### Install from npm only for the current project\n\n```bash\npi install -l npm:pi-code-rollback\n```\n\nThis writes to `.pi/settings.json` in the current project.\n\n### Try it without installing\n\n```bash\npi -e npm:pi-code-rollback\n```\n\nThis loads the extension for the current pi run only.\n\n### Install from GitHub instead\n\n```bash\npi install https://github.com/sudodaksh/pi-code-rollback.git\n```\n\n### Install from a local checkout\n\nFrom this repository root:\n\n```bash\npi install .\n```\n\nOr with an absolute path:\n\n```bash\npi install /absolute/path/to/pi-code-rollback\n```\n\nFor one-off local testing:\n\n```bash\npi -e .\n```\n\n### Verify it is installed\n\nStart pi inside a git repository and run:\n\n```text\n/restore\n```\n\nYou should see the restore picker listing your prompts.\n\n## What gets saved\n\nDuring a session, the extension saves git-backed snapshots at two useful boundaries:\n\n- **before:** just before a user prompt runs\n- **after:** just after a completed run finishes\n\nThat means restore points map to how you actually think about work:\n- \"go back to before I asked for this\"\n- \"go back to the finished result of that run\"\n\n## Typical flow\n\n1. Work normally in a **git repository**.\n2. Ask pi to make changes.\n3. The extension captures:\n   - a **baseline** snapshot before a prompt runs\n   - a **post-run** snapshot after a completed run, but only if the workspace changed\n4. Run `/restore` when you want to go back.\n5. Pick a prompt from the list.\n6. Choose **before** or **after** that prompt (if both snapshots exist).\n7. Pick a restore mode:\n   - **code + conversation**\n   - **conversation only**\n   - **code only**\n\nIf you change your mind after restoring, run `/undo-restore` to recover the working tree from before the restore and restore the conversation position when the original restore changed it.\n\n## Restore semantics\n\n### Before\n\nThis means **just before that prompt ran**.\n\n- **Conversation restore**: rewinds there and puts that prompt back in the editor\n- **Code restore**: restores files to the snapshot from before that prompt started\n\n### After\n\nThis means **the saved completed state after that prompt finished**.\n\n- **Conversation restore**: restores the completed response after that prompt\n- **Code restore**: restores files to the exact post-run snapshot for that completed state\n\n## Example\n\nSay your session looked like this:\n\n1. `a: update README.md`\n2. `b: update loop.md`\n\nRunning `/restore` and selecting prompt `a`:\n- **Before** \u2192 restore to the original state before `README.md` changed\n- **After** \u2192 restore to the finished state after `README.md` changed\n\nSelecting prompt `b`:\n- **Before** \u2192 restore to the state after `a`, but before `b`\n- **After** \u2192 restore to the finished state after `b`, including `loop.md`\n\n## Commands\n\n- `/restore` \u2014 restore code + conversation to a prompt boundary\n- `/rollback` \u2014 alias for `/restore`\n- `/undo-restore` \u2014 undo the last restore (recovers the working tree, and restores the conversation position when applicable)\n- `/rollback-gc` \u2014 remove stale rollback snapshot refs for the current session\n\n## Requirements\n\n- must be inside a git repository\n- snapshots include tracked + untracked non-ignored files\n- ignored files are preserved on restore\n\n## Notes\n\n- Post-run snapshots are only saved when the workspace actually changes.\n- If a prompt does not have its own exact snapshot, restore uses the nearest earlier snapshot on that branch path.\n- Before any code restore, the current working tree is saved so it can be undone with `/undo-restore`.\n- If the original restore also rewound or advanced the session conversation, `/undo-restore` restores that conversation position too.\n- Snapshots are stored as orphan git commits under `refs/pi/rollback/...`.\n\n## Package manifest\n\nThis repository is already structured as a publishable pi package.\n\n### Files used by pi\n\n- `package.json` \u2014 npm metadata + pi package manifest\n- `index.ts` \u2014 the extension entrypoint loaded by pi\n- `README.md` \u2014 package docs shown on npm/GitHub\n- `LICENSE` \u2014 required for clean package publishing\n- `tsconfig.json` \u2014 typecheck config for local validation and prepublish checks\n\nThe important manifest is:\n\n```json\n{\n  \"keywords\": [\"pi-package\"],\n  \"pi\": {\n    \"extensions\": [\"./index.ts\"]\n  }\n}\n```\n\n## Publish this package\n\nAfter pushing this repo to GitHub and logging into npm:\n\n```bash\nnpm publish\n```\n\nThen users can install it with:\n\n```bash\npi install npm:pi-code-rollback\n```\n\nTo validate locally before publishing:\n\n```bash\nnpm install\nnpm run check\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "rollback",
+    "restore",
+    "git"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/sudodaksh/pi-code-rollback",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sudodaksh/pi-code-rollback.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "video": "https://raw.githubusercontent.com/sudodaksh/pi-code-rollback/main/docs/demo.mp4",
+    "image": "https://raw.githubusercontent.com/sudodaksh/pi-code-rollback/main/docs/demo-preview.gif"
+  },
+  "time": {
+    "created": "2026-04-21T08:10:15.338Z",
+    "modified": "2026-04-21T08:50:14.929Z",
+    "0.1.0": "2026-04-21T08:10:15.609Z",
+    "0.1.1": "2026-04-21T08:50:14.811Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 12,
+  "download_trend": []
+}

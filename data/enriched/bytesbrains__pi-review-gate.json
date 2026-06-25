@@ -1,0 +1,353 @@
+{
+  "name": "@bytesbrains/pi-review-gate",
+  "latest_version": "1.1.3",
+  "description": "CI-level merge guardian for AI agents \u2014 required reviewers, breaking change detection, stale PR cleanup, and review automation.",
+  "readme": "# Review Gate for Pi\n\n[![npm version](https://img.shields.io/npm/v/@bytesbrains/pi-review-gate)](https://www.npmjs.com/package/@bytesbrains/pi-review-gate)\n[![license](https://img.shields.io/npm/l/@bytesbrains/pi-review-gate)](./LICENSE)\n\n> CI-level merge guardian for AI agents \u2014 required reviewers, breaking change detection, stale PR cleanup, and review automation. **Agents don't `git merge` \u2014 CI merges only after all gates pass.**\n\n## Philosophy\n\n`pi-contrib-gate` handles the *contribution* side (branch \u2192 commit \u2192 PR).\n`pi-review-gate` handles the *review* side (check \u2192 approve \u2192 merge).\n\nCore enforcement runs in Gitea Actions \u2014 agents **cannot bypass** these gates.\n\n## Install\n\n```bash\npi install npm:@bytesbrains/pi-review-gate\n```\n\n## Tools\n\n| Tool | What it does |\n|---|---|\n| `review_check(pr_number)` | Check PR merge readiness \u2014 CI, reviewers, breaking changes, staleness |\n| `review_approve(pr_number, comment)` | Submit an approval review |\n| `review_request(pr_number, reviewers)` | Request reviewers by username |\n| `review_status(pr_number)` | Show detailed review + CI status |\n| `review_close_stale(pr_number, reason)` | Close stale PR with comment |\n\n## Safety Intercepts\n\nThe gate **passively monitors** all `bash` tool calls and:\n\n- \u26d4 Blocks `git merge` \u2014 directs agents to use review tools instead\n- \u26a0\ufe0f Warns on `gh pr close` or branch deletion\n\n## Review Gates (CI-enforced)\n\nThese run in Gitea Actions \u2014 agents cannot skip them:\n\n| Gate | Config | Description |\n|---|---|---|\n| CI green | `quality.*` in .contribrc.yml | lint, test, build, doctor audit |\n| Required reviewers | `requiredReviewers.*` in .reviewrc.yml | Path-based required reviewer mapping |\n| Breaking change detection | `breakingChangePatterns` | API surface changes flagged for human review |\n| Stale PR closure | `staleDays` | Auto-close PRs inactive past threshold |\n| Protected paths | `protectedPaths` | Modifications to CI, agents, Docker \u2192 human review |\n| Model diversity | `minDiverseReviews` | Different model families must review (from #42) |\n\n## Configuration\n\nCreate `.reviewrc.yml` in your project root:\n\n```yaml\n# Required reviewers by path pattern\nrequiredReviewers.factory/**: factory-admin\nrequiredReviewers.agents/**: agent-owner\nrequiredReviewers..gitea/**: ci-admin\n\n# Stale PR threshold (days)\nstaleDays: 14\n\n# Minimum distinct model families that must review (0 = disabled)\nminDiverseReviews: 1\n\n# Paths that always require human review\nprotectedPaths: .gitea/workflows/,docker-compose.yml,Dockerfile,agents/,factory/package.json\n\n# Patterns that signal API-breaking changes\nbreakingChangePatterns: export interface,export type,export function,export class,BREAKING CHANGE:\n```\n\n> Tip: Start with `staleDays: 14` and `minDiverseReviews: 0` during adoption, then tighten.\n\n## Workflow\n\n```\ncontrib_submit() from @bytesbrains/pi-contrib-gate\n  \u2502\n  \u25bc\nPR opened on Gitea\n  \u2502\n  \u25bc\nCI runs (lint, test, build, doctor audit)\n  \u2502\n  \u25bc\nreview_check(pr_number)        \u2190 agent checks readiness\n  \u2502\n  \u25bc\nreview_request(pr_number, ...)  \u2190 request specific reviewers\n  \u2502\n  \u25bc\n[reviewer approves]\n  \u2502\n  \u25bc\nreview_check(pr_number)        \u2190 re-check: all green? required reviewers satisfied?\n  \u2502\n  \u25bc\nCI auto-merges (squash)        \u2190 only CI can merge\n  \u2502\n  \u25bc\nPR closed, branch deleted\n```\n\n## Stale PR Cleanup\n\nPRs older than `staleDays` (default 14) are flagged. A CI scheduled job can auto-close them:\n\n```bash\n# Runs nightly in Gitea Actions\nreview-gate-stale.sh --repo factory/wrok.in --days 14\n```\n\n## Breaking Change Detection\n\nEvery CI run diffs against the base branch and scans for:\n- `export interface` / `export type` / `export function` / `export class` additions\n- `BREAKING CHANGE:` in commit messages\n\nIf detected, CI adds a `\u26a0\ufe0f breaking-change` label and requires human review.\n\n## Integration with @bytesbrains/pi-contrib-gate\n\nThe two gates work together:\n\n```\npi-contrib-gate          @bytesbrains/pi-review-gate\n     \u2502                        \u2502\n     \u2502  contrib_start_work    \u2502\n     \u2502  contrib_propose       \u2502\n     \u2502  contrib_submit  \u2500\u2500\u2500\u2500\u2192 PR created\n     \u2502                        \u2502\n     \u2502                        \u2502  review_check\n     \u2502                        \u2502  review_request\n     \u2502                        \u2502  review_approve\n     \u2502                        \u2502  [CI enforcement]\n     \u2502                        \u2502  auto-merge (squash)\n```\n\nInstall both for full agent governance:\n\n```bash\npi install npm:@bytesbrains/pi-contrib-gate\npi install npm:@bytesbrains/pi-review-gate\n```\n\n## License\n\nMIT \u00a9 [nandal](https://github.com/nandal)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "governance",
+    "ci",
+    "code-review",
+    "merge-gate",
+    "breaking-changes"
+  ],
+  "author": {
+    "name": "nandal",
+    "email": "nandal@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/nandal/pi-ext/tree/main/review-gate",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nandal/pi-ext.git",
+    "directory": "review-gate"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-15T18:57:07.077Z",
+    "modified": "2026-05-18T01:49:16.226Z",
+    "1.1.2": "2026-05-15T18:57:07.409Z",
+    "1.1.3": "2026-05-18T01:49:16.099Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 29,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 229
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 22
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 28
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

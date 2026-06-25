@@ -1,0 +1,38 @@
+{
+  "name": "pi-omni-compact",
+  "latest_version": "0.1.2",
+  "description": "Pi extension that delegates compaction to a large-context model subprocess",
+  "readme": "# pi-omni-compact\n\n![pi-omni-compact banner](https://raw.githubusercontent.com/Whamp/pi-omni-compact/master/assets/banner.png)\n\n[![npm version](https://img.shields.io/npm/v/pi-omni-compact)](https://www.npmjs.com/package/pi-omni-compact)\n[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)\n\nA [pi](https://github.com/mariozechner/pi) extension that replaces default context compaction with a large-context model subprocess. Pi normally summarizes with the active conversation model. This extension spawns a separate pi instance using a large-context model that reads the entire conversation at once, producing higher-fidelity summaries.\n\n## Installation\n\n```bash\npi install npm:pi-omni-compact\n```\n\nOr from git:\n\n```bash\npi install git:github.com/Whamp/pi-omni-compact\n```\n\n## Requirements\n\n- [pi](https://github.com/mariozechner/pi) installed\n- An API key for a large-context model configured in pi's model registry\n\n## Configuration\n\nEdit `settings.json` in the extension directory to configure which models to try. The extension uses the first model with a valid API key:\n\n```json\n{\n  \"models\": [\n    { \"provider\": \"google-antigravity\", \"id\": \"gemini-3-flash\", \"thinking\": \"high\" },\n    { \"provider\": \"google-antigravity\", \"id\": \"gemini-3-pro-low\", \"thinking\": \"high\" }\n  ],\n  \"debugCompactions\": false,\n  \"minSummaryChars\": 100\n}\n```\n\n**You will need to update the `models` array** to match a provider and model available in your pi setup. A model with a 1M+ token context window is highly recommended \u2014 the whole point is reading the full conversation at once.\n\n| Setting | Default | Description |\n|---------|---------|-------------|\n| `models` | See above | Ordered list of models to try. First with a valid API key wins. |\n| `debugCompactions` | `false` | Save input/output JSON to `~/.pi/agent/extensions/pi-omni-compact/compactions/` for diagnosing bad summaries. |\n| `minSummaryChars` | `100` | Minimum summary length. Shorter output triggers fallback to default compaction. |\n\nAPI keys are resolved through pi's model registry \u2014 no separate key configuration needed.\n\n### Optional: pi-read-map\n\nIf you have [pi-read-map](https://github.com/Whamp/pi-read-map) installed, the summarizer subprocess will use it automatically. It provides structural file maps so the summarizer can navigate the codebase faster and produce more accurate summaries.\n\n## How it works\n\nThe extension hooks two pi events:\n\n- **`session_before_compact`** \u2014 fires when the context window fills up and pi needs to summarize conversation history\n- **`session_before_tree`** \u2014 fires when the user abandons a conversation branch and pi needs to preserve what happened\n\nFor both events, the extension:\n\n1. Analyzes the full session for structural metadata \u2014 tool usage patterns, friction signals (error loops, rephrasing cascades), file operations, and session boundaries\n2. Serializes the conversation and metadata into a hybrid text format\n3. Resolves the first configured model with a valid API key\n4. Spawns a pi subprocess with read-only tools (`read`, `grep`, `find`, `ls`) and pi-read-map if installed\n5. The subprocess reads the conversation and referenced source files, then returns a structured summary\n\nOn any failure \u2014 no API key, subprocess crash, output too short \u2014 the extension returns `undefined` and pi falls back to its default compaction.\n\n## Summary format\n\nThe output follows a fixed structure:\n\n- **Goal** \u2014 the original user request, quoted verbatim\n- **Constraints & Preferences** \u2014 requirements and style decisions\n- **Progress** \u2014 done, in progress, blocked\n- **Key Decisions** \u2014 what was decided, why, and alternatives rejected\n- **File Changes** \u2014 paths and what changed\n- **Code Patterns Established** \u2014 conventions and architectural choices the codebase follows\n- **Implicit Dependencies** \u2014 environment variables, config, non-obvious coupling\n- **Open Questions** \u2014 deferred decisions, unresolved issues\n- **Error History** \u2014 errors encountered and fixes applied\n- **Remaining Work** \u2014 unfinished tasks\n- **Next Steps** \u2014 ordered list of recommended actions\n- **Critical Context** \u2014 specific values, references, and data needed to continue\n\n## Benchmark results\n\nEvaluated against 14 real coding sessions (25k\u2013165k tokens) using [pi-compression-benchmark](https://github.com/Whamp/pi-compression-benchmark) with probe-response scoring:\n\n| Strategy | Avg Score | Min | Max |\n|----------|-----------|-----|-----|\n| **pi-omni-compact** | **57.1** | 35 | 89 |\n| pi-agentic-compaction | 46.2 | 30 | 70 |\n| pi-default | 46.1 | 20 | 85 |\n\nStrongest on sessions with concrete implementation work. Weakest on pure exploration/research sessions with no clear goal structure.\n\n## Development\n\n```bash\nnpm run validate   # typecheck + lint + format check\nnpm test           # unit + integration tests\nnpm run test:e2e   # end-to-end tests (requires real API key)\nnpm run build      # compile to dist/\n```\n\n## Architecture\n\n```\nsrc/\n  index.ts              Event handlers for session_before_compact, session_before_tree\n  models.ts             Resolve first configured model with valid API key\n  serializer.ts         Convert pi messages to LLM input format\n  session-analysis.ts   Extract structural metadata (friction, boundaries, file ops)\n  prompts.ts            System prompts (initial, incremental, branch)\n  subprocess.ts         Spawn pi subprocess, parse JSON event stream\n  settings.ts           Load and validate settings.json\n  debug.ts              Save compaction input/output as debug artifacts\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "extension",
+    "compaction",
+    "context",
+    "gemini"
+  ],
+  "author": {
+    "name": "Will Hampson"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Whamp/pi-omni-compact#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Whamp/pi-omni-compact.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-23T20:11:19.766Z",
+    "modified": "2026-03-03T06:10:59.566Z",
+    "0.1.0": "2026-02-23T20:11:20.049Z",
+    "0.1.1": "2026-03-03T06:04:36.741Z",
+    "0.1.2": "2026-03-03T06:10:59.433Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

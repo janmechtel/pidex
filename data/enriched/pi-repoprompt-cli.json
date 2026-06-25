@@ -1,0 +1,43 @@
+{
+  "name": "pi-repoprompt-cli",
+  "latest_version": "0.3.1",
+  "description": "Integrates RepoPrompt with Pi via RepoPrompt's `rp-cli` executable",
+  "readme": "# RepoPrompt CLI bridge for Pi (`pi-repoprompt-cli`)\n\n> **\u26a0 Deprecated and not supported for Pi versions >0.64.0.**  Consider instead using [`pi-repoprompt-mcp`](https://www.npmjs.com/package/pi-repoprompt-mcp), which offers everything this extension has and several more reliability and QoL features, with none of the extra token overheads MCP tools typically entail.\n\nI recommend exploring the RepoPrompt CLI more from the angle of an agent skill for writing scripts that invoke rp-cli, while using repoprompt-mcp for Pi-RepoPrompt integration.\n\n---\n\nIntegrates RepoPrompt with Pi via RepoPrompt's `rp-cli` executable.\n\nProvides two tools:\n- `rp_bind` \u2014 bind a RepoPrompt window + compose tab (routing)\n- `rp_exec` \u2014 run `rp-cli -e <cmd>` against that binding (quiet defaults + output truncation)\n\nOptional:\n- Diff blocks in `rp_exec` output use `delta` when installed (honoring the user's global git/delta color config), with graceful fallback otherwise\n- [Gurpartap/pi-readcache](https://github.com/Gurpartap/pi-readcache)-like caching for `rp_exec` calls that read files (`read` / `cat` / `read_file`) to save on tokens\n  - returns unchanged markers and diffs on repeat reads\n- Auto-selection (in the RP app, e.g. for use in RP Chat) of slices/files the agent has read; these selections are also branch-safe across `/tree` navigation and `/fork`ed session\n\nAlso provides convenience commands:\n- `/rpbind <window_id> <tab>`\n- `/rpcli-readcache-status`\n- `/rpcli-readcache-refresh <path> [start-end]`\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:pi-repoprompt-cli\n```\n\nFrom the dot314 git bundle (filtered install):\n\nAdd to `~/.pi/agent/settings.json` (or replace an existing unfiltered `git:github.com/w-winter/dot314` entry):\n\n```json\n{\n  \"packages\": [\n    {\n      \"source\": \"git:github.com/w-winter/dot314\",\n      \"extensions\": [\"extensions/repoprompt-cli/index.ts\"],\n      \"skills\": [],\n      \"themes\": [],\n      \"prompts\": []\n    }\n  ]\n}\n```\n\n## Requirements\n\n- `rp-cli` must be installed and available on `PATH`\n\n## Configuration\n\nEnable readcache (optional):\n\nCreate `~/.pi/agent/extensions/repoprompt-cli/config.json`:\n\n```json\n{\n  \"readcacheReadFile\": true,\n  \"autoSelectReadSlices\": true,\n  \"collapsedMaxLines\": 3\n}\n```\n\n`collapsedMaxLines` controls how many lines of `rp_exec` output Pi shows in collapsed view before you expand the result. It applies across RepoPrompt CLI commands, so it is the main knob for keeping reads, window listings, and other verbose CLI responses compact in the TUI. Recommended setting: `3` for maximally compressed but still informative output.\n\n## Quick start\n\n1) Find your RepoPrompt window + tab (from a terminal):\n\n```bash\nrp-cli -e windows\nrp-cli -e \"workspace tabs\"\n```\n\n2) Bind inside Pi:\n\n```text\n/rpbind 3 Compose\n```\n\n3) Instruct the agent to use RepoPrompt via the `rp_exec` tool, for example:\n\n```text\nUse rp_exec with cmd: \"get_file_tree type=files max_depth=4\".\n```\n\nIf `readcacheReadFile` is enabled, repeat reads can be token-optimized:\n\n```text\nUse rp_exec with cmd: \"read path=src/main.ts start_line=1 limit=120\".\n```\n\nTo force baseline output for a specific read:\n\n```text\nUse rp_exec with cmd: \"read path=src/main.ts start_line=1 limit=120 bypass_cache=true\".\n```\n\nNotes:\n- Readcache only triggers for **single-command** reads. Compound commands (`&&`, `;`, `|`) fail open to baseline output\n- When `just-bash` AST parsing is unavailable, caching only applies to unquoted/unescaped single-command reads; quoted/escaped forms fail open\n- `rawJson=true` disables caching\n- Read-driven selection replay is enabled by default (`autoSelectReadSlices: true`); set it to `false` to disable\n- Manual selection is always preserved for paths not managed by this feature; for managed paths, branch replay may restore the branch snapshot\n\n## Readcache gotchas\n\n- `rawJson=true` disables readcache. Don't use unless debugging\n- Need full content? rerun with `bypass_cache=true`\n- Single-command reads only (no `&&` / `;` / `|`)\n- Multi-root: use absolute or specific relative paths\n\n## Safety behavior (by default)\n\n- Blocks delete-like commands unless `allowDelete: true`\n- Blocks in-place workspace switching unless `allowWorkspaceSwitchInPlace: true`\n- Blocks non-trivial commands when unbound (to avoid operating on the wrong window/tab)\n- Treats \"0 edits applied\" as an error by default (`failOnNoopEdits: true`)\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "repoprompt"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/w-winter/dot314#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/w-winter/dot314.git",
+    "directory": "packages/pi-repoprompt-cli"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/repoprompt-cli/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-01-28T01:45:30.196Z",
+    "modified": "2026-05-07T17:21:10.933Z",
+    "0.1.0": "2026-01-28T01:45:30.366Z",
+    "0.1.1": "2026-02-02T04:14:32.344Z",
+    "0.2.0": "2026-02-15T22:25:34.240Z",
+    "0.2.5": "2026-02-18T04:05:16.660Z",
+    "0.2.6": "2026-02-18T04:18:34.755Z",
+    "0.2.7": "2026-02-20T12:19:59.382Z",
+    "0.2.8": "2026-02-22T06:09:46.671Z",
+    "0.2.9": "2026-03-12T05:18:53.731Z",
+    "0.2.10": "2026-03-31T15:25:22.545Z",
+    "0.3.0": "2026-04-03T01:14:10.245Z",
+    "0.3.1": "2026-05-07T17:21:10.810Z"
+  },
+  "versions_count": 11,
+  "downloads_last_week": null,
+  "download_trend": []
+}

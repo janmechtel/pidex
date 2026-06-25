@@ -1,0 +1,55 @@
+{
+  "name": "pi-tool-search",
+  "latest_version": "0.3.6",
+  "description": "Hide all tools behind a manifest-aware tool_search \u2014 LLM enables tools by name on demand",
+  "readme": "# pi-tool-search\n\nHide non-core tools behind a manifest-aware `tool_search` gate. Core tools stay enabled by default; everything else can be unlocked on demand. Purpose: reduce prompt context / token usage by avoiding full tool schemas for rarely used tools.\n\n## Why\n\nFull tool schemas are expensive (~500 bytes each). With 50 tools that's ~25KB of schema noise every turn. Purpose of this extension is to reduce prompt context / token usage: keep core tools active, replace rest with compact manifest in `tool_search`, and only load full schemas when explicitly unlocked.\n\n## How it works\n\n- **`session_start`** \u2014 snapshots all tools into compact manifest, seeds `unlocked` set with core tools enabled by default (`read`, `write`, `edit`, `bash`, `grep`, `find`)\n- **`turn_start`** \u2014 rebuilds manifest before every LLM call, re-registers `tool_search` with fresh description, re-applies active tools for agent-loop continuations too\n- **`tool_search.execute`** \u2014 validates names, adds to `unlocked` set, persists across turns, queues hidden steer hint so agent can continue without waiting for another user message\n\n## What the LLM sees\n\nPi's system prompt includes a lightweight tool index \u2014 names and one-liners for every registered tool. This is intentional: the LLM needs to know what tools exist so it can make targeted `tool_search` requests rather than guessing. The index costs ~4KB regardless of tool count; full schemas are never sent until unlocked.\n\nThe `tool_search` description itself carries the same manifest, reinforcing which tools are available and how to unlock them:\n\n```\nEnable tools by name before calling them. All tools below are hidden until you enable them here.\n\nAvailable tools:\n  read: Read file contents with optional offset/limit\n  write: Write content to a file\n  bash: Execute a shell command\n  grep: Search files with ripgrep\n  ...\n\nPass one or more exact tool names. After enabling, call those tools directly in next turn.\n```\n\n## Install\n\n```bash\npi install npm:pi-tool-search\n```\n\nOr configure manually in `settings.json`:\n\n```json\n{\n  \"extensions\": [\"/path/to/pi-tool-search\"]\n}\n```\n\n## Usage\n\nOnce installed, all tools except core defaults (`read`, `write`, `edit`, `bash`, `grep`, `find`) are hidden behind `tool_search`. Call `tool_search` with tool names to unlock them on demand.\n\n## Configuration\n\nAdd a `toolSearch` block to `settings.json`:\n\n```json\n{\n  \"toolSearch\": {\n    \"alwaysEnabled\": [\"lsp\", \"grep\", \"find\"],\n    \"showToolSearchFooterStatus\": true\n  }\n}\n```\n\n| Key | Default | Description |\n|---|---|---|\n| `alwaysEnabled` | `[]` | Tool names to pre-unlock beyond default core tools (`read`, `write`, `edit`, `bash`, `grep`, `find`) |\n| `showToolSearchFooterStatus` | `true` | Show tool-search `N / total tools` in the footer status bar |\n\nUnknown names in `alwaysEnabled` are silently ignored until they appear in manifest. `alwaysEnabled` is read at each `session_start`, so changes take effect on next session without reinstall. `showToolSearchFooterStatus` is re-read on refresh; set it to `false` to clear/hide the tool-search footer status.\n\n## Same-response activation caveat\n\nIf model emits `tool_search(...)` and newly enabled tool in same assistant response, second call can still fail because provider already received old tool schema for that response. Extension now mitigates this by:\n\n- telling model to call `tool_search` alone\n- re-applying active tools on every `turn_start`\n- queueing hidden steer hint after successful enable so agent can retry in next turn without waiting for another user message\n\nResult: failure no longer needs fresh user message to recover. Retry can happen in immediate next agent turn.\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "tools",
+    "tool-search",
+    "manifest",
+    "lazy-loading",
+    "on-demand",
+    "tool-manager",
+    "tool-registry",
+    "context-window",
+    "token-saving",
+    "tool-gating",
+    "tool-filter",
+    "tool-discovery",
+    "dynamic-tools",
+    "context"
+  ],
+  "author": {
+    "name": "Tuan Son",
+    "email": "tuansondinh96@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/tuansondinh/pi-tool-search#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tuansondinh/pi-tool-search.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-23T10:27:29.504Z",
+    "modified": "2026-04-24T07:43:55.919Z",
+    "0.3.0": "2026-04-23T10:27:29.647Z",
+    "0.3.1": "2026-04-23T10:39:52.012Z",
+    "0.3.2": "2026-04-23T11:36:36.753Z",
+    "0.3.3": "2026-04-23T13:42:42.095Z",
+    "0.3.4": "2026-04-23T14:17:30.993Z",
+    "0.3.5": "2026-04-23T14:19:42.943Z",
+    "0.3.6": "2026-04-24T07:43:55.790Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,43 @@
+{
+  "name": "pi-subagent-in-memory",
+  "latest_version": "0.2.1",
+  "description": "In-process subagent tool for pi with live TUI card widgets, JSONL session logging, and zero system-prompt overhead.",
+  "readme": "# pi-subagent-in-memory\n\nIn-process subagent tool for [pi](https://github.com/nicholasgasior/pi-coding-agent) with live TUI card widgets, JSONL session logging, and **zero system-prompt overhead**.\n\n![Parallel subagents running with live TUI card widgets](media/parallel-subagents.png)\n\n## Key Design Principle\n\n**This extension adds nothing to your LLM context beyond tool parameter definitions.** No system prompt injection, no hidden instructions, no pre-determined behavior \u2014 the LLM only sees the `subagent_create` tool schema and decides how to use it naturally.\n\n## Features\n\n### \ud83e\udd16 `subagent_create` Tool\n\nSpawns an in-process subagent session using pi's `createAgentSession` SDK. The subagent runs in the same process (not a subprocess), with its own session, tools, and model. Multiple subagents can run in parallel.\n\n**Tool parameters:**\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n| `task` | string | \u2705 | The task for the subagent to perform |\n| `title` | string | | Display title for the card widget |\n| `provider` | string | | LLM provider (e.g. `anthropic`, `google`, `openai`) |\n| `model` | string | | Model ID. Supports `provider/model` format (e.g. `openai/gpt-4o-mini`) |\n| `cwd` | string | | Working directory for the subagent |\n| `timeout` | number | | Timeout in seconds. Aborts the subagent if exceeded |\n| `columnWidthPercent` | number | | Card width as % of terminal (33\u2013100). Controls card grid layout |\n\nIf `provider` and `model` are omitted, the subagent inherits the main agent's model.\n\n### \ud83d\udcca Live TUI Card Widgets\n\nEach running subagent is displayed as a colored card widget above the editor:\n\n- Cards show **title**, **model**, **prompt preview**, **elapsed time**, and **status indicator** (\u23f3 started, \u26a1 working\u2026, \u2705 finished, \u274c error)\n- The prompt passed to the subagent is displayed as card content, so you can see at a glance what each subagent is doing\n- Cards auto-layout into a responsive grid (1\u20133 columns based on `columnWidthPercent`)\n- Subagent number badge (`#1`, `#2`, \u2026) shown on the top-right corner of each card\n- Six rotating color themes for visual distinction between cards\n\n### \ud83d\udd0d Subagent Detail Overlay (`Ctrl+N`)\n\nPress **Ctrl+1** through **Ctrl+9** to open a detail popup for the **N-th visible** subagent card (1 = leftmost/topmost in the current window):\n\n- **Prompt** \u2014 Full prompt text with word wrapping (up to 5 lines)\n- **Messages** \u2014 Live-updating stream of the subagent's activity (text output, tool calls, status changes), always showing the latest 5 lines\n- Press the same **Ctrl+N** shortcut or **Escape** to close the overlay\n\n### \ud83d\udcd1 Paging Through Cards (`Ctrl+Alt+\u2190/\u2192`)\n\nWhen more subagents have been spawned than fit in the visible window (see `/saim-set-max-tui-overlays` below):\n\n- **Ctrl+Alt+\u2190** scrolls back to older subagent cards\n- **Ctrl+Alt+\u2192** scrolls forward to newer subagent cards\n- A `subagents X\u2013Y of N (Ctrl+Alt+\u2190/\u2192 to page)` hint is displayed above the cards whenever paging is active\n\n### \ud83d\udcdd JSONL Session Logging\n\nEvery subagent session is logged to disk for debugging and auditing:\n\n```\n.pi/subagent-in-memory/<mainSessionId>/\n\u251c\u2500\u2500 subagent_1/\n\u2502   \u251c\u2500\u2500 events.jsonl    # Full event stream (text, tool calls, results)\n\u2502   \u2514\u2500\u2500 result.md       # Final subagent output (or error.md on failure)\n\u251c\u2500\u2500 subagent_2/\n\u2502   \u251c\u2500\u2500 events.jsonl\n\u2502   \u2514\u2500\u2500 result.md\n\u2514\u2500\u2500 ...\n```\n\nThe JSONL log includes:\n- Session metadata (model, provider, task, cwd)\n- Aggregated text output (deltas combined into single entries)\n- Tool call arguments and results\n- Timestamps and parent event IDs for tracing\n\n### \ud83d\udd04 Nested Subagent Support\n\nSubagents can spawn their own subagents. All nested cards render in the main agent's widget \u2014 they share the same module-level state regardless of nesting depth. This is achieved by passing the `subagent_create` tool directly as an `AgentTool` to child sessions.\n\n### \ud83c\udf9b\ufe0f TUI Overlay Slash Commands\n\n| Command | Description |\n|---------|-------------|\n| `/saim-toggle-overlay [on\\|off\\|toggle]` | Enable, disable, or toggle the subagent TUI overlay. When disabled, **no card widget is mounted even while subagents are actively running** \u2014 they continue executing silently in the background. |\n| `/saim-set-max-tui-overlays <N>` | Set the maximum number of cards displayed at once (1\u20139, default 3). Older cards remain accessible via **Ctrl+Alt+\u2190/\u2192**. |\n| `/saim-clear-tui-overlay` | Clear all subagent cards from the TUI and close any open detail overlay. |\n\n### \ud83d\udea9 `--saim-no-tui` CLI Flag\n\nStart `pi` with `--saim-no-tui` to launch with the subagent overlay disabled (equivalent to running `/saim-toggle-overlay off` immediately on startup). Subagents still run normally \u2014 only the TUI cards are hidden.\n\n## Install\n\n```bash\npi install npm:pi-subagent-in-memory\n```\n\n## Remove\n\n```bash\npi remove npm:pi-subagent-in-memory\n```\n\n## Verify Installation\n\nAfter installing, start pi and check:\n\n1. The `subagent_create` tool should appear in the tool list\n2. The `/saim-toggle-overlay`, `/saim-set-max-tui-overlays`, and `/saim-clear-tui-overlay` commands should be available (type `/` to see commands)\n3. Ask the agent to \"run a subagent to list files\" \u2014 you should see a card widget appear\n\n## Usage Examples\n\nOnce installed, the LLM will discover the `subagent_create` tool from its schema and use it when appropriate. Some natural prompts:\n\n```\n# Single subagent\n\"Spawn a subagent to analyze the test coverage in this repo\"\n\n# Parallel subagents\n\"Run 2 subagents in parallel: one to summarize src/ and another to summarize tests/\"\n\n# Different models\n\"Use a subagent with openai/gpt-4o-mini to review the README\"\n\n# With timeout\n\"Spawn a subagent with a 60-second timeout to count lines of code\"\n\n# Custom working directory\n\"Run a subagent in /tmp to check disk space\"\n```\n\n## How It Works\n\n1. **Tool registration** \u2014 On load, registers `subagent_create` as a tool plus the `/saim-*` commands and `--saim-no-tui` flag. No system prompt modifications.\n2. **Session creation** \u2014 When the LLM calls `subagent_create`, a new `createAgentSession` is created in-process with its own model, auth, and coding tools (read, write, edit, bash, grep, find, ls).\n3. **Event streaming** \u2014 All subagent events (text deltas, tool calls, completions) are forwarded as `tool_execution_update` events to the parent agent and logged to JSONL.\n4. **Widget rendering** \u2014 A TUI widget renders card(s) above the editor, updated on every event.\n5. **Result handoff** \u2014 The final text output is written to `result.md`. The parent agent receives a short pointer path, not the full content, keeping context lean.\n\n## Requirements\n\n- [pi](https://github.com/nicholasgasior/pi-coding-agent) (peer dependency)\n- API keys configured for any providers you want subagents to use (via `pi login` or environment variables)\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "subagent",
+    "in-memory",
+    "agent",
+    "widget"
+  ],
+  "author": {
+    "name": "Ross Z"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ross-jill-ws/pi-subagent-in-memory#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ross-jill-ws/pi-subagent-in-memory.git"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/ross-jill-ws/pi-subagent-in-memory/main/media/parallel-subagents.png?raw=true"
+  },
+  "time": {
+    "created": "2026-03-31T07:17:46.646Z",
+    "modified": "2026-04-24T12:34:55.617Z",
+    "0.1.0": "2026-03-31T07:17:46.792Z",
+    "0.1.1": "2026-03-31T07:32:27.097Z",
+    "0.1.2": "2026-03-31T07:36:02.436Z",
+    "0.1.3": "2026-04-01T03:03:23.772Z",
+    "0.1.4": "2026-04-01T04:52:22.676Z",
+    "0.1.5": "2026-04-02T06:08:39.425Z",
+    "0.1.6": "2026-04-04T03:58:45.820Z",
+    "0.2.1": "2026-04-24T12:34:55.515Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": null,
+  "download_trend": []
+}

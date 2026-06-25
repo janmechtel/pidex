@@ -1,0 +1,344 @@
+{
+  "name": "@estebanforge/pi-agentmemory",
+  "latest_version": "1.0.2",
+  "description": "Pi-native agent-memory.dev tools \u2014 cross-session memory via REST, no MCP dependency",
+  "readme": "# @estebanforge/pi-agentmemory\n\nPi-native **cross-session memory** for Pi, backed by [agent-memory.dev](https://www.agent-memory.dev). The agent recalls past decisions, bugs, and preferences across sessions automatically, with no MCP server in the loop. This package is the client; it talks directly to the agentmemory REST API.\n\n> **Requires the agentmemory server.** This extension does not bundle the server. Install [agent-memory.dev](https://www.agent-memory.dev) once (see [Prerequisites](#prerequisites)); thereafter the extension starts it automatically when needed and reuses an already-running one. See [Auto-start](#auto-start).\n\n## Prerequisites\n\nInstall and start the agentmemory server on your machine:\n\n```bash\nnpm install -g @agentmemory/agentmemory\nagentmemory\n```\n\nOr run it without installing: `npx -y @agentmemory/agentmemory@latest`.\n\nBy default the REST API listens on `http://localhost:3111` (the web viewer is on `http://localhost:3113`). See the [agent-memory.dev docs](https://www.agent-memory.dev/docs) and the [source on GitHub](https://github.com/rohitg00/agentmemory) for auth, Docker, and configuration.\n\n## Install\n\n```\npi install npm:@estebanforge/pi-agentmemory\n```\n\nStart (or restart) Pi in a project. On session start the extension health-checks the server and lights up the footer status.\n\n## What it does\n\nThree tools, one command, and a recall/observe lifecycle wired into Pi hooks.\n\n### Tools\n\n| Tool | Description |\n| --- | --- |\n| `memory_health` | Check whether the agentmemory server is reachable and healthy |\n| `memory_search` | Search memory for prior decisions, preferences, bugs, and workflows |\n| `memory_save` | Save a durable fact, convention, or bug fix into memory |\n\n### Command\n\n| Command | Description |\n| --- | --- |\n| `/agentmemory` | Show server health + flags, or toggle a flag (`/agentmemory [toggle <flag>]`) |\n\n### Hooks\n\n| Hook | What it does |\n| --- | --- |\n| `session_start` | Derives the session ID, health-checks the server, sets the footer status |\n| `before_agent_start` | Fires a background smart-search for the prompt and appends tool guidance to the system prompt |\n| `context` | Awaits the search results and injects them as a user message before the LLM call |\n| `agent_end` | Observes the conversation turn back into agentmemory for future recall |\n\n## How it works\n\nThe recall path is deferred to keep prompt latency low. On `before_agent_start` the extension kicks off a smart-search against agentmemory and returns immediately; the `context` hook then awaits the result and prepends it as a user message just before the LLM is called. After the turn, `agent_end` writes the exchange back to agentmemory as an observation, so later sessions can recall it.\n\nNo MCP server required. The extension talks directly to the agentmemory REST API (`health`, `smart-search`, `remember`, `observe`).\n\n## Auto-start\n\nThe extension brings the server up on demand so you rarely start it by hand. On session start, and whenever `memory_search` / `memory_save` run, it:\n\n1. Health-checks `GET /agentmemory/health`. If healthy, do nothing.\n2. If down, checks whether `agentmemory` is installed. If so, starts it (detached, so it outlives Pi). If not, falls back to `npx -y @agentmemory/agentmemory@latest`.\n3. Polls health for up to ~20s (first run downloads its engine), then proceeds or reports a clear error.\n\nClosing Pi leaves the server running; reopening Pi, or opening a second Pi at the same time, detects it via the health check and does not start it again. A single Pi process also starts it only once per outage, even if several memory tools fire while it is down.\n\nTwo flags control this (edit in `pi config`):\n\n| Flag | Default | Effect |\n| --- | --- | --- |\n| `agentmemory-autostart` | `true` | Master switch. `false` disables auto-start entirely; the extension then only health-checks and reports if the server is down. |\n| `agentmemory-npx-fallback` | `true` | If `agentmemory` is not on PATH, start it via `npx`. `false` starts only a globally-installed server and otherwise reports that it is not installed. Use this if `npx` is too slow for you. |\n\n**Security note:** `npx -y @agentmemory/agentmemory@latest` downloads and runs the latest published package (unpinned) on first use. This is the official no-install path, but it is remote code execution. Install the CLI globally or set `agentmemory-npx-fallback=false` if that is not acceptable in your environment.\n\n## Configuration\n\nSet via environment variables:\n\n| Variable | Default | Purpose |\n| --- | --- | --- |\n| `AGENTMEMORY_URL` | `http://localhost:3111` | agentmemory server base URL |\n| `AGENTMEMORY_SECRET` | (none) | Bearer token for auth |\n| `AGENTMEMORY_REQUIRE_HTTPS` | (none) | Set `1` to reject plaintext HTTP + secret on non-loopback hosts |\n\n## Security\n\nA plaintext bearer-auth guard (`security.ts`) watches for a secret sent over plain HTTP to a non-loopback host. It warns once by default, and throws if `AGENTMEMORY_REQUIRE_HTTPS=1`. Use HTTPS or an SSH tunnel when carrying a bearer token over the network.\n\n## Compatibility\n\n- Pi (`@earendil-works/pi-coding-agent`), `pi-tui`, and `typebox`, as optional peer dependencies resolved by the Pi runtime.\n- The agentmemory server ([agent-memory.dev](https://www.agent-memory.dev)), default `http://localhost:3111`.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/EstebanForge/pi-agentmemory#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EstebanForge/pi-agentmemory.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/agentmemory"
+    ]
+  },
+  "time": {
+    "created": "2026-06-10T13:18:33.289Z",
+    "modified": "2026-06-24T19:31:48.141Z",
+    "1.0.0": "2026-06-10T13:18:33.586Z",
+    "1.0.1": "2026-06-24T18:25:23.897Z",
+    "1.0.2": "2026-06-24T19:31:48.052Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 277,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 91
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 271
+    }
+  ]
+}

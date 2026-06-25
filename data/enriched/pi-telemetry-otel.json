@@ -1,0 +1,33 @@
+{
+  "name": "pi-telemetry-otel",
+  "latest_version": "0.1.1",
+  "description": "OpenTelemetry (OTLP/HTTP) telemetry extension + helper APIs for pi",
+  "readme": "# pi OTEL Telemetry Extension\n\nEmits OpenTelemetry spans for pi agent lifecycle + tool usage to an OTLP/HTTP collector (Jaeger).\n\n## Install / enable\n\nInstall as a **pi package** (recommended):\n\n```bash\n# Global install (writes ~/.pi/agent/settings.json)\npi install npm:pi-telemetry-otel\n\n# Project-local install (writes .pi/settings.json)\npi install -l npm:pi-telemetry-otel\n```\n\nTry without installing:\n\n```bash\npi -e npm:pi-telemetry-otel \"List files\"\n```\n\nPi loads the extension from the package\u2019s `pi.extensions` manifest automatically once installed (unless disabled via `pi config`).\n\n## Configuration\n\nAll settings accept `PI_` overrides (e.g. `PI_OTEL_SERVICE_NAME`) and fall back to standard OTEL env vars.\n\n| Env var                       | Default                           | Purpose                                                                                         |\n| ----------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------- |\n| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318/v1/traces` | OTLP/HTTP endpoint                                                                              |\n| `OTEL_EXPORTER_OTLP_HEADERS`  | _(none)_                          | Comma-separated `k=v` headers                                                                   |\n| `OTEL_SERVICE_NAME`           | `pi-agent`                        | Service name in Jaeger (defaults to agent name from `PI_AGENT_CHAIN` if present)                |\n| `OTEL_RESOURCE_ATTRIBUTES`    | _(none)_                          | Comma-separated `k=v` attributes                                                                |\n| `PI_AGENT_TRACE_ID`           | _(generated)_                     | Parent trace ID to reuse; set once and kept for subprocess trace linking                        |\n| `PI_AGENT_SPAN_ID`            | _(generated)_                     | Parent span ID for subprocess linking; updated to current active span (session/agent/turn/tool) |\n\n## Extension interoperability (child spans)\n\nOther pi extensions can attach spans to the *current* pi trace.\n\n### Recommended: use the helper APIs\n\n```ts\nimport { withPiSpan } from \"pi-telemetry-otel/helpers\";\n\npi.on(\"tool_call\", async (_event, ctx) => {\n  await withPiSpan(ctx, \"myext.do_work\", async (span) => {\n    span?.setAttribute(\"myext.foo\", \"bar\");\n    // ... your work\n  });\n});\n```\n\nThe helper functions:\n- reuse the tracer/export pipeline registered by this extension\n- parent spans under the **active** pi span (session/agent/turn/tool)\n- prefer a per-session context registry (avoids env-var races in concurrent in-process sub-sessions)\n\n### Advanced: global registries (no hard dependency)\n\nIf you don\u2019t want to depend on the package, you can read the registries directly:\n\n- Runtime registry symbol: `Symbol.for(\"pi.telemetry-otel.runtimeRegistry.v1\")`\n- Active span context registry symbol: `Symbol.for(\"pi.telemetry-otel.activeSpanContextRegistry.v1\")`\n- Map key: `ctx.sessionManager.getSessionId()`\n\n(See `flow-machine` for a reference integration that emits `pi.flow.*` spans.)\n\n## Open the current trace\n\nUse `/open-jaeger-trace` to show the current trace URL and optionally open it in your browser.\nIf Tailscale is available, the command also surfaces a Tailscale IP URL for remote access.\n\n## Jaeger smoke check\n\n```bash\n# Run pi (interactive preferred so spans flush)\nPI_OTEL_SERVICE_NAME=pi-agent-dev pi\n\n# Query traces\ncurl -sSf \"http://localhost:16686/api/traces?service=pi-agent-dev&limit=5\" | jq -r '.data[].traceID'\ncurl -sSf \"http://localhost:16686/api/traces/<trace-id>\" | jq -r '.data[0].spans[].operationName'\n```\n\nExpected operations: `pi.session`, `pi.agent`, `pi.turn`, `pi.tool: <tool-name>` (bash adds command preview).\n\n## Tests\n\n```bash\ncd telemetry-otel\nbun install\nbun test\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "opentelemetry",
+    "otel",
+    "tracing",
+    "jaeger",
+    "otlp"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-03T19:03:20.503Z",
+    "modified": "2026-02-03T19:31:12.334Z",
+    "0.1.0": "2026-02-03T19:03:20.664Z",
+    "0.1.1": "2026-02-03T19:31:12.209Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

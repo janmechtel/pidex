@@ -1,0 +1,351 @@
+{
+  "name": "grok-pi",
+  "latest_version": "1.0.2",
+  "description": "Bridge Grok CLI session models (Composer 2.5, Grok Build) into Pi via cli-chat-proxy",
+  "readme": "# grok-pi\n\nUse **Grok CLI session models** inside **Pi Coding Agent** \u2014 including **Composer 2.5** (`grok-composer-2.5-fast`) and **Grok Build** (`grok-build`).\n\n![grok-pi screenshot](../../assets/grok-pi.png)\n\n![Composer 2.5 fast \u2014 response speed in footer](../../assets/composer-2.5-170-tok-s.png)\n\nThis extension registers a Pi provider named `grok-cli` that talks to the same backend the Grok CLI uses (`cli-chat-proxy.grok.com`), reusing your existing `~/.grok/auth.json` login. It is **not** the official xAI API-key provider (`xai` / `XAI_API_KEY`).\n\n## What you get\n\n| Pi provider | Pi model id | Grok name (typical) |\n|-------------|-------------|---------------------|\n| `grok-cli` | `grok-composer-2.5-fast` | Composer 2.5 |\n| `grok-cli` | `grok-build` | Grok Build |\n\nModels are read from `~/.grok/models_cache.json` when present; otherwise the extension ships safe defaults matching a standard Grok CLI install.\n\n## Prerequisites\n\n1. **Pi Coding Agent** installed (`pi` on your `PATH`).\n2. **Grok CLI** installed and on your `PATH` (`grok --version`).\n3. Network access to `https://cli-chat-proxy.grok.com` and `https://auth.x.ai`.\n\n## Install\n\nPublished on npm: [`grok-pi`](https://www.npmjs.com/package/grok-pi). Use **Pi's package manager** (`pi install`), not `npm install` alone.\n\n```bash\npi install npm:grok-pi\npi install npm:grok-pi@1.0.0   # pin version\npi install -l npm:grok-pi      # project-local (.pi/settings.json)\npi -e npm:grok-pi              # one session, no install\n```\n\nThen run `/reload` in Pi (or restart).\n\n```bash\npi list\npi update npm:grok-pi\npi remove npm:grok-pi\n```\n\n**From [pi-extensions](https://github.com/luongnv89/pi-extensions) (git):**\n\n```bash\ngit clone https://github.com/luongnv89/pi-extensions.git ~/.pi/pi-extensions\ncp -r ~/.pi/pi-extensions/extensions/grok-pi ~/.pi/agent/extensions/\nchmod 700 ~/.pi/agent/extensions/grok-pi/bin/*\n```\n\nFull collection:\n\n```bash\ncurl -fsSL https://raw.githubusercontent.com/luongnv89/pi-extensions/main/install.sh | bash -s -- --auto\n```\n\n**After install**\n\n1. Run **`/reload`** (or restart Pi).\n2. Confirm models: `pi --list-models | rg grok-cli`\n\nYou should see at least:\n\n```text\ngrok-cli        grok-composer-2.5-fast\ngrok-cli        grok-build\n```\n\n## Step-by-step: authenticate\n\nAuthentication is **Grok CLI\u2019s** session, not a separate Pi API key.\n\n### 1. Log in with Grok CLI (first time or expired token)\n\n```bash\ngrok login\n```\n\nThis opens the browser (or your configured auth flow) and writes credentials to:\n\n```text\n~/.grok/auth.json\n```\n\nTokens are refreshed automatically by the extension\u2019s `bin/grok-api-key` helper when Pi needs them.\n\n### 2. Verify Grok CLI works\n\n```bash\ngrok -m grok-composer-2.5-fast -p 'Reply with exactly: OK' --max-turns 1\n```\n\nExpected: `OK`\n\n### 3. Verify auth file exists\n\n```bash\ntest -f ~/.grok/auth.json && echo \"auth ok\"\n```\n\n### 4. Start Pi and check extension notice\n\n```bash\npi\n```\n\nOn session start you should see an info notification that `grok-cli` was registered. If auth is missing, you get a warning to run `grok login`.\n\n### Troubleshooting auth\n\n| Symptom | What to do |\n|---------|------------|\n| `grok-pi: no ~/.grok/auth.json` | Run `grok login`, then `/reload` |\n| Proxy says CLI version outdated | Update Grok: `grok update` or reinstall Grok CLI |\n| `grok-api-key: ... run grok login` | Re-authenticate with `grok login` |\n| Models missing in Pi | `/reload`, then `pi --list-models grok` |\n\nInside Pi:\n\n```text\n/grok-pi status\n/grok-pi help\n```\n\n## Step-by-step: use Grok models in Pi\n\n### Interactive Pi (TUI)\n\n1. Start Pi in your project:\n\n   ```bash\n   cd /path/to/your/repo\n   pi\n   ```\n\n2. Open the model picker: **`Ctrl+L`** or type **`/model`**.\n\n3. Choose provider **`grok-cli`** and model **`grok-composer-2.5-fast`** (Composer 2.5).\n\n4. Chat as usual; Pi tools (`read`, `bash`, `edit`, `write`, etc.) work with the selected model.\n\n### Non-interactive one-shot\n\n```bash\npi -p --provider grok-cli --model grok-composer-2.5-fast \"Summarize this repo in 3 bullets\"\n```\n\n### CLI flags on startup\n\n```bash\npi --provider grok-cli --model grok-composer-2.5-fast\n```\n\nProvider-prefixed model shorthand also works:\n\n```bash\npi --model grok-cli/grok-composer-2.5-fast\n```\n\n### Switch to Grok Build\n\n```bash\npi --provider grok-cli --model grok-build\n```\n\nOr select `grok-build` in `/model`.\n\n### Quick smoke test (minimal tools)\n\n```bash\npi -p --no-session \\\n  --provider grok-cli \\\n  --model grok-composer-2.5-fast \\\n  \"Reply with exactly OK\"\n```\n\n## How it works (technical)\n\nThe extension calls `pi.registerProvider(\"grok-cli\", \u2026)` with:\n\n- **API:** `openai-responses` (matches Grok\u2019s `api_backend: responses` for these models)\n- **Base URL:** `https://cli-chat-proxy.grok.com/v1`\n- **API key:** shell command `!\u2026/grok-api-key` (reads/refreshes `~/.grok/auth.json`)\n- **Required proxy headers** (same family as Grok CLI):\n  - `Authorization: Bearer <token>`\n  - `X-XAI-Token-Auth: xai-grok-cli`\n  - `x-grok-client-version: <from ~/.grok/version.json>`\n  - `User-Agent: xai-grok-workspace/<version>`\n  - Per model: `x-grok-model-override: <model-id>`\n\nComposer 2.5 in Grok config is the model id **`grok-composer-2.5-fast`**, not `composer-2.5` alone.\n\n## Files in this extension\n\n```text\nextensions/grok-pi/\n\u251c\u2500\u2500 bin/\n\u2502   \u251c\u2500\u2500 grok-api-key          # token + refresh for Pi apiKey command\n\u2502   \u251c\u2500\u2500 grok-client-version   # x-grok-client-version header value\n\u2502   \u2514\u2500\u2500 grok-user-agent       # User-Agent header value\n\u251c\u2500\u2500 src/index.ts              # registers grok-cli provider + /grok-pi command\n\u251c\u2500\u2500 package.json\n\u2514\u2500\u2500 README.md\n```\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/grok-pi` or `/grok-pi status` | Provider URL, auth presence, model list |\n| `/grok-pi models` | List models registered from cache/defaults |\n| `/grok-pi test` | Print a one-line smoke-test command |\n| `/grok-pi help` | Short usage |\n\n## Official xAI API vs this bridge\n\n| Approach | Provider in Pi | Auth |\n|----------|----------------|------|\n| **grok-pi (this extension)** | `grok-cli` | `grok login` \u2192 `~/.grok/auth.json` |\n| **Built-in xAI** | `xai` | `XAI_API_KEY` or Pi `/login` for xAI |\n\nUse **grok-pi** when you want the same **Composer 2.5 / Grok Build** models your Grok CLI already uses. Use **xAI** when you have a console API key and want Pi\u2019s stock `grok-*` catalog from `api.x.ai`.\n\n## License\n\nMIT \u2014 same as [pi-extensions](https://github.com/luongnv89/pi-extensions).",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "grok",
+    "xai",
+    "composer",
+    "custom-provider"
+  ],
+  "author": {
+    "name": "pi-extensions contributors"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/luongnv89/pi-extensions/tree/main/extensions/grok-pi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luongnv89/pi-extensions.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/luongnv89/pi-extensions/main/assets/composer-2.5-170-tok-s.png"
+  },
+  "time": {
+    "created": "2026-06-19T10:29:07.164Z",
+    "modified": "2026-06-19T10:38:37.938Z",
+    "1.0.0": "2026-06-19T10:29:07.442Z",
+    "1.0.2": "2026-06-19T10:38:37.816Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 288,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 288
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

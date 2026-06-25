@@ -1,0 +1,352 @@
+{
+  "name": "pi-lifeline",
+  "latest_version": "0.1.3",
+  "description": "Pi extension that lets smaller models phone a stronger advisor model when autoresearch gets stuck.",
+  "readme": "# pi-lifeline\n\nA Pi extension that lets a smaller/local model **ask a stronger advisor model** when an autonomous optimization loop gets stuck.\n\nInspired by Tobi L\u00fctke's [observation](https://x.com/tobi/status/2056198717225464307) that local models can run `pi-autoresearch` effectively when they occasionally ask a stronger model for ideas.\n\n## What it does\n\n`pi-lifeline` adds:\n\n- **Tool:** `phone_a_friend` \u2014 ask a configured stronger model for strategy, critique, debugging help, or next experiment ideas.\n- **Command:** `/lifeline` \u2014 inspect status, thresholds, and advisor config.\n- **Autoresearch trigger detection:** watches `log_experiment` results and detects repeated failures or plateaus.\n- **Rate limiting:** avoids calling the expensive model every iteration.\n\nThe larger model is a **strategy reset mechanism**, not the inner loop.\n\n```text\nsmall/local model: edit \u2192 run_experiment \u2192 log_experiment \u2192 repeat\n                                  \u2502\n                                  \u2502 only when stuck/plateaued\n                                  \u25bc\n                     phone_a_friend \u2192 stronger advisor model\n```\n\n## Why not call every iteration?\n\nCalling the larger model every run defeats the point. The default policy only triggers after evidence that the local model is stuck:\n\n```json\n{\n  \"auto\": true,\n  \"action\": \"nudge\",\n  \"minRunsBetweenCalls\": 5,\n  \"triggerAfterConsecutiveFailures\": 3,\n  \"triggerAfterPlateauRuns\": 6,\n  \"maxCallsPerSession\": 10\n}\n```\n\nDefault behavior is **nudge**, not hidden spending: when stuck, the extension sends a steer message telling the agent to call `phone_a_friend`. If you want fully automatic advisor calls, set `\"action\": \"ask\"`.\n\n## Install\n\nInstall from npm with Pi:\n\n```bash\npi install npm:pi-lifeline\n```\n\nThen reload Pi:\n\n```text\n/reload\n```\n\nVerify it loaded:\n\n```text\n/lifeline\n```\n\nCreate a global starter config:\n\n```text\n/lifeline init\n```\n\nThen edit `~/.pi/agent/pi-lifeline.json` to adjust your advisor provider/model or thresholds.\n\n### Load locally for development\n\nFrom this repo:\n\n```bash\npi -e ./extensions/pi-lifeline/index.ts\n```\n\nAs a Pi package, `package.json` exposes:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./extensions/pi-lifeline\"]\n  }\n}\n```\n\n## Configuration\n\nCreate `pi-lifeline.json` in your Pi agent config directory, usually `~/.pi/agent/pi-lifeline.json`:\n\n```json\n{\n  \"auto\": true,\n  \"action\": \"nudge\",\n  \"minRunsBetweenCalls\": 5,\n  \"triggerAfterConsecutiveFailures\": 3,\n  \"triggerAfterPlateauRuns\": 6,\n  \"maxCallsPerSession\": 10,\n  \"advisor\": {\n    \"provider\": \"openai\",\n    \"model\": \"gpt-5.5\",\n    \"thinking\": \"high\",\n    \"maxTokens\": 4096,\n    \"temperature\": 0.7\n  },\n  \"includeAutoresearchContext\": true\n}\n```\n\nYou can also set:\n\n```bash\nexport PI_LIFELINE_ADVISOR_PROVIDER=openai\nexport PI_LIFELINE_ADVISOR_MODEL=gpt-5.5\nexport PI_LIFELINE_THINKING=high\nexport PI_LIFELINE_MAX_TOKENS=4096\nexport PI_LIFELINE_TEMPERATURE=0.7\n```\n\nFor tests/smoke runs without spending tokens:\n\n```bash\nexport PI_LIFELINE_FAKE_RESPONSE=\"Try profiling phase timings and attack the largest non-noisy bucket.\"\n```\n\n## Tool: `phone_a_friend`\n\nInputs:\n\n- `question` \u2014 specific question for the advisor.\n- `context` \u2014 optional logs, metrics, code summary, failed ideas.\n- `mode` \u2014 one of:\n  - `ideas`\n  - `critique`\n  - `debug`\n  - `next_experiment`\n- `max_ideas` \u2014 default 5.\n- `provider` / `model` \u2014 optional per-call override.\n\nExample use:\n\n```json\n{\n  \"question\": \"We have three discarded parser optimization attempts. What should we try next?\",\n  \"mode\": \"next_experiment\",\n  \"context\": \"Recent runs: #2 discard inline cache, #3 crash arena reuse, #4 discard branchless scan\",\n  \"max_ideas\": 4\n}\n```\n\nThe advisor prompt explicitly asks for strategic, testable advice \u2014 not full patches \u2014 and warns against benchmark cheating.\n\n## Command: `/lifeline`\n\n```text\n/lifeline\n```\n\nShows:\n\n- active config source\n- advisor provider/model\n- thresholds\n- calls this session\n- autoresearch run count\n- current trigger decision\n\n```text\n/lifeline init\n```\n\nOpens a small setup wizard, asks for the advisor model, thinking/reasoning level, and auto-action policy, then creates global `~/.pi/agent/pi-lifeline.json` without overwriting an existing file.\n\n```text\n/lifeline sample-config\n```\n\nPrints the starter config without writing a file.\n\n## Autoresearch integration\n\nWhen `pi-autoresearch` is active, `pi-lifeline` reads `autoresearch.jsonl` and watches `log_experiment` results.\n\nIt triggers when either:\n\n1. trailing failures reach `triggerAfterConsecutiveFailures`\n   - statuses: `discard`, `crash`, `checks_failed`\n2. no kept improvement has happened for `triggerAfterPlateauRuns`\n\nIt respects:\n\n- `minRunsBetweenCalls`\n- `maxCallsPerSession`\n- `auto: false`\n\nWith `includeAutoresearchContext: true`, the tool includes recent `autoresearch.jsonl` runs in the advisor prompt.\n\n## Validation plan\n\n### 1. Static validation\n\n```bash\nnpm run check\n```\n\nThis verifies the extension and policy modules parse under Node's TypeScript stripping.\n\n### 2. Policy unit tests\n\n```bash\nnpm test\n```\n\nTests cover:\n\n- default config normalization\n- consecutive failure detection\n- keep resetting failure streak\n- plateau detection\n- `higher` and `lower` metric directions\n- `minRunsBetweenCalls`\n- `maxCallsPerSession`\n- `auto: false`\n\n### 3. Fake advisor smoke test\n\n```bash\nexport PI_LIFELINE_FAKE_RESPONSE=\"Try measuring phase timings before further code changes.\"\npi -e ./extensions/pi-lifeline/index.ts\n```\n\nThen ask the agent to call `phone_a_friend`. Expected: the tool returns the fake response and records a session call without requiring real model auth.\n\n### 4. Autoresearch fixture smoke test\n\nCreate `autoresearch.jsonl`:\n\n```jsonl\n{\"type\":\"config\",\"name\":\"test\",\"metricName\":\"score\",\"metricUnit\":\"\",\"bestDirection\":\"lower\"}\n{\"run\":1,\"metric\":100,\"status\":\"keep\",\"description\":\"baseline\",\"timestamp\":1}\n{\"run\":2,\"metric\":101,\"status\":\"discard\",\"description\":\"bad 1\",\"timestamp\":2}\n{\"run\":3,\"metric\":102,\"status\":\"discard\",\"description\":\"bad 2\",\"timestamp\":3}\n{\"run\":4,\"metric\":103,\"status\":\"discard\",\"description\":\"bad 3\",\"timestamp\":4}\n```\n\nStart Pi with the extension and run `/lifeline`. Expected: current decision says trigger due to 3 consecutive failures.\n\n### 5. Real advisor smoke test\n\nConfigure a cheap available model first:\n\n```json\n{\n  \"auto\": true,\n  \"action\": \"ask\",\n  \"minRunsBetweenCalls\": 0,\n  \"triggerAfterConsecutiveFailures\": 1,\n  \"triggerAfterPlateauRuns\": 99,\n  \"maxCallsPerSession\": 1,\n  \"advisor\": {\n    \"provider\": \"google\",\n    \"model\": \"gemini-2.5-flash\",\n    \"maxTokens\": 1024,\n    \"temperature\": 0.3\n  }\n}\n```\n\nExpected:\n\n- advisor auth resolves via Pi model registry\n- main model is not changed\n- advisor returns a concise strategy message\n- no code is modified by the advisor directly\n\n## Design notes\n\n- The small model remains responsible for edits and experiments.\n- The strong model is used only for strategic advice.\n- Defaults are intentionally conservative to avoid token waste.\n- `action: \"nudge\"` makes cost explicit; `action: \"ask\"` is available for trusted unattended runs.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "lifeline",
+    "autoresearch",
+    "advisor"
+  ],
+  "author": {
+    "name": "Robert Zolkos"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/robzolkos/pi-lifeline#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/robzolkos/pi-lifeline.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/pi-lifeline"
+    ]
+  },
+  "time": {
+    "created": "2026-05-18T04:34:53.422Z",
+    "modified": "2026-05-18T06:11:07.319Z",
+    "0.1.0": "2026-05-18T04:34:53.728Z",
+    "0.1.1": "2026-05-18T04:45:01.511Z",
+    "0.1.2": "2026-05-18T05:17:29.072Z",
+    "0.1.3": "2026-05-18T06:11:07.185Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 8,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 581
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 38
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 17
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 3
+    }
+  ]
+}

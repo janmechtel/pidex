@@ -1,0 +1,38 @@
+{
+  "name": "pi-hash-anchored-edit",
+  "latest_version": "0.1.4",
+  "description": "Hash-anchored read/edit replacement tools for Pi coding agent.",
+  "readme": "# Hash-Anchored Edit for Pi\n\nSafer `read`/`edit` replacement tools for [Pi](https://pi.dev/) coding agent. Each line returned by `read` includes a short SHA-256 content hash, and every `edit` must present the matching `LINE#HASH` position before the file is written.\n\n![Hash edit preview](./assets/hash-edit-preview.png)\n\n## Why this exists\n\nAgentic coding often fails because context goes stale: line numbers drift, exact text snippets are duplicated, or another edit changes the file between `read` and `edit`. This package adds a lightweight optimistic-concurrency check to file edits:\n\n1. `read` returns `LINE#HASH|content` anchors.\n2. The model sends target `LINE#HASH` positions back to `edit`.\n3. `edit` re-reads the file and verifies every position still matches current content.\n4. Any mismatch aborts the whole edit, forcing a fresh read instead of risking the wrong write.\n\n## Install\n\n```bash\npi install npm:pi-hash-anchored-edit\n```\n\nOr install from GitHub:\n\n```bash\npi install git:github.com/Fadouse/pi-hash-anchored-edit\n```\n\nThe extension intentionally registers tools named `read` and `edit`. Pi gives extension tools priority over built-ins with the same name, so normal model calls automatically use these safer implementations.\n\n## Read output\n\n`read` returns every editable text line as:\n\n```text\n0001#a1b2|const value = 1;\n```\n\n- `0001` is the real 1-based line number, padded to at least 4 digits.\n- `a1b2` is `sha256(lineContent).slice(0, 4)`.\n- The hash is computed without the newline character.\n\nThe raw tool result keeps anchors for the model. The Pi TUI hides anchor noise in collapsed previews and supports Ctrl+O expansion, matching the default Pi read experience.\n\n## Edit schema\n\n```json\n{\n  \"path\": \"src/file.ts\",\n  \"edits\": [\n    {\n      \"pos\": \"0001#a1b2\",\n      \"op\": \"patch\",\n      \"old\": \"1\",\n      \"new\": \"2\"\n    }\n  ]\n}\n```\n\nEach edit position is resolved against the current file content before any write happens.\n\n## Edit operations\n\n- `patch` \u2014 replace `old` with `new` inside the anchored line. `old` must occur exactly once and both strings must be single-line. Best for small token-efficient changes.\n- `replace` \u2014 replace the anchored line with `new`. `new` may contain multiple lines.\n- `delete` \u2014 delete the anchored line.\n- `before` \u2014 insert `new` before the anchored line.\n- `after` \u2014 insert `new` after the anchored line.\n\nExample small patch:\n\n```json\n{\n  \"path\": \"example.txt\",\n  \"edits\": [\n    { \"pos\": \"0001#dccb\", \"op\": \"patch\", \"old\": \"I\", \"new\": \"he\" }\n  ]\n}\n```\n\nTurns:\n\n```text\ntest I like you\n```\n\ninto:\n\n```text\ntest he like you\n```\n\nwithout sending the whole replacement line.\n\n## TUI behavior\n\n- `read` shows a 10-line preview by default and Ctrl+O expands the full result.\n- raw `read` output is capped at 400 lines or 32 KiB by default; use `offset`/`limit` to continue.\n- `read` mirrors Pi's `:start-end` range display when `offset`/`limit` are used.\n- successful `edit` shows only a colored diff in a green edit block.\n- failed `edit` shows the error message inside a red edit block.\n- raw successful `edit` results include only a small changed-anchor block, or ask the model to `read` again if that block would be too large.\n\n## Safety rules\n\n- Every edit must include `pos` in `LINE#HASH` format.\n- Missing or stale positions abort the whole edit.\n- Multiple edits for the same position are rejected.\n- `patch.old` must occur exactly once on the anchored line.\n- Edits are validated against the original file, then applied bottom-up.\n- Existing line endings and final newline style are preserved.\n- Binary/image files are not inlined.\n\n## Command\n\n```text\n/hash-edit-status\n```\n\nShows whether the extension is loaded and which hash length is active.\n\n## Development\n\n```bash\nnpm install\nnpm test\n```\n\nProject layout:\n\n- `index.ts` registers the extension.\n- `src/read.ts` implements the anchored `read` tool.\n- `src/edit.ts` implements hash-validated edits.\n- `src/shared.ts` contains hashing, line handling, UTF-8 text detection, and TUI helpers.\n- `prompts/` stores tool prompt guidelines.\n- `test/` stores Node test cases.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "hash-edit",
+    "anchored-edit"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/Fadouse/pi-hash-anchored-edit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fadouse/pi-hash-anchored-edit.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/Fadouse/pi-hash-anchored-edit/main/assets/hash-edit-preview.png"
+  },
+  "time": {
+    "created": "2026-05-06T12:47:28.770Z",
+    "modified": "2026-05-07T10:37:40.442Z",
+    "0.1.1": "2026-05-06T12:47:29.052Z",
+    "0.1.2": "2026-05-07T09:59:44.851Z",
+    "0.1.3": "2026-05-07T10:23:33.776Z",
+    "0.1.4": "2026-05-07T10:37:40.342Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 12,
+  "download_trend": []
+}

@@ -1,0 +1,36 @@
+{
+  "name": "pi-token-tracker",
+  "latest_version": "0.1.3",
+  "description": "Pi extension that tracks token usage across all sessions including taskplane workers and merge agents. Writes per-call token records to usage.jsonl and provides a token-report command.",
+  "readme": "# pi-token-tracker\n\nPi extension that tracks per-call token usage across all sessions, including taskplane lane workers and merge agents.\n\n## How it works\n\n- **`message_end` hook**: Writes one JSONL line per assistant response to `~/.pi/token-logs/usage.jsonl`\n- **`token-report` command**: Scans usage.jsonl + taskplane runtime exit summaries and prints a hierarchical vendor/model breakdown\n\n### Recorded Fields\n\nEach JSONL record contains:\n\n| Field | Description |\n|-------|-------------|\n| `date`, `time` | ISO date/timestamp |\n| `provider`, `model` | Model identifier (e.g., `anthropic`, `claude-sonnet-4`) |\n| `inputTokens` | Input token count |\n| `outputTokens` | Output token count |\n| `cacheReadTokens` | Cache read tokens (if supported) |\n| `cacheWriteTokens` | Cache write tokens (if supported) |\n| `totalTokens` | Sum of all token counts |\n| `cost` | Estimated cost in USD |\n| `ttftMs` | **Time to First Token** (ms) \u2014 from HTTP response headers to first streaming token |\n| `tps` | **Tokens Per Second** \u2014 output tokens / streaming duration |\n\n## Installation\n\n```bash\n# Clone and install\ngit clone https://github.com/skyscribe-yf/pi-token-tracker.git\ncd pi-token-tracker\nnpm link\n\n# Add to pi settings\n# Edit ~/.pi/agent/settings.json and add \"npm:pi-token-tracker\" to the \"packages\" array:\n# {\n#   \"packages\": [\n#     \"npm:pi-token-tracker\",\n#     ...\n#   ]\n# }\n```\n\n## Why a pi package?\n\nTaskplane lane workers and merge agents run with `--no-extensions`, which prevents auto-discovery of user extensions from the working directory. However, taskplane's `loadPiSettingsPackages` mechanism automatically forwards pi packages (from `settings.json`) to worker processes as explicit `-e` flags.\n\nBy installing this extension as a pi package, it gets loaded in:\n- Main pi sessions \u2713\n- Taskplane lane workers \u2713\n- Taskplane merge agents \u2713\n\n## Safety in RPC mode\n\nThe extension is safe to load in headless RPC worker processes:\n- `session_start` hook uses try-catch to handle missing UI\n- `token-report` command uses try-catch for notify in UI-less contexts\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "token",
+    "usage",
+    "analytics"
+  ],
+  "author": {
+    "name": "skyscribe-yf"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/skyscribe-yf/pi-token-tracker#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/skyscribe-yf/pi-token-tracker.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-19T11:44:03.930Z",
+    "modified": "2026-06-01T11:35:13.467Z",
+    "0.0.1": "2026-05-19T11:44:04.087Z",
+    "0.1.3": "2026-06-01T11:35:13.353Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

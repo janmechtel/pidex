@@ -1,0 +1,359 @@
+{
+  "name": "pi-mono-team-mode",
+  "latest_version": "2.3.2",
+  "description": "Pi extension for flat peer-agent orchestration \u2014 named, addressable teammates with resumable context (mirrors Claude Code's team-mate model)",
+  "readme": "# pi-mono-team-mode\n\nA faithful port of **Claude Code's team-mode mode** to the pi coding agent. Named workers are spawned as pi subprocesses by default, the coordinator ends its turn after launching, and completion arrives as a `<task-notification>` user-role message that wakes the coordinator event-driven \u2014 no polling, no leader subprocess.\n\n> **Sibling of `pi-mono-team-mode`.** `team-mode` is leader-driven (a coordinator subprocess runs on its own task graph). `team-mode` maps 1:1 to Claude Code's semantics instead.\n\n## Parity with Claude Code\n\nEverything below mirrors `claude-code/src/` behavior (`coordinator/coordinatorMode.ts`, `tools/AgentTool`, `tools/SendMessageTool`, `tools/Task*Tool`, `utils/swarm/teammatePromptAddendum.ts`).\n\n| Claude Code                                                                                         | team-mode                                                           |\n| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |\n| `Agent({ description, prompt, name?, team_name?, subagent_type?, isolation?, run_in_background? })` | `agent(...)` \u2014 same schema plus optional `runtime` selector         |\n| `subagent({ tasks })`-style fan-out                                                                 | `delegate({ tasks: [...] })`                                        |\n| `subagent({ chain })`-style sequencing                                                              | `delegate({ task, chain: [...] })`                                  |\n| `SendMessage({ to, message })`                                                                      | `send_message(...)`                                                 |\n| `TaskStop({ task_id })`                                                                             | `task_stop(...)`                                                    |\n| `TaskOutput({ task_id })`                                                                           | `task_output(...)`                                                  |\n| `TaskCreate({ subject, description, activeForm?, metadata? })`                                      | `task_create(...)`                                                  |\n| `TaskUpdate({ task_id, status?, owner?, addBlocks?, addBlockedBy?, ... })`                          | `task_update(...)`                                                  |\n| `TaskGet({ task_id })`                                                                              | `task_get(...)`                                                     |\n| `TaskList({ status?, owner? })`                                                                     | `task_list(...)`                                                    |\n| `TeamCreate / TeamDelete`                                                                           | `team_create / team_delete`                                         |\n| `<task-notification>` XML wakes coordinator                                                         | Emitted via `pi.sendMessage({ triggerTurn: true })` on teammate end |\n| Coordinator system prompt (`CLAUDE_CODE_COORDINATOR_MODE=1`)                                        | `PI_TEAM_MATE_COORDINATOR=1`                                        |\n| Teammate prompt addendum (`TEAMMATE_SYSTEM_PROMPT_ADDENDUM`)                                        | Prepended to every teammate's system prompt                         |\n| Task ids namespaced `agent-*`                                                                       | Same namespace; `task_stop` and `send_message` accept it            |\n\n## The execution model\n\nWorkers are **event-driven, not polled**. You don't write \"spawn, wait, spawn the next\" loops:\n\n```\nTurn 1 (coordinator):\n  agent({ description: \"research auth\", prompt: \"...\" })   \u2192 task_id: agent-r-ab1\n  agent({ description: \"research billing\", prompt: \"...\" })\u2192 task_id: agent-b-c3d\n  \"Investigating both \u2014 I'll report back.\"  [turn ends]\n\n  ...workers run in parallel; zero coordinator tokens burned...\n\nBetween turns:\n  <task-notification>\n    <task-id>agent-r-ab1</task-id>\n    <status>completed</status>\n    <summary>Agent \"research auth\" completed</summary>\n    <result>Found null pointer in src/auth/validate.ts:42...</result>\n    <usage><duration_ms>14230</duration_ms></usage>\n  </task-notification>\n\nTurn 2 (coordinator, woken by the notification):\n  \"Found the bug. I'll fix it.\"\n  send_message({ to: \"agent-r-ab1\", message: \"Fix src/auth/validate.ts:42...\" })\n  [turn ends]\n```\n\nFor a single coherent task, the coordinator should resolve it directly without creating a TODO item. Creating exactly one `task_create` entry is overhead, not coordination.\n\nFor a DAG of dependent tasks, the coordinator:\n\n1. Seeds the TODO list via `task_create` (each task with `blocks`/`blockedBy` set via `task_update`).\n2. Spawns a worker for each immediately-unblocked task, setting `task_update({ owner })` on the matching TODO.\n3. **Ends its turn.**\n4. On each `<task-notification>`, marks the TODO completed, checks what's newly unblocked, spawns the next wave.\n\nThe coordinator never waits \u2014 it runs briefly, reactively, on each notification.\n\n## Install\n\n```bash\npi install npm:pi-mono-team-mode\n# or load locally\npi -e /path/to/pi-extensions/extensions/team-mode/index.ts\n```\n\n## Coordinator mode\n\nSet `PI_TEAM_MATE_COORDINATOR=1` on the pi session you want to act as coordinator:\n\n```bash\nPI_TEAM_MATE_COORDINATOR=1 pi\n```\n\nThis injects the coordinator system prompt at every turn via the `before_agent_start` hook. The prompt teaches the LLM the `<task-notification>` flow, the delegation discipline, and the \"synthesize \u2014 don't hand off understanding\" rule lifted straight from Claude Code.\n\n## Teammate specs\n\nDrop a markdown file into `.pi/teammates/<role>.md` (or `.claude/teammates/<role>.md`):\n\n```markdown\n---\nname: reviewer\ndescription: reviews diffs for bugs and style violations\nmodelTier: deep\nthinkingLevel: high\ntools: read, bash, grep\n---\n\nYou are a careful code reviewer. ...\n```\n\nFrontmatter fields: `name`, `description`, `needsWorktree`, `hasMemory`, `modelTier`, `thinkingLevel`, `tools` (comma-separated). The body becomes the teammate's system prompt. The Claude Code teammate addendum (`send_message` instructions) is prepended automatically.\n\n## Model and thinking selection\n\n`agent(...)` and each `delegate` task accept both `model` and `thinking` (`thinking_level` is accepted as an alias):\n\n```ts\nagent({\n  description: \"review diff\",\n  prompt: \"Review the current branch\",\n  subagent_type: \"reviewer\",\n  model: \"deep\",\n  thinking: \"high\",\n});\n```\n\nValid thinking levels are `off`, `minimal`, `low`, `medium`, `high`, and `xhigh`. Team-mode passes the selected level to the teammate subprocess as `pi --thinking <level>`. Token budgets remain pi's responsibility via `~/.pi/agent/settings.json` `thinkingBudgets`.\n\n`model-config.json` can define compact role/tier defaults:\n\n```jsonc\n{\n  \"defaultTier\": \"md\",\n  \"tiers\": {\n    \"sm\": {\n      \"name\": \"Small\",\n      \"thinkingLevel\": \"low\",\n      \"description\": \"Simple tasks, deterministic outputs. Use for formatting, rewriting, classification\",\n    },\n    \"md\": {\n      \"name\": \"Medium\",\n      \"thinkingLevel\": \"medium\",\n      \"description\": \"Handles moderate complexity. Use for workflows, APIs, structured tasks\",\n    },\n    \"lg\": {\n      \"name\": \"Large\",\n      \"thinkingLevel\": \"high\",\n      \"description\": \"Strong reasoning, multi-step tasks. Use for reasoning, planning, debugging, decision support\",\n    },\n    \"xl\": {\n      \"name\": \"Deep\",\n      \"thinkingLevel\": \"xhigh\",\n      \"description\": \"Near-frontier capability, complex domains. Complex planning, abstraction, ambiguous problems\",\n    },\n  },\n  \"roles\": {\n    \"researcher\": \"sm\",\n    \"docs\": \"xs\",\n    \"backend\": \"md\",\n    \"frontend\": \"md\",\n    \"tester\": \"md\",\n    \"planner\": \"lg\",\n    \"reviewer\": \"md\",\n  },\n}\n```\n\nBuilt-in provider catalogs map `xs`/`sm` to small models, `md` to default models, and `lg`/`xl` to large models. You can still override `providers` if you want exact model IDs per tier. Legacy `roleTiers`, `tierThinkingLevels`, and `roleThinkingLevels` remain supported.\n\nThinking resolution order is: explicit tool `thinking`, teammate spec `thinkingLevel`, `roles`/`roleTiers` tier metadata (`tiers[tier].thinkingLevel`), a legacy `:<thinking>` model suffix such as `gpt-5.4:high`, legacy `tierThinkingLevels`, then `defaultThinkingLevel`. If none applies, pi inherits its normal default.\n\n## Execution runtimes\n\n`agent` and `delegate` accept an explicit `runtime` selector:\n\n```ts\nagent({\n  description: \"quick summary\",\n  prompt: \"Summarize README.md\",\n  runtime: \"transient\",\n});\n\ndelegate({\n  runtime: \"transient\",\n  tasks: [\n    { description: \"scan docs\", prompt: \"Find docs gaps\" },\n    { description: \"scan tests\", prompt: \"Find missing coverage\" },\n  ],\n});\n```\n\n- `runtime: \"subprocess\"` (default): durable, resumable workers backed by `pi --session`; supports `send_message`, names, teams, worktree isolation, background notifications, transcripts, and persistent records.\n- `runtime: \"transient\"`: fast one-shot in-process `createAgentSession()` runs; returns output directly to the current tool call; does not create teammate records, cannot be resumed, and does not share the parent LLM context window.\n\nTransient prompts must be fully self-contained. They only share the parent Node.js process/runtime infrastructure, not the coordinator conversation. Initial transient mode rejects `isolation: \"worktree\"`, `run_in_background: true`, `team_name`, and `name` because those imply durable teammate semantics.\n\nUse transient mode for quick disposable research/summarization fan-out. Use subprocess mode for implementation work, resumable teammates, background work, worktrees, or anything that needs a stable `task_id` for later `send_message`.\n\n## Storage\n\n```\n~/.pi/agent/extensions/team-mode/\n\u251c\u2500\u2500 model-config.json                            # provider/tier/role + taskCompletedHook\n\u251c\u2500\u2500 teammates/<agent-id>/record.json\n\u251c\u2500\u2500 teammates/<agent-id>/sessions/<id>.jsonl     # pi --session target\n\u251c\u2500\u2500 teams/<team-id>/record.json\n\u251c\u2500\u2500 tasks/<parent-session-id>/<task-id>.json     # shared TODO list\n\u2514\u2500\u2500 runtime/<parent-session-id>/index.json       # teammate name \u2192 agent-id\n```\n\nOverride with `PI_TEAM_MATE_STORAGE_ROOT` for tests.\n\n## Quality gates\n\nAdd to `model-config.json`:\n\n```jsonc\n{ \"taskCompletedHook\": \"pnpm test --run\" }\n```\n\nWhen a task transitions to `completed`, the hook runs in the task's cwd. Non-zero exit reverts the task to `failed` and attaches hook output (stdout + stderr, first 8 KB) to `result`. 2-minute timeout. Stale PID-based lock files are auto-recovered after 10 s.\n\n## Concurrency model\n\n- Each task is its own file under `tasks/<parent-session-id>/<task-id>.json`.\n- `task_update` takes an exclusive filesystem lock (`<task-id>.lock` via `open(..., \"wx\")`) and bumps a CAS `version` counter.\n- Stale locks (>10 s) are reclaimed automatically \u2014 safe across teammate subprocesses.\n\n## Delegate groups + live progress\n\n- `delegate({ tasks: [...] })` runs bounded parallel workers and returns aggregated output blocks.\n- `delegate({ task, chain: [...] })` runs sequential chains with `{task}`, `{previous}`, `{chain_dir}` substitution and optional inner `parallel` fan-out.\n- Per-step `output` and `reads` let chain steps exchange large artifacts through files in `{chain_dir}`.\n- Parallel caps: `PI_TEAM_MATE_MAX_PARALLEL` (default `8`) and `PI_TEAM_MATE_PARALLEL_CONCURRENCY` (default `4`).\n- Live TUI widget now renders a multi-line **\u25cf Agents** panel (spinner, turns/tool-uses/tokens/elapsed, activity hint, queued tail).\n- `<task-notification>` messages are rendered as styled completion boxes (status glyph, counters, duration, transcript path).\n\n## Slash commands & keybinding\n\n- `/teammate list | status <name> | stop <name>`\n- `/team list | create <name> | delete <id>`\n- `/tasks list | show <id> | clear`\n- **Ctrl+Shift+T** \u2014 show the shared task list (pi's built-in Ctrl+T toggles thinking blocks)\n\n## Differences from Claude Code (honest)\n\n- **Broadcast `to: \"*\"`** is not implemented. Swarm/persistent teammate pattern with mailboxes isn't needed for the one-shot worker model; each `send_message` resumes a teammate via `pi --session`, but injecting into an actively-running worker turn is not supported.\n- **Tool restriction in coordinator mode** is prompt-only, not enforced. Claude Code's coordinator mode actually strips Bash/Edit/Write from the tool pool; pi's extension API doesn't expose tool removal from the main session. The coordinator prompt tells the LLM not to use those tools, but the LLM could still call them.\n- **`TaskOutput` on a running worker** returns the teammate's last-saved record, not live stdout streaming. Completed workers return their final message faithfully.\n\n## Tests\n\n```bash\ncd extensions/team-mode\nnpm test\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/emanuelcasco/pi-mono-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emanuelcasco/pi-mono-extensions.git",
+    "directory": "extensions/team-mode"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-03T23:58:58.200Z",
+    "modified": "2026-05-08T22:43:32.432Z",
+    "0.1.0": "2026-04-03T23:58:58.466Z",
+    "1.0.0": "2026-04-04T07:49:43.649Z",
+    "1.1.0": "2026-04-04T10:49:47.853Z",
+    "1.1.1": "2026-04-04T12:11:26.331Z",
+    "1.3.0": "2026-04-04T17:05:18.308Z",
+    "1.4.0": "2026-04-07T08:46:55.605Z",
+    "1.5.0": "2026-04-12T09:38:46.967Z",
+    "1.5.1": "2026-04-12T15:21:42.142Z",
+    "1.6.0": "2026-04-12T21:14:55.209Z",
+    "1.7.0": "2026-04-16T22:28:51.607Z",
+    "1.7.2": "2026-04-23T12:45:30.130Z",
+    "2.0.0": "2026-04-24T11:36:31.892Z",
+    "2.1.0": "2026-04-29T23:27:13.386Z",
+    "2.3.0": "2026-05-05T17:19:45.112Z",
+    "2.3.1": "2026-05-06T16:22:20.917Z",
+    "2.3.2": "2026-05-08T22:43:32.321Z"
+  },
+  "versions_count": 16,
+  "downloads_last_week": 13,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 663
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 436
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 254
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 317
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 292
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 357
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 66
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 59
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 36
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 41
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "name": "pi-model-aware-compaction",
+  "latest_version": "0.1.5",
+  "description": "Per-model context-usage thresholds for Pi's built-in auto-compaction, so models with different context windows and performance profiles compact at the right time",
+  "readme": "# Model-Aware Compaction for Pi (`pi-model-aware-compaction`)\n\nPer-model context-usage thresholds for Pi's compaction pipeline, because different models have different context windows and different performance profiles near their context window limits.\n\nThis extension nudges Pi's native compaction pipeline at configurable percent-used thresholds, preserving the full built-in UX (loader, queued-message flush, and whichever compaction summary implementation ultimately handles `session_before_compact`).\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:pi-model-aware-compaction\n```\n\nFrom the dot314 git bundle (filtered install):\n\n```json\n{\n  \"packages\": [\n    {\n      \"source\": \"git:github.com/w-winter/dot314\",\n      \"extensions\": [\"extensions/model-aware-compaction/index.ts\"],\n      \"skills\": [],\n      \"themes\": [],\n      \"prompts\": []\n    }\n  ]\n}\n```\n\n## Requirements\n\nPi auto-compaction must be enabled in `~/.pi/agent/settings.json`:\n\n```json\n{ \"compaction\": { \"enabled\": true } }\n```\n\nCompatible with compaction-summary extensions that hook `session_before_compact`, since it triggers Pi's normal compaction pipeline rather than calling `ctx.compact()` directly.  Said differently, this package decides **when** compaction starts; stock Pi or your summary extension decides **what summary gets written**.\n\n## Configuration\n\nCopy `config.json.example` to `config.json` in the extension's directory and edit:\n\n```json\n{\n  \"global\": 70,\n  \"models\": {\n    \"claude-opus-4-6\": 85,\n    \"gpt-5.2*\": 75\n  }\n}\n```\n\n| Key | Purpose |\n|-----|---------|\n| `global` | Default threshold (percent used) for models without a specific override |\n| `models` | Per-model overrides keyed by model ID; supports `*` wildcards |\n\nCompaction triggers when `used% >= threshold`.\n\n### Tuning `reserveTokens`\n\nPi's own auto-compaction triggers when `usedTokens > contextWindow - reserveTokens`. If that fires before your model-aware threshold, Pi compacts first. To let model-aware thresholds take priority, lower `reserveTokens`:\n\n```json\n{\n  \"compaction\": {\n    \"enabled\": true,\n    \"reserveTokens\": 9000,\n    \"keepRecentTokens\": 15000\n  }\n}\n```\n\n## How it works\n\nAfter each agent run, the extension checks context usage against the model-specific threshold. When exceeded, it inflates the last assistant message's `usage.totalTokens` past the context window size, causing Pi's `_checkCompaction()` to fire its normal pipeline. The inflated value is ephemeral \u2014 compaction rebuilds messages from the session file.\n\nThat normal pipeline still prepares compaction the usual way, then either stock Pi or any installed `session_before_compact` override produces the actual summary entry.\n\nThis approach preserves the full native compaction UX (loader, summary, queued-message flush) that would be lost by calling `ctx.compact()` directly.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "compaction",
+    "context-window"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/w-winter/dot314#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/w-winter/dot314.git",
+    "directory": "packages/pi-model-aware-compaction"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/model-aware-compaction/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-15T22:19:52.420Z",
+    "modified": "2026-05-07T17:06:14.325Z",
+    "0.1.0": "2026-02-15T22:19:52.573Z",
+    "0.1.1": "2026-03-24T18:26:14.043Z",
+    "0.1.2": "2026-03-31T15:25:04.397Z",
+    "0.1.3": "2026-04-03T21:21:01.550Z",
+    "0.1.4": "2026-04-05T18:36:45.903Z",
+    "0.1.5": "2026-05-07T17:06:14.214Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 35,
+  "download_trend": []
+}

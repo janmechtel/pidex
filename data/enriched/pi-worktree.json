@@ -1,0 +1,42 @@
+{
+  "name": "pi-worktree",
+  "latest_version": "1.3.3",
+  "description": "Git worktree management for Pi \u2014 create isolated workspaces with one command, optionally launch in cmux/tmux.",
+  "readme": "# pi-worktree\n\nGit worktree management for [Pi Coding Agent](https://github.com/badlogic/pi-mono). Create isolated dev environments with one command \u2014 each with its own branch, database, dependencies, and ports.\n\nInspired by `claude --worktree` from Claude Code.\n\n## Why?\n\nWhen working on multiple features in parallel (or running multiple AI coding agents), you need full isolation \u2014 not just a git branch, but separate `node_modules`, databases, env files, and dev server ports. Git worktrees provide the branch isolation; **pi-worktree** automates everything else via project-level hooks.\n\n**One command** gets you:\n- A fresh git worktree on its own branch\n- A dedicated database (via `createdb` or any command you configure)\n- A generated `.env.local` with worktree-specific config\n- Installed dependencies (`npm install` / `bun install`)\n- Applied migrations or schema pushes\n- Pi running in the worktree directory, ready to code\n\n## Install\n\n```bash\npi install pi-worktree\n```\n\nIf Pi is already running, use `/reload` to pick up the new extension.\n\n## Usage\n\n```bash\n# Create a worktree and start Pi in it\npi --worktree my-feature\n\n# Auto-generated name (e.g. \"calm-fox\")\npi --worktree\n\n# From within a Pi session\n/worktree my-feature\n/worktree destroy my-feature\n/worktree list\n```\n\nWhen cmux or tmux is detected, Pi relaunches itself in the worktree directory within the same terminal. Without a multiplexer, it prints the path for manual `cd && pi`.\n\n## Project configuration\n\nCreate `.pi/worktree.json` in your repo root (commit it so all contributors share the same setup). Run `/skill:worktree-setup` for interactive setup, or create it manually:\n\n```json\n{\n  \"dir\": \".worktrees\",\n  \"branchPrefix\": \"worktree/\",\n  \"linkEnvFiles\": true,\n  \"postCreate\": [\n    \"npm install\",\n    \"npx prisma db push\"\n  ],\n  \"preRemove\": [\n    \"dropdb --if-exists myapp_$(basename $PWD) 2>/dev/null || true\"\n  ]\n}\n```\n\n| Key | Default | Description |\n|-----|---------|-------------|\n| `dir` | `.worktrees` | Directory for worktrees (relative to repo root) |\n| `branchPrefix` | `worktree/` | Branch name prefix |\n| `linkEnvFiles` | `true` | Symlink gitignored `.env*` files (except `.env.local`) from main repo |\n| `postCreate` | `[]` | Shell commands run after creation (cwd = worktree) |\n| `preRemove` | `[]` | Shell commands run before removal (cwd = worktree) |\n\nDon't forget to add the worktree directory to `.gitignore`:\n\n```\n.worktrees/\n```\n\n## How it works\n\n**Create** (`pi --worktree my-feature` or `/worktree my-feature`):\n\n1. `git worktree add -b worktree/my-feature .worktrees/my-feature HEAD`\n2. Symlinks gitignored `.env*` files (except `.env.local`) from the main repo\n3. Runs each `postCreate` command in order\n4. Relaunches Pi in the worktree directory\n\n**Destroy** (`/worktree destroy my-feature`):\n\n1. Runs each `preRemove` command\n2. `git worktree remove --force .worktrees/my-feature`\n3. `git branch -D worktree/my-feature`\n\n**Relaunch strategy:** Pi's tools (bash, read, edit, etc.) bind to the working directory at startup via closure \u2014 there is no way to change it mid-session. When a worktree is created from the main repo, Pi shuts down and injects `cd <worktree> && pi` into the terminal via `cmux send` or `tmux send-keys`, so Pi restarts with the correct cwd.\n\n## Examples\n\n### Node.js + PostgreSQL + Prisma\n\nEach worktree gets its own database and `.env.local`:\n\n```json\n{\n  \"postCreate\": [\n    \"printf 'DATABASE_URL=postgres://localhost:5432/myapp_%s\\\\n' $(basename $PWD) > .env.local\",\n    \"createdb myapp_$(basename $PWD) 2>/dev/null || true\",\n    \"npm install\",\n    \"npx prisma db push\"\n  ],\n  \"preRemove\": [\n    \"dropdb --if-exists myapp_$(basename $PWD) 2>/dev/null || true\"\n  ]\n}\n```\n\n### Bun monorepo with per-worktree staging\n\nFor monorepos where each worktree needs a unique stage name (for isolated dev server ports), database, and environment:\n\n```json\n{\n  \"postCreate\": [\n    \"WT=$(basename $PWD); DB=myapp_$(echo $WT | tr '-' '_'); printf 'STAGE=%s\\\\nDATABASE_URL=postgres://localhost:5432/%s\\\\n' \\\"$WT\\\" \\\"$DB\\\" > .env.local\",\n    \"DB=$(grep DATABASE_URL .env.local | sed 's|.*/||'); createdb \\\"$DB\\\" 2>/dev/null || true\",\n    \"bun install\",\n    \"bun run prisma:generate\",\n    \"bun run prisma:push\"\n  ],\n  \"preRemove\": [\n    \"DB=$(grep DATABASE_URL .env.local 2>/dev/null | sed 's|.*/||'); [ -n \\\"$DB\\\" ] && dropdb --if-exists \\\"$DB\\\" 2>/dev/null || true\"\n  ]\n}\n```\n\nThis pattern works well for projects that derive dev server ports from the stage name, giving each worktree fully isolated services.\n\n## Update\n\n```bash\npi update pi-worktree\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-package",
+    "git",
+    "worktree",
+    "cmux",
+    "tmux"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions/worktree.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-03-13T03:16:48.563Z",
+    "modified": "2026-03-14T03:18:16.335Z",
+    "0.1.0": "2026-03-13T03:16:48.827Z",
+    "1.0.0": "2026-03-13T05:05:26.121Z",
+    "1.0.1": "2026-03-13T05:11:32.621Z",
+    "1.1.0": "2026-03-13T05:29:24.142Z",
+    "1.3.0": "2026-03-13T23:21:21.632Z",
+    "1.3.1": "2026-03-13T23:28:37.479Z",
+    "1.3.2": "2026-03-13T23:32:58.824Z",
+    "1.3.3": "2026-03-14T03:18:16.199Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": null,
+  "download_trend": []
+}

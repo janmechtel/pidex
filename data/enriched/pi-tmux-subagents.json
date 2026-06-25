@@ -1,0 +1,46 @@
+{
+  "name": "pi-tmux-subagents",
+  "latest_version": "0.1.1",
+  "description": "Pi extension for Markdown-defined, tmux-backed subagents and parallel coding-agent delegation",
+  "readme": "# pi-tmux-subagents\n\nPi extension for launching Markdown-defined subagents as real tmux-backed Pi sessions. Use it to delegate focused coding-agent tasks to parallel child Pi sessions, track their results, and optionally mirror them inside `pi-agent-hub`.\n\n## Requirements\n\n- Pi coding agent with package support.\n- `tmux` available on `PATH`.\n- Node.js 20 or newer for local development and npm installs.\n\n## Install\n\nInstall from npm:\n\n```bash\npi install npm:pi-tmux-subagents\n```\n\nRestart any already-running parent Pi sessions after installing or updating; Pi loads extension code at process start.\n\nLocal development install:\n\n```bash\ngit clone https://github.com/masta-g3/pi-tmux-subagents.git\ncd pi-tmux-subagents\nnpm install\nnpm test\npi install \"$PWD\"\n```\n\nRe-run `npm run build` after local changes, then restart parent Pi sessions that should use the updated extension.\n\n## Agent files\n\nThe package ships with three built-in agents:\n\n- `scout` \u2014 fast read-only codebase recon, pinned to `openai-codex/gpt-5.4-mini`.\n- `worker` \u2014 focused implementation agent, pinned to `openai-codex/gpt-5.5`.\n- `delegate` \u2014 lightweight general helper that inherits the parent model.\n\nUser agents are discovered from:\n\n```text\n~/.pi/agent/agents/*.md\n```\n\nUser/project agents with the same name override built-ins. Project agents are opt-in via `agentScope: \"project\"` or `\"both\"` and are discovered from the nearest:\n\n```text\n.pi/agents/*.md\n```\n\nExample:\n\n```md\n---\nname: scout\ndescription: Fast codebase recon\nmodel: openai-codex/gpt-5.5\nthinking: low\ntools: read, bash\nsystemPromptMode: replace\ninheritProjectContext: true\ninheritSkills: false\n---\n\nYou are a focused scouting agent. Report findings clearly and stop.\n```\n\n## Tool usage\n\n```ts\ntmux_subagent({ action: \"list\" })\ntmux_subagent({ action: \"get\", agent: \"scout\" })\ntmux_subagent({ agent: \"scout\", task: \"Inspect auth flow\", background: true })\ntmux_subagent({ agent: \"code-critic\", task: \"Review these files\" }) // auto-stops after clean completion by default\ntmux_subagent({ agent: \"scout\", task: \"Keep alive for follow-up\", autoStopOnComplete: false })\ntmux_subagent({ action: \"send\", childId: \"abc123\", message: \"Now check edge cases.\", wait: true })\ntmux_subagent({ action: \"wait\", childId: \"abc123\", timeoutMs: 600000 })\ntmux_subagent({ action: \"status\", childId: \"abc123\" })\ntmux_subagent({ action: \"stop\", childId: \"abc123\" }) // or action: \"cancel\"\n```\n\nChild sessions auto-stop after clean completion by default so completed subagents do not clutter tmux or `pi-agent-hub` dashboards. Pass `autoStopOnComplete: false` when you want to inspect, attach, or send follow-up messages after completion, then use `action: \"stop\"` when done. Auto-stop only applies after clean completion; failed or interrupted sessions stay alive for inspection. Background jobs auto-stop when a later `status` call observes clean completion.\n\nPersistent children support generic follow-up turns through `action: \"send\"`. By default `send` returns after pasting the message into the live child; pass `wait: true` to wait for the next completed turn. `action: \"wait\"` waits for a running child to return to an idle/completed state and supports `timeoutMs`; timeouts leave the child alive for later inspection or stopping.\n\nEach completed child turn writes a numbered result file under `jobs/<id>/turns/`, and `jobs/<id>/result.md` is updated to the latest result for compatibility with existing tooling.\n\nForeground runs and explicit status calls render a compact parent-session summary:\n\n```text\ntmux subagent scout\n \u2713 scout \u00b7 done \u00b7 2m39s\n   \u23bf  Done\n      <result preview>\n   tmux: pi-agent-hub-abc123\n   attach: tmux attach-session -t pi-agent-hub-abc123\n   output: /path/to/result.md\n   stop: tmux_subagent({ action: \"stop\", childId: \"...\" })\n```\n\nState is stored in `PI_TMUX_SUBAGENTS_DIR`, or `<PI_CODING_AGENT_DIR>/pi-tmux-subagents` when unset.\n\n## pi-agent-hub integration\n\nThe extension is standalone. When launched from a managed `pi-agent-hub` parent with `PI_AGENT_HUB_DIR` and `PI_AGENT_HUB_SESSION_ID`, it mirrors child rows into the hub registry and writes dashboard-compatible heartbeats. Without those env vars, no hub state is created or required.\n\n## Development\n\n```bash\nnpm install\nnpm test\nnpm publish --dry-run\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "agent",
+    "subagents",
+    "tmux",
+    "tmux-subagents",
+    "markdown-agents",
+    "parallel-agents",
+    "agent-delegation",
+    "agent-orchestration",
+    "extension",
+    "session-manager",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "masta-g3"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/masta-g3/pi-tmux-subagents#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/masta-g3/pi-tmux-subagents.git"
+  },
+  "pi": {
+    "extensions": [
+      "dist/src/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-05-14T05:46:07.077Z",
+    "modified": "2026-05-26T17:03:50.589Z",
+    "0.1.0": "2026-05-14T05:46:07.243Z",
+    "0.1.1": "2026-05-26T17:03:50.472Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 13,
+  "download_trend": []
+}

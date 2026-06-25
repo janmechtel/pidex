@@ -1,0 +1,376 @@
+{
+  "name": "@boofpackdev/pi-morph",
+  "latest_version": "0.8.0",
+  "description": "Agent orchestration layer for pi \u2014 guided 5-stage pipeline: spark \u2192 plan \u2192 work \u2192 review \u2192 ship. Mission-control TUI, browser approval gates, autonomous autorecovery, and final handoff reports.",
+  "readme": "# MORPH\r\n\r\n<p align=\"center\">\r\n<pre style=\"color: #00ff00; background: #000; padding: 20px; border: 2px solid #00ff00; border-radius: 4px; display: inline-block; font-family: monospace; font-weight: bold;\">\r\n    __  ___                 __  \r\n   /  |/  /___  _________  / /_ \r\n  / /|_/ / __ \\/ ___/ __ \\/ __ \\\r\n / /  / / /_/ / /  / /_/ / / / /\r\n/_/  /_/\\____/_/  / .___/_/ /_/ \r\n                 /_/            \r\n</pre>\r\n</p>\r\n\r\n**AGENT ORCHESTRATION PIPELINE FOR PI**\r\n\r\n[![VERSION](https://img.shields.io/badge/VERSION-0.7.9-00ff00?style=for-the-badge&labelColor=000000)](https://npmjs.org/package/@boofpackdev/pi-morph)\r\n[![LICENSE](https://img.shields.io/badge/LICENSE-MIT-ff9900?style=for-the-badge&labelColor=000000)](https://opensource.org/licenses/MIT)\r\n[![STATUS](https://img.shields.io/badge/STATUS-ACTIVE-00ccff?style=for-the-badge&labelColor=000000)](#)\r\n\r\n---\r\n\r\n## <span style=\"color: #ff9900;\">SYNOPSIS</span>\r\n\r\n`morph` is a strict, 5-stage deterministic state machine designed to transform high-level intent into verified software artifacts. It orchestrates specialized agent teams within `pi`, enforcing strict data handoffs through a centralized **Blackboard** and a Directed Acyclic Graph (DAG) execution engine.\r\n\r\nIt utilizes a Hub-and-Spoke consensus model, deterministic git-diff validation, and an exhaustive 10-state Autorecovery Taxonomy to prevent hallucination loops and ensure architectural integrity without operator babysitting.\r\n\r\n## <span style=\"color: #ff9900;\">1. STATE MACHINE & DATA CONTRACTS</span>\r\n\r\nThe pipeline evolves a \"Product Shape\" through five strictly enforced Zod schemas. Progression is impossible without a validated state extraction.\r\n\r\n| PHASE | AGENTS | OUTPUT SCHEMA | DESCRIPTION |\r\n| :--- | :--- | :--- | :--- |\r\n| **SPARK** | Visionary, Critic | `SparkOutputSchema` | Extracts core features, risk parameters, and the exact Deliverable Type. |\r\n| **PLAN** | Architect, QA, Efficiency | `PlanOutputSchema` | Synthesizes Mermaid architecture, Data Models, and the JSON Task DAG. |\r\n| **WORK** | Engineer, Peer Reviewer | `WorkTaskResultSchema` | Executes DAG tasks. Requires strict git-diff validation to pass. |\r\n| **REVIEW** | Tech Lead, QA, Perf, User | `ReviewOutputSchema` | Generates a 1-10 Efficiency Score and a definitive GO / NO-GO verdict. |\r\n| **SHIP** | DevOps, Release Consultant | `ShipOutputSchema` | Computes SEMVER, changelog, and a step-by-step rollback procedure. |\r\n\r\n## <span style=\"color: #ff9900;\">2. DAG EXECUTION ENGINE</span>\r\n\r\nThe `Work` phase execution is strictly controlled by a DAG Router (`src/core/engine.ts`).\r\n\r\n- **Topological Sorting:** Tasks are resolved via Kahn's algorithm based on `dependsOn` arrays. Cycles will throw exceptions and trigger Plan-phase auto-repair.\r\n- **Wave Parallelization:** Tasks with resolved dependencies are grouped into execution waves and processed in parallel batches (default `maxParallel: 3`).\r\n- **File Target Overlap Detection:** Analyzes target files across waves. If concurrent edits to the same file are detected (`severity: \"high\"`), the engine applies `serializeHighSeverityFileOverlaps` to rewrite the DAG, forcing sequential execution to prevent git-patch collisions.\r\n- **Truthful Completion Verification:** A task is never marked `done` based on LLM output alone. Morph compares a pre-task and post-task git worktree snapshot. If no file delta is detected, the task fails verification.\r\n\r\n## <span style=\"color: #ff9900;\">3. AUTONOMOUS AUTORECOVERY TAXONOMY</span>\r\n\r\nWhen an execution failure occurs, Morph diagnoses the state and categorizes it into one of 10 taxonomical states (`diagnoseRecoveryState`). Safe failures are retried automatically; critical failures halt execution and generate markdown incident reports.\r\n\r\n- <span style=\"color: #ff3333;\">`NO_EFFECT`</span>: The agent claimed success, but no git-diff was produced. *Auto-safe retry.*\r\n- <span style=\"color: #ff3333;\">`TOOL_FAILURE`</span>: Internal system exception or subprocess crash. *Auto-safe retry.*\r\n- <span style=\"color: #ff3333;\">`CLI_LAUNCH_FAILURE`</span>: Node/pi process spawn failure. *Halts pipeline.*\r\n- <span style=\"color: #ff3333;\">`AUTH_OR_QUOTA_FAILURE`</span>: API limits reached or 401 Unauthorized. *Halts pipeline.*\r\n- <span style=\"color: #ff3333;\">`REVIEW_REJECTED`</span>: The Peer Reviewer agent rejected the implementation. Feedback is automatically injected into the next Engineer retry attempt. *Auto-safe retry.*\r\n- <span style=\"color: #ff3333;\">`REVIEW_FORMAT_INVALID`</span>: Reviewer failed to provide a valid APPROVED/REJECTED verdict. *Auto-safe retry.*\r\n- <span style=\"color: #ff3333;\">`VERIFICATION_FAILED`</span>: File changes were detected, but they did not match the expected targets declared in the Task Node. *Auto-safe retry.*\r\n- <span style=\"color: #ff3333;\">`DEPENDENCY_BLOCKED`</span>: A parent task failed, recursively blocking all children. The engine will not retry blocked children until the parent is repaired. *Halts pipeline.*\r\n- <span style=\"color: #ff3333;\">`TASK_UNDERSPECIFIED`</span>: The LLM rejected the task due to fog-of-war. Requires replanning. *Halts pipeline.*\r\n- <span style=\"color: #ff3333;\">`STATE_INCONSISTENT`</span>: The Blackboard and repository state diverge impossibly (e.g., marked done but zero worktree changes). *Auto-safe retry (wipes stale state).*\r\n\r\n## <span style=\"color: #ff9900;\">4. HUB-AND-SPOKE CONSENSUS PROTOCOL</span>\r\n\r\nTo prevent context bloat and hallucination loops, agents do not chat freely. They use a strict hub-and-spoke synthesis model.\r\n\r\n- **Plan Synthesis:** The Lead Architect drafts a DAG. The QA Expert analyzes it for edge cases, and the Efficiency Manager checks for redundant loops. The Architect is then re-invoked to synthesize the feedback into a final JSON array.\r\n- **Review Routing:** The `determineReviewRouting` system uses regex heuristics against the codebase diff to determine if the QA Auditor, Performance Guru, or End User agents need to be invoked. The Tech Lead then synthesizes their parallel reports into a final verdict.\r\n\r\n## <span style=\"color: #ff9900;\">5. CENTRALIZED BLACKBOARD & CONSERVATION</span>\r\n\r\n- **Atomic File Swaps:** All context is read/written atomically to `.morph/state.json` via `.tmp` file renaming to prevent corruption.\r\n- **Fallback JSON Repair:** `repairPersistedState` dynamically fixes malformed states (e.g., truncating bloated array limits from older parsers) instead of destroying the Blackboard.\r\n- **Internal Monologue Stripping:** `<thinking>` tokens and chain-of-thought blocks are purged via `stripReasoningTokens` before state handoffs.\r\n- **Context Sliding Window:** Deep retry loops aggressively truncate historical context to prevent the window from collapsing during extended debugging sessions.\r\n- **Differential Patching:** `diff.ts` invokes `git diff --no-index` for clean, unified patch blocks. If git fails, it falls back to an internal Longest Common Subsequence (LCS) matrix diff.\r\n\r\n## <span style=\"color: #ff9900;\">6. MISSION CONTROL TUI & BROWSER GATES</span>\r\n\r\n- **Live TUI Display:** Displays pipeline telemetry (`PipelineDisplay`), execution waves, real-time file-modification activity (`FileActivity`), and live token ledger costs via `@earendil-works/pi-tui`.\r\n- **Pre-Work Approval Gate:** Before implementation begins, Morph generates `work-spec.md` and `work-approval.html`, launching a local REST/WebSocket server (`localhost:4040/api/approve`). The DAG must be explicitly approved via browser or terminal.\r\n- **Final Handoff Artifacts:** Produces a comprehensive `final-report.md` / `final-report.html` detailing the quickstart guide, inferred project root, delivered architecture, and rollback instructions.\r\n- **Auto-Scaffolding Protection:** Configuration tasks automatically execute `git commit -m \"morph: auto-commit\"` so Morph's internal `git stash push` checkpoints do not accidentally wipe untracked scaffolding logic.\r\n\r\n## <span style=\"color: #ff9900;\">INSTALLATION</span>\r\n\r\n```bash\r\npi install @boofpackdev/pi-morph\r\n```\r\n\r\n## <span style=\"color: #ff9900;\">CLI CONTROL</span>\r\n\r\n### <span style=\"color: #00ccff;\">SHORTCUTS</span>\r\n<pre style=\"background: #111; color: #00ff00; padding: 10px; border-left: 4px solid #ff9900; font-family: monospace;\">\r\nCTRL+M G : Full Guided Pipeline\r\nCTRL+M S : Spark (Idea Refinement)\r\nCTRL+M P : Plan (Architecture)\r\nCTRL+M W : Work (Implementation)\r\nCTRL+M R : Review (Audit)\r\nCTRL+M H : Ship (Release)\r\n</pre>\r\n\r\n### <span style=\"color: #00ccff;\">DAEMON COMMANDS</span>\r\n```text\r\n/morph:run <idea>  Start a new project\r\n/morph:recover     Diagnose and resume from an Autorecovery failure state\r\n/morph:status      Poll Blackboard for phase/token telemetry\r\n/morph:reset       Purge local .morph/ context and kill active agents\r\n```\r\n\r\n---\r\n<div align=\"center\" style=\"color: #444; font-size: 0.8em; letter-spacing: 0.2em;\">MORPH OPERATIONAL DATA \u00b7 EOF</div>\r\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "morph",
+    "agent-orchestration",
+    "subagent",
+    "pipeline",
+    "multi-agent",
+    "software-development",
+    "code-review",
+    "ci-cd"
+  ],
+  "author": {
+    "name": "morph contributors"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/boofpackdev/morph#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/boofpackdev/morph.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-14T16:12:27.399Z",
+    "modified": "2026-05-18T20:26:07.537Z",
+    "0.1.0": "2026-05-14T16:12:27.683Z",
+    "0.1.1": "2026-05-14T16:14:42.712Z",
+    "0.2.0": "2026-05-14T17:44:26.726Z",
+    "0.2.1": "2026-05-14T18:01:24.405Z",
+    "0.3.0": "2026-05-14T19:34:46.820Z",
+    "0.3.1": "2026-05-14T21:01:30.987Z",
+    "0.3.2": "2026-05-15T03:17:50.718Z",
+    "0.3.3": "2026-05-15T04:54:10.389Z",
+    "0.3.4": "2026-05-15T05:07:26.717Z",
+    "0.4.0": "2026-05-15T14:22:30.402Z",
+    "0.5.0": "2026-05-15T15:23:06.724Z",
+    "0.6.0": "2026-05-16T05:27:38.916Z",
+    "0.7.0": "2026-05-17T09:59:45.011Z",
+    "0.7.1": "2026-05-17T14:05:43.818Z",
+    "0.7.2": "2026-05-17T14:34:57.447Z",
+    "0.7.4": "2026-05-17T16:46:25.022Z",
+    "0.7.5": "2026-05-17T16:51:27.510Z",
+    "0.7.6": "2026-05-18T06:19:19.203Z",
+    "0.7.7": "2026-05-18T11:16:48.695Z",
+    "0.7.8": "2026-05-18T12:11:30.065Z",
+    "0.7.9": "2026-05-18T12:38:05.196Z",
+    "0.7.10": "2026-05-18T13:00:42.662Z",
+    "0.7.11": "2026-05-18T14:51:21.018Z",
+    "0.8.0": "2026-05-18T20:26:07.412Z"
+  },
+  "versions_count": 24,
+  "downloads_last_week": 47,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 3099
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 153
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 93
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 66
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 42
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 5
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "name": "@vahor/pi-keymap",
+  "latest_version": "0.0.13",
+  "description": "Vim-like custom keymaps for binding keyboard shortcuts to shell commands in pi.",
+  "readme": "# @vahor/pi-keymap\n\n[![npm downloads](https://img.shields.io/npm/dm/%40vahor%2Fpi-keymap)](https://www.npmjs.com/package/@vahor/pi-keymap)\n\nDefine Vim-like custom keymaps that bind keyboard shortcuts to shell commands.\n\n```bash\npi install npm:@vahor/pi-keymap\n```\n\n## Config\n\nConfiguration is loaded from both locations and merged recursively. `keymaps` arrays are merged by `key`, so project entries replace global entries with the same key:\n\n| Location | Scope |\n|----------|-------|\n| `~/.pi/agent/keymap.json` | Global keymaps |\n| `.pi/keymap.json` | Project keymaps; overrides global values |\n\nIf neither file exists, the extension creates `.pi/keymap.json` with an empty config and a `$schema` field for editor validation.\n\n```jsonc\n// .pi/keymap.json\n{\n  \"leader\": \"space\",\n  \"keymaps\": [\n    // Direct shortcuts\n    {\n      \"key\": \"ctrl+shift+t\",\n      \"commands\": [\"bun run test\"]\n    },\n    // Leader-prefixed shortcuts (triggered via leader key + sub-key)\n    {\n      \"key\": \"<leader>f\",\n      \"description\": \"Format\",\n      \"commands\": [{ \"command\": \"bun run format\", \"timeout\": 1000, \"print\": true }]\n    },\n    {\n      \"key\": \"<leader>p\",\n      \"description\": \"Draft prompt in pi editor\",\n      \"prompt\": \"Default prompt content\",\n      \"send\": false,\n      \"open\": true\n    },\n    {\n      \"key\": \"<leader>g\",\n      \"description\": \"Git\",\n    },\n    // Nested leader keys\n    {\n      \"key\": \"<leader>gg\",\n      \"commands\": [{ \"command\": \"lazygit\", \"interactive\": true }]\n    },\n  ]\n}\n```\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| `leader` | `string` | Yes | Key that activates the which-key overlay |\n| `keymaps` | `array` | Yes | List of keymap entries |\n| `keymaps[].key` | `string` | Yes | Key combination or `<leader>key` |\n| `keymaps[].description` | `string` | No | Label shown in the which-key overlay (falls back to first command) |\n| `keymaps[].commands` | `array` | No | Shell commands to run. Required for command keymaps. |\n| `keymaps[].prompt` | `string` | No | Default prompt text. |\n| `keymaps[].send` | `boolean` | No | For prompt keymaps, send saved content immediately instead of placing it in the input editor. Defaults `false` |\n| `keymaps[].open` | `boolean` | No | For prompt keymaps, open editor before using the prompt. Defaults `true`; `false` uses the prompt immediately according to `send`. |\n| `keymaps[].print` | `boolean` | No | Print command output in the UI. Defaults `true` |\n| `keymaps[].context` | `boolean` | No | Add command output to the agent context |\n| `keymaps[].interactive` | `boolean` | No | Default interactive mode for commands in this keymap |\n\n`commands`, `prompt`, and grouping entries are mutually exclusive shapes: use `commands` for shell commands, `prompt` for prompt drafts, or neither for a leader grouping node. `print`, `context`, and `interactive` can be overridden at command level. Command-level wins over keymap-level.\n\n### Key format\n\n`modifier+key` where modifiers are `ctrl`, `shift`, `alt`, `super` (e.g. `ctrl+shift+p`, `alt+x`).\n\nValid base keys:\n\n| Category | Keys |\n|----------|------|\n| **Letters** | `a`\u2013`z` |\n| **Digits** | `0`\u2013`9` |\n| **Named** | `escape`, `esc`, `enter`, `return`, `tab`, `space`, `backspace`, `delete`, `insert`, `clear`, `home`, `end`, `pageUp`, `pageDown` |\n| **Arrows** | `up`, `down`, `left`, `right` |\n| **Function** | `f1`\u2013`f12` |\n| **Symbols** | `` ` ``, `-`, `=`, `[`, `]`, `\\`, `;`, `'`, `,`, `.`, `/`, `!`, `@`, `#`, `$`, `%`, `^`, `&`, `*`, `(`, `)`, `_`, `+`, `\\|`, `~`, `{`, `}`, `:`, `<`, `>`, `?` |\n\nInvalid keys are warned at startup and skipped.\n\n### Command format\n\nEach entry can be a string (just the command) or an object:\n\n| Field | Type | Required | Default | Description |\n|-------|------|----------|---------|-------------|\n| `command` | `string` | Yes | \u2013 | Shell command to run |\n| `cwd` | `string` | No | project root | Working directory (relative) |\n| `timeout` | `number` | No | `30000` | Timeout in milliseconds |\n| `print` | `boolean` | No | `true` | Render command output in pi |\n| `context` | `boolean` | No | `false` | Add command output to the agent context |\n| `interactive` | `boolean` | No | `false` | Suspend pi's TUI and run with full terminal access. Use for commands like `lazygit`, `vim`, `htop`, or `fzf`. Output is not captured. |\n\nCommand output is rendered in pi when `print` or `context` is enabled. Interactive commands restore and fully redraw pi after they exit.\n\n## Leader key & which-key overlay\n\nPress the configured `leader` key to open a full-width bottom overlay listing all leader-prefixed keymaps. The overlay only opens when the input editor is empty, so typing a space (if your leader is `space`) won't accidentally trigger it. Press the sub-key to run the mapping, or `escape` to dismiss. The overlay auto-closes after 5 seconds.\n\nLeader keys can be nested: `<leader>g` shows a sub-overlay with its children (`gp` \u2192 `git push`, `gpf` \u2192 `git push --force`). Prefix-only nodes (no `commands`, just a `description`) act as grouping folders.\n\nWhich-key entry styles:\n\n| Mapping state | Style |\n|---------------|-------|\n| Default command | Accent key |\n| `print: false` | Accent key, appends dim `(silent)` |\n| `context: true` | Prefixed with `#` |\n| `interactive: true` | Prefixed with `$` |\n| Prefix/group node | Warning key + purple `+` label |\n| Labels | Purple for groups, soft orange for actions |\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "keymap",
+    "keybindings",
+    "keymaps",
+    "pi"
+  ],
+  "author": {
+    "name": "Vahor",
+    "email": "me@vahor.fr"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Vahor/pi-extensions/tree/main/packages/pi-keymap#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vahor/pi-extensions.git",
+    "directory": "packages/pi-keymap"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-05-04T11:43:44.610Z",
+    "modified": "2026-05-23T14:41:15.125Z",
+    "0.0.2": "2026-05-04T11:43:44.896Z",
+    "0.0.3": "2026-05-04T12:26:20.489Z",
+    "0.0.4": "2026-05-04T14:34:39.288Z",
+    "0.0.5": "2026-05-05T19:35:11.944Z",
+    "0.0.6": "2026-05-08T16:12:48.715Z",
+    "0.0.8": "2026-05-08T18:30:11.588Z",
+    "0.0.9": "2026-05-17T09:27:00.393Z",
+    "0.0.10": "2026-05-17T12:20:02.054Z",
+    "0.0.12": "2026-05-17T20:11:50.386Z",
+    "0.0.13": "2026-05-23T14:41:14.851Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": null,
+  "download_trend": []
+}

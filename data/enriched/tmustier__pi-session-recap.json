@@ -1,0 +1,349 @@
+{
+  "name": "@tmustier/pi-session-recap",
+  "latest_version": "0.1.3",
+  "description": "One-line recap above the editor when you refocus a Pi session. Keeps you in flow when multi-agenting.",
+  "readme": "# session-recap\n\nClaude-Code-style session recap for Pi. When you switch focus away from a Pi session and come back, a one-line recap appears above the editor so you can re-enter flow without re-reading scrollback.\n\n![session-recap widget in a live Pi session](./assets/recap.png)\n\nBuilt for multi-clauding / multi-pi workflows where several agent sessions run in parallel tabs.\n\n## How it triggers\n\nTwo complementary triggers. You get whichever fires first.\n\n1. **Terminal focus reporting (DECSET `?1004`).** The extension enables focus events on session start and listens for `ESC[O` (focus-out) and `ESC[I` (focus-in). On focus-out it drafts a recap in the background; on focus-in it reveals the recap above the editor, as long as you were away for at least `--recap-focus-min-seconds` (default 3s \u2014 suppresses quick glances).\n2. **Idle fallback.** After the last `turn_end`, if you don't type for `--recap-idle-seconds` (default 45s), the recap is generated and shown anyway. This covers terminals that don't report focus events.\n\nAlso fires automatically on `/resume` and `/fork` so you know where the prior session left off.\n\nClears cleanly on: next user input, new turn start, session reload, or session shutdown.\n\n## Terminal compatibility\n\n| Terminal | Focus reporting | Notes |\n|---|---|---|\n| iTerm2, Ghostty, Alacritty, Kitty, WezTerm, xterm | \u2705 | Works out of the box. |\n| VS Code integrated terminal, Warp | \u2705 | Works. |\n| Apple Terminal | \u26a0\ufe0f Partial | Idle fallback covers it. |\n| tmux | \u2705 (with config) | Add `set -g focus-events on` to `~/.tmux.conf`, then `tmux source-file ~/.tmux.conf`. |\n\nIf focus events cause any weirdness in your terminal, run with `--recap-disable-focus` and the idle fallback still works.\n\n## Model\n\nDefaults to the **currently active model** in your Pi session, but with recap-specific low-cost settings. This piggybacks on whatever auth you already have (including custom providers registered via `pi.registerProvider`), so there are no login surprises.\n\n- No tools or Agent Skills are loaded into the recap call \u2014 only the compact transcript below is sent.\n- Reasoning/thinking is disabled for the recap call.\n- Prompt cache writes/reads are disabled with `cacheRetention: \"none\"`.\n- Output is capped with `maxTokens: 256`.\n- No active model or missing API key \u2192 the recap is skipped silently.\n\nOverride with `--recap-model \"<provider>/<id>\"` if you want a specific model regardless of the session's active one.\n\n## Install\n\n### Pi package manager\n\n```bash\npi install git:github.com/tmustier/pi-extensions\n```\n\nFilter to just this extension in `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\n    {\n      \"source\": \"git:github.com/tmustier/pi-extensions\",\n      \"extensions\": [\"session-recap/index.ts\"]\n    }\n  ]\n}\n```\n\n### Local clone\n\n```json\n{\n  \"extensions\": [\n    \"~/pi-extensions/session-recap/index.ts\"\n  ]\n}\n```\n\n## Flags\n\n| Flag | Default | Description |\n|---|---|---|\n| `--recap-idle-seconds <n>` | `45` | Seconds after `turn_end` before the idle-fallback recap fires. |\n| `--recap-focus-min-seconds <n>` | `3` | Minimum focus-out duration before a recap is revealed on refocus. |\n| `--recap-disable-focus` | `false` | Disable DECSET `?1004` focus reporting. Idle fallback still runs. |\n| `--recap-during-active` | `false` | Allow focus-triggered recaps while an agent turn is still running. This restores the older \u201cpeek mid-flight\u201d behavior, at the cost of possible stale/discarded duplicate drafts. |\n| `--recap-disable` | `false` | Disable the automatic recap entirely. `/recap` still works. |\n| `--recap-model \"<p/id>\"` | (active model) | Override the default, e.g. `anthropic/claude-sonnet-4-6`. |\n\n## Command\n\n| Command | Description |\n|---|---|\n| `/recap` | Force-generate a recap right now, bypassing the activity gate. |\n\n## Behaviour notes\n\n- **Uses `turn_end`, not `agent_end`**, so a turn that errors or is aborted still gets recapped.\n- **No duplicate drafts**: the last-drafted branch-leaf is stamped; if you focus out / in repeatedly without any new session activity, the recap is reused rather than regenerated.\n- **Defers during active work by default**: if you focus away during a slow model/tool action, the focus recap waits until the agent finishes loading before drafting, matching Claude Code's away-summary behavior. Use `--recap-during-active` to allow mid-flight recaps instead.\n- **Aborts on new input**: any in-flight recap request is cancelled when you start typing or a new turn begins.\n- **No session persistence**: the recap lives only in the widget for the active session \u2014 nothing is stored.\n\n## Design\n\nSee [DESIGN.md](./DESIGN.md) for the design-of-record and open questions.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "Thomas Mustier"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/tmustier/pi-extensions/tree/main/session-recap",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tmustier/pi-extensions.git",
+    "directory": "session-recap"
+  },
+  "pi": {
+    "extensions": [
+      "index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/tmustier/pi-extensions/main/session-recap/assets/recap.png"
+  },
+  "time": {
+    "created": "2026-04-23T10:14:12.747Z",
+    "modified": "2026-05-12T12:01:58.951Z",
+    "0.1.0": "2026-04-23T10:14:12.986Z",
+    "0.1.1": "2026-04-24T10:30:30.128Z",
+    "0.1.2": "2026-05-07T16:17:17.212Z",
+    "0.1.3": "2026-05-12T12:01:58.837Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 21,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 224
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 251
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 35
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 31
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

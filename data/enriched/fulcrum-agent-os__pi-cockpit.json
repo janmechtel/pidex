@@ -1,0 +1,37 @@
+{
+  "name": "@fulcrum-agent-os/pi-cockpit",
+  "latest_version": "0.0.6",
+  "description": "Fulcrum Cockpit \u2014 control-plane dashboard, task management, memory, lifecycle tools, and policy hook for the PI coding agent",
+  "readme": "# Fulcrum Cockpit\n\nControl-plane dashboard and native PI tools for the [PI coding agent](https://github.com/mariozechner/pi).\n\n## Install\n\n```bash\n# From this repo\npi install ./agent-integration/pi/cockpit\n\n# Or use the install script\nbash agent-integration/pi/install.sh\n```\n\n## What you get\n\n### Dashboard widget\n\nLive-updating widget in PI's TUI showing:\n- Server status (stopped / starting / up / error)\n- Running agent count + roles\n- Blocked agent count + reasons\n- WIP count\n- Workspace/project context\n\n### Footer status line\n\nAlways-visible at the bottom of PI:\n```\n\u25cf FULCRUM  2 run  WIP:3  :4721\n```\n\n### Slash commands\n\n| Command | Description |\n|---------|-------------|\n| `/fulcrum-setup` | Confirm workspace IDs (computed from project path, no files written) |\n| `/fulcrum-status` | Show workspace status: running agents, blockers, WIP count |\n| `/fulcrum-start` | Start the Fulcrum monitor server |\n| `/fulcrum-monitor` | Open monitor in browser (http://localhost:4721) |\n| `/fulcrum-tasks [status]` | List tasks, optionally filtered by status |\n| `/fulcrum-create <title>` | Create a new task |\n| `/fulcrum-run <task_id> <role>` | Start an agent run |\n| `/fulcrum-complete <run_id> [summary]` | Mark a run as completed |\n| `/fulcrum-block <run_id> <reason>` | Mark a run as blocked |\n| `/fulcrum-recall <query>` | Search project memories |\n| `/fulcrum-workspaces` | List all workspaces |\n| `/cos <goal>` | Inject Chief-of-Staff world-state context into the conversation |\n\n### Native LLM tools (11 tools, no MCP overhead)\n\n| Tool | Description |\n|------|-------------|\n| `fulcrum_list_tasks` | List tasks in current workspace |\n| `fulcrum_create_task` | Create a new task |\n| `fulcrum_update_task` | Update task status or add a blocker note |\n| `fulcrum_recall_memory` | Semantic search over project memory |\n| `fulcrum_write_memory` | Persist a note to project memory |\n| `fulcrum_start_run` | Register a new agent run (call at task start) |\n| `fulcrum_heartbeat` | Send a heartbeat during long operations |\n| `fulcrum_complete_run` | Mark a run as completed |\n| `fulcrum_block_run` | Mark a run as blocked, escalate to CoS |\n| `fulcrum_workspace_status` | Get full workspace snapshot |\n| `fulcrum_build_cos_context` | Build Chief-of-Staff world-state context |\n\n### Policy hook\n\nEvery tool call in PI is checked against the Fulcrum policy engine. Currently enforced:\n- **Team invocation guard**: only `chief_of_staff` may invoke teams\n\n### Auto-start\n\nOn PI session start, the cockpit:\n1. Computes `workspace_id` and `project_id` deterministically from the project directory path (sha256[:12] of abs path) \u2014 no file needed\n2. Starts the Fulcrum monitor server (`fulcrum serve monitor`) if not already running\n3. Polls workspace status every 5 s\n4. Injects a Fulcrum-first system-prompt nudge before each agent turn so PI\n   prefers native `fulcrum_workspace_status` / `fulcrum_recall_memory` before\n   filesystem search or architecture decisions\n\n## Configuration\n\nNo project-local config files. IDs are computed from the directory path automatically.\n\nEnvironment variable overrides:\n- `FULCRUM_WORKSPACE_ID` \u2014 override computed workspace_id\n- `FULCRUM_PROJECT_ID` \u2014 override computed project_id\n- `FULCRUM_PORT` \u2014 override monitor port (default 4721)\n\n## Monitor URLs\n\nAfter `fulcrum serve monitor` (or auto-start):\n\n| Endpoint | Description |\n|----------|-------------|\n| `http://localhost:4721/status` | Server health |\n| `http://localhost:4721/agents` | All agent runs |\n| `http://localhost:4721/board` | Task counts by status |\n| `http://localhost:4721/tasks` | Task list |\n| `http://localhost:4721/workspaces` | Workspaces |\n| `http://localhost:4721/metrics` | Workspace metrics |\n| `http://localhost:4721/memory-trace` | Memory entries |\n\n## Multi-runtime sharing\n\nThe same Fulcrum monitor server is shared by all three runtimes:\n\n| Runtime | Integration |\n|---------|-------------|\n| **PI** | This cockpit (native tools + hook) |\n| **Claude Code** | `agent-integration/claude/` (MCP + hook) |\n| **Gemini CLI** | `agent-integration/gemini/` (MCP + hook) |\n",
+  "keywords": [
+    "pi-package",
+    "fulcrum",
+    "agent-os",
+    "task-management",
+    "cockpit",
+    "multi-agent"
+  ],
+  "author": {
+    "name": "Fulcrum"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/moabualruz/fulcrum#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moabualruz/fulcrum.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-21T04:22:03.494Z",
+    "modified": "2026-04-21T22:07:57.531Z",
+    "0.0.3": "2026-04-21T04:22:03.700Z",
+    "0.0.6": "2026-04-21T22:07:57.395Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 7,
+  "download_trend": []
+}

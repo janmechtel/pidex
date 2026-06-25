@@ -1,0 +1,37 @@
+{
+  "name": "pi-omp-session-sync",
+  "latest_version": "0.1.0",
+  "description": "Bidirectional session sync between vanilla Pi (@earendil-works/pi-coding-agent) and OMP (@oh-my-pi/pi-coding-agent)",
+  "readme": "# pi-omp-session-sync\n\nBidirectional session sync between vanilla Pi (`@earendil-works/pi-coding-agent`) and OMP (`@oh-my-pi/pi-coding-agent`).\n\nAdds a `/pi-omp-sync` slash command to whichever runtime you're in. When run inside Pi it imports OMP sessions; when run inside OMP it imports Pi sessions. Sessions get rewritten into the target runtime's native JSONL format with the model entry shape and title metadata each runtime expects.\n\n## Features\n\n- `/pi-omp-sync` slash command in both runtimes\n- Interactive session selector\n- `list`, `status`, `all`, `all --dry-run`, `open <session-id>` subcommands\n- Filters: `--cwd`, `--since`, `--updated-since`, `--limit`, `--source-dir`\n- Idempotent registry keyed by source session id + source mtime\n- Stale-source detection: re-imports automatically when the source file changes\n- OMP-only entry types (`mode_change`, `service_tier_change`, `session_init`) skipped on OMP\u2192Pi\n- `model_change` reshaped both directions (`{provider, modelId}` \u2194 `model: \"provider/modelId\"`)\n- Title round-tripped: Pi's `session_info` entry \u2194 OMP's header `title`\n\n## Install\n\n### Vanilla Pi\n\n```bash\npi install /path/to/pi-omp-session-sync\n```\n\n\u2026or add the absolute repo path to `~/.pi/agent/settings.json:packages[]`.\n\n### OMP\n\nAdd the package as a `file:` dependency in `~/.omp/plugins/package.json` and symlink the repo into `~/.omp/plugins/node_modules/pi-omp-session-sync`:\n\n```bash\nln -s /path/to/pi-omp-session-sync ~/.omp/plugins/node_modules/pi-omp-session-sync\n```\n\nThen update `~/.omp/plugins/package.json`:\n\n```json\n{\n  \"dependencies\": {\n    \"pi-omp-session-sync\": \"file:/path/to/pi-omp-session-sync\"\n  }\n}\n```\n\nVerify with `omp plugin doctor`.\n\n## Usage\n\n```text\n/pi-omp-sync                          # interactive selector\n/pi-omp-sync <session-id>             # sync a specific session\n/pi-omp-sync list [search]            # list source-runtime sessions\n/pi-omp-sync status                   # show registry + pending counts\n/pi-omp-sync all --dry-run            # preview bulk sync\n/pi-omp-sync all                      # bulk sync, idempotent\n/pi-omp-sync open <session-id>        # switch to a synced session\n```\n\nFlags:\n\n```text\n--source-dir /path/to/sessions\n--registry /path/to/registry.json\n--limit 100\n--cwd /repo/path\n--since 2026-05-01\n--updated-since 2026-05-15\n--force\n--dry-run\n```\n\n## Behavior\n\nWhen running inside **Pi**, the command imports **OMP** sessions into Pi.\nWhen running inside **OMP**, the command imports **Pi** sessions into OMP.\n\nEach imported session becomes a new native session file in the target runtime. The source file is never modified. The registry (`~/.pi/agent/pi-omp-sync-registry.json` or `~/.omp/agent/pi-omp-sync-registry.json`) tracks source session id \u2192 target session file, mtime, and conversion version. A bulk re-run skips sessions whose source mtime hasn't changed; `--force` overrides.\n\n## What's preserved\n\n| Concept | Pi format | OMP format | Round-trip |\n|---|---|---|---|\n| Title | `session_info.name` entry | header `title` + `titleSource` | yes |\n| Model | `model_change {provider, modelId}` | `model_change {model: \"provider/modelId\"}` | yes |\n| Messages | `message.message` (AgentMessage) | same | yes |\n| Thinking level | `thinking_level_change` | same | yes |\n| Custom messages | `custom_message` | same | yes |\n| OMP-only entries | n/a | `mode_change`, `service_tier_change`, `session_init` | dropped on OMP\u2192Pi |\n\n## Tests\n\n```bash\nbun test\n```\n",
+  "keywords": [
+    "pi",
+    "omp",
+    "pi-coding-agent",
+    "session",
+    "sync",
+    "pi-package",
+    "agent"
+  ],
+  "author": {
+    "name": "Jordan"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/jms830/pi-omp-session-sync#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jms830/pi-omp-session-sync.git"
+  },
+  "pi": {
+    "extensions": [
+      "./adapters/pi/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-27T01:39:00.228Z",
+    "0.1.0": "2026-05-27T01:39:00.486Z",
+    "modified": "2026-05-27T01:39:00.691Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

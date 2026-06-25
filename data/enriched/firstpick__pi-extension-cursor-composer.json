@@ -1,0 +1,350 @@
+{
+  "name": "@firstpick/pi-extension-cursor-composer",
+  "latest_version": "0.1.2",
+  "description": "Pi extension and custom model provider for Cursor SDK Composer 2.5.",
+  "readme": "# Cursor Composer 2.5 Pi Extension\n\nDelegates explicit tasks from Pi to Cursor SDK using `composer-2.5`.\n\nIt also registers a native Pi custom model provider:\n\n```text\ncursor-composer/composer-2.5\n```\n\nThis provider wraps Cursor SDK local-agent runs, so it behaves more like a delegated agent than a raw chat-completions model. While Cursor is doing long internal tool runs, the provider emits periodic thinking/progress heartbeats so Pi Web UI does not look silent.\n\n## Install\n\nFrom npm after publish:\n\n```bash\npi install npm:@firstpick/pi-extension-cursor-composer\n```\n\nFor local development from this repository:\n\n```bash\n# Option A: install as a local package\npi install ./pi-extension-cursor-composer\n\n# Option B: live-link all repo Pi packages for development\n./dev/scripts/sync-pi-package-symlinks.sh\ncd pi-extension-cursor-composer\nnpm install\n```\n\nThe package depends on `@cursor/sdk`. Published/local `pi install` installs that dependency automatically; the repo symlink workflow needs the package-local `npm install` step because the sync script only creates symlinks. Then reload Pi with `/reload`.\n\n## Configure auth\n\nSet `CURSOR_API_KEY`, or run:\n\n```text\n/cursor-composer-setup\n```\n\nThe setup command can save the key to Pi global `.env`, workspace `.env`, or only the current process. It then asks whether to add `cursor-composer/composer-2.5` to Pi's `enabledModels` scoped-model list in `~/.pi/agent/settings.json`.\n\nIf you already have a scoped model list, setup appends Composer 2.5. If you do not, adding it creates an explicit scoped list; use `/scoped-models` afterward if you want to include other models too.\n\n## Commands\n\n- `/cursor-composer-status` \u2014 check API key, SDK install status, native provider id, and scoped-model status.\n- `/cursor-composer-add-scoped-model` \u2014 add `cursor-composer/composer-2.5` to Pi `enabledModels`.\n- `/cursor-composer-models` \u2014 list Cursor models visible to the key and verify `composer-2.5`.\n- `/cursor-composer [flags] <prompt>` \u2014 run Composer 2.5 on a prompt.\n\nFlags:\n\n- `--plan` / `--agent`\n- `--thinking=low|medium|high`\n- `--sandbox`\n- `--no-auto-review`\n- `--cwd=subdir` or `--workspace-subdir=subdir`\n\nExample:\n\n```text\n/cursor-composer --plan --thinking=high Review this repo and propose the safest migration plan.\n```\n\n## Native Pi model\n\nAfter setup and `/reload`, check:\n\n```bash\nCURSOR_API_KEY=crsr_... pi --list-models | grep cursor-composer\n```\n\nIn Pi, it should appear as:\n\n```text\ncursor-composer/composer-2.5\n```\n\nUse `/model` to select it, or add it through setup/`/cursor-composer-add-scoped-model` for scoped Ctrl+P cycling. Changes to `enabledModels` are persisted, but the current session's scoped list may need `/scoped-models`, `/reload`, or a new session to refresh.\n\nProvider usage/status behavior:\n\n- The native provider forwards Cursor SDK `turn-ended` usage into Pi assistant-message usage, so `git-footer-status` can show input/output tokens, cache read/write tokens, cost, context, and speed.\n- If the installed Cursor SDK does not emit final usage, the provider estimates input/output tokens from prompt/output text and records a `cursor-composer.usage_estimated` diagnostic; cache tokens are not estimated.\n- Pricing defaults to Cursor's fast Composer 2.5 tier because Cursor documents Fast as the product default: `$3/M` input and `$15/M` output. Standard pricing is `$0.50/M` input and `$2.50/M` output.\n- Set `CURSOR_COMPOSER_PRICE_TIER=standard` to use standard pricing, or override individual rates with `CURSOR_COMPOSER_INPUT_COST_PER_MILLION`, `CURSOR_COMPOSER_OUTPUT_COST_PER_MILLION`, `CURSOR_COMPOSER_CACHE_READ_COST_PER_MILLION`, and `CURSOR_COMPOSER_CACHE_WRITE_COST_PER_MILLION`.\n- Cursor publishes input/output prices, not a separate cache discount; cache read/write rates default to the active input rate unless overridden.\n- Default verbosity is `quiet`: show one short working line, final assistant text, requests, and errors.\n- Set `CURSOR_COMPOSER_PROVIDER_VERBOSITY=normal` to include tool/status progress.\n- Set `CURSOR_COMPOSER_PROVIDER_VERBOSITY=debug` to include rawer Cursor stream details.\n- `CURSOR_COMPOSER_PROVIDER_HEARTBEAT_MS=15000` controls quiet heartbeat checks; only `normal`/`debug` show repeated heartbeat lines.\n- Set `CURSOR_COMPOSER_PROVIDER_HEARTBEAT_MS=0` or `false` to disable heartbeats entirely.\n- Set `CURSOR_COMPOSER_PROVIDER_AUTO_REVIEW=false` to disable Cursor local auto-review.\n- Set `CURSOR_COMPOSER_PROVIDER_SANDBOX=true` to enable Cursor SDK sandboxing for native model runs.\n- Large Pi `toolResult` messages are truncated by default before they are replayed into the native provider prompt. This keeps previous `read`/`bash` dumps from being resent to Cursor on every turn while preserving the message header, head/tail previews, original size, content hash, and a deterministic Recovery ID. Truncation uses Pi's normal tool-output byte and line limits.\n- When a provider prompt contains truncated tool results, the local Cursor agent also receives an ephemeral `pi_get_truncated_tool_result` custom tool. Composer can call it with the Recovery ID and an optional line range to fetch exact omitted historical content for that provider run without replaying every large output up front. Recovery IDs are deterministic for the same persisted tool result, but the recovery map itself is rebuilt per provider run rather than stored separately.\n- Set `CURSOR_COMPOSER_PROVIDER_TRUNCATE_TOOL_RESULTS=false` to restore the previous full tool-result replay behavior.\n\n\n## Tool\n\nThe extension registers `cursor_composer_agent` for Pi to call when you explicitly ask to use Cursor/Composer.\n\nBy default, tool use requires interactive confirmation because Cursor SDK local mode can run commands and edit files. To allow unattended runs, set:\n\n```bash\nexport CURSOR_COMPOSER_REQUIRE_CONFIRMATION=false\n```\n\nUse that only if you accept unattended Cursor SDK tool execution.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "cursor",
+    "composer"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/Firstp1ck/npm-packages/tree/main/pi-extension-cursor-composer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Firstp1ck/npm-packages.git",
+    "directory": "pi-extension-cursor-composer"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-16T22:33:58.673Z",
+    "modified": "2026-06-20T07:19:03.961Z",
+    "0.1.0": "2026-06-16T22:33:58.981Z",
+    "0.1.1": "2026-06-18T17:58:03.120Z",
+    "0.1.2": "2026-06-20T07:19:03.851Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 317,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 44
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 327
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 4
+    }
+  ]
+}

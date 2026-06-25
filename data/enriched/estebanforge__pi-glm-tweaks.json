@@ -1,0 +1,43 @@
+{
+  "name": "@estebanforge/pi-glm-tweaks",
+  "latest_version": "1.1.1",
+  "description": "Pi-native tweaks for Z.AI's GLM-5.2. Restricts the Pi thinking-level UI to the three modes GLM-5.2 actually supports (off, high, max), wires the native thinkingFormat:\"zai\" wire translation, and auto-clamps hidden levels when the model is selected.",
+  "readme": "# @estebanforge/pi-glm-tweaks\n\nPi-native tweaks for Z.AI's **GLM-5.2**. Restricts the Pi thinking-level UI to the three modes GLM-5.2 actually supports (**off**, **high**, **max**), wires the native `thinkingFormat:\"zai\"` translation, and auto-clamps any stale level when the model is selected.\n\n## Install\n\n```\npi install npm:@estebanforge/pi-glm-tweaks\n```\n\nWorks with Pi's built-in `zai/glm-5.2` model out of the box, or a custom entry in `~/.pi/agent/models.json`. The extension re-registers it with the OpenAI-compat endpoint and the proper thinking map. Other Z.AI models (`zai/glm-4.7`, `zai/glm-5-turbo`, `zai/glm-5.1`, plus any custom entries) are preserved across the re-registration.\n\n## What it does\n\nGLM-5.2 ships three thinking modes (per [docs.z.ai](https://docs.z.ai/guides/capabilities/thinking)):\n\n| Pi thinking level | GLM-5.2 wire |\n| --- | --- |\n| `off` | `thinking: { type: \"disabled\" }` |\n| `high` | `thinking: { type: \"enabled\" }` + `reasoning_effort: \"high\"` |\n| `max` (Pi `xhigh`) | `thinking: { type: \"enabled\" }` + `reasoning_effort: \"max\"` |\n\nPi natively exposes six thinking levels (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`). GLM-5.2 doesn't really fit the middle four \u2014 `low`/`medium` get mapped to `high` server-side, `minimal` skips thinking, and `xhigh` is the only way to reach `reasoning_effort: \"max\"`.\n\nThis extension collapses that mismatch:\n\n1. **Re-registers `zai/glm-5.2`** on `session_start` with `api: \"openai-completions\"`, `baseUrl: https://api.z.ai/api/coding/paas/v4`, `compat.thinkingFormat: \"zai\"`, and a tight `thinkingLevelMap`:\n   ```ts\n   {\n     minimal: null,  // hidden\n     low: null,      // hidden\n     medium: null,   // hidden\n     high:   \"high\", // \u2192 reasoning_effort: \"high\"\n     xhigh:  \"max\",  // \u2192 reasoning_effort: \"max\"\n     // off omitted \u2192 supported, sends thinking.type = \"disabled\"\n   }\n   ```\n2. **Auto-clamps on `model_select`** \u2014 if the current level is one we hid (e.g. you switched from a model that allowed `medium`), quietly bump to `high` and notify.\n3. **Footer hint** \u2014 sets `ctx.ui.setStatus(\"glm-thinking\", \"thinking: off | high | max\")` while GLM-5.2 is the active model.\n4. **`/glm-tweaks` command** \u2014 status panel + flag toggle from inside Pi (see [`/glm-tweaks` command](#glm-tweaks-command)).\n\n`Shift+Tab`, `/thinking`, and the level picker all see only the three GLM-5.2 modes.\n\n## Token-efficiency tweaks\n\nGLM-5.2 overthinks on long agent loops \u2014 it can spend an entire turn on `reasoning_content` without taking a tool call. The Z.AI API does not expose a `max_thinking_tokens` parameter, so the post that popularised this observation does it at the provider layer (mid-stream injection). We can't intercept the stream, but we can approximate the win with three cheap, opt-out tweaks:\n\n| Flag | Default | What it does |\n| --- | --- | --- |\n| `glm-budget-nudge` | `true` | (a) Appends a soft thinking-budget fragment to the system prompt on every zai/glm-5.2 turn. (b) Per LLM call, sums `reasoning_content` across prior assistant messages in the current agent loop (the one started by the most recent user prompt); if cumulative exceeds ~2000 characters (roughly 500 English tokens), injects a one-shot hint to push the model back toward tool calls. Fires at most once per loop. The hint appears in the conversation panel as a user message prefixed `[system reminder: ...]` \u2014 that is intentional, so you can see when the ratchet fired. |\n| `glm-clear-thinking` | `true` | Forces `clear_thinking: true` on every request. The coding endpoint (`api.z.ai/api/coding/paas/v4`) defaults to preserved thinking, which silently compounds `reasoning_content` across turns. At $4.4/MTok output, this is real money. |\n| `glm-skip-short-thinking` | `true` | For user prompts under 80 chars, forces `thinking.type: \"disabled\"` for that turn. Trivial questions (\"what time is it\") don't need deep thinking. |\n\nAll three flags surface in `pi config` and Pi's flag editor \u2014 `pi config set glm-budget-nudge false` to disable.\n\n## `/glm-tweaks` command\n\nAn in-session command for inspecting and flipping the flags above without leaving Pi.\n\n| Invocation | Effect |\n| --- | --- |\n| `/glm-tweaks` (TUI) | Opens an interactive settings menu (the same `SettingsList` component `/settings` uses). Flip any combination of flags, then a single reload fires on close to apply them all. |\n| `/glm-tweaks` (non-TUI / RPC) | Falls back to a read-only status panel (active model, thinking level vs the `off \\| high \\| max` map, and each flag's on/off state). |\n| `/glm-tweaks toggle <flag>` | One-shot flip: persists, then reloads. |\n| `/glm-tweaks <flag>` | Shorthand one-shot toggle (flag name without the `toggle` keyword). |\n\nThe command offers tab-completion for `toggle` and the three flag names.\n\n**Why a reload per apply.** Pi's extension API exposes `getFlag` but no live `setFlag`, and flag values are read into memory at load time. So changes persist via `pi config set` and a `/reload` picks them up. The interactive menu stages all your flips and reloads once on close; the one-shot toggle reloads immediately. In both cases the command notifies (`Applied 2 change(s). Reloading...`) before reloading. If you'd rather avoid reload churn entirely, set flags directly in `pi config` / the flag editor and reload once at your convenience.\n\n### What the tweaks cannot do\n\n- Cap thinking tokens at a wire level. Z.AI does not expose a thinking budget param.\n- Inject text mid-stream. No Pi hook for streaming chunk mutation.\n- Force the model to call a tool. The system prompt can ask; nothing forces it.\n- Lower `reasoning_effort` per-request. Per [KiwiGaze/glm-for-copilot #7](https://github.com/KiwiGaze/glm-for-copilot/issues/7) it's a no-op on `/chat/completions`.\n\n## Why this exists\n\nPi's built-in `thinkingFormat: \"zai\"` (in `openai-completions.js`) already knows the wire translation. The catch is that GLM-5.2's user-defined model in `models.json` typically lacks a `thinkingLevelMap`, so the UI shows all six levels and sends invalid combinations on hidden ones. This extension fills that gap automatically \u2014 no manual `models.json` editing.\n\n## Compatibility\n\n- Pi (`@earendil-works/pi-coding-agent`) \u2014 any version with `registerProvider` taking effect post-bind and `thinkingFormat: \"zai\"` support, plus the `before_agent_start` / `context` / `before_provider_request` / `registerFlag` hooks.\n- Z.AI API key \u2014 resolved through Pi's standard auth storage (env var `ZAI_API_KEY`, `/login`, or `models.json` provider `apiKey`). The extension does not configure auth.\n\n## License\n\nMIT",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "zai",
+    "z-ai",
+    "glm",
+    "glm-5.2",
+    "thinking",
+    "reasoning_effort",
+    "thinking-mode"
+  ],
+  "author": {
+    "name": "EstebanForge",
+    "email": "esteban@attitude.cl",
+    "url": "https://actitud.xyz"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/EstebanForge/pi-glm-tweaks#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EstebanForge/pi-glm-tweaks.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-24T16:19:23.388Z",
+    "modified": "2026-06-24T19:03:23.873Z",
+    "1.0.0": "2026-06-24T16:19:23.663Z",
+    "1.1.0": "2026-06-24T18:40:05.110Z",
+    "1.1.1": "2026-06-24T19:03:23.773Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

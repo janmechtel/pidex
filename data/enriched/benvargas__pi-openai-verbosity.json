@@ -1,0 +1,44 @@
+{
+  "name": "@benvargas/pi-openai-verbosity",
+  "latest_version": "1.0.1",
+  "description": "Per-model OpenAI Codex text verbosity overrides for pi",
+  "readme": "# @benvargas/pi-openai-verbosity\n\nPer-model text verbosity overrides for pi's `openai-codex` provider.\n\n## Why This Exists\n\nThis extension was originally created because pi sent OpenAI Codex provider requests with the default Responses\nAPI text verbosity, which made some models, especially `gpt-5.5`, noticeably more verbose than the Codex CLI.\nThe goal was to align `openai-codex/gpt-5.5` with Codex CLI behavior by setting:\n\n```json\n{\n  \"text\": {\n    \"verbosity\": \"low\"\n  }\n}\n```\n\npi has since shipped an upstream fix: OpenAI Codex Responses requests now default to `low` verbosity when no\nexplicit verbosity is provided.\n\nThat upstream change addresses the original `gpt-5.5` issue, but it also means pi now defaults every\n`openai-codex` model to `low`. That may not be ideal for all model slugs. For example, you may prefer `low` on\n`gpt-5.5`, but `medium` on an older or different model such as `gpt-5.3-codex`.\n\nThis extension now provides the missing user-facing control: per-slug verbosity settings for pi's\n`openai-codex` provider.\n\nRequires pi `0.74.0` or newer.\n\n## What It Does\n\nThe extension uses pi's `before_provider_request` hook to rewrite outgoing provider payloads for configured\n`openai-codex/<model>` keys.\n\nFor matching models, it sets:\n\n```json\n{\n  \"text\": {\n    \"verbosity\": \"low | medium | high\"\n  }\n}\n```\n\nNon-matching models are left unchanged.\n\n## Install\n\n```bash\npi install npm:@benvargas/pi-openai-verbosity\n```\n\nOr try without installing:\n\n```bash\npi -e npm:@benvargas/pi-openai-verbosity\n```\n\n## Usage\n\nRun pi with the extension enabled:\n\n```bash\npi -e npm:@benvargas/pi-openai-verbosity --model openai-codex/gpt-5.5\n```\n\nUse `/openai-verbosity status` inside pi to report the configured rewrite for the current model. The command also\nreloads the config file.\n\n## Config\n\nConfig files follow pi's project-over-global pattern:\n\n- Project: `<repo>/.pi/extensions/pi-openai-verbosity.json`\n- Global: `~/.pi/agent/extensions/pi-openai-verbosity.json`\n\nIf neither exists, the extension writes a default global config on first run.\n\nExample config:\n\n```json\n{\n  \"models\": {\n    \"openai-codex/gpt-5.5\": \"low\",\n    \"openai-codex/gpt-5.4\": \"low\",\n    \"openai-codex/gpt-5.3-codex\": \"medium\",\n    \"openai-codex/gpt-5.3-codex-spark\": \"medium\",\n    \"openai-codex/gpt-5.2\": \"medium\"\n  }\n}\n```\n\nSettings:\n\n- `models`: object mapping `openai-codex/<model-id>` strings to `low`, `medium`, or `high`.\n\nProject config overrides global config per model key. Any model not listed is left unchanged, which means pi's\nnative default behavior applies.\n\n## Default Config\n\nBy default, the extension preserves the original workaround behavior and sets known supported OpenAI Codex models\nto `low`:\n\n```json\n{\n  \"models\": {\n    \"openai-codex/gpt-5.4\": \"low\",\n    \"openai-codex/gpt-5.5\": \"low\",\n    \"openai-codex/gpt-5.4-mini\": \"low\",\n    \"openai-codex/gpt-5.3-codex\": \"low\",\n    \"openai-codex/gpt-5.3-codex-spark\": \"low\",\n    \"openai-codex/gpt-5.2\": \"low\",\n    \"openai-codex/codex-auto-review\": \"low\"\n  }\n}\n```\n\nYou can change any value to `medium` or `high` to override pi's native low-verbosity default for that model.\n\n## Debugging\n\nPi does not currently expose a simple CLI flag to print the final provider request body. To verify this extension is\nmatching and rewriting a request, set `PI_OPENAI_VERBOSITY_DEBUG_LOG` to a JSONL file path.\n\n| Variable | Description |\n|---|---|\n| `PI_OPENAI_VERBOSITY_DEBUG_LOG` | Set to a file path to enable debug logging. Matching requests write `\"before\"` and `\"after\"` JSON entries with the full provider payload. Non-matching requests write one `\"skipped\"` entry. |\n\n```bash\nPI_OPENAI_VERBOSITY_DEBUG_LOG=/tmp/pi-openai-verbosity.jsonl \\\n  pi -e npm:@benvargas/pi-openai-verbosity \\\n  --model openai-codex/gpt-5.3-codex \\\n  -p \"Reply in one short sentence.\"\n```\n\nThen inspect the last entries:\n\n```bash\ntail -n 5 /tmp/pi-openai-verbosity.jsonl | jq .\n```\n\nThese entries include prompts, messages, tools, and the rest of the provider payload, so keep the file local and\ndelete it when you are done debugging.\n\n## Notes\n\n- This extension only changes outgoing provider request payloads.\n- Existing `text` fields are preserved, and only `text.verbosity` is replaced.\n- Only the `openai-codex` provider is supported.\n- This extension is most useful if you want different verbosity settings for different OpenAI Codex model slugs.\n\n## Uninstall\n\n```bash\npi remove npm:@benvargas/pi-openai-verbosity\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "openai",
+    "codex",
+    "openai-codex",
+    "gpt-5.5",
+    "gpt-5.3-codex",
+    "verbosity",
+    "text-verbosity",
+    "per-model"
+  ],
+  "author": {
+    "name": "Ben Vargas"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ben-vargas/pi-packages/tree/main/packages/pi-openai-verbosity#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ben-vargas/pi-packages.git",
+    "directory": "packages/pi-openai-verbosity"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-27T18:23:49.389Z",
+    "modified": "2026-05-25T19:40:51.694Z",
+    "1.0.0": "2026-04-27T18:23:49.673Z",
+    "1.0.1": "2026-05-25T19:40:51.596Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 34,
+  "download_trend": []
+}

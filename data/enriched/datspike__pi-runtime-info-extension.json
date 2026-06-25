@@ -1,0 +1,36 @@
+{
+  "name": "@datspike/pi-runtime-info-extension",
+  "latest_version": "0.1.1",
+  "description": "Pi extension exposing verified runtime model, thinking level, and artifact metadata to agents.",
+  "readme": "# @datspike/pi-runtime-info-extension\n\n[![npm version](https://img.shields.io/npm/v/@datspike/pi-runtime-info-extension.svg)](https://www.npmjs.com/package/@datspike/pi-runtime-info-extension)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)\n\nPi package that exposes the current runtime model, thinking level, and session metadata to agents. It is built for workflows that need reproducible artifacts, model-sensitive subagent orchestration, or reviewer-facing metadata such as `model_actual` and `thinking_actual`.\n\n## Why this exists\n\nPi already lets the user select a model and a thinking level, but an agent writing a report cannot always prove which runtime settings were actually used. That becomes painful when you need to:\n\n- write `model_actual` and `thinking_actual` into review, research, or handoff artifacts;\n- compare requested subagent routing with the resolved runtime model;\n- debug model picker and profile overrides;\n- keep multi-model review output reproducible.\n\nThis extension keeps that check inside Pi, without patching Pi core.\n\n## Features\n\n- `runtime_info` tool for the current Pi session.\n- `subagent_runtime_info` tool for checking an active `pi-subagents` run by `agent_id`.\n- Tested subagent integration with Tintinweb's `pi-subagents`: `git:github.com/tintinweb/pi-subagents`.\n- `runtime_artifact_fields` tool that returns ready-to-paste YAML/JSON artifact fields.\n- `/runtime-info` command for a quick human-readable runtime summary.\n- No external service and no network calls.\n\n## Quick start\n\n### 1. Install as a Pi package\n\n```bash\npi install npm:@datspike/pi-runtime-info-extension\n```\n\n### 2. Reload Pi\n\n```text\n/reload\n```\n\n### 3. Ask the agent to verify runtime metadata\n\n```text\nCall runtime_info and print the JSON result.\n```\n\nExpected shape:\n\n```json\n{\n  \"scope\": \"current_session\",\n  \"model\": {\n    \"provider\": \"openai\",\n    \"id\": \"gpt-5.5\",\n    \"ref\": \"openai/gpt-5.5\"\n  },\n  \"thinking\": {\n    \"level\": \"xhigh\"\n  },\n  \"session\": {\n    \"id\": \"...\",\n    \"file\": \"...\",\n    \"cwd\": \"/path/to/project\"\n  },\n  \"confidence\": \"selected_model_from_extension_context\"\n}\n```\n\n## Tools\n\n| Tool | Use it when | Output |\n| --- | --- | --- |\n| `runtime_info` | You need the current session runtime. | Model, thinking level, session id/file/cwd, last assistant message metadata. |\n| `subagent_runtime_info` | You launched a subagent and need the resolved runtime by `agent_id`. | Subagent status, model, thinking level, session metadata, output file. |\n| `runtime_artifact_fields` | You are about to write a report, review, plan, or handoff artifact. | Ready artifact fields plus a YAML block. |\n\nExample artifact fields:\n\n```yaml\nmodel_requested: zai/glm-5.1\nmodel_actual: openai/gpt-5.3-codex\nthinking_requested: high\nthinking_actual: xhigh\nruntime_verified_at: 2026-05-04T12:00:00.000Z\nruntime_info_source: pi-runtime-info\nruntime_info_confidence: subagent_session_model_and_thinking\nruntime_scope: subagent\nruntime_agent_id: 57444cd3-fb66-4b7\n```\n\n## Command\n\n```text\n/runtime-info\n/runtime-info <agent_id>\n```\n\nWithout arguments, the command shows the current session model, thinking level, session id, and cwd. With an `agent_id`, it shows the same summary for a known subagent record.\n\n## Installation options\n\n### npm package\n\n```bash\npi install npm:@datspike/pi-runtime-info-extension\n```\n\n### Git package\n\n```bash\npi install git:github.com/datspike/pi-runtime-info-extension\n```\n\n### Local development path\n\n```json\n{\n  \"packages\": [\n    \"/absolute/path/to/pi-runtime-info-extension\"\n  ]\n}\n```\n\nThe package entrypoint is declared in `package.json`:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./src/index.ts\"]\n  }\n}\n```\n\n## Compatibility notes\n\nThe current-session tools use documented Pi extension APIs:\n\n- `ctx.model`;\n- `ctx.sessionManager`;\n- `pi.getThinkingLevel()`;\n- session assistant message metadata.\n\nThe `subagent_runtime_info` tool is intentionally narrower. It is tested against Tintinweb's `pi-subagents` package:\n\n```bash\npi install git:github.com/tintinweb/pi-subagents\n```\n\nIt reads the active manager from `globalThis[Symbol.for(\"pi-subagents:manager\")]`, which is a package-level integration seam rather than a Pi core API. Put `pi-subagents` in Pi settings before this package so its manager is available when the tool runs. If `pi-subagents` is not installed, not loaded, or changes that seam, current-session tools continue to work and the subagent tool reports a clear error.\n\n## Where to read current Pi docs\n\nFor questions about Pi APIs and usage examples, start with the locally installed `@earendil-works/pi-coding-agent` package.\nPrefer this read order inside that package: `README.md`, then `docs/`, then `examples/`.\n\nIn practice, that means:\n\n- first find your local Pi install directory through your global npm root or Pi install location;\n- then read `@earendil-works/pi-coding-agent/README.md`, `docs/`, and `examples/`;\n- use this extension's code as an integration example, not as the source of truth for Pi APIs.\n\nImportant: the published `@earendil-works/pi-coding-agent` package does not include `src/`.\nIf you need Pi core implementation details or the exact internal behavior, use a source checkout of `earendil-works/pi-mono`, not only the installed npm package.\n\n## Verification\n\n```bash\nnpm run check\nnpm pack --dry-run\n```\n\nFor a live Pi smoke test:\n\n```bash\npi --mode json -p 'Call runtime_info and print its JSON result.'\n```\n\n## Current limitations\n\n- `runtime_info` reports the selected/effective session model. After at least one assistant response, `last_assistant_message` can also confirm provider-reported message metadata.\n- `subagent_runtime_info` only sees subagents known to the active parent session and the loaded `pi-subagents` manager.\n- If a subagent is started with extensions disabled, it cannot call `runtime_info` itself; the parent can still call `subagent_runtime_info` when the manager seam is available.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "runtime",
+    "model-routing",
+    "observability",
+    "metadata"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/datspike/pi-runtime-info-extension#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/datspike/pi-runtime-info-extension.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-04T13:27:12.575Z",
+    "modified": "2026-05-20T12:06:20.774Z",
+    "0.1.0": "2026-05-04T13:27:12.812Z",
+    "0.1.1": "2026-05-20T12:06:20.606Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 11,
+  "download_trend": []
+}

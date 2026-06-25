@@ -1,0 +1,44 @@
+{
+  "name": "pi-package-template",
+  "latest_version": "1.2.0",
+  "description": "A minimal starter template for building pi packages",
+  "readme": "# pi-package-template\n\nA minimal starter template for building [pi](https://pi.dev) packages.\n\nUse this as a starting point to create your own pi package with extensions, skills, prompt templates, and themes.\n\n## Quick Start\n\n```bash\n# 1. Clone this template\ngit clone https://github.com/YOU/pi-package-template.git my-pi-package\ncd my-pi-package\n\n# 2. Install dev dependencies (for type checking)\nnpm install\n\n# 3. Edit package.json \u2014 set name, description, author, repository\n\n# 4. Start building! Edit the files in extensions/, skills/, prompts/, themes/\n\n# 5. Test locally\npi -e .\n\n# 6. Publish to npm\nnpm publish\n```\n\n## What's Included\n\n```\npi-package-template/\n\u251c\u2500\u2500 extensions/\n\u2502   \u2514\u2500\u2500 index.ts          # Sample extension (tool + command + event)\n\u251c\u2500\u2500 skills/\n\u2502   \u2514\u2500\u2500 hello/SKILL.md    # Sample skill\n\u251c\u2500\u2500 prompts/\n\u2502   \u2514\u2500\u2500 hello.md          # Sample prompt template (/hello)\n\u251c\u2500\u2500 themes/\n\u2502   \u2514\u2500\u2500 template.json     # Sample theme\n\u251c\u2500\u2500 package.json          # Pi manifest + npm config\n\u251c\u2500\u2500 tsconfig.json         # TypeScript config (type checking only)\n\u251c\u2500\u2500 .gitignore\n\u251c\u2500\u2500 LICENSE               # MIT\n\u251c\u2500\u2500 CHANGELOG.md\n\u2514\u2500\u2500 README.md             # This file\n```\n\n## Package Structure\n\nPi packages can contain any combination of these resources:\n\n### Extensions (`extensions/`)\n\nTypeScript modules that extend pi's behavior. Capabilities include:\n\n- **Custom tools** \u2014 functions the LLM can call\n- **Slash commands** \u2014 user-invoked commands like `/hello`\n- **Event handlers** \u2014 react to session lifecycle events\n- **Custom UI** \u2014 render custom components in the terminal\n- **Keybindings** \u2014 register keyboard shortcuts\n- **CLI flags** \u2014 add custom command-line options\n\n```typescript\nimport type { ExtensionAPI } from \"@mariozechner/pi-coding-agent\";\nimport { Type } from \"typebox\";\n\nexport default function (pi: ExtensionAPI) {\n  // Register a tool the LLM can call\n  pi.registerTool({\n    name: \"my_tool\",\n    label: \"My Tool\",\n    description: \"What this tool does\",\n    parameters: Type.Object({\n      input: Type.String({ description: \"Some input\" }),\n    }),\n    async execute(toolCallId, params, signal, onUpdate, ctx) {\n      return {\n        content: [{ type: \"text\", text: `Result: ${params.input}` }],\n        details: {},\n      };\n    },\n  });\n\n  // Register a slash command\n  pi.registerCommand(\"my-cmd\", {\n    description: \"Do something\",\n    handler: async (args, ctx) => {\n      ctx.ui.notify(\"Done!\", \"info\");\n    },\n  });\n\n  // React to events\n  pi.on(\"session_start\", async (_event, ctx) => {\n    ctx.ui.notify(\"Loaded!\", \"info\");\n  });\n}\n```\n\n### Skills (`skills/`)\n\nMarkdown files with instructions the LLM loads on-demand. Place each skill in its own folder with a `SKILL.md` file.\n\n```markdown\n# My Skill\n\nUse this skill when the user asks about X.\n\n## Steps\n1. Do this\n2. Then that\n```\n\n### Prompt Templates (`prompts/`)\n\nMarkdown files that become slash commands. The filename (without `.md`) becomes the command name.\n\n```markdown\nReview the current codebase and suggest improvements.\n```\n\nUsers invoke it with `/review` (if the file is `review.md`).\n\n### Themes (`themes/`)\n\nJSON files that define color schemes.\n\n```json\n{\n  \"name\": \"my-theme\",\n  \"colors\": {\n    \"primary\": \"#61afef\",\n    \"success\": \"#98c379\"\n  }\n}\n```\n\n## Testing Your Package\n\n```bash\n# Run without installing (ephemeral)\npi -e .\n\n# Or install locally\npi install ./path/to/your-package\n\n# Type check\nnpm run typecheck\n\n# Lint\nnpm run lint\n\n# Fix lint issues\nnpm run lint:fix\n\n# Format code\nnpm run format\n```\n\n## CI/CD\n\nThis template includes two GitHub Actions workflows:\n\n### CI (`ci.yml`)\n\nRuns on every push and PR to `main`:\n- **Type check** \u2014 `tsc --noEmit`\n- **Lint** \u2014 biome check\n\n### Release (`release.yml`)\n\nUses [release-please](https://github.com/googleapis/release-please) to automate releases:\n\n1. Write conventional commits (`feat:`, `fix:`, `feat!:`, etc.)\n2. On push to `main`, release-please opens/updates a **Release PR** with:\n   - Updated `CHANGELOG.md` (auto-generated from commits)\n   - Version bump in `package.json`\n3. Merge the Release PR \u2192 release-please creates a **GitHub Release** + git tag\n4. The `publish` job auto-publishes to **npm** (requires `NPM_TOKEN` secret)\n\n#### GitHub Setup\n\n1. **Create an npm access token**\n   - Go to [npmjs.com \u2192 Access Tokens](https://www.npmjs.com/settings/~/tokens)\n   - Generate a new **Automation** token (bypasses 2FA for CI)\n\n2. **Add the secret to your GitHub repo**\n   - Go to your repo \u2192 **Settings** \u2192 **Secrets and variables** \u2192 **Actions**\n   - Click **New repository secret**\n   - Name: `NPM_TOKEN`\n   - Value: paste your npm access token\n\n3. **Allow GitHub Actions to create PRs** (required for release-please)\n   - Go to your repo \u2192 **Settings** \u2192 **Actions** \u2192 **General**\n   - Under **Workflow permissions**, select **Read and write permissions**\n   - Check **Allow GitHub Actions to create and approve pull requests**\n\n4. Write conventional commits \u2014 everything else is automatic!\n\n#### How `pi update` works\n\nOnce your package is published, users can update with:\n\n```bash\npi update                    # update pi and all packages\npi update --extensions       # update packages only\npi update npm:your-package   # update one package\n```\n\nPi compares the installed version against `npm view <name> version` and installs `@latest` if a newer version is found. Pinned versions (e.g. `npm:pkg@1.0.0`) are never auto-updated.\n\n#### Manual publish (alternative)\n\n```bash\nnpm login\nnpm publish\n```\n\n## Key Concepts\n\n- **`peerDependencies`** \u2014 Pi core packages (`@mariozechner/pi-ai`, `@mariozechner/pi-coding-agent`, `@mariozechner/pi-tui`, `typebox`) must be listed as peer dependencies with `\"*\"` range. They are provided by pi at runtime.\n- **`pi` manifest** \u2014 The `pi` key in `package.json` tells pi which directories contain resources.\n- **`keywords`** \u2014 Include `\"pi-package\"` so your package appears in the [pi package gallery](https://pi.dev/packages).\n- **`files`** \u2014 Controls what's included in the npm tarball. Only list your resource directories and docs.\n- **No build step** \u2014 Pi loads TypeScript extensions directly via [jiti](https://github.com/unjs/jiti). No compilation needed.\n\n## Learn More\n\n- [Pi Documentation](https://pi.dev/docs/latest)\n- [Extensions Guide](https://pi.dev/docs/latest/extensions)\n- [Skills Guide](https://pi.dev/docs/latest/skills)\n- [Package Gallery](https://pi.dev/packages)\n- [Extension Examples](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/examples/extensions)\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent"
+  ],
+  "author": {
+    "name": "S1M0N38"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/S1M0N38/pi-package-template#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/S1M0N38/pi-package-template.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ],
+    "themes": [
+      "./themes"
+    ]
+  },
+  "time": {
+    "created": "2026-05-03T08:48:36.982Z",
+    "modified": "2026-05-04T14:58:09.859Z",
+    "1.0.1": "2026-05-03T08:48:37.363Z",
+    "1.1.0": "2026-05-03T13:28:17.098Z",
+    "1.2.0": "2026-05-04T14:58:09.609Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,46 @@
+{
+  "name": "@bytetrue/pi-web-search",
+  "latest_version": "0.1.0",
+  "description": "Pi extension: web_search + web_fetch with a zero-config free default (Bing, works in mainland China) and pluggable providers (DuckDuckGo, Bocha, Tavily, Exa, Brave, Jina, Firecrawl).",
+  "readme": "# @bytetrue/pi-web-search\n\n`web_search` + `web_fetch` for the [pi coding agent](https://pi.dev) \u2014 same two-tool\nsurface as Claude Code / Codex CLI.\n\n- **Zero config.** The default provider is **Bing** (free, no API key, no account)\n  \u2014 scraped from `bing.com`, and reachable from mainland China without a proxy.\n  **DuckDuckGo** is also available as a keyless option.\n- **Pluggable.** Configure a key-backed provider for higher reliability:\n  **Bocha \u535a\u67e5 (China), Tavily, Exa, Brave, Jina, Firecrawl**.\n\n## Tools\n\n| Tool | What it does |\n|---|---|\n| `web_search` | Search the web. Args: `query`, optional `max_results` (1\u201310, default 5). |\n| `web_fetch` | Fetch a URL and return extracted text. Args: `url`, optional `raw`. Blocks private/loopback hosts; truncates large pages to a temp file. |\n\n## Install\n\n```bash\npi install /absolute/path/to/pi-package-mono/packages/pi-web-search\n```\n\n> If you previously used another web package (e.g. `@juicesharp/rpiv-web-tools`),\n> remove it first \u2014 both register `web_search`/`web_fetch` and the names would collide.\n\n## Configure (optional)\n\nRun `/web` to pick a provider, enter its API key, or **set an HTTP proxy** (the\nlast entry in the picker). Selecting a provider that's **already configured**\n(or keyless) activates it immediately \u2014 no key prompt. `/web --show` prints the\ncurrent config including the active proxy. Keys can also come from environment\nvariables (env wins over config):\n\n| Provider | Env var | Roles | Notes |\n|---|---|---|---|\n| Bing | \u2014 (keyless, default) | search | scrapes bing.com; **reachable from mainland China without a proxy** |\n| DuckDuckGo | \u2014 (keyless) | search | needs to reach duckduckgo.com (proxy in CN) |\n| Bocha \u535a\u67e5 | `BOCHA_API_KEY` | search | China AI-search API, LLM-optimized, domestic/compliant |\n| Tavily | `TAVILY_API_KEY` | search + fetch | |\n| Exa | `EXA_API_KEY` | search + fetch | |\n| Brave | `BRAVE_SEARCH_API_KEY` | search | |\n| Jina | `JINA_API_KEY` | search + fetch (reader) | |\n| Firecrawl | `FIRECRAWL_API_KEY` | search + scrape | |\n\n**Mainland China without a proxy:** select **Bing** (free, no key) via `/web`, or\n**Bocha \u535a\u67e5** for a reliable LLM-optimized domestic API (`/web` \u2192 enter key).\n\nConfig lives at `~/.pi/byte-pi-web/config.json` (override the base dir with `PI_CONFIG_DIR`):\n\n```json\n{\n  \"provider\": \"bing\",\n  \"proxy\": \"http://127.0.0.1:7890\",\n  \"apiKeys\": { \"tavily\": \"tvly-...\", \"exa\": \"...\" }\n}\n```\n\n> `proxy` applies to **all** web fetches. Bing works without a proxy in mainland\n> China, so omit `proxy` if you don't need it; keep it if you also rely on\n> DuckDuckGo or on fetching otherwise-blocked URLs.\n\nWhen a key-backed provider with a native fetch endpoint is active (Tavily, Exa,\nJina, Firecrawl), `web_fetch` uses it; otherwise it falls back to a built-in,\nkeyless HTML\u2192text fetcher.\n\n## Automatic fallback\n\nWhen the active search provider fails (error, rate-limit) or returns nothing,\n`web_search` automatically tries the other **available** providers \u2014 keyless ones\n(Bing, DuckDuckGo) plus any keyed ones you've configured \u2014 in order, and returns\nthe first that yields results. No manual `/web` switching needed. The result\ndetails report which `backend` actually answered (and `fellBackFrom` if it fell\nback). Disable with `\"autoFallback\": false` in the config.\n\n`web_fetch` similarly falls back to the built-in HTML extractor if a keyed\nprovider's native fetch fails.\n\n## Proxy support\n\nNode's global `fetch` does **not** honor `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY`\nby default. In a region-restricted network this shows up as: `web_fetch` of a\nreachable site works, but `web_search` fails \u2014 because the search backend's host\n(e.g. `duckduckgo.com`) is only reachable through your proxy, and `fetch`\nbypasses it. A TUN-mode or system proxy often sets no env var at all, so relying\non env vars isn't enough.\n\nSet an explicit proxy in the config \u2014 the most reliable option, independent of\nhow pi was launched:\n\n```json\n{ \"proxy\": \"http://127.0.0.1:7890\" }\n```\n\nOn load the package routes all fetches through it via undici (`NO_PROXY` /\nlocalhost endpoints bypass it). If `proxy` is unset it falls back to the\n`HTTP(S)_PROXY` env vars. Set `BYTE_PI_WEB_NO_PROXY=1` to disable entirely.\n\n## DuckDuckGo caveats\n\nDuckDuckGo has no official API; this scrapes its non-JS HTML endpoints\n(`lite.duckduckgo.com` / `html.duckduckgo.com`) like the community-standard\n`ddgs` library. It throttles after roughly 20\u201330 searches/min per IP and can\nbreak on markup changes. The provider retries with backoff across both\nendpoints and surfaces a clear, actionable error on rate-limit. For heavy use,\nconfigure a key-backed provider via `/web`.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "web-search",
+    "web-fetch",
+    "search",
+    "fetch",
+    "duckduckgo",
+    "tavily",
+    "exa",
+    "brave",
+    "jina",
+    "firecrawl",
+    "ai",
+    "llm",
+    "agent"
+  ],
+  "author": {
+    "name": "byte"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ByteTrue/pi-package-mono#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ByteTrue/pi-package-mono.git",
+    "directory": "packages/pi-web-search"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-20T07:40:12.740Z",
+    "0.1.0": "2026-06-20T07:40:13.026Z",
+    "modified": "2026-06-20T07:40:13.237Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

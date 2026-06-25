@@ -1,0 +1,36 @@
+{
+  "name": "pi-prompt-control",
+  "latest_version": "0.1.2",
+  "description": "Manage and minimize Pi's system prompt \u2014 config-driven patches, interactive skill toggle, and probe-based prompt capture.",
+  "readme": "# pi-prompt-control\n\nManage and minimize [Pi](https://github.com/anthropics/pi)'s system prompt \u2014 config-driven patches, interactive skill toggle, and probe-based prompt capture.\n\n## Install\n\n```bash\npi install npm:pi-prompt-control\n```\n\n## Features\n\n### `/prompt-dump [path]` \u2014 Capture the real system prompt\n\nFires a probe turn so **every** `before_agent_start` handler runs (pi-slim, your own extensions, anything).\nCaptures the fully-chained system prompt in `turn_start`, writes it to a file, and aborts before the LLM call.\n\n```\n/prompt-dump                      # \u2192 ./pi-system-prompt-patched.md\n/prompt-dump my-prompt.md         # \u2192 ./my-prompt.md\n```\n\nWorks at fresh start \u2014 no prior message needed.\n\n### `/skills` \u2014 Interactive skill toggle\n\nOpens a TUI checklist of every loaded skill. Toggle with <kbd>Space</kbd>.\nUnchecked skills are stripped from the system prompt before each turn, saving context tokens.\n\nSkills remain explicitly invokable via `/skill:<name>` \u2014 only their automatic inclusion is toggled off.\n\n```\n/skills           # open the TUI checklist\n/skills:reset     # re-enable all skills\n```\n\nState is persisted to:\n- `~/.pi/agent/disabled-skills.json` (user scope)\n- `.pi/disabled-skills.json` (project scope, overrides user)\n\n### Config-driven patches \u2014 `prompt-patches.json`\n\nPlace a config file at `.pi/prompt-patches.json` (project) or `~/.pi/agent/prompt-patches.json` (global):\n\n```json\n{\n  \"patches\": [\n    {\n      \"name\": \"remove bash guidance\",\n      \"op\": \"remove\",\n      \"find\": \"- Use bash for file operations like ls, rg, find\\n\"\n    },\n    {\n      \"name\": \"soften a rule\",\n      \"op\": \"replace\",\n      \"find\": \"You must always\",\n      \"replace\": \"Prefer to\",\n      \"regex\": false\n    },\n    {\n      \"name\": \"add house rule\",\n      \"op\": \"append\",\n      \"text\": \"\\n\\nPrefer rg over grep.\\n\"\n    },\n    {\n      \"name\": \"strip a block (regex)\",\n      \"op\": \"replace\",\n      \"find\": \"\\\\n\\\\nSome block[\\\\s\\\\S]*?end of block\",\n      \"replace\": \"\",\n      \"regex\": true\n    }\n  ]\n}\n```\n\n#### Patch operations\n\n| `op` | Required fields | Description |\n|------|----------------|-------------|\n| `remove` | `find` | Remove the first occurrence of `find` |\n| `replace` | `find`, `replace` | Replace the first occurrence of `find` with `replace` |\n| `append` | `text` | Append `text` to the end of the prompt |\n\nAll `remove` and `replace` patches support `\"regex\": true` and an optional `\"flags\"` string (e.g. `\"gi\"`).\n\n#### Live reload\n\nThe config file is watched \u2014 edits take effect on the next message without `/reload`.\nParse errors and validation issues are surfaced via notifications.\n\n## How `/prompt-dump` works\n\nUnlike `ctx.getSystemPrompt()` (which returns the **base** prompt), `/prompt-dump` captures the prompt **after all extensions have modified it**:\n\n1. Sets a capture flag\n2. Sends a probe user message (`.`)\n3. All `before_agent_start` handlers chain naturally\n4. In `turn_start`, captures `ctx.getSystemPrompt()` (now fully chained)\n5. Writes to file and calls `ctx.abort()` \u2014 no LLM call, no cost\n\nThis means it works with **any** combination of extensions (pi-slim, custom patches, skill-toggle, future extensions) without knowing about them.\n\n## Publish through GitHub Actions\n\nThis package publishes to npm through `.github/workflows/publish.yml`.\n\n1. In npm, create a granular access token with publish access and **2FA bypass** enabled.\n2. In GitHub, add it as repository secret `NPM_TOKEN`.\n3. Bump the package version:\n\n   ```bash\n   npm version patch\n   git push --follow-tags\n   ```\n\n4. The workflow publishes when a `v*.*.*` tag is pushed, when a GitHub Release is published, or when run manually from the Actions tab.\n\nThe workflow runs `npm pack --dry-run`, skips versions that are already published, and publishes with npm provenance.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "prompt",
+    "extension",
+    "system-prompt",
+    "skills"
+  ],
+  "author": {
+    "name": "sylac"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/sylac/pi-prompt-control#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sylac/pi-prompt-control.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-09T09:46:59.374Z",
+    "0.1.2": "2026-06-09T09:46:59.689Z",
+    "modified": "2026-06-09T09:46:59.887Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

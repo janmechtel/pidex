@@ -1,0 +1,40 @@
+{
+  "name": "pi-provider-tama",
+  "latest_version": "0.10.0",
+  "description": "Pi agent extension for tama local AI server auto-discovery and model configuration",
+  "readme": "# pi-provider-tama\n\n[Pi agent](https://pi.dev) extension that auto-discovers models from a local [tama](https://github.com/danielcherubini/tama) server and registers them as a provider.\n\n## What it does\n\nWhen pi starts (or on `/reload`), this extension:\n\n1. Auto-detects tama on ports `11434` or `8080`\n2. Fetches available models from tama's API\n3. Registers a `tama` provider in pi with all discovered models\n\nModels appear in `/model` immediately \u2014 no manual `models.json` editing needed.\n\n## Installation\n\n### Option A: npm (recommended)\n\n```bash\npi install npm:pi-provider-tama\n```\n\n### Option B: git\n\n```bash\npi install git:github.com/danielcherubini/pi-provider-tama\n```\n\nUse `-l` to install to project scope (`.pi/settings.json`) instead of global:\n\n```bash\npi install -l npm:pi-provider-tama\n```\n\n### Option C: Local development\n\n```bash\ngit clone https://github.com/danielcherubini/pi-provider-tama.git\ncd pi-provider-tama\nnpm install\n\n# Install from local path\npi install ./pi-provider-tama\n```\n\n## Configuration\n\nBy default, the extension auto-detects tama on `127.0.0.1:11434` and `127.0.0.1:8080`.\n\nNo configuration is needed if tama is running locally on the default port.\n\n### Remote tama server\n\nAdd the tama URL to `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\"npm:pi-provider-tama\"],\n  \"pi-provider-tama\": {\n    \"url\": \"http://myserver:11434\"\n  }\n}\n```\n\nOr use the `TAMA_URL` environment variable (takes priority over settings.json):\n\n```bash\nexport TAMA_URL=http://myserver:11434\n```\n\n**Priority order:** `TAMA_URL` env var \u2192 `settings.json` \u2192 auto-detect localhost\n\n### Authentication\n\nIf your tama instance is gated behind a bearer token, configure one of:\n\n1. **`TAMA_TOKEN` environment variable** (highest priority):\n\n   ```bash\n   export TAMA_TOKEN=your-token-here\n   ```\n\n2. **`token` field in `~/.pi/agent/settings.json`**:\n\n   ```json\n   {\n     \"packages\": [\"npm:pi-provider-tama\"],\n     \"pi-provider-tama\": {\n       \"url\": \"https://tama.example.com\",\n       \"token\": \"your-token-here\"\n     }\n   }\n   ```\n\nThe token is sent as `Authorization: Bearer <token>` on both model discovery and inference requests, and is used as pi's `apiKey` for the registered provider. When unset, no auth header is sent (fine for localhost).\n\n**Priority order:** `TAMA_TOKEN` env var \u2192 `settings.json` token \u2192 none\n\n## How it works\n\nThe extension is an **async factory**: pi awaits it before resolving which\nmodels are available, so every tama model is registered before pi decides\nwhat's selectable. No caching layer, no sync pre-registration dance.\n\nOn startup the factory:\n\n1. Resolves the tama URL/token (env \u2192 `settings.json` \u2192 auto-detect localhost).\n2. Fetches the live model list from `/tama/v1/opencode/models`.\n3. Calls `pi.registerProvider(\"tama\", \u2026)` with every discovered model.\n\nIt also re-runs the same flow on `session_start`, so `/reload` picks up\nmodels that were added to tama after pi started.\n\n> Requires pi with async-factory support (pi-mono \u2265 Jan 2026,\n> commit `aea9f843`). If tama is offline when pi boots, no tama models\n> register \u2014 bring tama up and run `/reload`.\n\nDiscovered models are mapped to pi's provider format:\n\n| Tama field                          | Pi field        | Fallback                      |\n| ----------------------------------- | --------------- | ----------------------------- |\n| `id` (lowercased HF repo)           | model `id`      | \u2014                             |\n| `name` (pretty display)             | model `name`    | `id`                          |\n| `context_length` or `limit.context` | `contextWindow` | `128000`                      |\n| `limit.output`                      | `maxTokens`     | `contextWindow / 16` or `8192`|\n| `modalities.input`                  | `input`         | `[\"text\"]`                    |\n\nAll models are registered with:\n\n- `api: \"openai-completions\"` (OpenAI-compatible)\n- `reasoning: false`\n- `cost: { input: 0, output: 0, ... }` (local = free)\n- `compat: { supportsDeveloperRole: false, supportsReasoningEffort: false }`\n\n## Migrating from pi-tama\n\nThis package was previously published as `pi-tama`. To migrate:\n\n1. Reinstall: `pi install npm:pi-provider-tama`\n2. Rename the settings key in `~/.pi/agent/settings.json` from `\"pi-tama\"` to `\"pi-provider-tama\"`\n3. Uninstall the old package\n\n## Development\n\n```bash\nnpm install\nnpm test          # Run tests in watch mode\nnpm run test:run  # Run tests once\nnpm run typecheck # Type check\n```\n\n## Requirements\n\n- [tama](https://github.com/danielcherubini/tama) running locally with `tama serve`\n- [pi](https://pi.dev) agent\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-agent",
+    "tama",
+    "extension",
+    "local-llm",
+    "openai-compatible",
+    "auto-discovery"
+  ],
+  "author": {
+    "name": "Daniel Cherubini"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/danielcherubini/pi-provider-tama#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danielcherubini/pi-provider-tama.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-23T00:00:36.696Z",
+    "modified": "2026-05-24T18:00:40.002Z",
+    "0.9.0": "2026-04-23T00:00:36.848Z",
+    "0.9.1": "2026-04-27T16:58:45.956Z",
+    "0.10.0": "2026-05-24T18:00:39.903Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 10,
+  "download_trend": []
+}

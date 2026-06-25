@@ -1,0 +1,45 @@
+{
+  "name": "@peteturnbull/pi-extensions",
+  "latest_version": "1.0.6",
+  "description": "A pi extension pack with a local task board TUI and a deterministic docs-store with qmd-powered search.",
+  "readme": "# @peteturnbull/pi-extensions\n\nA `pi` extension pack that includes:\n\n- A **TUI task board** backed by `.pi/task-board/tasks.json`\n- A **deterministic docs-store** backed by `.pi/docs-store/` with qmd-powered search\n\n## Features\n\n### Task board\n\n- Ticket tools: `create_ticket`, `update_ticket`, `list_tickets`, `list_ready_tickets`, `get_ticket`\n- `/task-board` command launches the terminal UI\n- Ready/active/blocked/all workflow views\n- Keyboard-first ticket inspect + status transitions + progress + notes\n- Feature tags (`feature:<slug>`) for feature-isolated planning/filtering\n- JSON persistence with dependency-aware readiness and blocked-state reasoning\n\n### Docs-store\n\n**Why this exists**\n\nWhen agents only use ad-hoc files, knowledge gets fragmented and hard to recover.\nDocs-store gives agents a single, structured memory surface with two goals:\n\n1. **Deterministic writes**\n   - Agents write via typed tools, not arbitrary file paths.\n   - This reduces random file dumping and keeps stored knowledge consistent.\n\n2. **High-quality retrieval**\n   - Stored docs are indexed for qmd search (`query`/`search`/`vsearch`).\n   - Agents can reliably find prior decisions, notes, and context by meaning or keywords.\n\nIn short: docs-store is for durable project memory that stays organized and searchable as runs accumulate.\n\n- Deterministic write/read tools (no arbitrary write paths in tool inputs)\n- Tools: `docs_store_put`, `docs_store_get`, `docs_store_list`, `docs_store_search`, `docs_store_delete`, `docs_store_status`, `docs_store_set_base_dir`, `docs_store_refresh`\n- `/docs-store` helper command (`help`, `status`, `where`, `set-dir`, `use-default`, `refresh`, `refresh-embed`)\n- Configurable base directory (default: `<project>/.pi/docs-store`)\n- Markdown documents persisted under `<base-dir>/docs/*.md`\n- qmd integration (`query`/`search`/`vsearch`) on a project-scoped qmd index\n\n## Install\n\n```bash\n# global\npi install npm:@peteturnbull/pi-extensions\n\n# project-local\npi install -l npm:@peteturnbull/pi-extensions\n```\n\n## Usage\n\n### Task board\n\n```bash\n/task-board\n/task-board <feature>\n/task-board help\n```\n\n- `/task-board` opens the board with tickets from all features.\n- `/task-board <feature>` opens a feature-scoped board (tickets where `ticket.feature === <feature>`).\n\n#### TUI keys\n\n- List: `\u2191/\u2193`, `Enter`, `1..4`, `/`, `Esc`\n- Detail: `s` (start), `b` (block), `c` (complete), `p` (progress), `n` (note), `Esc`\n\n### Docs-store\n\n```bash\n/docs-store\n/docs-store status\n/docs-store where\n/docs-store set-dir ../shared/docs-store\n/docs-store use-default\n/docs-store refresh\n/docs-store refresh-embed\n```\n\nDocs-store data location defaults to:\n\n```text\n<project>/.pi/docs-store/\n  docs/      # managed markdown docs\n  index.json # metadata index\n```\n\nOverride options (highest precedence first):\n\n1. Environment variable: `PI_DOCS_STORE_DIR`\n2. Config file: `<project>/.pi/docs-store.config.json` (set by `/docs-store set-dir` or `docs_store_set_base_dir`)\n3. Default: `<project>/.pi/docs-store`\n\n### qmd requirement\n\nDocs-store search uses the `qmd` CLI. Install globally:\n\n```bash\nnpm install -g @tobilu/qmd\n```\n\n### Docs-store smoke test\n\nRun the integration smoke flow (`set-base-dir -> put -> list -> get -> search -> delete -> use-default`):\n\n```bash\n# Runs search only if qmd is available\nnpm run smoke:docs-store\n\n# Enforce qmd availability (fails if qmd is missing)\nnpm run smoke:docs-store:qmd\n```\n\n## Task board data file\n\n```text\n<project>/.pi/task-board/tasks.json\n```\n\n## Seed task board demo data\n\n```bash\nnode .pi/scripts/seed-task-board.mjs --force\n```\n\n---\n\n## Publishing to npm\n\n### One-time setup\n\n1. Ensure you have an npm account and are logged in:\n   ```bash\n   npm login\n   npm whoami\n   ```\n\n2. Confirm package name availability (first publish only):\n   ```bash\n   npm view @peteturnbull/pi-extensions name\n   ```\n   - If this returns `E404`, the name is available.\n   - If it exists and you do not own it, choose a new package name in `package.json`.\n\n3. Confirm access rights if package already exists:\n   ```bash\n   npm access ls-packages $(npm whoami)\n   ```\n\n### Preflight checks\n\n```bash\nnpm run preflight\nnpm run pack:dry\n```\n\n### Release script workflow (recommended)\n\nThis repo includes `scripts/release.sh`, which handles:\n- clean working tree check\n- preflight + `npm pack --dry-run`\n- version bump\n- changelog section rollover\n- release commit + git tag\n- optional push + npm publish\n\n#### Prepare release only (no publish)\n\n```bash\nnpm run release\n# or: npm run release:patch | release:minor | release:major\n```\n\n#### Release + publish in one command\n\n```bash\nnpm run release:publish:patch\n# or: release:publish:minor | release:publish:major\n```\n\n#### Dry-run publish (safe test)\n\n```bash\nnpm run release:publish:dry-run\n```\n\n### Manual fallback\n\n```bash\n# after release commit + tag exists\ngit push && git push --tags\nnpm publish --access public\n```\n\n---\n\n## Package layout\n\n```text\nextensions/\n  task-board.ts\n  docs-store.ts\n  docs-store-paths.ts\ntest/\n  docs-store-paths.test.ts\n  smoke/\n    mock-loader.mjs\n    register-loader.mjs\n    shims/\n      pi-ai.mjs\n      typebox.mjs\n      pi-coding-agent.mjs\nCHANGELOG.md\nREADME.md\npackage.json\nscripts/\n  preflight.mjs\n  release.sh\n  smoke-docs-store.mjs\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "task-board",
+    "docs-store",
+    "qmd",
+    "tui",
+    "project-management",
+    "knowledge-base"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/pete-j-turnbull/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pete-j-turnbull/pi-extensions.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/task-board.ts",
+      "./extensions/docs-store.ts",
+      "./extensions/subagents/index.ts",
+      "./extensions/subagents/notify.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-26T23:30:07.260Z",
+    "modified": "2026-03-08T16:43:03.831Z",
+    "1.0.0": "2026-02-26T23:30:07.512Z",
+    "1.0.1": "2026-02-26T23:39:43.304Z",
+    "1.0.2": "2026-03-06T16:26:41.848Z",
+    "1.0.3": "2026-03-06T23:38:42.436Z",
+    "1.0.4": "2026-03-08T10:17:53.444Z",
+    "1.0.5": "2026-03-08T16:17:08.704Z",
+    "1.0.6": "2026-03-08T16:43:03.700Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 17,
+  "download_trend": []
+}

@@ -1,0 +1,366 @@
+{
+  "name": "@zgltyq/pi-provider-kimi-code",
+  "latest_version": "0.3.2",
+  "description": "Kimi Code plan in pi-coding-agent \u2014 fork of pi-provider-kimi-code with bearer-auth fix for OAuth tokens",
+  "readme": "# @zgltyq/pi-provider-kimi-code\n[![npm](https://img.shields.io/npm/v/@zgltyq/pi-provider-kimi-code)](https://www.npmjs.com/package/@zgltyq/pi-provider-kimi-code)\n[![license](https://img.shields.io/npm/l/@zgltyq/pi-provider-kimi-code)](./LICENSE)\n\n> **Fork of [`pi-provider-kimi-code`](https://github.com/Leechael/pi-provider-kimi-code) with a bearer-auth fix that restores OAuth subscription login.**\n>\n> If upstream `pi-provider-kimi-code` works for you with OAuth login, keep using it. This fork exists because on recent `@mariozechner/pi-coding-agent` / `@mariozechner/pi-ai` versions the upstream package sends Kimi OAuth tokens as `x-api-key` instead of `Authorization: Bearer`, which api.kimi.com rejects with `401 invalid x-api-key`. See [Bug fix below](#bug-fix-oauth-tokens-were-sent-as-x-api-key) for the gory details.\n\n**Reuse your [Kimi Code Plan](https://www.kimi.com/code/docs/en/) inside [pi-coding-agent](https://pi.dev/)** \u2014 no separate API credits, no second billing dashboard. Every request draws from your Kimi Code membership quota (the 5-hour token bucket) instead of billing per-token on the Moonshot Open Platform.\n\nIt's **\"Claude Code for Kimi\"** \u2014 log in with your Kimi account, with `KIMI_API_KEY` still supported as a fallback for CI. You get `kimi-for-coding` (the Kimi-k2.6 latest alias, backed by the same Kimi Code Plan that covers K2.6 and K2.5) with a 262K-token context window, automatic prompt caching, automatic large-image and video upload, and compatibility with both Anthropic-style and OpenAI-style clients.\n\n## Who is this for?\n\n- You already pay for a **[Kimi Code Plan](https://www.kimi.com/code/docs/en/)** and want to use it inside `pi-coding-agent` instead of the official `kimi-cli` \u2014 see [MoonshotAI/kimi-cli#757](https://github.com/MoonshotAI/kimi-cli/issues/757) for the canonical feature request this extension answers.\n- You want **\"Claude Code for Kimi\"**: log in with your Kimi account instead of buying separate API credits. (`KIMI_API_KEY` is also supported as a fallback for CI.)\n- You're in the [pi / pi-mono](https://github.com/badlogic/pi-mono) ecosystem and want **Kimi K2.6** (and the K2.5 coverage that comes with the Code Plan) as a pi provider.\n\nPay-per-token via `KIMI_API_KEY` also works if you just want to try Kimi in CI or without a subscription.\n\n## Features\n\n- **Browser login with your Kimi account** \u2014 reuse your Kimi Code Membership without buying separate API credits. Credentials are stored locally and refreshed automatically. `KIMI_API_KEY` is also accepted for pay-per-token or CI use.\n- **262K-token context window** on all registered models.\n- **Automatic prompt caching** \u2014 binds Kimi's prompt cache to your pi session so repeated calls hit the cache cheaply (observed TTL ~5-10 minutes). Honors pi's `PI_CACHE_RETENTION=none` if you want to disable caching entirely.\n- **Automatic large-image and video upload** \u2014 images over 1 MB and all videos are uploaded to Kimi ahead of time, so you don't hit inline payload limits.\n- **Works with both Anthropic- and OpenAI-compatible modes** \u2014 use whichever one your pi setup expects.\n- **Stream cleaning** \u2014 Kimi occasionally leaks placeholder blocks into the stream during thinking phases; this extension catches and hides them so your pi UI stays clean.\n- **Zero dependencies, zero build step** \u2014 the extension loads directly as TypeScript, nothing to compile.\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:@zgltyq/pi-provider-kimi-code\n```\n\nOr load a local checkout without installing:\n\n```bash\npi -e /path/to/pi-provider-kimi-code\n```\n\n## Bug fix: OAuth tokens were sent as `x-api-key`\n\n### Symptom\n\nAfter `/login kimi-coding` succeeded and your token file at `~/.pi/agent/auth.json` looked healthy, every chat request failed with:\n\n```\nError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\n             \"message\":\"invalid x-api-key\"},\n           \"request_id\":\"req_...\"}\n[kimi-coding] auth refresh: reusing newer on-disk token\n[kimi-coding] retrying stream with refreshed token\n```\n\n\u2026 and the retry loop kept burning refresh tokens without ever making a successful request.\n\n### Root cause\n\n`@mariozechner/pi-ai/providers/anthropic.js` decides which auth header to send based on the token string itself:\n\n```js\nfunction isOAuthToken(apiKey) {\n    return apiKey.includes(\"sk-ant-oat\");  // Anthropic OAuth token prefix\n}\n```\n\nThat substring check correctly identifies real Anthropic OAuth tokens (which start with `sk-ant-oat01-\u2026`) and sends them as `Authorization: Bearer \u2026`. Everything else \u2014 including Kimi Code OAuth access tokens, which are JWTs starting with `eyJ\u2026` \u2014 falls through to the API-key branch and is sent as `X-Api-Key: \u2026`. api.kimi.com\u2019s proxy only accepts Bearer auth for OAuth tokens, so it returned 401.\n\n### Fix\n\nThe Anthropic SDK builds outgoing headers in this order\n\n```\n[stainless defaults, authHeaders(), _options.defaultHeaders,\n bodyHeaders, options.headers]\n```\n\nwith later sources winning, and it supports `NullableHeaders` where a `null` value suppresses a header entirely. That lets us override both directions from the extension\u2019s own `streamSimple` function \u2014 no changes to pi-ai required:\n\n```ts\nconst authOverride =\n  model.api === \"anthropic-messages\" && apiKey\n    ? { \"x-api-key\": null, authorization: `Bearer ${apiKey}` }\n    : undefined;\n// then pass it through options.headers to streamSimpleAnthropic(...)\n```\n\n* `\"x-api-key\": null` \u2014 removes the header the SDK added from the `apiKey` constructor argument before the request hits the wire.\n* `authorization: Bearer \u2026` \u2014 supplies the real token in the shape Kimi\u2019s API expects.\n\nApplied only on the Anthropic wire protocol; the OpenAI completions path already uses Bearer auth by convention and is untouched.\n\n### Verified behaviour\n\nAgainst `api.kimi.com/coding`, using a freshly-refreshed Kimi Code OAuth access token, both the non-streaming and streaming endpoints now return 200 OK on the first try and the extension's internal auth-refresh retry never fires. See the test scripts in [`docs/debug/`](./docs/debug/) if you want to reproduce.\n\n### Install from GitHub Release tarball\n\nIf you prefer not to use npm, download the tarball from the [latest release](https://github.com/Leechael/pi-provider-kimi-code/releases/latest), extract it, and install from the local path:\n\n```bash\n# Download and extract\ncurl -L https://github.com/Leechael/pi-provider-kimi-code/releases/latest/download/pi-provider-kimi-code.tar.gz | tar -xz -C /tmp\n\n# Install from the extracted directory\npi install /tmp/pi-provider-kimi-code\n```\n\n## Authentication\n\n### Browser login (recommended)\n\nInside `pi`, run:\n\n```\n/login kimi-coding\n```\n\nA browser tab opens, you sign into your Kimi account, and credentials are stored at `~/.pi/agent/auth.json`. Tokens refresh automatically.\n\n### API key\n\nFor CI or pay-per-token use, set `KIMI_API_KEY`:\n\n```bash\nKIMI_API_KEY=sk-... pi\n```\n\n## Models\n\n| ID                | Name            | Reasoning | Input              | Context | Max Output |\n| ----------------- | --------------- | --------- | ------------------ | ------- | ---------- |\n| `kimi-for-coding` | Kimi for Coding | yes       | text, image, video | 262 144 | 32 000     |\n\n`kimi-for-coding` is the latest alias on the Kimi Code Plan \u2014 today it points at Kimi-k2.6. The Plan itself still covers K2.5; the upstream routes older model IDs to the current alias, but this provider only publishes the canonical `kimi-for-coding` entry.\n\nSelect it inside `pi`:\n\n```\n/model kimi-coding/kimi-for-coding\n```\n\n## Environment variables\n\n| Variable                           | Description                                            |\n| ---------------------------------- | ------------------------------------------------------ |\n| `KIMI_API_KEY`                     | Static API key (alternative to browser login)          |\n| `KIMI_CODE_BASE_URL`               | Override the API base URL                              |\n| `KIMI_CODE_OAUTH_HOST`             | Override the OAuth host                                |\n| `KIMI_CODE_PROTOCOL`               | `anthropic` (default) or `openai`                      |\n| `KIMI_CODE_UPLOAD_THRESHOLD_BYTES` | Image auto-upload threshold, default `1048576` (1 MB)  |\n| `KIMI_CODE_DEBUG`                  | Set to `1` to print provider-side debug logs           |\n\nFull list with defaults and the test-script variables: [docs/ENV.md](docs/ENV.md).\n\n## FAQ\n\n### How is this different from the official `kimi-cli`?\n\n`kimi-cli` is Moonshot's own terminal agent. It's a full CLI \u2014 it replaces pi, you can't use it as a pi provider. This extension is the bridge: it lets you keep pi as your harness and point it at your Kimi Code Membership for inference, reusing the same login flow `kimi-cli` v1.3+ ships.\n\n### Do I need a paid Kimi subscription?\n\nFor browser login, yes \u2014 whatever your Moonshot account is entitled to is what the provider can access. Without a plan you'll hit rate limits quickly. For pay-per-token usage, set `KIMI_API_KEY` instead.\n\n### Where does my data go?\n\nRequests go only to `api.kimi.com` (Moonshot's servers). Login credentials are stored locally at `~/.pi/agent/auth.json`, readable only by your user. Nothing is uploaded to any third party.\n\n### Is this affiliated with Moonshot AI?\n\nNo. This is an independent extension. The login flow is derived from the public implementation in the open-source [`kimi-cli`](https://github.com/MoonshotAI/kimi-cli) repository.\n\n### Which pi version does this work with?\n\nAny recent [pi-coding-agent](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent).\n\n### Why are there two protocol modes?\n\nKimi's coding endpoint speaks both Anthropic and OpenAI dialects. Anthropic mode has better visibility into cache hits, so it's the default. Switch via `KIMI_CODE_PROTOCOL=openai` if something in your pi setup prefers the OpenAI path.\n\n## Troubleshooting\n\n### `pi` reports `fetch failed` even though `curl` works\n\npi runs on Node's `fetch` / undici stack, which handles `http_proxy` / `https_proxy` / `all_proxy` differently from `curl`. Verify those variables in the pi process's environment. The bundled smoke-test script `scripts/test_e2e.sh` prints the effective proxy-related environment for easier debugging.\n\n### `/login kimi-coding` prints a device code but the browser never opens\n\nThe login flow always prints a verification URL \u2014 opening it is the terminal's job. If your terminal or OS blocks auto-open, copy the URL and paste it into a browser manually.\n\n### \"Access denied\" or subscription errors after a successful login\n\nYour Moonshot account needs an active Kimi Code subscription for the provider to do anything useful. If the same account works in `kimi-cli`, re-run `/login kimi-coding` to refresh credentials.\n\n### Large images fail with a payload error\n\nThis extension uploads images over `KIMI_CODE_UPLOAD_THRESHOLD_BYTES` (default 1 MB) to Kimi's Files API and references them as `ms://`. Videos always upload. Set `KIMI_CODE_DEBUG=1` to see upload decisions in the provider logs.\n\n### Prompt cache never seems to hit\n\nThe cache is keyed off your pi session, which changes between sessions. Long-lived sessions get cache hits within a few minutes; cold sessions won't. Also check `PI_CACHE_RETENTION` \u2014 if it's set to `none`, this extension intentionally skips cache-key injection. For deterministic measurement, run the cache-TTL probe with a fixed key \u2014 see [docs/TESTING.md](docs/TESTING.md).\n\n### OpenAI-compatible tools complain about a `developer` role\n\nIn OpenAI mode this extension maps the `developer` role to `system` (Kimi's Coding endpoint does not recognize `developer`). If something in your toolchain expects `developer` to round-trip, use Anthropic mode instead.\n\n## References\n\n- Upstream harness: [badlogic/pi-mono](https://github.com/badlogic/pi-mono) \u00b7 [pi-coding-agent](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent)\n- Upstream login implementation and feature request: [MoonshotAI/kimi-cli](https://github.com/MoonshotAI/kimi-cli) \u00b7 [kimi-cli#757](https://github.com/MoonshotAI/kimi-cli/issues/757)\n- Environment variables: [docs/ENV.md](docs/ENV.md)\n- Testing guide: [docs/TESTING.md](docs/TESTING.md)\n- Architecture notes: [docs/architecture.md](docs/architecture.md)\n\n## Credits\n\nBased on the login implementation from [`kimi-cli`](https://github.com/MoonshotAI/kimi-cli) by Moonshot AI. Built as an extension for [`pi-coding-agent`](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) by [@badlogic](https://github.com/badlogic).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-provider",
+    "pi",
+    "pi-coding-agent",
+    "pi-mono",
+    "coding-agent",
+    "ai-provider",
+    "llm",
+    "llm-provider",
+    "kimi",
+    "kimi-for-coding",
+    "kimi-coder",
+    "kimi-k2",
+    "kimi-k2.6",
+    "kimi-k2.5",
+    "moonshot",
+    "moonshotai",
+    "oauth",
+    "device-code",
+    "subscription",
+    "fork"
+  ],
+  "author": {
+    "name": "Leechael"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ZGltYQ/pi-provider-kimi-code#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZGltYQ/pi-provider-kimi-code.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-21T16:17:32.492Z",
+    "modified": "2026-04-21T20:19:07.656Z",
+    "0.3.1": "2026-04-21T16:17:32.735Z",
+    "0.3.2": "2026-04-21T20:19:07.547Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 27,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 156
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 55
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 22
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 29
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

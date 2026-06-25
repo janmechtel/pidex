@@ -1,0 +1,352 @@
+{
+  "name": "pi-tmux-harness",
+  "latest_version": "0.1.0",
+  "description": "Pi extension exposing tmux as native tools \u2014 drive other TUIs (pi, claude, copilot CLI, lazygit, etc.) for adversarial testing without fragile sleep+grep loops.",
+  "readme": "# pi-tmux-harness\n\n[![npm version](https://img.shields.io/npm/v/pi-tmux-harness?style=flat-square)](https://www.npmjs.com/package/pi-tmux-harness)\n[![License](https://img.shields.io/github/license/bagatelia/pi-tmux-harness?style=flat-square)](LICENSE)\n\nTmux session/keystroke/capture exposed as native [pi coding agent](https://github.com/badlogic/pi-mono) tools, so any agent in pi can drive other terminal programs (most importantly: another pi instance, claude code, copilot CLI, lazygit, htop, gh) for adversarial testing \u2014 without ad-hoc `bash \u2192 tmux send-keys \u2192 sleep \u2192 grep` chains.\n\n## Why\n\nWhen testing pi extensions, you end up writing this kind of fragile shell:\n\n```bash\ntmux new-session -d -s pi-test 'pi'\nsleep 8                                    # how long is enough?\ntmux send-keys -t pi-test '/myextension' Enter\nsleep 12                                   # guess again\ntmux capture-pane -t pi-test -p | tail -25 | grep \"expected output\"\n```\n\nEvery `sleep` is a guess. Wrong guesses produce flaky tests. The `grep` is eyeball-driven assertion.\n\nThis extension turns that into:\n\n```typescript\ntmux_new({ command: \"pi\", cwd: \"/path/to/repo\" })\ntmux_expect({ name, pattern: \"\\\\[Extensions\\\\]\", timeoutMs: 30000 })  // ready signal\ntmux_send({ name, text: \"/myextension foo\" })\ntmux_expect({ name, pattern: \"expected output regex\", timeoutMs: 15000 })\ntmux_capture({ name })  // full snapshot for further assertions\ntmux_kill({ name })\n```\n\nThe killer feature is `tmux_expect`: poll `capture-pane` until a regex matches or timeout fires. Eliminates ~90% of the fragile sleep+grep we used to write.\n\n## Install\n\n```bash\npi install npm:pi-tmux-harness\n```\n\nThen restart pi (or start a new session). The 7 tools below register automatically.\n\n## Tools\n\nAll sessions go to an isolated tmux socket (`-L pi-harness`) so they never appear in your normal `tmux ls` output, can't accidentally be attached to, and `kill all` is bounded.\n\n| Tool | Purpose |\n|---|---|\n| `tmux_new` | Spawn a detached tmux session running any command (default: shell). Returns the session name. |\n| `tmux_send` | Send literal text. Optional `enter: true` (default) appends Enter. |\n| `tmux_send_key` | Send a named special key (Escape, Tab, Up/Down, C-c, C-d, BSpace, etc.) \u2014 uses tmux's native key names. |\n| `tmux_capture` | Snapshot the pane. Configurable scrollback lines + trim. |\n| `tmux_expect` | Poll capture until a regex matches or timeout. Returns `{matched, match?, elapsedMs, lastSnapshot}`. **The fragile-sleep killer.** |\n| `tmux_kill` | Kill a session. Pass `name: \"all\"` for every managed session. |\n| `tmux_list` | List sessions managed by this extension (with elapsed time + cwd). |\n\n## Hardening\n\nThis extension has been through ~10 rounds of multi-model code review. The defenses include:\n\n- **Regex DoS protection** in `tmux_expect`: AST-level rejection of obviously catastrophic patterns (nested quantifiers like `(a+)+`, `(a{1,2})+`, etc.) + 32KB input cap on the regex search window\n- **Tmux flag injection blocked**: strict allowlist `/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/` on session names, validated at every tool call. Rejects names starting with `-` (which would be parsed as tmux flags) and reserved names like `all`\n- **Tmux command-separator blocked**: `tmux_send_key` rejects `;`, `{`, `}`, and control bytes anywhere in key names (would otherwise escape the `send-keys` command context)\n- **Exact-target syntax**: every `-t name` invocation uses tmux's exact-match form (`=name` for session targets, `=name:` for pane targets) to defeat tmux's default prefix matching\n- **AbortSignal honored** at every poll boundary in `tmux_expect`\n- **Bounded LRU** on the managed-session map (hard cap 64; rejects new sessions when at cap)\n- **Tracker bookkeeping** for prune-on-list when sessions disappear\n\n## Per-agent reference (drive these via the harness)\n\nThe harness is agent-agnostic \u2014 it doesn't care what's in the tmux pane. Put the right binary in `tmux_new`'s `command` and use the right ready-signal in `tmux_expect`.\n\n### pi (recursive testing)\n\n```jsonc\ntmux_new({ command: \"pi\", cwd: \"/path/to/repo\", width: 220, height: 50 })\ntmux_expect({ name, pattern: \"\\\\[Extensions\\\\]\", timeoutMs: 30000 })  // pi finished startup\ntmux_send({ name, text: \"/t why does my parser leak memory\" })\ntmux_expect({ name, pattern: \"\\\\[Triage\\\\]\", timeoutMs: 15000 })\ntmux_send_key({ name, keys: [\"Escape\"] })  // close any modal\ntmux_send_key({ name, keys: [\"C-d\"] })     // quit pi\n```\n\n### Claude Code\n\n```jsonc\ntmux_new({ command: \"claude\", cwd: \"/path/to/repo\" })\ntmux_expect({ name, pattern: \"\\u2502\\\\s*>\\\\s*\\u2502|Try .*claude\", timeoutMs: 30000 })\ntmux_send({ name, text: \"explain the auth flow\" })\ntmux_send_key({ name, keys: [\"Escape\"] })  // interrupt running operation\ntmux_send({ name, text: \"/exit\" })\n```\n\n### GitHub Copilot CLI\n\n```jsonc\ntmux_new({ command: \"copilot\", cwd: \"/path/to/repo\" })\ntmux_expect({ name, pattern: \"GitHub Copilot|Welcome|Trust this folder|copilot>\", timeoutMs: 30000 })\n// If \"Trust this folder?\" appears, accept it:\ntmux_send_key({ name, keys: [\"Enter\"] })\ntmux_send({ name, text: \"summarize this repo\" })\ntmux_send_key({ name, keys: [\"Escape\"] })  // cancel \"Thinking...\"\ntmux_send({ name, text: \"/exit\" })\n```\n\n### Generic shell (sanity check)\n\n```jsonc\ntmux_new({ command: \"/bin/sh\" })\ntmux_send({ name, text: \"echo READY_$(date +%s)\" })\ntmux_expect({ name, pattern: \"READY_\\\\d+\", timeoutMs: 5000 })\n```\n\n## When to use harness vs `-p` print mode\n\n| Need | Use |\n|---|---|\n| One-shot answer, parse stdout | `claude -p` / `copilot -p` / `pi -p` directly. No harness needed. |\n| Multi-step interactive flow with cancels / modals / slash commands | Harness. |\n| Drive a TUI you don't control (lazygit, htop, gh, etc.) | Harness. |\n| Stream structured events to a supervisor | `claude --output-format stream-json` directly. No harness needed. |\n| Test that a pi extension renders a specific message at a specific point | Harness with `tmux_expect`. |\n\n## Requirements\n\n- tmux (\u2265 3.2 recommended for full key-modifier support)\n- Pi coding agent\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "tmux",
+    "testing",
+    "tui",
+    "harness",
+    "subagent",
+    "automation"
+  ],
+  "author": {
+    "name": "bagatelia"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/bagatelia/pi-tmux-harness#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bagatelia/pi-tmux-harness.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-04T16:55:28.012Z",
+    "0.1.0": "2026-05-04T16:55:28.203Z",
+    "modified": "2026-05-04T16:55:28.413Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 6,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 92
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

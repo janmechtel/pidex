@@ -1,0 +1,41 @@
+{
+  "name": "@qhn/pi-goal",
+  "latest_version": "0.4.1",
+  "description": "Setup-first autonomous goal mode extension for Pi.",
+  "readme": "# @qhn/pi-goal\n\nSetup-first autonomous goal mode for Pi.\n\n`@qhn/pi-goal` lets Pi pursue one objective across follow-up turns. It does **not** start autonomous work immediately: `/goal <intent>` first opens a setup interview so the assistant and user agree on outcome, done criteria, decision style, and ask-before boundaries.\n\n## Install\n\n```bash\npi install npm:@qhn/pi-goal\n```\n\nTry without installing:\n\n```bash\npi -e npm:@qhn/pi-goal\n```\n\n## Commands\n\n| Command | Behavior |\n|---------|----------|\n| `/goal <intent>` | Start setup mode for a new goal |\n| `/goal status` | Show current setup or goal state |\n| `/goal pause` | Pause autonomous continuation |\n| `/goal resume` | Resume a paused or blocked goal |\n| `/goal cancel` | Cancel setup or active goal state |\n| `/goal help` | Show command help |\n\n## Agent tools\n\n| Tool | Purpose |\n|------|---------|\n| `goal_present` | Record the contract (Outcome, Done criteria, Decision philosophy, Ask-before boundaries) when presenting it to the user; call this right when you show the contract |\n| `goal_set` | Activate the latest confirmed setup \u2014 checks that `goal_present` was called with a matching objective |\n| `goal_get` | Inspect setup/goal state, budget, usage, and remaining tokens |\n| `goal_status_line` | Update short current-progress text in the status line |\n| `goal_complete` | Mark the active goal complete after evidence proves it is done |\n\n`goal_complete` is intentionally narrow. Pause, resume, and cancel stay user-controlled through `/goal` commands.\n\n## Goal flow\n\n```text\n/goal <intent>\n  -> Pi asks setup questions\n  -> assistant summarizes the goal contract\n  -> assistant calls goal_present to record the contract\n  -> user approves the contract\n  -> assistant calls goal_set (checks goal_present was called + objective match)\n  -> Pi continues while idle\n  -> assistant updates progress with goal_status_line\n  -> assistant calls goal_complete only after proof\n```\n\n## Setup contract\n\nBefore activation, the assistant must resolve:\n\n| Contract part | Meaning |\n|---------------|---------|\n| Outcome | What should be true when the goal finishes |\n| Done criteria | Evidence required before completion |\n| Decision philosophy | How trade-offs should be made during autonomous work |\n| Ask-before boundaries | Actions that require explicit user approval |\n\n## Status line\n\n| State | Example |\n|-------|---------|\n| Setup | `/goal \u25c7 setup: ship the package` |\n| Working | `/goal \u25c7 \u25f4 verifying package` |\n| Paused | `/goal \u25c7 \u2161 paused: verifying package` |\n| Waiting on user | `/goal \u25c7 ? answer needed: choose release target` |\n| Blocked | `/goal \u25c7 BLOCKED! no progress \u2014 /goal resume` |\n| Budget blocked | `/goal \u25c7 BLOCKED! budget limit reached` |\n| Done | `/goal \u25c7 \u2713 goal complete`, then clears after the completion turn |\n\nColor is decoration only; glyphs and text carry the meaning. In terminals that support ANSI styling, `/goal` is bold and the working clock glyph is yellow.\n\n## Safety rules\n\n| Rule | Behavior |\n|------|----------|\n| Setup first | `/goal <intent>` never activates directly |\n| Explicit approval | `goal_set` requires `confirmed=true`, a matching objective, and a prior `goal_present` call that recorded the contract |\n| User input wins | Pi does not continue over queued or pending user messages |\n| No-work stop | A no-tool autonomous turn blocks with `/goal resume` guidance |\n| Evidence before done | `goal_complete` should be called only after the done criteria are proven |\n| Session-local state | Goal state is stored in Pi session entries, not a separate database |\n\n## Pi package manifest\n\n`package.json` declares the Pi package resources explicitly:\n\n```json\n{\n  \"keywords\": [\"pi-package\", \"pi-extension\", \"pi\", \"goal\", \"goal-mode\", \"autonomous-agent\", \"status-line\", \"agent\"],\n  \"pi\": {\n    \"extensions\": [\"./extensions/goal.ts\"],\n    \"image\": \"https://unpkg.com/@qhn/pi-goal@0.3.0/assets/pi-goal-status.png\"\n  }\n}\n```\n\n## Development\n\n```bash\nnpm install\nnpm test\nnpm run test:ui\nnpm run verify:pi\nnpm run verify:package\nnpm run pack:dry-run\n```\n\n`npm run test:ui` writes terminal-render artifacts under `codex-scripts/goal-ui/`; those artifacts are local test output and are not part of the npm package.\n\n## Package contents\n\n| Path | Purpose |\n|------|---------|\n| `package.json` | npm metadata and Pi package manifest |\n| `assets/pi-goal-status.png` | Pi package gallery preview image |\n| `extensions/goal.ts` | Pi extension entrypoint |\n| `extensions/goal/` | State, prompt, format, debug, and structured message helpers |\n| `index.test.ts` | Regression tests |\n| `messages.test.ts` | Structured message and toolResponse helper tests |\n| `.github/workflows/publish.yml` | Trusted publishing workflow |\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "goal",
+    "goal-mode",
+    "autonomous-agent",
+    "status-line",
+    "agent"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/nqh-packages/pi-goal#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nqh-packages/pi-goal.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/goal.ts"
+    ],
+    "image": "https://unpkg.com/@qhn/pi-goal@0.2.0/assets/pi-goal-status.png"
+  },
+  "time": {
+    "created": "2026-05-02T03:00:18.898Z",
+    "modified": "2026-05-10T19:25:15.951Z",
+    "0.0.1": "2026-05-02T03:00:19.208Z",
+    "0.1.1": "2026-05-02T05:45:05.298Z",
+    "0.2.0": "2026-05-02T09:54:39.658Z",
+    "0.3.0": "2026-05-09T08:43:46.403Z",
+    "0.4.1": "2026-05-10T19:25:15.654Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": null,
+  "download_trend": []
+}

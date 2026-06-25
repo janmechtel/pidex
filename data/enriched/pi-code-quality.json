@@ -1,0 +1,34 @@
+{
+  "name": "pi-code-quality",
+  "latest_version": "0.1.4",
+  "description": "Declarative Pi extension that automatically formats and lints files after write/edit.",
+  "readme": "# pi-code-quality\n\nDeclarative Pi extension that automatically formats and lints files after successful `write` / `edit` tool calls.\n\n## Why\n\n`pi-code-quality` lets users configure formatters and linters with JSON instead of installing a separate Pi plugin for every language.\n\nIt is intentionally separate from [`pi-lsp`](https://www.npmjs.com/package/pi-lsp): formatters/linters are short-lived command-line tools, while LSP servers are long-lived JSON-RPC processes.\n\n## Install\n\n```bash\npi install npm:pi-code-quality\n```\n\nFor local development:\n\n```bash\npi install /absolute/path/to/pi-code-quality\n```\n\n## Configuration\n\nGlobal config, trusted automatically:\n\n```text\n~/.pi/agent/code-quality.json\n```\n\nProject-local config, requires trust:\n\n```text\n.pi/code-quality.json\n```\n\nProject entries override global entries with the same `id`. A project entry with `\"enabled\": false` disables the global entry with that `id`.\n\n## Trust and security\n\nProject-local config can auto-run binaries on your machine. For that reason:\n\n- project-local config content is hashed;\n- unknown hashes prompt for `Trust once`, `Trust always`, or `Reject`;\n- the prompt shows every configured auto-run binary;\n- `Trust always` stores the hash in `~/.pi/agent/trust/code-quality.json`;\n- changing the config changes the hash and asks again;\n- non-interactive mode rejects project-local config by default;\n- commands run as `bin` + `args[]`, never as shell strings.\n\nGlobal config is considered trusted because it is user-owned agent configuration.\n\n## Example config\n\n```json\n{\n  \"version\": 1,\n  \"tools\": [\n    {\n      \"id\": \"go\",\n      \"enabled\": true,\n      \"include\": [\"**/*.go\"],\n      \"exclude\": [\"vendor/**\"],\n      \"rootMarkers\": [\"go.mod\"],\n      \"formatter\": {\n        \"bin\": \"gofmt\",\n        \"args\": [\"-w\", \"{file}\"],\n        \"cwd\": \"{root}\",\n        \"timeoutMs\": 25000\n      },\n      \"linter\": {\n        \"bin\": \"golangci-lint\",\n        \"args\": [\"run\", \"--new-from-rev=HEAD\", \"--timeout=25s\", \"./{relDir}\"],\n        \"cwd\": \"{root}\",\n        \"timeoutMs\": 30000,\n        \"diagnosticExitCodes\": [1]\n      }\n    },\n    {\n      \"id\": \"python\",\n      \"enabled\": true,\n      \"include\": [\"**/*.py\"],\n      \"rootMarkers\": [\"pyproject.toml\", \"ruff.toml\"],\n      \"formatter\": {\n        \"bin\": \"uv\",\n        \"args\": [\"run\", \"ruff\", \"format\", \"{file}\"],\n        \"cwd\": \"{root}\",\n        \"timeoutMs\": 25000\n      },\n      \"linter\": {\n        \"bin\": \"uv\",\n        \"args\": [\"run\", \"ruff\", \"check\", \"{file}\"],\n        \"cwd\": \"{root}\",\n        \"timeoutMs\": 30000,\n        \"diagnosticExitCodes\": [1]\n      }\n    },\n    {\n      \"id\": \"typescript\",\n      \"enabled\": true,\n      \"include\": [\"**/*.ts\", \"**/*.tsx\", \"**/*.js\", \"**/*.jsx\"],\n      \"exclude\": [\"node_modules/**\", \"dist/**\"],\n      \"rootMarkers\": [\"package.json\"],\n      \"formatter\": {\n        \"bin\": \"node_modules/.bin/prettier\",\n        \"args\": [\"--write\", \"{file}\"],\n        \"cwd\": \"{root}\",\n        \"timeoutMs\": 25000\n      },\n      \"linter\": {\n        \"bin\": \"node_modules/.bin/eslint\",\n        \"args\": [\"{file}\"],\n        \"cwd\": \"{root}\",\n        \"timeoutMs\": 30000,\n        \"diagnosticExitCodes\": [1]\n      }\n    }\n  ]\n}\n```\n\n## Behavior\n\nAfter a successful `write` or `edit`:\n\n1. finds tools matching `include` / `exclude`;\n2. finds `{root}` using `rootMarkers`;\n3. skips files above `maxFileSizeBytes`;\n4. runs formatter first;\n5. runs linter second;\n6. appends a compact summary to the original tool result.\n\nLint diagnostic exit codes do **not** make `write` / `edit` fail. Diagnostics are extra context for the model. Summaries that contain issues are also sent as a user-visible, tool-styled diagnostic notice.\n\nNo slash commands are registered.\n\n## Relative paths and placeholders\n\nPath resolution:\n\n1. absolute paths are used as-is;\n2. relative `bin`, `config`, and `cwd` values with `/` are resolved relative to `{root}`;\n3. bare binary names are resolved through `PATH`.\n\nPlaceholders:\n\n- `{workspace}` \u2014 Pi working directory or directory containing project `.pi` config\n- `{root}` \u2014 nearest directory containing one of `rootMarkers`\n- `{file}` \u2014 absolute file path\n- `{relFile}` \u2014 file path relative to `{root}`\n- `{dir}` \u2014 absolute file directory\n- `{relDir}` \u2014 file directory relative to `{root}`\n- `{config}` \u2014 resolved command config path\n- `{configDir}` \u2014 directory containing `{config}`\n\n## Output example\n\n```text\nCode quality:\n\n\u2705 gofmt: formatted internal/service/foo.go\n\u2705 golangci-lint: no issues in internal/service\n```\n\n```text\nCode quality:\n\n\u2705 gofmt: formatted internal/service/foo.go\n\u26a0\ufe0f golangci-lint found issues:\ninternal/service/foo.go:42:13: unchecked error\n```\n\n## Disable a tool\n\n```json\n{\n  \"version\": 1,\n  \"tools\": [{ \"id\": \"go\", \"enabled\": false }]\n}\n```\n\n## Development\n\n```bash\nnpm install\nnpm run verify\nnpm pack --dry-run\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "formatter",
+    "linter",
+    "code-quality"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "extensions/pi-code-quality/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-11T18:27:44.070Z",
+    "modified": "2026-05-11T19:59:34.902Z",
+    "0.1.0": "2026-05-11T18:27:44.218Z",
+    "0.1.1": "2026-05-11T19:00:13.937Z",
+    "0.1.2": "2026-05-11T19:10:14.893Z",
+    "0.1.3": "2026-05-11T19:44:44.177Z",
+    "0.1.4": "2026-05-11T19:59:34.792Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 9,
+  "download_trend": []
+}

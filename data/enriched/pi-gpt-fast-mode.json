@@ -1,0 +1,354 @@
+{
+  "name": "pi-gpt-fast-mode",
+  "latest_version": "0.1.2",
+  "description": "Pi extension to control OpenAI's GPT service tier (priority/flex/default/auto) for GPT-5.4 / GPT-5.5, with subagent hand-off.",
+  "readme": "# pi-gpt-fast-mode\n\nA [pi](https://pi.dev) extension that controls OpenAI's **service tier** for\nGPT-5.4 / GPT-5.5 from inside pi.\n\n![pi-gpt-fast-mode preview](https://raw.githubusercontent.com/devwithpug/pi-gpt-fast-mode/main/assets/preview.png)\n\nUnlike a simple on/off \"fast mode\", this lets you pick the tier:\n\n- **`priority`** \u2014 faster, premium (the classic \"fast mode\")\n- **`flex`** \u2014 cheaper, slower (economy)\n- **`default`** \u2014 standard\n- **`auto`** \u2014 let OpenAI choose\n\nIt shows the active tier in the TUI and hands the preference off to subagents\nautomatically.\n\n> [npm](https://www.npmjs.com/package/pi-gpt-fast-mode) \u00b7\n> [Pi Package Gallery](https://pi.dev/packages/pi-gpt-fast-mode)\n\n## Install\n\n```bash\npi install npm:pi-gpt-fast-mode\n```\n\nOr install from git:\n\n```bash\npi install git:github.com/devwithpug/pi-gpt-fast-mode\n```\n\nTry it for a single run without installing:\n\n```bash\npi -e npm:pi-gpt-fast-mode\n```\n\n## Usage\n\n```text\n/fast            # toggle Fast Mode (uses the selected tier, default: priority)\n/fast on         # enable\n/fast off        # disable\n/fast priority   # select the fast/premium tier and enable\n/fast flex       # select the economy tier and enable\n/fast default    # standard tier and enable\n/fast auto       # let OpenAI choose, and enable\n/fast status     # report current state and tier\n```\n\nStart pi with Fast Mode already requested (priority tier):\n\n```bash\npi --fast\n```\n\n## How it behaves\n\nThe extension separates what you **want** from what is **applied**:\n\n- **desired** \u2014 you asked for Fast Mode (`/fast`, `--fast`, or persisted config)\n- **active** \u2014 desired **and** the current model is supported \u2192 requests get\n  `service_tier: <tier>`\n\nSwitching to an unsupported model temporarily stops the request without losing\nyour preference or your selected tier. Switch back to a GPT-5.4/5.5 model and it\nresumes.\n\n## Subagents\n\nTurn Fast Mode on once in your parent pi session, then launch subagents as\nusual. The preference is exported as the `PI_GPT_FAST_MODE` environment variable\n(`1` / `0`), which child pi processes inherit on startup. A subagent only sends\nthe tier request when it is also on a supported model.\n\n**Parent on an unsupported model is fine.** If your parent session runs a\nnon-GPT model (e.g. Claude) and you only use GPT-5.4/5.5 in subagents, just run\n`/fast` in the parent anyway. The preference is still recorded and handed off \u2014\nthe parent simply won't request a tier for itself, but subagents on GPT-5.4/5.5\nwill. The TUI indicator shows `fast\u21e2` in that \"armed\" state to signal the\npreference is passed downstream.\n\nTo verify, ask a subagent to print `PI_GPT_FAST_MODE`; `1` means the preference\nwas handed off.\n\n## Supported models\n\nBy default:\n\n```json\n[\n  \"openai/gpt-5.4\",\n  \"openai/gpt-5.5\",\n  \"openai-codex/gpt-5.4\",\n  \"openai-codex/gpt-5.5\"\n]\n```\n\nModel keys must match pi's exact `provider/model` key.\n\n## Configuration\n\nConfig files are resolved in this order (first that exists wins):\n\n1. Project: `.pi/extensions/pi-gpt-fast-mode.json`\n2. User: `~/.pi/agent/extensions/pi-gpt-fast-mode/config.json`\n\n```json\n{\n  \"persist\": false,\n  \"desired\": false,\n  \"tier\": \"priority\",\n  \"models\": [\n    \"openai/gpt-5.4\",\n    \"openai/gpt-5.5\",\n    \"openai-codex/gpt-5.4\",\n    \"openai-codex/gpt-5.5\"\n  ],\n  \"indicator\": \"status\"\n}\n```\n\n| Field | Default | Meaning |\n|-------|---------|---------|\n| `persist` | `false` | Remember the on/off choice and tier between pi runs. |\n| `desired` | `false` | Saved preference (only honored when `persist` is `true`). |\n| `tier` | `\"priority\"` | Service tier: `priority`, `flex`, `default`, or `auto`. |\n| `models` | see above | Exact `provider/model` keys allowed to use Fast Mode. |\n| `indicator` | `\"status\"` | TUI feedback: `status`, `widget`, or `off`. |\n\nFast Mode starts **disabled** and **session-only** by default. Set\n`\"persist\": true` to remember your choice between runs.\n\n## How it differs from similar extensions\n\nThe core mechanism \u2014 injecting `service_tier` via `before_provider_request` \u2014 is\nnecessarily the same as other OpenAI fast-mode extensions. This one adds:\n\n- **Multi-tier control** (`priority` / `flex` / `default` / `auto`) instead of a\n  single hardcoded `priority` toggle, so it doubles as an economy (`flex`)\n  switch.\n- A `/fast status` subcommand and a tier-aware TUI indicator.\n\n## Troubleshooting\n\n**I turned Fast Mode on but I don't see the indicator.**\nCheck that your current model is in `models`, and that `indicator` is not `off`.\n\n**My choice isn't remembered after restart.**\nSet `\"persist\": true` in your config.\n\n**Does this guarantee faster responses?**\nNo. It requests a service tier when possible. Actual latency, availability, and\nbilling depend on OpenAI and your account. Not every model/account supports\nevery tier; OpenAI rejects unsupported tiers.\n\n## Development\n\n```bash\nnpm install\nnpm run check   # typecheck + tests\n```\n\n## License\n\nMIT \u00a9 devwithpug\n\nInspired by [pi-openai-fast-mode](https://github.com/johncmunson/pi-openai-fast-mode)\nand [pi-openai-fast](https://github.com/studioarray/pi-openai-fast).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "openai",
+    "gpt-5",
+    "fast-mode",
+    "service-tier",
+    "priority",
+    "flex"
+  ],
+  "author": {
+    "name": "devwithpug"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/devwithpug/pi-gpt-fast-mode#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devwithpug/pi-gpt-fast-mode.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/devwithpug/pi-gpt-fast-mode/main/assets/preview.png"
+  },
+  "time": {
+    "created": "2026-06-23T04:15:44.058Z",
+    "modified": "2026-06-23T04:30:12.829Z",
+    "0.1.0": "2026-06-23T04:15:44.574Z",
+    "0.1.1": "2026-06-23T04:24:20.177Z",
+    "0.1.2": "2026-06-23T04:30:12.732Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 370,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 359
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 11
+    }
+  ]
+}

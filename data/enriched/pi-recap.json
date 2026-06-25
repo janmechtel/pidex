@@ -1,0 +1,50 @@
+{
+  "name": "pi-recap",
+  "latest_version": "0.8.21",
+  "description": "Session recap panel for pi coding agent. Always-visible widget showing the current goal and last few conversation turns with live streaming updates. Auto-selects the fastest, cheapest summarization model using pi-bench benchmark data.",
+  "readme": "# pi-recap\n\n![pi-recap banner](https://fcskjxapefiqdclrvbtw.supabase.co/storage/v1/object/public/assets/pi-packages/pi-recap-banner.jpg)\n\n**Never scroll back to remember what you were doing.**\n\nAn always-visible session recap panel for [pi coding agent](https://github.com/badlogic/pi-mono) showing the current goal and last few conversation turns with live streaming updates.\n\n![pi-recap screenshot](_tmp/screenshot.png)\n\n*Banner and screenshot images created with [pi-banana](https://github.com/fornace/pi-banana).*\n\n## Features\n\n- **Auto-derived session goal** \u2014 the title updates automatically after the first turn using a fast LLM\n- **Turn history** \u2014 last 4 recaps with timestamps, speaker tags (`you` / `pi`), and fade-to-dim for older entries\n- **Live streaming** \u2014 breathing dot while thinking, caret blink during token arrival, 180ms settle animation on completion\n- **Keyboard navigation** \u2014 `Ctrl+Shift+R` to focus, `\u2191\u2193` to scroll older entries, `Esc` to release\n- **Slash commands** \u2014 `/goal` to override the title, `/recap-model` to pick the summarization model, `/recap-blacklist` to manage the model skip-list\n- **Theme-agnostic text colors** \u2014 recap headline and body use hardcoded high-contrast colors that work on any theme (light or dark)\n- **Cheap summarization** \u2014 auto-selects the fastest/cheapest available model (flash/mini/haiku/turbo) to keep costs near zero. Curated chain and blacklist seed are imported from [pi-bench](https://github.com/fornace/pi-bench), the source of truth for bench data.\n\n## Installation\n\nPi auto-discovers extensions from `~/.pi/agent/extensions/`. Clone the repo there:\n\n```bash\ngit clone https://github.com/fornace/pi-recap.git ~/.pi/agent/extensions/pi-recap\ncd ~/.pi/agent/extensions/pi-recap\nnpm install\n```\n\nRestart pi. The recap panel appears above the editor after your first message.\n\n## Usage\n\nThe panel is passive \u2014 it just shows the last few turns. No configuration needed.\n\n| Shortcut | Action |\n|---|---|\n| `Ctrl+Shift+R` | Focus the recap panel |\n| `\u2191` / `\u2193` | Navigate older entries (while focused) |\n| `Esc` | Release focus |\n\n### Slash commands\n\nType `/recap` for the interactive menu. No arguments needed \u2014 everything is selection-based.\n\n| Menu path | Description |\n|---|---|\n| `/recap` \u2192 **goal: ...** | Set/override the session goal (text input) |\n| `/recap` \u2192 **clear goal** | Remove override, return to auto-derivation |\n| `/recap` \u2192 **model: ...** | Pick from available fast models (select list) |\n| `/recap` \u2192 **clear model** | Remove model override |\n| `/recap` \u2192 **blacklist: N entries** \u2192 **view / add / remove / reset / re-seed** | Manage the model skip-list |\n\n## Architecture\n\n```\npi-recap/\n\u251c\u2500\u2500 index.ts           # Extension entry point (hooks, slash commands, state management)\n\u251c\u2500\u2500 state/\n\u2502   \u251c\u2500\u2500 state.ts       # HistoryEntry type, speaker enum\n\u2502   \u251c\u2500\u2500 store.ts       # In-memory state + persistence (session branch entries)\n\u2502   \u251c\u2500\u2500 replay.ts      # Restore state from session entries on restart\n\u2502   \u2514\u2500\u2500 blacklist.ts   # Persistent model skip-list\n\u251c\u2500\u2500 subagent/\n\u2502   \u251c\u2500\u2500 recap.ts       # User & agent recap generation (streams from cheap model)\n\u2502   \u251c\u2500\u2500 goal.ts        # Session goal derivation (streams from cheap model)\n\u2502   \u2514\u2500\u2500 picker.ts      # Model selection chain: override \u2192 cache \u2192 curated \u2192 ctx.model\n\u251c\u2500\u2500 ui/\n\u2502   \u251c\u2500\u2500 status-widget.ts  # TUI component (rendered above editor)\n\u2502   \u2514\u2500\u2500 anim.ts        # Animation primitives (streaming dot, settle sweep, color utilities)\n\u2514\u2500\u2500 util/\n    \u251c\u2500\u2500 date.ts        # Timestamp formatting (\"now\", \"14m\", \"14:30\")\n    \u2514\u2500\u2500 log.ts         # Best-effort debug logging\n```\n\n### Model picker chain\n\nThe summarization model is selected through a 4-layer chain (top wins):\n\n1. **User override** \u2014 set via `/recap-model <id>`\n2. **Cached winner** \u2014 24h TTL from last successful run\n3. **Curated chain** \u2014 fast/cheap models imported from [pi-bench](https://github.com/fornace/pi-bench), ordered by bench rank\n4. **Session model** \u2014 pi's configured model (sacred fallback, never blacklisted)\n\n## Development\n\n```bash\ncd ~/.pi/agent/extensions/pi-recap\nnpm install        # types + typescript\nnpx tsc            # type-check (no emit, jiti loads .ts directly)\n```\n\nPi loads `.ts` files via jiti \u2014 no build step needed during development.\n\n### Testing\n\n```bash\nnpx tsx test-recap.ts            # test recap/goal generation with mock registry\nnpx tsx test-recap-models.ts     # test model picker chain against real registry\n```\n\n## License\n\nMIT\n\n## From the same author\n\nBy [Francesco Frapporti](https://fornace.it) at [Fornace](https://fornace.it).\n\n- **[pi-bench](https://github.com/fornace/pi-bench)** \u2014 LLM benchmark toolkit for pi. Probes every model to find the fastest and cheapest. This extension uses pi-bench data to pick summarization models.\n- **[pi-banana](https://github.com/fornace/pi-banana)** \u2014 Generate and edit images inside pi using Google Nano Banana. The banner and screenshot images above were created with pi-banana.\n- **[pi-alibaba-models](https://github.com/fornace/pi-alibaba-models)** \u2014 Complete Alibaba provider for pi: Qwen, DeepSeek, Kimi, GLM, MiniMax with native thinking levels.\n- **[pi-notte-theme](https://github.com/fornace/pi-notte-theme)** \u2014 Notte: a true-dark pi theme where darkness has color and text glows like terminal phosphor.\n\n## Changelog\n\n### 0.8.16\n\n- Fixed double-render of the recap panel during pi-tui startup. The widget now registers on first user input (`before_agent_start`) instead of `session_start`, preventing the panel from appearing twice when pi first launches.\n- Added raw Enter keypress listener via `onTerminalInput` to bump the decoy row at the earliest possible moment, before pi processes the submit. This gives maximum time for the decoy to clear orphaned border fragments in scrollback. The listener skips when the recap widget has focus and never consumes the keypress.\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "recap",
+    "session-summary",
+    "session-recap",
+    "tui",
+    "tui-widget",
+    "terminal-ui",
+    "summarization",
+    "llm",
+    "model-picker",
+    "fast-model",
+    "cheap-model"
+  ],
+  "author": {
+    "name": "Francesco Frapporti",
+    "email": "effedue@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Fornace/pi-recap#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fornace/pi-recap.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-10T15:59:40.951Z",
+    "modified": "2026-05-11T17:18:55.342Z",
+    "0.8.0": "2026-05-10T15:59:41.106Z",
+    "0.8.1": "2026-05-10T16:20:16.217Z",
+    "0.8.3": "2026-05-10T18:36:47.324Z",
+    "0.8.20": "2026-05-11T15:29:14.761Z",
+    "0.8.21": "2026-05-11T17:18:55.227Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": null,
+  "download_trend": []
+}

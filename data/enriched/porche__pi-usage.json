@@ -1,0 +1,45 @@
+{
+  "name": "@porche/pi-usage",
+  "latest_version": "0.3.5",
+  "description": "Pi Coding Agent extension for tracking session token usage, provider account limits, and historical local consumption.",
+  "readme": "<p align=\"center\">\n  <img src=\"pi-usage-logo.svg\" alt=\"Pi Usage\" width=\"600\" />\n</p>\n<p align=\"center\">\n  <b>A comprehensive usage and quota tracking extension for the Pi Coding Agent.</b>\n</p>\n\n## Overview\n\n`pi-usage` brings a native, Hermes-style `/usage` command to the [Pi Coding Agent](https://pi.dev). \nIt provides complete visibility into your token consumption without spending LLM tokens to query it.\n\nEvery time you run `/usage`, it displays:\n1. **Live Session Token Usage:** The exact tokens (input, output, and context window percentage) spent in your current active session.\n2. **Provider Account Limits:** The real-time remaining quota from your active provider's API (e.g., ChatGPT Plus 5-hour limits, GitHub Copilot monthly quotas, OpenRouter credits).\n3. **Graceful Fallback:** If your active provider (like Google Gemini) does not expose a public quota API, it automatically falls back to local historical usage computed directly from your Pi session files.\n\n## Installation\n\nInstall directly from GitHub into your Pi environment:\n```bash\npi install git:github.com/aporcelli/pi-usage\n```\n\nAfter installation, reload your Pi session:\n```text\n/reload\n```\n\n## Commands\n\n- **/usage**\n  Detects your active provider and displays session token usage and API limits for that provider.\n\n- **/usage limits**\n  Checks account limits for the active provider only.\n\n- **/usage <provider>**\n  Checks account limits for a specific provider.\n  Supported providers: `openai-codex`, `anthropic`, `github-copilot`, `openrouter`.\n\n- **/usage local**\n  Bypasses provider APIs completely and calculates historical token usage (24h, 7d, 30d) directly from your Pi session files.\n\n## How It Works Under the Hood\n\n### 1. Smart Active Provider Inference\nPi extensions run synchronously in the UI. To accurately determine what model you are using (even if you just ran `/model` or resumed a session with `--resume`), the extension uses a robust fallback chain:\n1. Direct API: `ctx.getModel()?.provider`\n2. Context model: `ctx.model?.provider`\n3. Session History: Scans the session branch backwards for the last `model_change` event.\n4. Global Settings: `defaultProvider` from `~/.pi/agent/settings.json`.\n\n### 2. Pi-Native Authentication\nThe extension does not use hardcoded paths. It reads credentials natively from Pi:\n- Checks `~/.pi/agent/auth.json` first (for OAuth tokens generated via Pi's `/login` or saved API keys).\n- Falls back to standard environment variables (e.g., `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `GITHUB_TOKEN`/`GH_TOKEN`).\n- For GitHub Copilot, it also falls back to `gh auth token` automatically when available.\n\n### 3. Portable Timezone Formatting\nReset times (e.g., \"Resets: 15:00 on 12 May\") are automatically localized. You can force a specific timezone by setting an environment variable. Resolution order:\n1. `PI_USAGE_TZ` environment variable (e.g., `export PI_USAGE_TZ=America/Argentina/Buenos_Aires`)\n2. `TZ` environment variable\n3. System runtime timezone (`Intl.DateTimeFormat`)\n4. `UTC` (fallback)\n\n## UI & UX\n\nThe terminal output uses specialized formatting:\n- **Visual Progress Bars:** `[\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591] 60%`\n- **Traffic Light Indicators:** \ud83d\udfe2 (>70% remaining), \ud83d\udfe1 (30-70% remaining), \ud83d\udd34 (<30% remaining).\n- **Absolute Countdowns:** Clearly shows exactly when limits reset `(in 2h 15m)`.\n\n## Troubleshooting\n\n- **\"No limits data\" or \"Unavailable\"**: Ensure you have logged in via `/login` in Pi (for OAuth providers) or that your API keys are exported in your shell.\n- **GitHub Copilot unavailable**: run `gh auth login` (or export `GITHUB_TOKEN`) so `/usage github-copilot` can resolve a valid token fallback.\n- **Wrong Reset Timezone**: Export `PI_USAGE_TZ` in your shell profile.\n- **\"local usage unavailable\"**: Verify that `~/.pi/agent/sessions` exists and contains Pi session `.jsonl` files.\n\n## License\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-coding-agent",
+    "pi",
+    "usage",
+    "codex",
+    "anthropic",
+    "openrouter"
+  ],
+  "author": {
+    "name": "Porche"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/aporcelli/pi-usage#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aporcelli/pi-usage.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-05-11T06:11:28.464Z",
+    "modified": "2026-05-11T22:07:09.569Z",
+    "0.1.0": "2026-05-11T06:11:28.731Z",
+    "0.1.1": "2026-05-11T06:32:13.802Z",
+    "0.1.2": "2026-05-11T06:42:12.240Z",
+    "0.3.0": "2026-05-11T08:09:19.075Z",
+    "0.3.1": "2026-05-11T08:47:07.750Z",
+    "0.3.2": "2026-05-11T08:50:39.186Z",
+    "0.3.3": "2026-05-11T08:55:04.126Z",
+    "0.3.4": "2026-05-11T21:27:53.724Z",
+    "0.3.5": "2026-05-11T22:07:09.444Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": 46,
+  "download_trend": []
+}

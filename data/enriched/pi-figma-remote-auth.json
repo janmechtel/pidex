@@ -1,0 +1,38 @@
+{
+  "name": "pi-figma-remote-auth",
+  "latest_version": "0.1.1",
+  "description": "Pi extension that authenticates and configures Figma Remote MCP for pi-mcp-adapter.",
+  "readme": "# pi-figma-remote-auth\n\nA Pi extension that handles **OAuth authentication and MCP config** for Figma's hosted Remote MCP server (`https://mcp.figma.com/mcp`), so that an existing [`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter) install can expose Figma tools inside Pi.\n\n## What this does\n\nIn short, it does two things:\n\n1. **Writes the MCP server config** (`mcpServers.figma`) into Pi's MCP config file, pointing at Figma's remote endpoint with `auth: \"oauth\"`.\n2. **Runs the OAuth flow** against Figma and saves the resulting tokens in `pi-mcp-adapter`'s auth store, so the adapter can connect without re-prompting.\n\nThe OAuth step uses a workaround for Figma's MCP client allowlist: the dynamic client registration registers as `client_name: \"Codex\"` (which Figma allows), then the credentials are stored in the format `pi-mcp-adapter` expects. Same idea as [`mcp-auth-helper`](https://github.com/sdaoudi/mcp-auth-helper), but writing into the Pi adapter's storage instead of OpenCode's.\n\nThis is **not** the local Figma desktop MCP bridge \u2014 it only configures the remote endpoint.\n\n## Prerequisite\n\nInstall `pi-mcp-adapter` first:\n\n```sh\npi install npm:pi-mcp-adapter\n```\n\nRestart Pi.\n\n## Install this package\n\nFrom npm:\n\n```sh\npi install npm:pi-figma-remote-auth\n```\n\nOr from a local checkout:\n\n```sh\npi install /absolute/path/to/pi-figma-remote-auth\n```\n\nOr for one run, without installing:\n\n```sh\npi -e npm:pi-figma-remote-auth\n```\n\n## Usage\n\nInside Pi:\n\n```text\n/figma-remote-auth setup\n/figma-remote-auth login\n```\n\nDuring `login`, Pi prints the Figma authorization URL. Copy it from the notification and open it in your browser \u2014 the extension does **not** auto-open and Pi's TUI may not render the URL as clickable. After authorizing, restart Pi (or `/mcp reconnect figma`) so `pi-mcp-adapter` reloads MCP config.\n\nUse Figma tools through the adapter proxy:\n\n```ts\nmcp({ search: \"figma\" });\nmcp({ connect: \"figma\" });\nmcp({ tool: \"figma_TOOL_NAME\", args: \"{}\" });\n```\n\n## Commands\n\n```text\n/figma-remote-auth help\n/figma-remote-auth status [--server figma]\n/figma-remote-auth setup  [--global|--project|--shared] [--server figma] [--url https://mcp.figma.com/mcp] [--direct-tools] [--keep-alive]\n/figma-remote-auth login  [--server figma] [--url https://mcp.figma.com/mcp] [--client-name Codex] [--port <port>]\n/figma-remote-auth logout [--server figma]\n```\n\n`setup` and `login` first check that `pi-mcp-adapter` exists. If missing, install it before continuing.\n\nBy default, `login` uses a random free localhost callback port so it does not collide with `pi-mcp-adapter`'s own OAuth callback server. Use `--port` only when you need a fixed callback URL.\n\nConfig targets:\n\n- `--global` (default): writes `~/.pi/agent/mcp.json` or `$PI_CODING_AGENT_DIR/mcp.json`\n- `--project`: writes `.pi/mcp.json`\n- `--shared`: writes `.mcp.json`\n\nToken store (written by `login`, removed by `logout`):\n\n- `$MCP_OAUTH_DIR/figma/tokens.json` when `$MCP_OAUTH_DIR` is set\n- otherwise `~/.pi/agent/mcp-oauth/figma/tokens.json` or `$PI_CODING_AGENT_DIR/mcp-oauth/figma/tokens.json`\n\n## Security\n\nTokens are written with file mode `0600`. Pi packages execute code with local system access; review before installing.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "figma",
+    "mcp",
+    "remote-mcp",
+    "pi-mcp-adapter",
+    "oauth"
+  ],
+  "author": {
+    "name": "DianP"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/DianP/pi-figma-remote-auth#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DianP/pi-figma-remote-auth.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-08T04:06:40.831Z",
+    "modified": "2026-05-08T04:37:30.468Z",
+    "0.1.0": "2026-05-08T04:06:40.988Z",
+    "0.1.1": "2026-05-08T04:37:30.352Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,354 @@
+{
+  "name": "@zenobius/pi-footer",
+  "latest_version": "0.2.0",
+  "description": "A customisable footer component for the Pi Coding Agent interface.",
+  "readme": "# pi-footer\n\nA composable footer for [`pi`](https://pi.dev) with provider-driven data and a compiled pipeline renderer.\n\n\n- Template-based footer rendering with dynamic data from context providers.\n- Context **providers** (data sources) that resolve values from the current state (e.g. model, git, time).\n- Context transforms that reshape provider values (e.g. humanise, colorize).\n- Left/right alignment + flex growth.\n- Built-in providers for model, git, cwd/path, and time.\n- Debug command for inspecting pipeline execution.\n- API to register custom providers and transforms from other extensions.\n\n## Usage\n\n```sh\npi install @zenobius/pi-footer\n```\n\n## Quick start (60 seconds)\n\nCreate `~/.pi/agent/pi-footer.json`:\n\n```json\n{\n  \"$schema\": \"https://raw.githubusercontent.com/zenobi-us/pi-footer/main/config.schema.json\",\n  \"template\": [\n    [\n      \"{path}\",\n      {\n        \"items\": [\"{model_provider}.{model_name}\"],\n        \"align\": \"right\"\n      }\n    ]\n  ]\n}\n```\n\nThen run:\n\n```txt\n/pi-footer reload\n```\n\n## Advanced template example\n\n```json\n{\n  \"$schema\": \"https://raw.githubusercontent.com/zenobi-us/pi-footer/main/config.schema.json\",\n  \"template\": [\n    [\n      \"{model_provider}.{model_name} [{model_context_window}:{model_context_used | humanise_percent | context_used_color}]\",\n      \"{path}\",\n      { \"items\": [\"[{git_worktree_name}:{git_branch_name}]\"], \"align\": \"right\" }\n    ],\n    [\n      {\n        \"items\": [\n          \"ctx:{model_context_used_tokens | humanise_number} in:{usage_tokens_read | humanise_number} out:{usage_tokens_write | humanise_number} $:{usage_cost_usd | round(4)} mode:{model_thinking_mode} plan:{usage_plan}\"\n        ],\n        \"align\": \"right\"\n      }\n    ]\n  ]\n}\n```\n\nRenders:\n\n```txt\nopenai-codex.gpt-4.0 [200k:64%] /mnt/Store/Projects/Mine/Github/pi-footer              [my-worktree:main]\nctx:128,400 in:110,002 out:18,398 $:0.2321 mode:normal plan:pro\n```\n\n## Architecture (provider \u2192 transform \u2192 transform)\n\n> You can skip this section unless you are building custom providers/transforms.\n\nEach `{ ... }` expression in a template is compiled into a pipeline.\n\nExample:\n\n```txt\n{ model_context_used | humanise_percent | context_used_color }\n```\n\nExecution flow:\n\n1. `model_context_used` provider resolves raw value (e.g. `64`)\n2. `humanise_percent` updates text to `\"64%\"`\n3. `context_used_color` applies theme color based on numeric value\n4. Pipeline returns final text\n\nPipelines are parsed once (cached by template string) and executed each render.\n\n---\n\n## Template syntax\n\n### Basic\n\n```txt\n{provider_key}\n```\n\nLiteral sources are also supported:\n\n```txt\n{\"static text\"}\n```\n\n### Value transforms (pipelines)\n\n```txt\n{model_context_used | humanise_percent | context_used_color}\n{\"words\" | fg(\"error\")}\n```\n\n### Args: literal vs context reference\n\n- **Quoted args** are literals:\n  - `fg('accent')` \u2192 literal string `accent`\n- **Unquoted args** are context refs:\n  - `clamp(0, model_context_window)`\n\nIf an unquoted ref key does not exist, it falls back to the raw token string.\n\n---\n\n## Built-in providers\n\n### Core\n\n- `{time}` \u2013 current local time\n- `{cwd}` \u2013 current directory name\n- `{path}` \u2013 full current working directory path\n- `{model_name}` \u2013 active model id\n- `{model_provider}` \u2013 active model provider\n- `{model_context_used}` \u2013 context usage as number `0..100`\n- `{model_context_used_tokens}` \u2013 raw used context tokens\n- `{model_context_window}` \u2013 context window (e.g. `200k`)\n- `{model_thinking_level}` \u2013 current thinking level\n- `{model_thinking_mode}` \u2013 best-effort compatibility alias for thinking mode (`-` when unavailable)\n- `{usage_tokens_read}` \u2013 latest assistant read tokens (`input + cacheRead`)\n- `{usage_tokens_write}` \u2013 latest assistant write tokens (`output + cacheWrite`)\n- `{usage_cost_usd}` \u2013 cumulative branch/session assistant cost in USD\n- `{usage_plan}` \u2013 best-effort account plan/tier from runtime metadata (`-` when unavailable)\n\n### Git\n\n- `{git_branch_name}`\n- `{git_worktree_name}`\n- `{git_status}` (structured object)\n- `{recent_commits}` (structured object)\n\n\n---\n\n## Built-in transforms\n\n- `humanise_time`\n- `humanise_percent` (alias: `humanise_percentage`)\n- `humanise_amount`\n- `humanise_number`\n- `round(n)`\n- `clamp(min,max)`\n- `fg('themeColor')`\n- `bg('themeColor')`\n- `thinking_level_icons('ascii' | 'unicode')`\n- `git_status_icons('ascii' | 'unicode')`\n- `context_used_color` (alias: `model_context_colors`)\n\n`context_used_color` thresholds:\n\n- `< 50` \u2192 success\n- `50..79` \u2192 warning\n- `>= 80` \u2192 error\n\n---\n\n## Template layout config\n\n- A template is an array of rows.\n- Each row can be a string, an array of strings, an array of template objects, or a mix. \n- Template objects support additional layout config (alignment, separator, flex growth).\n- Before rendering, all strings are parsed into template objects (caching by string value) and compiled into pipelines. They align to the left by default.\n\nSet in `services/config/defaults.ts` or override via `Config.template`.\n\n> Note: The built-in default template remains intentionally compact for backwards compatibility; the expanded example below shows how to opt into `path`, token usage, cost, and plan fields.\n\nExample:\n\n`~/.pi/agent/pi-footer.json`\n\n```json\n{\n  \"$schema\": \"https://raw.githubusercontent.com/zenobi-us/pi-footer/main/config.schema.json\",\n  \"template\": [\n    [\n      \"{path}\",\n      {\n        \"items\": [\n          \"{model_provider}.{model_name} [{model_context_window}:{model_context_used | humanise_percent | context_used_color}]\",\n          \"[{git_worktree_name}:{git_branch_name}]\"\n        ],\n        \"align\": \"right\",\n        \"separator\": \" \"\n      }\n    ],\n    [\n      {\n        \"items\": [\n          \"ctx:{model_context_used_tokens | humanise_number}\",\n          \"in:{usage_tokens_read | humanise_number}\",\n          \"out:{usage_tokens_write | humanise_number}\",\n          \"$:{usage_cost_usd | round(4)}\",\n          \"mode:{model_thinking_mode}\",\n          \"plan:{usage_plan}\"\n        ],\n        \"align\": \"right\"\n      }\n    ]\n  ]\n}\n```\n\nSupported object item fields:\n\n- `items: (string | FooterTemplateObjectItem)[]`\n- `separator?: string`\n- `align?: 'left' | 'right'`\n- `flexGrow?: boolean`\n\n---\n\n## JSON Schema\n\nThe config schema is published as a JSON Schema document at:\n\n- `https://raw.githubusercontent.com/zenobi-us/pi-footer/main/config.schema.json`\n\nYou can also use the normalized/internal shape schema at:\n\n- `https://raw.githubusercontent.com/zenobi-us/pi-footer/main/resolved-config.schema.json`\n\nSchemas are generated from `src/services/config/schema.ts` via:\n\n```bash\nmise run generate-schema\n```\n\n---\n\n## Extension API usage\n\nProviding more context values and transforms is a common use case for other extensions. \n\nFor example: \n\n- a project management extension might want to provide current task/issue info from the active branch or project directory.\n- a cost-tracking extension might want to provide more detailed cost breakdowns or projections based on current usage patterns.\n- a system monitoring extension might want to provide resource usage stats or alerts.\n- a subagent extension might want to track how many subagents are currently active and provide that as context.\n\n```ts\nimport { Footer } from '@zenobius/pi-footer';\n\nexport default function yourCustomPiValuesExtension(): void {\n  // Add provider\n  Footer.registerContextValue('custom_value', ({ ctx }) => ctx.cwd.length);\n\n  // Add pipeline transform\n  Footer.registerContextTransform('custom_format', (state) => {\n    if (state.source !== 'custom_value') return state;\n\n    const value = `len=${state.value}`;\n\n    return {\n      ...state,\n      value,\n      text: value,\n    };\n  });\n}\n```\n\n---\n\n## Commands\n\n- `/pi-footer` \u2013 show command help\n- `/pi-footer providers` \u2013 show a scrollable list of registered context providers\n- `/pi-footer debug {expr}` \u2013 inspect template pipeline execution for an expression\n- `/pi-footer reload` \u2013 reload `~/.pi/agent/pi-footer.json` and rerender footer\n- `/pi-footer <subcommand> [args]` \u2013 run extension-registered subcommands (e.g. `quota`)\n\nExample:\n\n```txt\n/pi-footer debug {model_context_used | humanise_percent | context_used_color}\n/pi-footer quota\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "footer"
+  ],
+  "author": {
+    "name": "Zenobius Jiricek",
+    "email": "airtonix@users.noreply.github.com"
+  },
+  "license": null,
+  "homepage": "https://github.com/zenobi-us/pi-footer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zenobi-us/pi-footer.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/pi-footer.js",
+      "./extensions/pi-footer-subscription.js"
+    ]
+  },
+  "time": {
+    "created": "2026-02-11T07:23:10.444Z",
+    "modified": "2026-02-14T13:58:09.830Z",
+    "0.0.1": "2026-02-11T07:23:10.767Z",
+    "0.0.2-next.1": "2026-02-12T04:39:28.471Z",
+    "0.1.0-next.1": "2026-02-13T00:50:30.728Z",
+    "0.1.1": "2026-02-13T01:24:52.209Z",
+    "0.1.1-next.1": "2026-02-13T01:47:18.481Z",
+    "0.2.0": "2026-02-14T13:58:09.517Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 5,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 517
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 25
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 27
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 2
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 29
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

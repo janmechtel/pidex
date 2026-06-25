@@ -1,0 +1,37 @@
+{
+  "name": "@mohndoe/pi-atlas",
+  "latest_version": "0.1.3",
+  "description": "See your agent usage and cost directly in Pi \u2014 costs, languages, models, projects, and tools from session logs.",
+  "readme": "# @mohndoe/pi-atlas\n\n<p align=\"center\">\n  <strong>See your AI usage and cost directly in Pi.</strong>\n</p>\n<p align=\"center\">\n  <a href=\"https://www.npmjs.com/package/@mohndoe/pi-atlas\"><img src=\"https://img.shields.io/npm/v/@mohndoe/pi-atlas\" alt=\"Version\"></a>\n  <img src=\"https://img.shields.io/badge/coverage-97%25-green\" alt=\"Coverage\">\n  <img src=\"https://img.shields.io/badge/TypeScript-3178C6?style=flat&colorA=222222&logo=typescript&logoColor=white\" alt=\"TypeScript\">\n  <img src=\"https://img.shields.io/badge/runtime-Bun-f472b6?style=flat&colorA=222222\" alt=\"Bun\">\n  <a href=\"https://github.com/mohndoe/pi-atlas/blob/main/LICENSE\"><img src=\"https://img.shields.io/github/license/mohndoe/pi-atlas?style=flat&colorA=222222&colorB=58A6FF\" alt=\"License\"></a>\n</p>\n\nA [pi](https://pi.dev) extension that turns your session logs into an interactive dashboard \u2014 costs, languages, models, projects, tools, and token usage at a glance.\n\n<p align=\"center\">\n <img alt=\"pi-atlas screenshot\" src=\"./media/screenshot.png\" />\n</p>\n\n---\n\n## Features\n\n- **Multiple time ranges** \u2014 Today, Last 7 days, Last 30 days, or All time\n- **Cost tracking** \u2014 per-model, per-project, based on real usage costs\n- **Language breakdown** \u2014 lines written and edited\n- **Model analytics** \u2014 provider-aware model cost, call count, works with local LLMs too\n- **Project attribution** \u2014 cost and session count per project directory\n- **Usage overview** \u2014 tool call frequency and token breakdown (input, output, cache read/write)\n- **Cache** \u2014 SHA-256-gated persists day aggregates; near-instant open on next visits\n- **Zero dependencies** \u2014 uses only the pi TUI and the [`@mohndoe/pi-tui-extras`](https://github.com/MohnDoe/pi-tui-extras) component library\n\n## Dashboard\n\n### Tabs\n\n- **Overview** \u2014 Cards displaying total cost, sessions count, messages count, active days, average cost per day, total tokens. A bar chart displaying cost overtime. And top language, top model, and top project side by side.\n- **Languages** \u2014 Languages ranked by line written.\n- **Models** \u2014 Models ranked by cost. Shows providers, calls and cost per model.\n- **Projects** \u2014 Projects ranked by cost. Shows session count and cost per project.\n- **Usage** \u2014 Token breakdown (Total, Input, Output, Cache Read, Cache Write) and table of tool usage.\n\nAll tabs displayed data correspond to the selected time range (press `r` to change it). Press left/right arrows to change tabs.\n\n## Install\n\n```bash\npi install npm:@mohndoe/pi-atlas\n```\n\nThen run `/reload` in pi (or restart pi). The `/atlas` command is now available.\n\n## Usage\n\nIn the pi terminal, type `/atlas` to open the atlas dashboard. Session data is loaded from `~/.pi/agent/sessions/` -- on first load this may take a moment while JSONL files are parsed. Subsequent opens use a cached snapshot and load instantly.\n\n## How it works\n\n```\n~/.pi/agent/sessions/*.jsonl\n         \u2502\n         \u25bc parseFile()        \u25c4\u2500\u2500 entry types handled\n  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n  \u2502  DayAgg[]         \u2502   per calendar day\n  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n           \u2502\n           \u25bc summarize(days, range)\n  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n  \u2502 StatsSummary \u00d7 4  \u2502   1d, 7d, 30d, All pre-computed\n  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n           \u2502\n           \u25bc\n  Tab receives StatsSummary  \u2500\u2500\u2192  Component render\n```\n\n**Data sources** \u2014 pi stores every session as a `.jsonl` file in `~/.pi/agent/sessions/`. Pi Atlas parses entry types: session headers, user messages, assistant messages, tool results, model changes, thinking level changes, compactions, and branch summaries.\n\n**Caching** \u2014 On first open, the sessions directory is scanned and all JSONL files are parsed into `DayAgg` objects. This aggregate is cached to disk alongside a SHA-256 signature of the directory (file paths, sizes, modification times). On subsequent opens, the cache is reused if the signature matches, making the dashboard appear instantly.\n\n**Language detection** \u2014 Lines are counted by splitting written/edited content on `\\n`. File extensions map to language names via a built-in mapping of 70+ extensions (TypeScript, Python, Rust, Go, etc.).\n\n**Cost attribution** \u2014 Assistant message costs are attributed to all active projects in the session. See [ADR-0001](./docs/adr/0001-global-session-project-map.md) for details.\n\n## Development\n\n```bash\n# Setup\ngit clone https://github.com/MohnDoe/pi-atlas.git\ncd pi-atlas\nbun install\n\n# Type check\nbun run typecheck\n\n# Test\nbun test\n\n# Coverage\nbun test --coverage\n```\n\n### Architecture decisions\n\nSee [docs/adr/](./docs/adr/) for recorded decisions:\n\n- [ADR-0001: Global session-project map](./docs/adr/0001-global-session-project-map.md) \u2014 cost attribution model\n- [ADR-0002: Pre-computed summaries](./docs/adr/0002-precomputed-summaries.md) \u2014 all four time ranges computed at open\n\nA higher-level [ARCHITECTURE.md](./docs/ARCHITECTURE.md) covers module structure and component hierarchy.\n\n## Data privacy\n\nPi Atlas reads session logs from `~/.pi/agent/sessions/`. All processing is done locally - no data ever leaves your machine. The cache file is written to `~/.pi/pi-atlas-cache.json` and contains aggregated statistics (costs and counts), not message content.\n\n## License\n\n[MIT](./LICENSE)\n",
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "pi-package"
+  ],
+  "author": {
+    "name": "Kevin P.",
+    "email": "@mohndoe"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/MohnDoe/pi-atlas#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MohnDoe/pi-atlas.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "image": "https://github.com/mohndoe/pi-atlas/raw/main/media/screenshot.png"
+  },
+  "time": {
+    "created": "2026-06-22T14:47:55.874Z",
+    "modified": "2026-06-24T13:08:57.575Z",
+    "0.1.1": "2026-06-22T14:47:56.116Z",
+    "0.1.2": "2026-06-22T15:11:55.922Z",
+    "0.1.3": "2026-06-24T13:08:57.485Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 366,
+  "download_trend": []
+}

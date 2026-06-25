@@ -1,0 +1,40 @@
+{
+  "name": "@eliemessiecode/pi-mcp",
+  "latest_version": "1.2.2",
+  "description": "Connect MCP (Model Context Protocol) HTTP servers to Pi agent. Auto-discover and use MCP tools.",
+  "readme": "# pi-mcp\r\n\r\n> Pi extension for connecting MCP (Model Context Protocol) HTTP servers\r\n\r\n[![npm version](https://badge.fury.io/js/%40eliemessiecode%2Fpi-mcp.svg)](https://www.npmjs.com/package/@eliemessiecode/pi-mcp)\r\n[![Downloads](https://img.shields.io/npm/dm/@eliemessiecode/pi-mcp.svg)](https://www.npmjs.com/package/@eliemessiecode/pi-mcp)\r\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)\r\n\r\n## Features\r\n\r\n- Connect to MCP servers via HTTP/SSE or Streamable HTTP\r\n- Auto-discover tools available on servers\r\n- Register MCP tools as native Pi tools\r\n- Manage connections via slash commands\r\n- Persistent configuration across sessions\r\n- Global and per-project server configurations\r\n\r\n## Installation\r\n\r\n### Via npm (recommended)\r\n```bash\r\nnpm install -g @eliemessiecode/pi-mcp\r\n```\r\n\r\n### Via bun\r\n```bash\r\nbun install -g @eliemessiecode/pi-mcp\r\n```\r\n\r\n### Via Pi\r\n```bash\r\npi install npm:@eliemessiecode/pi-mcp\r\n```\r\n\r\n### Via Git\r\n```bash\r\npi install git:github.com/ElieMessieCode/pi-mcp\r\n```\r\n\r\n### Manual\r\nCopy the `pi-mcp` folder to:\r\n- `~/.pi/agent/extensions/pi-mcp/` (global - all projects)\r\n- `.pi/extensions/pi-mcp/` (project-local)\r\n\r\n## Usage\r\n\r\n### Commands\r\n\r\n| Command | Description |\r\n|---------|-------------|\r\n| `/mcp add <name> <url> [options]` | Add server (options: `--global`, `--project`, `--insecure`, `--timeout`) |\r\n| `/mcp remove <name>` | Remove a server |\r\n| `/mcp list` | List configured servers (grouped by scope) |\r\n| `/mcp connect [name]` | Connect to server(s) - all if no name |\r\n| `/mcp disconnect [name]` | Disconnect from server(s) - all if no name |\r\n| `/mcp tools [name]` | List available tools |\r\n| `/mcp resources [name]` | List available resources |\r\n| `/mcp prompts [name]` | List available prompts |\r\n| `/mcp status` | Show connection status |\r\n| `/mcp refresh [name]` | Refresh tool list |\r\n| `/mcp scopes` | Show config file paths |\r\n| `/mcp move <name> --global\\|--project` | Move server between scopes |\r\n| `/mcp export [file]` | Export servers to JSON |\r\n| `/mcp import <file>` | Import servers from JSON |\r\n| `/mcp-status` | Quick status overview |\r\n| `/mcp-logs` | View debug logs |\r\n| `/mcp-logs clear` | Clear debug logs |\r\n\r\n### Examples\r\n\r\nAdd an MCP server (global):\r\n```\r\n/mcp add my-server https://my-mcp-server.com/mcp\r\n```\r\n\r\nAdd a server for current project only:\r\n```\r\n/mcp add unity http://localhost:53559 --project\r\n```\r\n\r\nAdd server with authentication:\r\n```\r\n/mcp add github https://api.github.com/mcp Authorization=Bearer ghp_xxx\r\n```\r\n\r\nConnect to all servers:\r\n```\r\n/mcp connect\r\n```\r\n\r\nUse an MCP tool (auto-registered):\r\n```\r\nTools are automatically registered with the prefix: mcp_<server-name>_<tool-name>\r\n```\r\n\r\n## Supported Protocols\r\n\r\n- **Streamable HTTP** (recommended): JSON-RPC with SSE support\r\n- **SSE**: Server-Sent Events for notifications\r\n- **Simple HTTP**: Request-response JSON-RPC\r\n\r\n## Supported Data Types\r\n\r\nMCP tools are automatically converted to Pi tools with:\r\n- JSON Schema to TypeBox parameter conversion\r\n- Supported types: `string`, `number`, `integer`, `boolean`, `array`, `object`\r\n- Automatic description and documentation\r\n\r\n## Configuration Scopes\r\n\r\n| Scope | Path | Usage |\r\n|-------|------|-------|\r\n| Global | `~/.pi/agent/mcp/servers.json` | Shared across all projects |\r\n| Project | `.pi/mcp/servers.json` | Specific to current project |\r\n\r\nServers auto-connect on Pi startup.\r\n\r\n## Project Structure\r\n\r\n```\r\npi-mcp/\r\n\u251c\u2500\u2500 index.ts           # Main extension\r\n\u251c\u2500\u2500 package.json       # Package metadata\r\n\u251c\u2500\u2500 README.md          # This documentation\r\n\u251c\u2500\u2500 LICENSE            # MIT license\r\n\u251c\u2500\u2500 CHANGELOG.md       # Version history\r\n\u2514\u2500\u2500 CONTRIBUTING.md    # Contribution guidelines\r\n```\r\n\r\n## Compatible MCP Server Example\r\n\r\n```typescript\r\nimport { McpServer } from \"@modelcontextprotocol/sdk/server/mcp.js\";\r\n\r\nconst server = new McpServer({\r\n  name: \"example-server\",\r\n  version: \"1.0.0\",\r\n});\r\n\r\nserver.tool(\"get_weather\", \r\n  { city: { type: \"string\", description: \"City name\" } },\r\n  async ({ city }) => ({\r\n    content: [{ type: \"text\", text: `Weather in ${city}: Sunny, 22C` }]\r\n  })\r\n);\r\n\r\nserver.start(3000);\r\n```\r\n\r\n## Troubleshooting\r\n\r\n**Connection failed:**\r\n- Verify the URL is accessible\r\n- Check authentication headers\r\n- Use `/mcp status` to see errors\r\n\r\n**Tools not detected:**\r\n- Use `/mcp refresh <name>` to refresh\r\n- Verify the server implements `tools/list`\r\n- Check Docker logs if using Docker: `docker logs <container-name>`\r\n\r\n**Request timeout:**\r\n- Default timeout: 30 seconds\r\n- Check network latency\r\n\r\n**Pi shows 0 tools:**\r\n- Ensure Unity Editor is running (for Unity MCP)\r\n- Check the MCP plugin is connected in Unity\r\n- View logs: `/mcp-logs`\r\n\r\n## Roadmap\r\n\r\n### High Priority\r\n- [x] Auto-reconnect when server drops\r\n- [x] Periodic health check for server connections\r\n- [x] Tool cleanup when server disconnects\r\n\r\n### Medium Priority\r\n- [x] MCP Resources support (`/mcp resources`)\r\n- [x] MCP Prompts support (`/mcp prompts`)\r\n- [x] TLS/SSL skip option (`--insecure`)\r\n- [x] Configurable timeout per server (`--timeout <ms>`)\r\n- [x] Move server between scopes (`/mcp move <name> --global|--project`)\r\n- [x] Export/Import server configuration\r\n\r\n### Low Priority\r\n- [ ] Server groups (`/mcp group add <name> <server1> <server2>`)\r\n- [ ] Tool filters (`/mcp add x --filter=\"assets-*\"`)\r\n- [ ] Connection history\r\n- [ ] Usage metrics\r\n- [ ] Custom tool templates\r\n\r\n### Known Bugs\r\n- [ ] Handle special characters in URLs\r\n- [ ] More explicit timeout error messages\r\n- [ ] Support Basic authentication\r\n\r\n## Contributing\r\n\r\nContributions are welcome!\r\n\r\n1. Fork the repo\r\n2. Create a branch (`git checkout -b feature/amazing-feature`)\r\n3. Commit changes (`git commit -m 'Add amazing feature'`)\r\n4. Push (`git push origin feature/amazing-feature`)\r\n5. Open a Pull Request\r\n\r\n## License\r\n\r\nMIT - see [LICENSE](LICENSE) for details\r\n\r\n---\r\n\r\n## What's New in v1.2.0\r\n\r\n- Auto-reconnect when server drops (up to 3 attempts)\r\n- Periodic health check for server connections (30s interval)\r\n- Automatic tool cleanup when server disconnects\r\n- MCP Resources support\r\n- MCP Prompts support\r\n- TLS/SSL skip option (`--insecure`)\r\n- Configurable timeout per server (`--timeout <ms>`)\r\n- Move server between scopes (`/mcp move`)\r\n- Export/Import server configuration\r\n\r\n---\r\n\r\n**Repository:** [github.com/ElieMessieCode/pi-mcp](https://github.com/ElieMessieCode/pi-mcp)\r\n",
+  "keywords": [
+    "pi-package",
+    "mcp",
+    "model-context-protocol",
+    "extension",
+    "ai-agent",
+    "tools"
+  ],
+  "author": {
+    "name": "ElieMessieCode"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ElieMessieCode/pi-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ElieMessieCode/pi-mcp.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-15T15:40:25.712Z",
+    "modified": "2026-03-15T17:10:57.757Z",
+    "1.0.0": "2026-03-15T15:40:26.028Z",
+    "1.0.1": "2026-03-15T15:43:29.377Z",
+    "1.2.0": "2026-03-15T15:52:28.206Z",
+    "1.2.1": "2026-03-15T16:34:57.111Z",
+    "1.2.2": "2026-03-15T17:10:57.641Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 24,
+  "download_trend": []
+}

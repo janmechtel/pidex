@@ -1,0 +1,49 @@
+{
+  "name": "pi-opa",
+  "latest_version": "1.0.3",
+  "description": "Enterprise-grade Open Policy Agent (OPA) integration for pi coding agent - comprehensive authorization, authentication, and policy enforcement",
+  "readme": "# pi-opa\n\nEnterprise-grade Open Policy Agent (OPA) integration for pi coding agent. Provides comprehensive authorization, authentication, and policy enforcement for multi-agent systems.\n\n## Overview\n\npi-opa brings enterprise-class authorization to pi using the industry-standard Open Policy Agent (OPA). It enables:\n\n- **Policy-as-Code** - Define authorization rules in Rego language\n- **Multi-dimensional Access Control** - WHO, WHAT, WHEN, WHERE, WHY\n- **Audit Logging** - Complete decision trail for compliance\n- **A2A Integration** - Secure multi-agent authorization\n- **Dynamic Policy Updates** - Hot-reload without restarting\n\n## Prerequisites\n\n- pi coding agent >= 1.0.0\n- Node.js >= 18.0.0\n- OPA binary installed (`opa`) - [Install OPA](https://www.openpolicyagent.org/docs/latest/#running-opa)\n\n## Installation\n\n```bash\n# Via npm (recommended)\npi install npm:pi-opa\n\n# Via git\npi install git:github.com/DrOlu/pi-opa\n```\n\n## Quick Start\n\n### 1. Start OPA Server\n\n```bash\n/opa-start\n# OPA server started on localhost:8181\n```\n\n### 2. Create a Policy\n\n```bash\n/opa-template my_policy\n# Created: ~/.pi/agent/opa/policies/my_policy.rego\n```\n\n### 3. Edit the Policy\n\nEdit the generated policy file to add your rules.\n\n### 4. Test Authorization\n\n```bash\n/opa-check ci-bot deploy production\n# \u2705 ALLOWED\n# Agent: ci-bot\n# Action: deploy\n# Resource: production\n# Reason: Agent has high trust level and is within business hours\n```\n\n## Features\n\n### Authorization Commands\n\n| Command | Description |\n|---------|-------------|\n| `/opa-check` | Check authorization for an action |\n| `/opa-start` | Start OPA server |\n| `/opa-stop` | Stop OPA server |\n| `/opa-status` | Show OPA status |\n\n### Policy Management\n\n| Command | Description |\n|---------|-------------|\n| `/opa-load` | Load policies from directory |\n| `/opa-test` | Test policies |\n| `/opa-validate` | Validate policy syntax |\n| `/opa-template` | Create policy template |\n\n### Audit & Logging\n\n| Command | Description |\n|---------|-------------|\n| `/opa-audit` | Show authorization audit log |\n| `/opa-export-audit` | Export audit log (json/csv) |\n\n### Configuration\n\n| Command | Description |\n|---------|-------------|\n| `/opa-config` | Configure settings |\n| `/opa-help` | Show help |\n\n## Policy Language (Rego)\n\nPolicies are written in OPA's Rego language:\n\n```rego\npackage pi.authz\n\n# Default deny\ndefault allow := false\n\n# Allow trusted agents to read non-sensitive resources\nallow if {\n    input.agent.trust_level == \"high\"\n    input.action.category == \"read\"\n    input.resource.classification != \"secret\"\n}\n\n# Deny destructive actions after hours\ndeny contains violation if {\n    input.action.category == \"delete\"\n    not is_business_hours\n    violation := {\n        \"policy\": \"business_hours\",\n        \"rule\": \"no_destructive_after_hours\",\n        \"message\": \"Destructive actions not allowed outside 9-5\"\n    }\n}\n\nis_business_hours if {\n    time.now_ns >= time.parse_rfc3339_ns(\"2026-01-01T09:00:00Z\")\n    time.now_ns <= time.parse_rfc3339_ns(\"2026-01-01T17:00:00Z\")\n}\n```\n\n## Multi-Dimensional Access Control\n\nOPA can evaluate multiple factors:\n\n- **WHO** - Agent identity, roles, trust level\n- **WHAT** - Action type, sensitivity\n- **WHERE** - Network zone, IP address, VPN status\n- **WHEN** - Time of day, business hours\n- **WHY** - Purpose, ticket ID, approval chain\n\n## A2A Integration\n\npi-opa integrates with `pi-a2a-communication` for agent-to-agent authorization:\n\n```bash\n# Enable A2A authorization\n/opa-config integration.a2aEnabled true\n/opa-config integration.requireOPAForA2A true\n\n# Now all A2A requests go through OPA\n/a2a-send some-agent \"do something\"\n# \u2192 OPA evaluates authorization first\n```\n\n## Tools\n\n### opa_evaluate\n\nEvaluate authorization programmatically:\n\n```json\n{\n  \"tool\": \"opa_evaluate\",\n  \"params\": {\n    \"agent\": \"ci-bot\",\n    \"action\": \"deploy\",\n    \"resource\": \"production\",\n    \"context\": {\n      \"time\": \"14:00\",\n      \"emergency\": false\n    }\n  }\n}\n```\n\n### opa_check_policy\n\nValidate policy syntax:\n\n```json\n{\n  \"tool\": \"opa_check_policy\",\n  \"params\": {\n    \"policy_file\": \"./my_policy.rego\"\n  }\n}\n```\n\n## Configuration\n\nDefault configuration location: `~/.pi/agent/opa/config.json`\n\n```json\n{\n  \"opa\": {\n    \"binaryPath\": \"opa\",\n    \"serverPort\": 8181,\n    \"serverHost\": \"localhost\",\n    \"autoStart\": true,\n    \"logLevel\": \"info\"\n  },\n  \"policies\": {\n    \"directory\": \"~/.pi/agent/opa/policies\",\n    \"defaultPackage\": \"pi.authz\",\n    \"autoReload\": true,\n    \"testOnLoad\": true\n  },\n  \"authorization\": {\n    \"defaultDecision\": \"deny\",\n    \"cacheDecisions\": true,\n    \"cacheTTL\": 300000,\n    \"requireAuthentication\": true\n  },\n  \"audit\": {\n    \"enabled\": true,\n    \"logDirectory\": \"~/.pi/agent/opa/audit\",\n    \"retentionDays\": 90,\n    \"logSuccessful\": true,\n    \"logFailed\": true\n  }\n}\n```\n\n## Enterprise Features\n\n### Audit Logging\n\nAll authorization decisions are logged with:\n- Timestamp\n- Agent identity\n- Action and resource\n- Decision (allow/deny)\n- Policy violations\n- Duration\n- Context\n\nExport to JSON or CSV for compliance reporting.\n\n### Policy Testing\n\nWrite tests for your policies:\n\n```rego\npackage pi.authz_test\n\nimport data.pi.authz\n\ntest_allow_trusted_read if {\n    authz.allow with input as {\n        \"agent\": {\"trust_level\": \"high\"},\n        \"action\": {\"category\": \"read\"},\n        \"resource\": {\"classification\": \"internal\"}\n    }\n}\n```\n\n### Decision Caching\n\nFrequently evaluated decisions are cached for performance (configurable TTL).\n\n### Hot Reload\n\nUpdate policies without restarting - changes take effect immediately.\n\n## Examples\n\n### Example 1: Time-Based Access\n\n```rego\n# No destructive operations after 6 PM\ndeny contains violation if {\n    input.action.category == \"delete\"\n    time.now_ns > time.parse_rfc3339_ns(\"${TODAY}T18:00:00Z\")\n    violation := {\n        \"policy\": \"time_based\",\n        \"message\": \"Destructive ops only allowed 9-6\"\n    }\n}\n```\n\n### Example 2: Need-to-Know\n\n```rego\n# Customer data only for assigned agents\nallow if {\n    input.resource.type == \"customer_data\"\n    input.agent.id == input.resource.assigned_agent\n}\n```\n\n### Example 3: Emergency Override\n\n```rego\n# Emergency break-glass\nallow if {\n    input.context.emergency == true\n    input.context.incident_id != \"\"\n    input.agent.on_call == true\n}\n```\n\n## Integration with OPA Ecosystem\n\npi-opa works with:\n- **OPA CLI** - Local policy testing\n- **OPA Server** - Production deployment\n- **OPA Bundles** - Distributed policy updates\n- **OPA Discovery** - Dynamic configuration\n- **Styra DAS** - Managed OPA service\n\n## Documentation\n\n- [OPA Documentation](https://www.openpolicyagent.org/docs/latest/)\n- [Rego Language Reference](https://www.openpolicyagent.org/docs/latest/policy-reference/)\n- [OPA Policy Testing](https://www.openpolicyagent.org/docs/latest/policy-testing/)\n\n## License\n\nMIT License - See [LICENSE](LICENSE)\n\n## Contributing\n\nContributions welcome! Please ensure:\n1. Code follows TypeScript best practices\n2. All new features include tests\n3. Documentation is updated\n4. Changes are backward compatible\n\n## Support\n\n- GitHub Issues: https://github.com/DrOlu/pi-opa/issues\n- pi Discord: Link on pi.dev\n\n---\n\n**Secure your multi-agent workflows with pi-opa!** \ud83d\udd12\n",
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "pi-package",
+    "opa",
+    "open-policy-agent",
+    "authorization",
+    "authz",
+    "policy",
+    "rego",
+    "enterprise",
+    "security",
+    "access-control",
+    "rbac",
+    "abac",
+    "audit"
+  ],
+  "author": {
+    "name": "pi-extensions",
+    "email": "extensions@pi.dev"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/DrOlu/pi-opa#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DrOlu/pi-opa.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-03-15T11:24:41.642Z",
+    "modified": "2026-03-15T22:01:07.001Z",
+    "1.0.0": "2026-03-15T11:24:41.891Z",
+    "1.0.1": "2026-03-15T21:54:04.445Z",
+    "1.0.2": "2026-03-15T21:55:42.721Z",
+    "1.0.3": "2026-03-15T22:01:06.879Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 11,
+  "download_trend": []
+}

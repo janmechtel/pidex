@@ -1,0 +1,37 @@
+{
+  "name": "pi-simple-voice",
+  "latest_version": "1.0.0",
+  "description": "Streaming, verbatim Kokoro TTS for the Pi agent \u2014 speaks the assistant's output as it streams, no summarization.",
+  "readme": "# pi-simple-voice\n\nGive your Pi agent a voice \u2014 **streaming** and **verbatim**.\n\npi-simple-voice is a text-to-speech package for the [Pi coding agent](https://github.com/earendil-works/pi). It speaks the assistant's output **as it streams**, sentence by sentence, with **no summarization** \u2014 you hear exactly what the agent writes. It runs a local HTTP server powered by [Kokoro ONNX](https://github.com/hexgrad/kokoro) and exposes a `/voice` settings UI.\n\n> **This is a fork of [s1m0n38/pi-voice](https://github.com/s1m0n38/pi-voice)** (MIT). See [What's different](#whats-different-from-upstream) below. Huge thanks to the upstream author \u2014 the Kokoro server, `/voice` TUI, and model management started there.\n\n**How it works:** A small local server loads a single Kokoro ONNX model into memory and exposes a REST API for synthesis. The pi extension talks to it over HTTP \u2014 it never loads the model itself. The extension spawns the server on demand; the server self-exits after an idle timeout (default 15 min) and is re-spawned when next needed, so one model lives in RAM and is shared across all your pi sessions.\n\n## What's different from upstream\n\n| | upstream `pi-voice` | this fork |\n|---|---|---|\n| Speech text | LLM **summarizes** each response | **verbatim** \u2014 speaks what the agent writes |\n| Timing | one utterance at `agent_end` | **streaming**, on sentence boundaries as tokens arrive |\n| Reasoning | \u2014 | thinking/reasoning content is never voiced |\n| Interrupt | `agent_end` (could cut the final sentence) | `turn_start` / `abort` (clean) |\n| `tts` tool | agent can call it | **removed** \u2014 speech is a side-effect of output, not a tool |\n| Server lifetime | started/stopped via CLI | extension-managed; **self-exits when idle**, re-spawned on demand |\n| Runtime | `@mariozechner/*` | `@earendil-works/*` |\n\n## Installation\n\n```bash\npi install npm:pi-simple-voice\n```\n\nThe extension auto-spawns the server and downloads the default `q4` model (~291 MB) the first time speech is enabled. The `pi-simple-voice` CLI is also available for manual control.\n\n> Requires [`bun`](https://bun.sh) on `PATH` \u2014 the extension spawns the server under bun.\n\n## Usage\n\n### `/voice` command\n\nOpen the interactive settings UI inside Pi:\n\n| Setting | Controls | Keys |\n|---------|----------|------|\n| TTS | Enable/disable speech | \u2190 \u2192 |\n| Voice | Speaker voice (with language/gender hints) | \u2190 \u2192 |\n| Speed | Speech rate (0.5\u00d7\u20133.0\u00d7) | \u2190 \u2192 |\n| Model | Quantization dtype | \u2190 \u2192 (loads on close) |\n\nNavigate with **\u2191 \u2193**, change a value with **\u2190 \u2192**, **Enter** plays a sample, **s** saves the current selection as the default, **r** resets, **Esc** closes. Toggle speech quickly with **alt+v**. The `\u266a` status bar shows live download/load progress (e.g. `\u266a \u2193 q4 25%`). The Voice row appears once a model is loaded and its voices are fetched.\n\nSettings persist in `~/.pi/voice/config.json`.\n\n### Configuration\n\n```json\n{\n  \"enabled\": true,\n  \"voice\": \"af_heart\",\n  \"speed\": 1.0,\n  \"host\": \"127.0.0.1\",\n  \"port\": 8181,\n  \"dtype\": \"q4\",\n  \"idleMs\": 900000\n}\n```\n\n`idleMs` is how long the server sits idle before self-exiting (default 15 min). There is no summarization model and no per-event prompt config \u2014 speech is always the assistant's verbatim output.\n\n## CLI Reference\n\n```bash\npi-simple-voice server status                # show server status\npi-simple-voice server start                 # start server, load default model\npi-simple-voice server stop                  # stop server (exits the process)\npi-simple-voice server restart               # restart\npi-simple-voice model list                   # list dtypes + download status\npi-simple-voice model load <dtype>           # load (downloads if needed)\npi-simple-voice model unload                 # unload the active model\npi-simple-voice model download <dtype>       # download without loading\npi-simple-voice model remove <dtype>         # unload (if active) + delete cached files\n```\n\nOptions: `--host <host>` `--port <port>` (defaults `127.0.0.1:8181`).\n\n### Model dtypes\n\n| Dtype | Size | Quality | Notes |\n|-------|------|---------|-------|\n| `q4` | ~291 MB | Good | 4-bit matmul \u2014 recommended default |\n| `q4f16` | ~147 MB | Good | 4-bit matmul + fp16 weights |\n| `q8` | ~88 MB | Great | 8-bit quantized \u2014 best quality/size ratio |\n| `fp16` | ~156 MB | Excellent | Half-precision floats |\n| `fp32` | ~310 MB | Best | Full-precision floats |\n\nOnly one model is loaded at a time. Files are cached at `~/.pi/voice/cache/`.\n\n## API\n\nThe server exposes HTTP endpoints at `http://127.0.0.1:8181`:\n\n| Method | Path | Description |\n|--------|------|-------------|\n| GET | `/health` | Status, active + last dtype, model loaded, download/load progress |\n| GET | `/voices` | Available voice names |\n| GET | `/models` | All dtypes with download status |\n| POST | `/models/download` | Download (+ optionally activate) a dtype |\n| POST | `/models/delete` | Delete cached model files |\n| POST | `/models/activate` | Load a downloaded model |\n| POST | `/models/unload` | Unload model, free memory |\n| POST | `/tts` | Synthesize text \u2192 WAV audio |\n| POST | `/shutdown` | Graceful shutdown |\n\n## Events\n\nThe extension emits `voice:config` on the pi event bus (`pi.events`) whenever a setting changes via `/voice`:\n\n```typescript\npi.events.on(\"voice:config\", ({ enabled, voice, speed }) => {\n  // update status bar, toggle features, etc.\n});\n```\n\n## License\n\nMIT \u2014 same as upstream. Forked from [s1m0n38/pi-voice](https://github.com/s1m0n38/pi-voice).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "tts",
+    "kokoro",
+    "speech-synthesis",
+    "streaming"
+  ],
+  "author": {
+    "name": "grrowl"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/grrowl/pi-simple-voice#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/grrowl/pi-simple-voice.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-13T09:17:06.558Z",
+    "1.0.0": "2026-06-13T09:17:06.793Z",
+    "modified": "2026-06-13T09:17:06.944Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

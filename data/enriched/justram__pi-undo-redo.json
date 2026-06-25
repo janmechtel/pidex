@@ -1,0 +1,39 @@
+{
+  "name": "@justram/pi-undo-redo",
+  "latest_version": "0.2.0",
+  "description": "Buffered undo/redo extension for Pi coding agent",
+  "readme": "# Undo/Redo Extension (pi)\n\nThis extension adds buffered undo/redo support to pi sessions by running tools inside a sandbox and restoring file snapshots when you navigate between conversation branches.\n\n## What it does\n\n- Wraps built-in tools (`read`, `edit`, `write`, `bash`, `grep`, `find`, `ls`) so file operations happen in a sandbox.\n- Tracks file snapshots per conversation leaf and restores them on undo/redo or `/tree` navigation.\n- Adds commands for undo/redo and inspecting buffered diffs.\n- Replaces the input editor with a custom editor that exposes undo/redo shortcuts.\n\n## Requirements\n\n- pi with extension support.\n- Peer dependencies available at runtime:\n  - `@mariozechner/pi-coding-agent`\n  - `@mariozechner/pi-tui`\n- Node dependencies installed for this extension when developing or testing.\n\n## Install\n\n### Install via pi (recommended)\n\n```bash\npi install npm:@justram/pi-undo-redo\n```\n\n### Local development / testing\n\n```bash\ngit clone https://github.com/justram/pi-undo-redo.git\ncd pi-undo-redo\nnpm install\npi -e /absolute/path/to/pi-undo-redo\n```\n\nYou can also load it via auto-discovery:\n- Global: `~/.pi/agent/extensions/undo-redo/`\n- Project: `.pi/extensions/undo-redo/`\n\nOr install the local path as a pi package:\n\n```bash\npi install /absolute/path/to/pi-undo-redo\n```\n\n## Usage\n\nOnce loaded, tools operate in the sandbox automatically. The status bar shows the number of tracked files and total size. File snapshots are saved per conversation leaf and restored when you move around the session tree.\n\n### Commands\n\n- `/undo` \u2014 Navigate to the previous leaf and restore buffered files.\n- `/redo` \u2014 Navigate to the next leaf and restore buffered files.\n- `/diff-stack` \u2014 Inspect buffered diffs per leaf (UI only).\n- `/undo-redo-clear-cache` \u2014 Clear the undo/redo extension cache for the current session (snapshots, diffs, and sandbox) and reset history.\n\n### LLM tool\n\nThe extension exposes a tool named `undo_redo` so the LLM can manage undo/redo and diffs without UI navigation. Actions:\n\n- `undo` \u2014 Move to the previous leaf and restore files.\n- `redo` \u2014 Move to the next leaf and restore files.\n- `list_diffs` \u2014 List buffered diffs across leaves.\n- `diff` \u2014 Show a diff for a specific file and leaf (`path` required, `leafId` optional).\n\n**Tool vs command behavior:** the tool version does not trigger UI navigation and does not rebuild the current turn context. This keeps the current KV cache intact and avoids editor/tree updates. The new leaf is applied on the next user prompt when pi rebuilds context. Use the commands if you want immediate UI navigation and context replay.\n\n### Editor behavior\n\nThe extension keeps the standard pi editor behavior and adds undo/redo shortcuts:\n\n- `ctrl+shift+z`: undo (runs `/undo`)\n- `ctrl+shift+y`: redo (runs `/redo`)\n\nYou can customize these in `~/.pi/agent/keybindings.json` using these keys:\n\n```json\n{\n  \"treeUndo\": \"ctrl+shift+z\",\n  \"treeRedo\": \"ctrl+shift+y\"\n}\n```\n\n## How it works\n\n- A sandbox directory is created under the extension cache root and synced with your working directory (honors `.gitignore` plus a default ignore list).\n- Tool calls operate on sandbox paths. Writes are synced back to the real workspace, and file snapshots are saved per leaf.\n- When you undo/redo or navigate the tree, snapshots are restored to both the sandbox and your real workspace.\n\n## Session behavior\n\n- Each pi session gets its own cache root keyed by session ID.\n- `/resume` reuses the same session ID, so cached snapshots and the sandbox are reused. Undo/redo stacks are reset on load, so undo/redo is unavailable until new changes are recorded.\n- `/fork` creates a new session ID, so the extension re-initializes with a fresh sandbox/cache for the forked session.\n\n## Cache layout\n\nThe extension stores data under:\n\n```\n~/.pi/agent/cache/undo-redo/<session-id>/\n  blobs/           # File content snapshots by hash\n  leaves/          # Per-leaf manifests\n  base.json        # Initial snapshot manifest\n  sandbox/         # Sandbox working copy\n```\n\n## How file tracking works\n\n- The extension maintains a sandbox working copy and a content-addressed blob store.\n- We track files by intercepting pi tools and sandboxed bash calls, then snapshotting the touched paths.\n- Each snapshot stores file contents keyed by hash and a per-leaf manifest mapping relative paths to hashes.\n- On undo/redo or tree navigation, the manifest for the selected leaf is replayed into both the sandbox and the real workspace.\n\n## Development\n\n- Lint and typecheck:\n  ```bash\n  npm run check\n  ```\n- Unit tests:\n  ```bash\n  npm test\n  ```\n\n## Notes and limitations\n\n- Only files under the current working directory are tracked.\n- We only know about changes that flow through pi tools or the sandboxed bash wrapper. Files modified outside of pi are not detected and may be overwritten when restoring a leaf.\n- We assume the working directory is stable for the session. Changing the cwd outside of pi or moving the project root during a session can desync the sandbox.\n- We assume file operations are path-based within the project. Renames/moves are treated as delete + add at the path level.\n- `/diff-stack` requires interactive UI mode.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "undo-redo"
+  ],
+  "author": {
+    "name": "Jheng-Hong Yang"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/justram/pi-undo-redo#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/justram/pi-undo-redo.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-02-04T01:23:55.214Z",
+    "modified": "2026-02-04T03:15:33.423Z",
+    "0.1.0": "2026-02-04T01:23:55.418Z",
+    "0.2.0": "2026-02-04T03:15:33.306Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

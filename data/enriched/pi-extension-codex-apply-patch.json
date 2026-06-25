@@ -1,0 +1,31 @@
+{
+  "name": "pi-extension-codex-apply-patch",
+  "latest_version": "0.1.2",
+  "description": "Pi extension that adds Codex-style CFG constrained apply_patch with local verification",
+  "readme": "# pi-extension-codex-apply-patch\n\nPi extension that adds Codex-style `apply_patch` with:\n\n- **Remote constraint**: sends `apply_patch` as a **custom freeform tool** with Lark grammar to Codex Responses API\n- **Local constraint**: parses and verifies patch format before applying filesystem changes\n- **Model gating**: activates only for `gpt-5.2-codex*` and `gpt-5.3-codex*`\n- **Hard tool policy**:\n  - on codex models, `edit` and `write` are disabled (use `apply_patch`)\n  - `apply_patch` is disabled for non-codex models\n  - warning is shown when switching from codex to non-codex after `apply_patch` has been used in the session\n- **Interrupted-turn recovery**: orphaned custom tool calls are auto-completed with synthetic cancellation outputs so follow-up prompts do not fail with missing `custom_tool_call_output`\n- **Codex prompt parity (patch section)**: injects Codex `## apply_patch` instructions for codex 5.2/5.3 turns\n- **Live patch counters**: shows streaming `+X -Y path` lines while patch args arrive and while hunks/files are applied\n- **Diff UI**: `apply_patch` renders a colored diff using pi's native diff renderer (expand tool output to view full diff)\n\n## Install\n\n```bash\npi install npm:pi-extension-codex-apply-patch\n```\n\nOr for local dev in a project:\n\n```bash\npi install ./\n```\n\n## How it works\n\n1. Registers an `apply_patch` tool in pi\n2. Enforces tool policy:\n   - on codex models, removes/blocks `edit` and `write`\n   - when switching back to non-codex, restores `edit`/`write` if this extension removed them\n   - exposes `apply_patch` only on codex 5.2/5.3 models\n3. Overrides the `openai-codex` provider stream path via `registerProvider(... streamSimple ... )`\n4. When model is codex 5.2/5.3 family, `apply_patch` is sent as:\n   - `type: \"custom\"`\n   - grammar format (`syntax: \"lark\"`)\n5. Parses Codex `custom_tool_call` events and maps them into pi tool calls\n6. Sends tool results back as `custom_tool_call_output`\n\n## Local patch format\n\nExpected patch envelope:\n\n```text\n*** Begin Patch\n*** Add File: hello.txt\n+Hello\n*** End Patch\n```\n\nSupports:\n\n- `*** Add File: <path>`\n- `*** Delete File: <path>`\n- `*** Update File: <path>` (+ optional `*** Move to: <path>`)\n- hunks with `@@` and lines prefixed by ` `, `+`, `-`\n\nPath behavior:\n\n- matches pi `write` semantics for relative/absolute paths\n- relative paths resolve against current working directory\n\n## Development\n\n```bash\npnpm install\npnpm typecheck\npnpm test\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "codex",
+    "apply-patch"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-18T12:40:54.796Z",
+    "modified": "2026-02-18T15:28:59.324Z",
+    "0.1.0": "2026-02-18T12:40:55.717Z",
+    "0.1.1": "2026-02-18T12:50:14.232Z",
+    "0.1.2": "2026-02-18T15:28:59.223Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

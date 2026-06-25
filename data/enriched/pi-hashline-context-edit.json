@@ -1,0 +1,349 @@
+{
+  "name": "pi-hashline-context-edit",
+  "latest_version": "0.11.0",
+  "description": "Hashline read/edit tool override for pi-coding-agent",
+  "readme": "![pi-hashline-context-edit](assets/banner.png)\n\n# pi-hashline-context-edit\n\nA [pi-coding-agent](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) extension that replaces the built-in `read` and `edit` tools with a hash-anchored line-editing workflow.\n\n## Fork notice\n\n`pi-hashline-context-edit` is a fork of `pi-hashline-edit`, itself inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi). This fork keeps the strict hashline editing contract and adds v0.8 changes focused on safer stale-context detection, optional raw reads, and deterministic stale-anchor recovery.\n\nNotable fork changes:\n\n- Contextual FNV-1a hashes: anchors now include line number plus previous/current/next visible line context, so changing one line invalidates nearby stale anchors.\n- Removed `xxhashjs`; hashing is inline and dependency-free.\n- Added `read({ raw: true })` for unanchored inspection/token-saving output.\n- Added normal-read snapshot cache and safe 3-way stale-anchor merge recovery for non-overlapping external file changes.\n- Updated diff previews and edit success anchors to compute hashes against the full post-edit file context.\n- Updated docs, prompts, ADRs, tests, and package metadata for v0.8.\n\nEvery line returned by normal `read` carries a short contextual hash. Edits reference these hashes instead of raw text, so the tool can detect stale context and reject outdated changes before they reach the file.\n\n## Installation\n\n```bash\n# From GitHub\npi install git:github.com/obalado/pi-hashline-context-edit\n\n# From a local checkout\npi install /path/to/pi-hashline-context-edit\n```\n\n## How It Works\n\n### `read` \u2014 tagged line output\n\nText files are returned with a `LINE#HASH:` prefix on every line. Line numbers may be left-padded within each returned block so the `#HASH:` columns align:\n\n```text\n 8#VR:function hello() {\n 9#KT:  console.log(\"world\");\n10#BH:}\n```\n\n- `LINE` \u2014 1-indexed line number.\n- `HASH` \u2014 2-character contextual hash from the alphabet `ZPMQVRWSNKTXJBYH`.\n\nOptional parameters:\n- `offset` \u2014 start reading from this line number (1-indexed).\n- `limit` \u2014 maximum number of lines to return.\n- `raw` \u2014 return raw file lines without `LINE#HASH:` prefixes. Use this for inspection/token saving only; use normal `read` before anchor edits.\n\nImages (JPEG, PNG, GIF, WebP) are passed through as attachments and do not participate in the hashline protocol. Binary and directory paths are rejected with a descriptive error. Empty files return an advisory suggesting `prepend`/`append` instead of a synthetic anchor.\n\n### `edit` \u2014 hash-anchored modifications\n\nEdits use the `LINE#HASH` anchors from `read` output to target lines precisely:\n\n```json\n{\n  \"path\": \"src/main.ts\",\n  \"edits\": [\n    { \"op\": \"replace\", \"pos\": \"11#KT\", \"lines\": [\"  console.log('hashline');\"] }\n  ]\n}\n```\n\n| Op | Purpose | Fields |\n|---|---|---|\n| `replace` | Replace one line (`pos`) or an inclusive range (`pos` + `end`). | `pos` required, `end` optional, `lines` |\n| `append` | Insert lines after `pos`. Omit `pos` to append at EOF. | `pos` optional, `lines` |\n| `prepend` | Insert lines before `pos`. Omit `pos` to prepend at BOF. | `pos` optional, `lines` |\n| `replace_text` | Replace an exact unique substring anywhere in the file. Fails if the text is not found or matches more than once. | `oldText`, `newText` |\n\nAll edits in a single call validate against the same pre-edit snapshot and apply bottom-up, so line numbers stay consistent across operations.\n\n### Chained edits\n\nAfter a successful edit in the default `changed` return mode, the result text includes an `--- Anchors A-B ---` block with fresh `LINE#HASH` references for the changed region. These can be used directly in the next `edit` call on the same file without a full re-read, provided the next edit targets the same or nearby lines. For distant changes, use `read` first.\n\n### Diff preview\n\nThe full diff is stored in `details.diff` for the host UI. The model-visible text stays compact and focuses on fresh anchors, warnings, and retry guidance.\n\n## Design Decisions\n\n- **Stale anchors fail or merge safely.** A hash mismatch means the file has changed since the last `read`. If the last normal `read` snapshot is available and the requested edit does not overlap current file changes, the edit may be merged with warning `[W_MERGED_STALE_ANCHORS]`. Otherwise the error includes fresh `LINE#HASH` retry snippets.\n- **No fallback relocation.** Mismatched anchors are never silently relocated to a \"close enough\" line. Merge recovery composes non-overlapping changes only; conflicts still fail.\n- **Strict patch content.** If `lines` contains `LINE#HASH:` display prefixes or diff `+`/`-` markers, the edit is rejected with `[E_INVALID_PATCH]`. The model must send literal file content; the runtime does not silently strip accidental prefixes.\n- **Native edit normalization.** When a caller sends a top-level `oldText`/`newText` payload (the built-in edit format), the request is normalized into `op: \"replace_text\"` and uses the same strict exact-unique-match semantics as any other `replace_text` edit. Inexact or non-unique matches are rejected; there is no fuzzy legacy fallback or separate compatibility notifier.\n- **Atomic writes.** Files are written via temp-file-then-rename to avoid corruption from interrupted writes. Symlink chains are resolved so the target file is updated without replacing the symlink. Hard-linked files are updated in place to preserve the shared inode. File permissions are preserved across atomic renames.\n- **Per-file mutation queue.** Edits queue by the canonical write target, so concurrent edits through different symlink paths still serialize onto the same underlying file.\n\n## Hashing\n\nHashes use an inline FNV-1a 32-bit hash over line number plus neighboring context:\n\n```text\nlineNumber \\0 previousLine \\0 currentLine \\0 nextLine\n```\n\nThe low byte maps to a 2-character string from the custom alphabet `ZPMQVRWSNKTXJBYH`, which excludes hex digits, common vowels, and visually ambiguous letters (D/G/I/L/O). A reference like `5#MQ` stays compact and unambiguous.\n\nBecause hashes include previous and next visible lines, changing one line also invalidates anchors for its immediate neighbors. This catches common line-shift/stale-context mistakes while keeping anchors short.\n\n## Development\n\nRequires [Node.js](https://nodejs.org) and npm.\n\n```bash\nnpm install\nnpm test\n```\n\nSet `PI_HASHLINE_DEBUG=1` to show an \"active\" notification at session start.\n\n## Credits\n\nThanks to [can1357](https://github.com/can1357) for the original [oh-my-pi](https://github.com/can1357/oh-my-pi) implementation and the hashline concept.\n\n## License\n\n[MIT](LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "coding-agent",
+    "extension",
+    "hashline"
+  ],
+  "author": {
+    "name": "obalado"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/obalado/pi-hashline-context-edit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/obalado/pi-hashline-context-edit.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "./assets/banner.png"
+  },
+  "time": {
+    "created": "2026-06-24T03:17:17.542Z",
+    "0.11.0": "2026-06-24T03:17:17.780Z",
+    "modified": "2026-06-24T03:17:18.040Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 127,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 127
+    }
+  ]
+}

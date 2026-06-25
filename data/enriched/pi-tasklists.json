@@ -1,0 +1,34 @@
+{
+  "name": "pi-tasklists",
+  "latest_version": "0.1.0",
+  "description": "Multi-list task management extension for the Pi coding agent",
+  "readme": "# pi-tasklists\n\nMulti-list task management for the [Pi coding agent](https://github.com/badlogic/pi-mono). Where a single global todo list is limiting, `pi-tasklists` lets you segregate tasks into named contexts \u2014 `work`, `personal`, `project-x` \u2014 and switch between them. It registers a `todo` tool the model can call and `/tasklist`, `/tasklists`, `/todos` commands for you.\n\nState lives in the session (not external files), so it stays correct across branching, reload, and compaction \u2014 the same pattern as the SDK's `examples/extensions/todo.ts`.\n\n## Features\n\n- **Multiple named lists** \u2014 keep separate task lists and switch the active context.\n- **`todo` tool** \u2014 the model manages tasks via `create`, `update`, `list`, `get`, `delete`, `clear`. Pass `listId` to target a specific list, or omit it to use the active one.\n- **Rich task fields** \u2014 `subject`, `description`, `status` (`pending` / `in_progress` / `completed` / `deleted`), `activeForm`, `owner`, `blockedBy`, `metadata`.\n- **Survives reload & compaction** \u2014 tasks are rebuilt from each tool result's `details` snapshot, and the active list is persisted as a session entry. Compaction never loses your lists or which one is active.\n- **Session isolation** \u2014 state is per-session; `/new`, `/resume`, and `/fork` don't leak tasks between sessions.\n- **`PI_TASKLIST_ID`** \u2014 seeds the initial active list (fallback only; a saved `/tasklist` choice always wins on resume).\n\n## Installation\n\nInstall from this repo as a Pi package:\n\n```bash\npi install git:github.com/strugglingcomic/pi-tasklists\n```\n\nOr load a local checkout directly:\n\n```bash\npi -e ./src/index.ts\n```\n\nOr place the package under `~/.pi/agent/extensions/` (global) or `.pi/extensions/` (project-local) for auto-discovery and `/reload` support.\n\n## Usage\n\n### Commands\n\n| Command | Description |\n|---------|-------------|\n| `/tasklist <name>` | Switch the active tasklist (creates it if new). |\n| `/tasklists` | List all tasklists, marking the active one with `*` and showing open-task counts. |\n| `/todos` | Show the active list's tasks, grouped by status. |\n\n### The `todo` tool\n\nThe model calls `todo` with an `action`:\n\n```jsonc\n{ \"action\": \"create\", \"subject\": \"Write the migration\" }\n{ \"action\": \"create\", \"listId\": \"work\", \"subject\": \"Review PR #42\" }\n{ \"action\": \"update\", \"id\": 1, \"status\": \"in_progress\", \"activeForm\": \"Writing the migration\" }\n{ \"action\": \"list\", \"status\": \"pending\" }\n{ \"action\": \"delete\", \"id\": 1 }\n{ \"action\": \"clear\" }\n```\n\nA bare `listId` on a `todo` call targets that list without changing your active context; use `/tasklist` to switch the active list.\n\n### Environment\n\n```bash\nPI_TASKLIST_ID=work pi\n```\n\nStarts with `work` as the active list. This is only a fallback \u2014 once you switch lists with `/tasklist`, that choice is what's restored on resume.\n\n## How state survives compaction\n\nCompaction doesn't delete session entries; it only changes what the LLM sees. On every `session_start` / `session_tree`, the extension rebuilds state from `ctx.sessionManager.getBranch()`:\n\n- Each `todo` tool result carries a `details` snapshot of the **single list it touched** (`listId`, `tasks`, `nextId`). Replaying these per-`listId` (last-write-wins) reconstructs every list and keeps sibling lists independent under branching.\n- `/tasklist` writes a `pi-tasklists:active-list` custom entry via `pi.appendEntry`, so the active list is restored too.\n\nAll state transitions go through a pure reducer \u2014 no in-place mutation.\n\n## Development\n\nRuntime needs no build step: Pi loads the TypeScript directly via [jiti](https://github.com/unjs/jiti). To typecheck:\n\n```bash\nnpm install   # pulls peer deps for type resolution\nnpm run typecheck\n```\n\n### Layout\n\n```\nsrc/\n\u251c\u2500\u2500 index.ts            # Default-export factory; wires events, tool, commands\n\u251c\u2500\u2500 state/\n\u2502   \u251c\u2500\u2500 types.ts        # Task, TaskList, GlobalState, details/entry types\n\u2502   \u251c\u2500\u2500 reducer.ts      # Pure immutable state transitions\n\u2502   \u251c\u2500\u2500 store.ts        # Per-load state holder\n\u2502   \u2514\u2500\u2500 replay.ts       # Rebuild GlobalState from the session branch\n\u251c\u2500\u2500 tool/todo.ts        # `todo` tool (pi.registerTool, TypeBox params)\n\u2514\u2500\u2500 view/commands.ts    # /tasklist, /tasklists, /todos (pi.registerCommand)\n```\n\nSee [spec.md](spec.md) for the full technical specification.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "tasklist",
+    "todo"
+  ],
+  "author": {
+    "name": "strugglingcomic"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/strugglingcomic/pi-tasklists#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/strugglingcomic/pi-tasklists.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-24T04:53:44.223Z",
+    "0.1.0": "2026-05-24T04:53:44.430Z",
+    "modified": "2026-05-24T04:53:44.667Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 7,
+  "download_trend": []
+}

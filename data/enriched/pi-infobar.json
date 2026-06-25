@@ -1,0 +1,39 @@
+{
+  "name": "pi-infobar",
+  "latest_version": "0.3.0",
+  "description": "High-contrast, readable info bar for the Pi coding agent.",
+  "readme": "![pi-infobar banner](./pi-infobar.png)\n\n# pi-infobar - Pi extension\n\nHigh-contrast two-row info bar for the Pi coding agent.\n\nThis extension replaces Pi's default footer with a cleaner info bar layout inspired by a Starship-style prompt. It keeps the most important information visually dominant and avoids low-value activity labels like `status`, `idle`, or `ready`.\n\n## Install\n\n```bash\npi install npm:pi-infobar\n```\n\nTry it without installing permanently:\n\n```bash\npi -e npm:pi-infobar\n```\n\n## Layout\n\n### Line 1 \u2014 navigation + model state\n\n#### Left:\n\n- current working folder, rendered first and styled as the primary segment;\n- linked worktree name with `\udb81\ude45`, when the current folder is a Git worktree;\n- git branch, when available, with Starship-style git status inline (`~` modified blue, `\u2718` untracked red, `+` staged green, `-` deleted red, `\u21e1/\u21e3` ahead/behind).\n\nThe path segment stays as the normal path. Linked worktrees get a separate green worktree segment using the worktree root folder name.\n\n#### Right:\n\n- active model in light blue;\n- thinking level with effort-specific color;\n- context percentage with a stepped color ramp from transparent/green through yellow, orange, and red by 60%.\n\nA subtle separator sits between the two information rows.\n\n### Line 2\n\n#### Left: Codex subscription usage\n\n#### Right: token usage and cost\n\n- `\u2191` tokens sent;\n- `\u2193` tokens received;\n- dark-green `$` estimated cost.\n\n## Commands\n\n```text\n/pi-infobar            toggle the info bar\n/pi-infobar on         enable\n/pi-infobar off        disable\n/pi-infobar toggle     toggle\n/codex-status          show Codex usage and rate-limit windows\n/codex-status --refresh  refresh Codex usage\n/codex-status --no-statusline  show report without updating footer\n/codex-status --clear-statusline  clear Codex usage from footer\n```\n\nYou can start Pi with the info bar disabled:\n\n```bash\nPI_INFOBAR=0 pi\n```\n\n---\n\n## Implementation Details\n\n## Structure\n\n```\npi-infobar/\n\u251c\u2500\u2500 src/\n\u2502   \u251c\u2500\u2500 index.ts          \u2190 Entry point: extension lifecycle only (~80 lines)\n\u2502   \u251c\u2500\u2500 types.ts          \u2190 All shared interfaces & type aliases (~45 lines)\n\u2502   \u251c\u2500\u2500 theme.ts          \u2190 COLOR palette + contextColor/thinkingColor/codexAccent (~75 lines)\n\u2502   \u251c\u2500\u2500 ansi.ts           \u2190 Low-level ANSI helpers: ansi(), stripAnsi(), hexToRgb(), readableTextOn() (~55 lines)\n\u2502   \u251c\u2500\u2500 chips.ts          \u2190 Chip factory + renderChip/renderChips/renderSegmentedChip (~85 lines)\n\u2502   \u251c\u2500\u2500 format.ts         \u2190 Pure data formatters: formatCount, formatCost, shortenModel, etc. (~80 lines)\n\u2502   \u251c\u2500\u2500 git.ts            \u2190 Git snapshot, cache, parsing, status formatting (~175 lines)\n\u2502   \u251c\u2500\u2500 codex-usage/      \u2190 Codex subscription usage queries, reports, cache, and statusline manager\n\u2502   \u2514\u2500\u2500 renderers.ts      \u2190 Footer line renderers: renderPrimaryLine, renderUsageLine, etc. (~140 lines)\n\u251c\u2500\u2500 index.ts              \u2190 Re-export barrel: `export { default } from \"./src/index.js\"` (~1 line)\n\u251c\u2500\u2500 package.json          \u2190 Updated \"files\" list & tsconfig include\n\u2514\u2500\u2500 tsconfig.json         \u2190 Updated include glob\n```\n\n## Code Overview\n\n- The `COLOR` constant object\n- `contextColor()` \u2014 percent \u2192 color mapping\n- `thinkingColor()` \u2014 thinking level \u2192 color mapping\n- `codexAccent()` \u2014 raw status string \u2192 accent color\n- `codexPercentColor()` \u2014 codex percent \u2192 color\n\nLow-level terminal rendering primitives:\n\n- `ansi()` \u2014 apply fg/bg/bold SGR codes\n- `stripAnsi()` \u2014 strip ANSI escape sequences\n- `hexToRgb()` \u2014 hex string \u2192 RGB\n- `rgbCode()` \u2014 RGB \u2192 SGR color code\n- `readableTextOn()` \u2014 pick readable text color for a background\n\nThe chip UI component system:\n\n- `chip()` factory\n- `renderChip()`, `renderChips()`\n- `renderSegmentedChip()`\n\nPure data formatting functions:\n\n- `formatCount()`, `formatCost()`\n- `shortenModel()`, `modelName()`\n- `formatThinking()`\n- `formatWorkingPath()`, `smartPathTruncate()`\n- `shorten()`, `simplifyStatusText()`\n- `formatCodexValue()`, `codexValueSegments()`\n- `getTokenTotals()`\n\nAll git integration, fully self-contained:\n\n- `gitCache`, `GIT_CACHE_TTL_MS`, `GIT_COMMAND_TIMEOUT_MS`\n- `getGitSnapshot()`, `execGit()`, `getLinkedWorktreeName()`\n- `parseGitStatus()`, `parseStatusBranch()`\n- `formatGitStatus()`, `formatGitStatusPart()`, `isDirty()`\n\nFooter line renderers that compose chips, git, and formatting:\n\n- `renderPrimaryLine()`, `renderUsageLine()`, `renderSeparatorLine()`\n- `fitLeftRight()`\n- `renderPathCluster()`, `renderPathChip()`, `renderFittedPathChip()`\n- `renderBranchChip()`, `renderWorktreeChip()`\n- `renderCodexStatus()`\n\nThe main extension entry point \u2014 only lifecycle & event wiring:\n\n- `piInfobar()` default export\n- `installFooter()`, `refresh()`\n- Event handlers: `session_start`, `session_tree`, `session_shutdown`, `model_select`, `agent_end`, `turn_end`, `thinking_level_select`\n- Command handlers: `pi-infobar`, `codex-status`\n\n---\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "status",
+    "footer",
+    "codex",
+    "quota",
+    "limits",
+    "usage",
+    "git-status",
+    "context"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://github.com/inteist/pi-infobar/raw/main/pi-infobar.png"
+  },
+  "time": {
+    "created": "2026-06-06T04:47:41.044Z",
+    "modified": "2026-06-24T16:38:01.711Z",
+    "0.1.1": "2026-06-06T04:47:41.753Z",
+    "0.2.0": "2026-06-06T16:27:22.858Z",
+    "0.3.0": "2026-06-24T16:38:01.167Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

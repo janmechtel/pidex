@@ -1,0 +1,361 @@
+{
+  "name": "pi-use-claude-seo",
+  "latest_version": "1.0.2",
+  "description": "Claude SEO ported to pi runtime. 25 SEO skills, 18 subagents, and 30 Python scripts for comprehensive SEO analysis \u2014 technical audits, content quality (E-E-A-T), schema markup, GEO/AI search, local SEO, backlinks, rank tracking, drift monitoring, and more",
+  "readme": "# pi-use-claude-seo\n\n[Claude SEO](https://github.com/AgriciDaniel/claude-seo) ported to the [pi coding agent](https://pi.dev) runtime.\n\n25 SEO skills, 18 subagents, and 30 Python scripts for comprehensive website SEO analysis.\n\n## What's Included\n\n| Category | Count | Examples |\n|----------|-------|---------|\n| **Skills** | 25 | Technical SEO, Content/E-E-A-T, Schema, GEO/AI Search, Local SEO, Backlinks, Clustering, Drift Monitoring |\n| **Subagents** | 18 | Parallel audit delegation via [pi-subagents](https://www.npmjs.com/package/pi-subagents) |\n| **Python Scripts** | 30 | Google APIs, DataForSEO, Moz, Bing, Common Crawl, PDF reports, drift baselines |\n| **Extensions** | 2 | `/seo` command registration, schema validation hook |\n\n## Install\n\n```bash\npi install npm:pi-use-claude-seo\n```\n\n### Requirements\n\n- Python 3.10+\n- [pi-subagents](https://www.npmjs.com/package/pi-subagents) (recommended for parallel audit delegation)\n\n```bash\n# Install pi-subagents if you don't have it\npi install npm:pi-subagents\n```\n\n### Optional Dependencies\n\n```bash\n# For Google API integration (Search Console, PageSpeed, CrUX, GA4)\npip install google-api-python-client google-auth-oauthlib\n\n# For PDF report generation\npip install weasyprint matplotlib\n\n# For screenshots and visual testing\npip install playwright && python -m playwright install chromium\n\n# For NLP analysis\npip install google-cloud-language\n```\n\n## Quick Start\n\n```bash\n# Start pi\npi\n\n# Full site audit (uses parallel subagents)\n/seo audit https://example.com\n\n# Single page analysis\n/seo page https://example.com/about\n\n# Technical SEO\n/seo technical https://example.com\n\n# Schema markup\n/seo schema https://example.com\n\n# AI search optimization (GEO)\n/seo geo https://example.com\n\n# Local SEO\n/seo local https://example.com\n\n# Backlink profile\n/seo backlinks https://example.com\n\n# Content quality (E-E-A-T)\n/seo content https://example.com\n\n# Strategic planning\n/seo plan saas\n```\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/seo audit <url>` | Full website audit with parallel subagent delegation |\n| `/seo page <url>` | Deep single-page analysis |\n| `/seo technical <url>` | Technical SEO audit (9 categories) |\n| `/seo content <url>` | E-E-A-T and content quality analysis |\n| `/seo content-brief <topic>` | Generate SEO content brief |\n| `/seo schema <url>` | Schema.org detection, validation, generation |\n| `/seo images <url>` | Image optimization audit |\n| `/seo sitemap <url>` | Sitemap analysis or generation |\n| `/seo geo <url>` | AI Overviews / GEO optimization |\n| `/seo plan <type>` | Strategic planning (saas, local, ecommerce, publisher, agency) |\n| `/seo programmatic <url>` | Programmatic SEO analysis |\n| `/seo competitor-pages <url>` | \"X vs Y\" comparison pages |\n| `/seo local <url>` | Local SEO (GBP, NAP, citations, reviews) |\n| `/seo maps <command>` | Maps intelligence (geo-grid, GBP audit) |\n| `/seo hreflang <url>` | International SEO / hreflang audit |\n| `/seo google <command> <url>` | Google APIs (GSC, PageSpeed, CrUX, GA4) |\n| `/seo backlinks <url>` | Backlink profile (Moz, Bing, Common Crawl) |\n| `/seo cluster <keyword>` | SERP-based semantic clustering |\n| `/seo sxo <url>` | Search Experience Optimization |\n| `/seo drift baseline <url>` | Capture SEO baseline |\n| `/seo drift compare <url>` | Compare against baseline |\n| `/seo ecommerce <url>` | E-commerce SEO analysis |\n| `/seo flow <stage> <url>` | FLOW framework prompts |\n\n## How It Works\n\n### Architecture\n\n```\n~/.pi/agent/\n\u251c\u2500\u2500 skills/\n\u2502   \u251c\u2500\u2500 seo/              # Main orchestrator\n\u2502   \u251c\u2500\u2500 seo-audit/        # Full audit with subagent delegation\n\u2502   \u251c\u2500\u2500 seo-technical/    # Technical SEO\n\u2502   \u251c\u2500\u2500 seo-content/      # E-E-A-T analysis\n\u2502   \u2514\u2500\u2500 ... (25 total)\n\u251c\u2500\u2500 agents/               # pi-subagents agent definitions\n\u2502   \u251c\u2500\u2500 seo-technical.md  # package: seo\n\u2502   \u251c\u2500\u2500 seo-content.md\n\u2502   \u2514\u2500\u2500 ... (18 total)\n\u2514\u2500\u2500 extensions/\n    \u251c\u2500\u2500 seo-setup.ts      # /seo command, script path resolution\n    \u2514\u2500\u2500 seo-schema-validator.ts\n```\n\n### Subagent Delegation\n\nFull audits use [pi-subagents](https://www.npmjs.com/package/pi-subagents) to\nrun analysis in parallel. Agents are namespaced under `seo.*`:\n\n```typescript\nsubagent({\n  tasks: [\n    { agent: \"seo.seo-technical\", task: \"Technical audit on https://example.com\" },\n    { agent: \"seo.seo-content\", task: \"Content quality analysis\" },\n    { agent: \"seo.seo-schema\", task: \"Schema validation\" },\n    { agent: \"seo.seo-geo\", task: \"AI search visibility\" }\n  ],\n  concurrency: 4,\n  context: \"fresh\"\n})\n```\n\nWithout pi-subagents installed, the skills still work \u2014 the model reads each\nsub-skill inline and runs the analysis sequentially.\n\n### Script Resolution\n\nThe extension sets `SEO_SCRIPTS_DIR` at session start. When skills reference\n`python scripts/foo.py`, use `python $SEO_SCRIPTS_DIR/foo.py`.\n\n## Google API Setup\n\n> **Rate limit warning:** Without an API key, PageSpeed Insights uses a shared\n> anonymous quota (240 QPM per IP). You'll likely hit rate limits on first use.\n> Create a free API key (takes 2 minutes) to get your own quota bucket.\n\nSee the [auth setup guide](skills/seo-google/references/auth-setup.md) for\nconfiguring Google Search Console, PageSpeed Insights, CrUX, GA4, and Indexing API.\n\n**Quick start (Tier 0 \u2014 free, no billing):**\n\n1. Go to [console.cloud.google.com](https://console.cloud.google.com)\n2. Create a project, enable **PageSpeed Insights API** + **Chrome UX Report API**\n3. Create an API key under Credentials\n4. Save to `~/.config/claude-seo/google-api.json`:\n\n```json\n{\n  \"api_key\": \"AIzaSy...\"\n}\n```\n\n5. Verify: `python $SEO_SCRIPTS_DIR/google_auth.py --check`\n\n**4-tier credential system (all free):**\n\n| Tier | Auth | APIs |\n|------|------|------|\n| 0 | API key | PageSpeed, CrUX, CrUX History |\n| 1 | + Service Account | + GSC, URL Inspection, Indexing |\n| 2 | + GA4 config | + GA4 organic traffic |\n| 3 | + Ads token | + Keyword Planner |\n\n## Attribution\n\nBased on [claude-seo v1.9.9](https://github.com/AgriciDaniel/claude-seo) by\n[AgriciDaniel](https://github.com/AgriciDaniel). MIT License.\n\nCommunity contributors: Lutfiya Miller (seo-cluster), Florian Schmitz (seo-sxo),\nDan Colta (seo-drift), Chris Muller (seo-hreflang), Matej Marjanovic (seo-ecommerce).\n\nPorted to pi runtime by [zzapp](https://github.com/zzapp-uk).\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "seo",
+    "technical-seo",
+    "geo",
+    "ai-search",
+    "e-e-a-t",
+    "schema-markup",
+    "local-seo",
+    "backlinks",
+    "content-quality",
+    "core-web-vitals",
+    "claude-seo"
+  ],
+  "author": {
+    "name": "zzapp",
+    "url": "https://github.com/zzapp-uk"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/zzapp-uk/pi-use-claude-seo#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zzapp-uk/pi-use-claude-seo.git"
+  },
+  "pi": {
+    "skills": [
+      "./skills"
+    ],
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-05-13T14:23:14.516Z",
+    "modified": "2026-05-13T14:43:07.554Z",
+    "1.0.0": "2026-05-13T14:23:14.818Z",
+    "1.0.1": "2026-05-13T14:25:08.710Z",
+    "1.0.2": "2026-05-13T14:43:07.441Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 20,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 68
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 30
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 60
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 49
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 67
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 38
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 4
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@llblab/pi-wakeup",
+  "latest_version": "0.4.0",
+  "description": "Singleton wake-up scheduler extension for pi",
+  "readme": "# pi-wakeup\n\nSingleton wake-up scheduler extension for the pi coding agent.\n\n## Start Here\n\n- [Project Context](./AGENTS.md)\n- [Open Backlog](./BACKLOG.md)\n- [Changelog](./CHANGELOG.md)\n- [Documentation](./docs/README.md)\n\n## Features\n\n- `WAKEUP.md` is the durable schedule\n- `/wakeup-start` selects the active pi instance\n- `/wakeup-stop` explicitly releases the scheduler lock\n- `wakeup` tool: `check`, `schedule`, `done`\n- The `wakeup` tool is active only in the singleton owner session, keeping inactive pi contexts free of schedule prompt guidance\n- Footer status: `wakeup off`, `wakeup on`, or `wakeup [hh:mm:ss]`\n- Fired tasks become `[~]` until closed with `wakeup done` or `wakeup done N`\n- If pending tasks become overdue while another task is `[~]`, the oldest one fires after the current task is closed\n- Wake-up messages and schedule checks include monotonically increasing task indexes\n- Completed tasks are kept while work remains, then `WAKEUP.md` resets to the empty template when all tasks are done\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:@llblab/pi-wakeup\n```\n\nFrom git:\n\n```bash\npi install git:github.com/llblab/pi-wakeup\n```\n\n## Usage\n\n```text\n/wakeup-start\nwakeup schedule \"in 10m | Read one AAA spec section deeply\"\nwakeup check\nwakeup done\n/wakeup-stop\n```\n\n## Scheduling\n\nSchedule with relative time to avoid timezone mistakes:\n\n```text\nwakeup schedule \"in 10m | Review WAKEUP.md\"\nwakeup schedule \"1h30m | Deep work checkpoint\"\nwakeup schedule \"2026-04-28T15:00:00Z | Absolute UTC task\"\n```\n\nSupported duration units: `s`, `m`, `h`, `d`.\n\n## WAKEUP.md\n\nEntries are stored as UTC ISO 8601 timestamps:\n\n```markdown\n# Wakeup Plan\n\n> Flat list of scheduled agent awakenings\n> Format: `N. [status] YYYY-MM-DDTHH:MM:SSZ | action`\n> N: task index, starts from 3\n> Status: ` ` pending, `x` done, `~` in progress\n> Timestamps are stored as UTC ISO 8601\n\n---\n\n0. [x] 2026-04-28T10:00:00Z | Finished task\n1. [~] 2026-04-28T11:00:00Z | Current fired task\n2. [ ] 2026-04-28T12:00:00Z | Future task\n\n---\n```\n\n`WAKEUP.md` keeps human-edited order. `> N: task index, starts from ...` stores the next task index. Use direct file edits for rescheduling or removing tasks.\n\n## Runtime\n\n- `WAKEUP.md` is editable schedule state and stores the next task index in `> N: task index, starts from ...`\n- `locks.json` stores `{ \"@llblab/pi-wakeup\": { \"pid\": ..., \"cwd\": ... } }`\n- Timers are rebuilt from `WAKEUP.md` on startup, tool edits, and manual file changes\n- Only the locked pi process sends `\u23f0 Wakeup`\n- Only the locked pi process keeps the `wakeup` tool active in the agent context\n- `/wakeup-start` can move singleton ownership here when another live pi instance owns the lock\n- `/new` and process restarts resume explicit ownership from the lock when `pid`/`cwd` semantics allow it\n- The footer countdown is updated from cached schedule state, not by rereading `WAKEUP.md` every second\n- No cron, daemon, or external service\n\nArchitecture overview: [`docs/architecture.md`](docs/architecture.md)\nLock standard: [`docs/locks.md`](docs/locks.md)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "wakeup",
+    "scheduler"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/llblab/pi-wakeup",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/llblab/pi-wakeup.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-28T10:37:30.206Z",
+    "modified": "2026-05-06T02:51:25.486Z",
+    "0.1.0": "2026-04-28T10:37:30.408Z",
+    "0.1.1": "2026-04-28T10:43:48.230Z",
+    "0.2.0": "2026-04-29T14:07:17.799Z",
+    "0.2.1": "2026-04-29T14:51:14.062Z",
+    "0.3.0": "2026-05-03T06:19:05.635Z",
+    "0.4.0": "2026-05-06T02:51:25.380Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,344 @@
+{
+  "name": "@rwese/pi-hooks",
+  "latest_version": "0.2.0",
+  "description": "Run user-defined hooks on pi events (input, agent_end)",
+  "readme": "# pi-hooks\n\nRun user-defined hooks on all pi events.\n\n## Features\n\n- **Per-project hooks**: Place hooks in `.pi/pi-hooks/` in your project\n- **Global hooks**: Place hooks in `~/.pi/pi-hooks/` for all projects\n- **All events**: Hook into any pi Extension event\n- **Multiple hooks per event**: Each hook lives in its own directory\n- **User confirmation**: On hook failure, presents options to ignore or abort\n- **Output persistence**: Hook output saved to temp file for reference\n- **Commands**: List and configure hook settings\n- **Execution visibility**: Toggle \"show hook execution\" to see notifications when hooks run\n- **Verbose output**: See what hooks are doing via `console.log/warn/error` output\n\n## Supported Events\n\nEach hook declares which event it listens to via the `event` export.\n\n| Hook | Trigger | Can Block? | Can Modify? | Use Cases |\n|------|---------|------------|------------|-----------|\n| **Agent** |||\n| `before_agent_start` | Before LLM dispatch | \u2705 Yes | \u2705 Transform | Validate, inject context |\n| `agent_start` | Agent starts | \u274c No | Logging, setup |\n| `agent_start` | Agent starts | \u274c No | Logging, setup |\n| `agent_end` | Agent completes | \u274c No | Post-processing, logging |\n| **Turn** |||\n| `turn_start` | Turn begins | \u274c No | Per-turn setup |\n| `turn_end` | Turn ends | \u274c No | Per-turn cleanup |\n| **Message** |||\n| `message_start` | Message starts | \u274c No | Track message flow |\n| `message_update` | Message updates (streaming) | \u274c No | Monitor streaming |\n| `message_end` | Message ends | \u274c No | Track completion |\n| **Context** ||||\n| `context` | Before LLM call | \u274c No | \u2705 Transform | Filter/inject messages |\n| **Tool Execution** |||\n| `tool_execution_start` | Tool starts | \u274c No | Track execution |\n| `tool_execution_update` | Tool progress | \u274c No | Monitor progress |\n| `tool_execution_end` | Tool ends | \u274c No | Track completion |\n| `tool_call` | **Before tool runs** | \u2705 Yes | \u2705 Transform | Block/modify tool arguments |\n| `tool_result` | **After tool completes** | \u274c No | \u2705 Modify | Validate, log, modify output |\n| **Session** |||\n| `session_start` | Session starts | \u274c No | Setup, clear state |\n| `session_shutdown` | Session ends | \u274c No | Cleanup |\n| `session_before_switch` | Before session switch | \u274c No | Warn on dirty state |\n| `session_before_fork` | Before fork | \u274c No | Prepare fork |\n| `session_before_compact` | Before compaction | \u274c No | Customize summary |\n| `session_compact` | After compaction | \u274c No | Post-compact actions |\n| `session_before_tree` | Before tree nav | \u274c No | Prepare navigation |\n| `session_tree` | After tree nav | \u274c No | Post-nav actions |\n| **Model** |||\n| `model_select` | Model changes | \u274c No | Log model changes |\n| **Provider** |||\n| `before_provider_request` | Before API call | \u274c No | Debug payloads |\n| `after_provider_response` | After API response | \u274c No | Debug responses |\n| **Resource** |||\n| `resources_discover` | Resources discovered | \u274c No | Log resources |\n| **User Bash** |||\n| `user_bash` | User runs `!` or `!!` | \u274c No | Intercept commands |\n\n## Installation\n\n```bash\npi install git:https://github.com/rwese/pi-hooks\n```\n\nOr copy the extension to `~/.pi/agent/extensions/pi-hooks/`.\n\n## Creating Hooks\n\n### Location\n\nEach hook lives in its own directory with an `index.ts` file that exports its event type.\n\n**Project-specific:**\n```\nyour-project/\n\u251c\u2500\u2500 .pi/\n\u2502   \u2514\u2500\u2500 pi-hooks/\n\u2502       \u251c\u2500\u2500 my_input_validator/\n\u2502       \u2502   \u2514\u2500\u2500 index.ts\n\u2502       \u251c\u2500\u2500 block_dangerous/\n\u2502       \u2502   \u2514\u2500\u2500 index.ts\n\u2502       \u2514\u2500\u2500 log_changes/\n\u2502           \u2514\u2500\u2500 index.ts\n\u2514\u2500\u2500 ...\n```\n\n**Global:**\n```\n~/.pi/\n\u2514\u2500\u2500 pi-hooks/\n    \u251c\u2500\u2500 my_input_validator/\n    \u2502   \u2514\u2500\u2500 index.ts\n    \u251c\u2500\u2500 block_dangerous/\n    \u2502   \u2514\u2500\u2500 index.ts\n    \u2514\u2500\u2500 log_changes/\n        \u2514\u2500\u2500 index.ts\n```\n\n### Hook Format\n\n```typescript\n// ~/.pi/pi-hooks/log_changes/index.ts\n\n// Declare which event this hook listens to\nexport const event = \"tool_result\" as const;\n\ninterface ToolResultPayload {\n  event: \"tool_result\";\n  toolCallId: string;\n  toolName: string;       // \"edit\", \"write\", \"bash\", etc.\n  input: object;           // Tool arguments\n  content: Content[];     // Tool output\n  details: object;        // Tool-specific details\n  isError: boolean;\n}\n\nexport default function logChangesHook(\n  payload: ToolResultPayload\n): boolean | void {\n  const { toolName, input } = payload;\n\n  // Log file modifications\n  if (toolName === \"edit\" || toolName === \"write\") {\n    const path = input.path as string;\n    console.log(`[HOOK] ${toolName}: ${path}`);\n  }\n\n  return true; // Pass\n  // return false; // Fail\n}\n```\n\n### before_agent_start Hook (Can Block & Transform)\n\n```typescript\n// ~/.pi/pi-hooks/pre_dispatch/index.ts\n\nexport const event = \"before_agent_start\" as const;\n\ninterface BeforeAgentStartPayload {\n  event: \"before_agent_start\";\n  prompt: string;\n  images: Image[];\n  systemPrompt: string;\n}\n\n// Return false to block, or modified payload to transform\nexport default function preDispatchHook(\n  payload: BeforeAgentStartPayload\n): boolean | void | { prompt?: string; images?: Image[]; systemPrompt?: string } {\n  const { prompt } = payload;\n\n  // Auto-correct shorthand commands\n  if (prompt.startsWith(\"test \")) {\n    return {\n      prompt: prompt.replace(/^test /, \"test(unit): \"),\n    };\n  }\n\n  return true; // Pass unchanged\n}\n```\n\n### tool_call Hook (Can Block & Modify)\n\n```typescript\n// ~/.pi/pi-hooks/block_dangerous/index.ts\n\nexport const event = \"tool_call\" as const;\n\ninterface ToolCallPayload {\n  event: \"tool_call\";\n  toolCallId: string;\n  toolName: string;\n  input: object;\n}\n\n// Return modified input to transform tool arguments\nexport default function blockDangerous(\n  payload: ToolCallPayload\n): boolean | void | { input: Record<string, unknown> } {\n  const { toolName, input } = payload;\n\n  // Block dangerous bash commands\n  if (toolName === \"bash\") {\n    const command = (input.command as string) || \"\";\n    if (command.includes(\"rm -rf /\")) {\n      console.error(\"Blocking dangerous command!\");\n      return false; // Block\n    }\n  }\n\n  // Modify tool arguments by returning new input\n  if (toolName === \"bash\") {\n    const command = input.command as string;\n    if (!command.includes(\"--no-preserve-root\")) {\n      // Add safety flag\n      return {\n        passed: true,\n        modified: true,\n        input: {\n          ...input,\n          command: command + \" --no-preserve-root\",\n        },\n      };\n    }\n  }\n\n  return true;\n}\n```\n\n### context Hook (Can Transform Messages)\n\n```typescript\n// ~/.pi/pi-hooks/context_transformer/index.ts\n\nexport const event = \"context\" as const;\n\ninterface Message {\n  role: \"user\" | \"assistant\" | \"system\";\n  content: unknown;\n}\n\ninterface ContextPayload {\n  event: \"context\";\n  messages: Message[];\n}\n\nexport default function contextTransformerHook(\n  payload: ContextPayload\n): boolean | void | { messages: Message[] } {\n  const { messages } = payload;\n\n  // Example: Filter to last N messages\n  const MAX = 20;\n  if (messages.length > MAX) {\n    return {\n      passed: true,\n      modified: true,\n      messages: messages.slice(-MAX),\n    };\n  }\n\n  return true; // Pass unchanged\n}\n```\n\n### tool_result Hook (Can Modify Output)\n\n```typescript\n// ~/.pi/pi-hooks/validate_git/index.ts\n\nexport const event = \"tool_result\" as const;\n\ninterface ToolResultPayload {\n  event: \"tool_result\";\n  toolCallId: string;\n  toolName: string;\n  input: object;\n  content: Content[];\n  details: object;\n  isError: boolean;\n}\n\nexport default function validateGit(\n  payload: ToolResultPayload\n): boolean | void {\n  const { toolName, content } = payload;\n\n  // Validate git operations\n  if (toolName === \"bash\") {\n    const output = content\n      .filter(c => c.type === \"text\")\n      .map(c => c.text)\n      .join(\"\");\n\n    if (output.includes(\"CONFLICT\")) {\n      console.error(\"[HOOK] Git conflict detected!\");\n    }\n  }\n\n  return true;\n}\n```\n\n## Example Hooks\n\nSee the `examples/` directory for complete implementations:\n\n| Example | Event | Description |\n|---------|-------|-------------|\n| `before_agent_start/` | `before_agent_start` | Validates/modifies before LLM dispatch |\n\n| `block_dangerous_commands/` | `tool_call` | Blocks dangerous bash commands |\n| `log_file_modifications/` | `tool_result` | Logs all file modifications |\n| `trim_tool_whitespace/` | `tool_call` | Trims trailing whitespace from input |\n| `dirty_edit_guard/` | `tool_call` | Prevents edits to modified files |\n| `context_transformer/` | `context` | Filters/transforms messages before LLM call |\n| `agent_end/` | `agent_end` | Logs after agent completes |\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/hooks:list` | List available hooks (shows name and event type) |\n| `/hooks:show [on\\|off]` | Toggle hook execution visibility |\n| `/hooks:verbose [on\\|off]` | Toggle verbose hook output |\n| `/hooks:dirty-edit-clear` | Clear tracked file states |\n| `/hooks:disable <event>` | Disable an event type for this session |\n| `/hooks:enable <event>` | Re-enable a disabled event type |\n\n## Hook Return Values\n\n| Return | Meaning |\n|--------|---------|\n| `true` or `undefined` | Hook passed |\n| `false` | Hook failed (blocked for blocking events) |\n| `throw new Error(msg)` | Hook failed with message |\n| `{ prompt?, images?, systemPrompt? }` | For `before_agent_start`: return transformed payload |\n| `{ input: {...} }` | For `tool_call`: return transformed tool arguments |\n| `{ messages: [...] }` | For `context`: return transformed messages |\n| `{ content, details, isError }` | For `tool_result`: return modified result |\n\n## Notes\n\n- Hooks run with access to `node_modules` via `npx tsx`\n- 30-second timeout per hook\n- Hooks are skipped for non-interactive input (RPC, extensions)\n- `tool_call` and `before_agent_start` can block execution\n- Other hooks are informational only (can't block)\n- Use `/hooks:list` to see which hooks are active\n- Multiple hooks can listen to the same event type\n- Project hooks take precedence over global hooks with the same name\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "hooks"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/rwese/pi-hooks#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rwese/pi-hooks.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-04-22T06:11:29.849Z",
+    "0.2.0": "2026-04-22T06:11:30.115Z",
+    "modified": "2026-04-22T06:11:30.423Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 8,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 62
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 7
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

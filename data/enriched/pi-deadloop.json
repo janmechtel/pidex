@@ -1,0 +1,31 @@
+{
+  "name": "pi-deadloop",
+  "latest_version": "0.3.0",
+  "description": "Detect and alert on agentic reasoning loops and tool call repetition in pi-coding-agent",
+  "readme": "# pi-deadloop\n\nDetect and alert on agentic reasoning loops and tool call repetition patterns.\n\n## Installation\n\n```bash\npi install npm:pi-deadloop\n```\n\n## What it detects\n\n### 1. Tool call repetition\nSame sequence of tool calls repeated (e.g., `read(fileA) \u2192 edit(fileA) \u2192 read(fileA) \u2192 edit(fileA)`), indicating the agent is stuck in a loop rather than making progress.\n\n### 2. Reasoning stagnation\nThe agent's thinking content is highly similar across consecutive turns (\u22654 turns, Jaccard similarity \u226585%), suggesting it's circling on the same problem with the same approach.\n\n### 3. File read repetition\nThe same file is read 4+ times across the turn window. Catches the \"I need to read more context\" loop where the agent keeps re-examining the same source file without making changes. Threshold is deliberately set to 4+ to avoid false positives from legitimate research.\n\n### 4. Search expansion spiral\n`grep`/`find` calls with progressively broader or varying patterns on the same topic. Catches the \"let me grep for X\" \u2192 \"let me grep for something similar\" \u2192 \"let me search elsewhere\" spiral.\n\n## Setup\n\nAdd to your `package.json`:\n\n```json\n{\n  \"peerDependencies\": {\n    \"@mariozechner/pi-coding-agent\": \">=0.70.0\"\n  }\n}\n```\n\nRegister the extension:\n\n```ts\nimport piLoopDetectExtension from \"pi-loop-detector\";\n\n// Default config (all 4 detectors enabled, conservative thresholds)\npiLoopDetectExtension(pi);\n\n// Customize: disable noisy detector\npiLoopDetectExtension(pi, {\n  enableSearchSpiralDetection: false, // disable if too noisy\n});\n```\n\n## Behavior\n\nWhen a loop is detected, the extension sends a warning message to the conversation with actionable context, prunes the problematic turns from the sliding window, and suggests a different approach. The agent sees the message and responds accordingly.\n\n## Configuration\n\n| Option | Default | Description |\n|--------|---------|-------------|\n| `windowSize` | `10` | Sliding window of turns to analyze |\n| `reasoningStuckThreshold` | `4` | Consecutive similar-thinking turns before flagging |\n| `reasoningStuckThresholdSimilarity` | `0.85` | Jaccard similarity threshold (0-1) for reasoning stagnation detection |\n| `repeatSequenceMinLength` | `6` | Min tool calls in a repeating pattern (pattern \u00d7 3 reps) |\n| `repeatPatternMinReps` | `3` | Min repetitions of the same tool pattern |\n| `enableReasoningDetection` | `true` | Enable reasoning stagnation detection |\n| `enableToolRepetitionDetection` | `true` | Enable tool call repetition detection |\n| `enableReadRepetitionDetection` | `true` | Enable file read repetition detection (4+ reads) |\n| `enableSearchSpiralDetection` | `true` | Enable search expansion spiral detection |\n\n## Runtime Configuration\n\nModify detection settings mid-session via the `deadloop` command:\n\n```\n/deadloop                              # Show current status and config\n/deadloop windowSize=12                # Increase detection window\n\n/deadloop enableSearchSpiralDetection=false     # Disable a specific detector\n/deadloop windowSize=12 enableReadRepetitionDetection=false  # Multiple options\n```\n\nThis is useful for tuning thresholds without restarting the agent. Changes apply immediately to the current session.\n\n## Debugging\n\nRun `/deadloop` to see the current detection state, window size, and all configuration values. Pass `key=value` pairs to modify settings mid-session (see [Runtime Configuration](#runtime-configuration)).\n\n## Design rationale\n\nThe extension hooks into `turn_end` events, providing the full assistant message including thinking content and tool call details. Four independent detectors run on the sliding window:\n\n1. **Tool repetition** \u2014 builds an ordered sequence of tool calls, looks for repeating subsequences of length 2\u20133, requires \u22653 repetitions\n2. **Reasoning stagnation** \u2014 extracts thinking text, normalizes it (strips paths/code), uses Jaccard similarity with >85% threshold, requires \u22654 consecutive turns\n3. **File read repetition** \u2014 counts `read()` calls per file path, triggers at 4+ reads (high threshold to avoid false positives)\n4. **Search expansion spiral** \u2014 tracks `grep`/`find` calls, detects same-pattern-multi-path (\u22653 paths) or progressively-expanding-patterns\n\nWhen a detector triggers, a message is sent via `pi.sendMessage()` with actionable context.\n\nThe approach is deliberately conservative \u2014 thresholds are set high to avoid false positives from legitimate work patterns (iterative debugging, research, refactoring). All detectors are independently configurable so you can tune or disable them per project needs. Changes apply immediately at runtime via the `deadloop` command.\n",
+  "keywords": [
+    "pi-package",
+    "loop-detection",
+    "agent-stuck",
+    "coding-agent"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-18T16:42:22.121Z",
+    "modified": "2026-05-21T03:33:48.311Z",
+    "0.1.0": "2026-05-18T16:42:22.343Z",
+    "0.2.0": "2026-05-21T02:44:25.685Z",
+    "0.3.0": "2026-05-21T03:33:48.210Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 22,
+  "download_trend": []
+}

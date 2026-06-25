@@ -1,0 +1,42 @@
+{
+  "name": "pi-free-web-search",
+  "latest_version": "0.3.0",
+  "description": "Free, hybrid, browser-aware web search and content extraction package for Pi coding agent",
+  "readme": "# pi-free-web-search\n\n[![CI](https://github.com/Albertobelleiro/pi-free-web-search/actions/workflows/ci.yml/badge.svg)](https://github.com/Albertobelleiro/pi-free-web-search/actions/workflows/ci.yml)\n[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)\n\nFree, browser-aware web search and readable content extraction for [Pi coding agent](https://pi.dev), without paid APIs.\n\n---\n\n## Why this package exists\n\n`pi-web-access` is excellent, but its search path depends on Perplexity/Gemini. `pi-free-web-search` is for teams that want:\n\n- zero paid APIs\n- browser-aware behavior for automation, while defaulting searches to Yahoo and failing over across engines when needed\n- HTTP-first performance with browser fallback only when quality requires it\n- a package that feels native in Pi (tools, commands, status line, TUI rendering)\n\n---\n\n## What it provides\n\n| Capability | Name | Description |\n|---|---|---|\n| Tool | `free_web_search` | Natural-language web search with HTTP-first and browser fallback pipeline |\n| Tool | `free_fetch_content` | Readable content extraction from a URL with browser fallback for JS-heavy pages |\n| Command | `/free-search-info` | Shows detected browser, engine, mode, and executable |\n| Command | `/free-search-test <query>` | End-to-end smoke test from inside Pi |\n| Command | `/free-search-debug <query>` | Runs a real search and shows detailed debug logs/attempt metadata |\n| Command | `/free-search-status` | Shows recent per-engine health, latency, failures, and cooldown state for the current session |\n| Prompt | `/pi-search <topic>` | Short research template that steers the current session/model to use `free_web_search` and `free_fetch_content` |\n| Skill | `free-web-researcher` | Guidance for robust research flow with these tools |\n\n---\n\n## Quick start\n\n### 1) Install dependencies\n\n```bash\nbun install\n```\n\n### 2) Run checks\n\n```bash\nbun run check\nbun run smoke\n```\n\n### 3) Install into Pi\n\n```bash\npi install /absolute/path/to/pi-free-web-search\n```\n\n### 4) Use the prompt shortcut\n\n```text\n/pi-search exact Bun documentation for test reporters\n/pi-search study the Playwright locator docs and explain best practices\n```\n\n---\n\n## How the search pipeline works\n\n1. Detect browser context for automation.\n2. Choose the configured search engine, or Yahoo by default.\n3. Build search URL for the active engine.\n4. Run HTTP search first.\n5. Re-rank and quality-check results.\n6. Escalate to browser automation only if needed and allowed.\n7. Merge/dedupe/rerank final results.\n8. Optionally fetch top-result content with readable extraction.\n\n---\n\n## Supported targets\n\n### Operating systems\n- macOS\n- Linux\n\n### Browsers / families\n- Safari\n- Chrome\n- Brave\n- Edge\n- Chromium\n- Firefox\n- Dia Browser (best-effort via Chromium-family fallback)\n\n### Search engines\n- Google\n- Bing\n- DuckDuckGo\n- Brave Search\n- Yahoo\n- SearXNG (if configured)\n\n---\n\n## Configuration\n\nCreate `~/.pi/free-web-search.json`:\n\n```json\n{\n  \"mode\": \"auto\",\n  \"httpFirst\": true,\n  \"browserFallbackThreshold\": 0.55,\n  \"preferredEngine\": \"yahoo\",\n  \"locale\": \"en-US\",\n  \"language\": \"en\"\n}\n```\n\nProject-local override is also supported:\n\n```text\n.pi/free-web-search.json\n```\n\n### Configuration reference\n\n| Field | Type | Default | Notes |\n|---|---|---|---|\n| `mode` | `auto \\| visible \\| headless \\| ask \\| disabled` | `auto` | Global browser execution policy (`ask` prompts before browser automation in Pi UI) |\n| `preferredBrowser` | browser family | detected | Force browser family |\n| `preferredEngine` | search engine id | `yahoo` | Force search engine |\n| `locale` | string | system locale | Locale/market hint for engines that support it (for example Bing `mkt`) |\n| `language` | string | system language | Language hint for engines that support it (for example Yahoo/Google `hl`) |\n| `searchTemplateUrl` | string | per engine | Custom search URL template |\n| `browserExecutablePath` | string | auto-resolved | Explicit browser executable |\n| `chromiumProfilePath` | string | auto | Chromium-family profile path |\n| `firefoxProfilePath` | string | auto | Firefox profile path |\n| `searxngBaseUrl` | string | unset | Base URL for SearXNG |\n| `httpFirst` | boolean | `true` | Skip HTTP path when false |\n| `browserFallbackThreshold` | number | `0.55` | Quality threshold for fallback |\n| `httpTimeoutMs` | number | `10000` | Timeout for HTTP search/fetch |\n| `browserNavigationTimeoutMs` | number | `12000` | Browser navigation timeout |\n| `browserResultWaitMs` | number | `700` | Additional wait for dynamic result content |\n| `contentMinMarkdownLength` | number | `200` | Minimum extraction size before browser fallback |\n| `includeContentMinScore` | number | `2` | Skip low-relevance search results when `includeContent=true` |\n| `maxContentFetchConcurrency` | number | `2` | Max parallel content fetches when `includeContent=true` |\n| `engineHealthCooldownMs` | number | `600000` | How long session engine failures remain cooled down before retry |\n| `engineFailureThreshold` | number | `2` | Consecutive failures before a session temporarily skips an engine |\n| `userAgent` | string | bundled UA | Override request UA |\n\n---\n\n## Usage examples in Pi\n\n```ts\nfree_web_search({ query: \"Bun runtime documentation\", numResults: 5 })\nfree_web_search({ query: \"React server components caching\", includeContent: true })\nfree_web_search({ query: \"Supabase RLS docs\", domainFilter: [\"supabase.com\"] })\nfree_web_search({ query: \"OpenAI Responses API reference\", engine: \"yahoo\", mode: \"headless\", debug: true })\nfree_fetch_content({ url: \"https://bun.sh/docs\" })\n```\n\nFor manual diagnostics inside Pi:\n\n```text\n/free-search-debug OpenAI Responses API documentation\n```\n\n---\n\n## Development\n\n```bash\nbun install\nbun run typecheck\nbun test\nbun run check\nbun run smoke\n\n# CI-safe smoke mode (no browser automation)\nFREE_WEB_SMOKE_MODE=disabled FREE_WEB_SMOKE_ALLOW_OFFLINE=1 bun run smoke\n```\n\n---\n\n## Open source project health\n\nThis repository includes the standard community health files and templates:\n\n- [`CONTRIBUTING.md`](./CONTRIBUTING.md)\n- [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)\n- [`SECURITY.md`](./SECURITY.md)\n- [`SUPPORT.md`](./SUPPORT.md)\n- [Issue templates](./.github/ISSUE_TEMPLATE)\n- [PR template](./.github/PULL_REQUEST_TEMPLATE.md)\n- [Release configuration](./.github/release.yml)\n- [Changelog](./CHANGELOG.md)\n\n---\n\n## Notes\n\n- v0.x focuses on normal web pages, not YouTube/PDF/GitHub-specialized extraction flows.\n- Browser and engine detection are best-effort and can be overridden in config.\n- Safari automation uses Playwright WebKit instead of directly controlling Safari binaries.\n- The package is authored and tested with Bun.\n\n---\n\n## License\n\nMIT \u2014 see [LICENSE](./LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "web-search",
+    "browser-automation",
+    "research"
+  ],
+  "author": {
+    "name": "Albert Obelleiro"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Albertobelleiro/pi-free-web-search#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Albertobelleiro/pi-free-web-search.git"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/free-web-search/index.ts"
+    ],
+    "skills": [
+      "skills/free-web-researcher"
+    ],
+    "prompts": [
+      "prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-25T03:28:14.328Z",
+    "0.3.0": "2026-03-25T03:28:14.469Z",
+    "modified": "2026-03-25T03:28:14.642Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 25,
+  "download_trend": []
+}

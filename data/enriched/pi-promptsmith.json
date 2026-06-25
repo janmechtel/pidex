@@ -1,0 +1,354 @@
+{
+  "name": "pi-promptsmith",
+  "latest_version": "0.4.0",
+  "description": "Intent-aware prompt rewriter and execution-contract compiler for Pi",
+  "readme": "# pi-promptsmith\n\nPromptsmith is a prompt-rewriting extension for [Pi](https://github.com/earendil-works/pi-mono). It takes the rough draft in your Pi editor and turns it into a clearer, stronger prompt without making you leave the editor.\n\n![Promptsmith demo](./promptsmith.gif)\n\nIt supports two output styles:\n\n- **Plain rewrite** \u2014 tighten and clarify the prompt\n- **Execution contract** \u2014 turn a rough task into a compact, agent-executable spec\n\n## Installation\n\nRun it once in Pi without installing:\n\n```bash\npi -e npm:pi-promptsmith\n```\n\nInstall it as a Pi package:\n\n```bash\npi install npm:pi-promptsmith\n```\n\nOr install directly from git:\n\n```bash\npi install git:github.com/ayagmar/pi-promptsmith\n```\n\n## Quick start\n\nWrite a rough request in the Pi editor, then:\n\n- press `Alt+P` by default (or your custom Promptsmith shortcut), or\n- run `/promptsmith`\n\nPromptsmith rewrites the current draft directly in the editor.\n\nTo undo the last enhancement:\n\n- run `/promptsmith undo`\n\n## How it works\n\nPromptsmith looks at:\n\n- the current editor draft\n- your configured rewrite mode\n- the selected model family / routing rules\n- optional context settings, if enabled\n\nSupported target families:\n\n- `gpt`\n- `claude`\n\n## Rewrite modes\n\nPromptsmith stores its settings globally in `~/.pi/agent/promptsmith-settings.json`.\n\n### `auto` (default)\n\nPromptsmith uses deterministic local heuristics to decide whether the draft should become:\n\n- a **plain rewrite**, or\n- an **execution contract**\n\n`auto` tends to choose **execution-contract** for coding-agent work such as:\n\n- implementing a feature\n- debugging or fixing a bug\n- refactoring\n- reviewing code\n- researching an approach\n- updating docs\n- adding or fixing tests\n\n`auto` tends to choose **plain** for things like:\n\n- explanations\n- brainstorming\n- ideation\n- prose cleanup\n- open-ended chat\n\n### `plain`\n\nAlways produce a stronger prompt without deliberately compiling it into an execution contract.\n\n### `execution-contract`\n\nAlways produce a compact task spec that is easier for a coding agent to execute.\n\n## What execution-contract mode does\n\nExecution-contract rewrites stay compact, but make the task more explicit when useful, including things like:\n\n- goal\n- relevant context\n- constraints\n- files or surfaces to inspect\n- expected change\n- verification steps\n- output expectations\n\nIt is intentionally **not** a giant fixed template. Promptsmith keeps concrete user details such as file paths, commands, APIs, and acceptance criteria, while avoiding made-up requirements.\n\nFamily-aware behavior still applies:\n\n- **GPT-style** rewrites follow OpenAI prompt guidance: outcome-first, compact, explicit about success criteria/constraints/output/stop rules when useful, and light on process scaffolding\n- **Claude-style** rewrites can use stronger structure, including XML-like sections when that genuinely helps\n\n## Examples\n\n### Plain rewrite\n\nDraft:\n\n```text\ncan you rewrite this prompt so it sounds better and asks for a short explanation of how model routing works\n```\n\nTypical result:\n\n```text\nExplain how Promptsmith model routing works. Keep the explanation concise and practical. Focus on how the active model, explicit overrides, and fallback rules determine the final target family.\n```\n\n### Execution contract\n\nDraft:\n\n```text\nadd rewrite mode support for promptsmith and make status show what mode it picks\n```\n\nTypical result:\n\n```text\nGoal\nAdd rewrite mode support to Promptsmith and update status reporting so it shows both the configured mode and the resolved mode for the current editor draft.\n\nConstraints\n- Preserve current preview, undo, timeout, and cancellation behavior.\n- Keep settings persisted globally across Pi sessions.\n- Do not add extra model calls.\n\nWhat to inspect\n- command handling and persisted settings\n- enhancement request shaping\n- status reporting\n- settings UI\n\nVerification\n- update or add tests for mode persistence, command handling, and status output\n- run the relevant project checks\n```\n\n## Commands\n\nMain commands:\n\n- `/promptsmith` \u2014 enhance the current editor draft\n- `/promptsmith undo` \u2014 restore the previous pre-enhancement draft\n- `/promptsmith status` \u2014 show current configuration and runtime state\n- `/promptsmith settings` \u2014 open the interactive settings UI\n- `/promptsmith reset-settings` \u2014 restore saved global defaults\n\n### Interactive settings UX\n\nInside the interactive settings and model pickers:\n\n- lists wrap around at the top and bottom\n- large model lists are paginated to stay compact\n- press `/` to open search in the compact selector\n- `PageUp` / `PageDown` switch pages in paginated selectors\n- the keyboard shortcut row lets you turn the shortcut on or off, remap it, or reset it to `Alt+P`\n- you can toggle auto-send if you want Promptsmith to submit the refined prompt immediately after rewriting\n- if auto-send is on, you can choose whether a busy Pi session gets the refined prompt as a steer message or a follow-up\n- when remapping, press the new key combo directly; `Esc` cancels and `Backspace` resets to default\n\nQuick config:\n\n- `/promptsmith enable`\n- `/promptsmith disable`\n- `/promptsmith family auto|gpt|claude`\n- `/promptsmith mode auto|plain|execution-contract`\n- `/promptsmith enhancer-model active`\n- `/promptsmith enhancer-model fixed <provider>/<id>`\n- `/promptsmith enhancer-model family-linked <gpt-provider>/<gpt-id> <claude-provider>/<claude-id>`\n- `/promptsmith map active <gpt|claude>`\n- `/promptsmith map set <provider>/<id> <gpt|claude>`\n- `/promptsmith map add <pattern> <gpt|claude>`\n- `/promptsmith map remove <pattern>`\n- `/promptsmith conversation on|off`\n- `/promptsmith project-metadata on|off`\n- `/promptsmith status-bar on|off`\n- `/promptsmith strength light|balanced|strong`\n- `/promptsmith preview on|off`\n- `/promptsmith auto-send on|off`\n- `/promptsmith auto-send-when-busy steer|follow-up`\n- `/promptsmith preserve-code on|off`\n- `/promptsmith timeout <seconds>`\n\n## Settings at a glance\n\nPromptsmith saves global settings in:\n\n```text\n~/.pi/agent/promptsmith-settings.json\n```\n\nImportant defaults:\n\n- keyboard shortcut = `Alt+P`\n- rewrite mode = `auto`\n- rewrite strength = `balanced`\n- status bar = `off`\n- recent conversation = `off`\n- project metadata = `off`\n- preview before replace = `false`\n- auto-send refined prompt = `false`\n- auto-send while busy = `steer`\n- preserve code blocks = `true`\n- enhancement timeout = `45s`\n\n## What context Promptsmith uses\n\nBy default, Promptsmith is fairly lightweight. It always uses:\n\n- the current editor draft\n- the chosen rewrite mode\n- target-family routing\n- local intent detection\n\nOptional context:\n\n- **Recent conversation** \u2014 recent chat history from the current session branch\n- **Project metadata** \u2014 current working directory and git branch, if available\n\nIt does **not** automatically read your repository files, `AGENTS.md`, or README by default.\n\n## Status\n\nThere are two ways to see status:\n\n- optional footer status bar\n- `/promptsmith status`\n\n`/promptsmith status` reports things like:\n\n- whether the footer status bar is enabled\n- configured rewrite mode\n- resolved target family\n- timeout\n- current draft intent and effective rewrite mode, when the editor is readable\n- the last enhancement outcome, enhancer model, and whether a format-retry was needed\n- the last enhancement failure detail when a model breaks the sentinel contract\n\nOutside interactive editor mode, draft-aware status degrades gracefully.\n\n## Routing\n\nTarget-family routing order:\n\n1. forced family mode when not `auto`\n2. exact model overrides\n3. pattern overrides\n4. built-in defaults\n5. fallback family\n\nBuilt-in defaults include:\n\n- OpenAI GPT / o-series \u2192 `gpt`\n- Anthropic Claude \u2192 `claude`\n- Moonshot / Kimi-style identifiers \u2192 `claude`\n\nEnhancer model execution is configured separately:\n\n- `active`\n- `fixed`\n- `family-linked`\n\n## Safety guarantees\n\nPromptsmith keeps a few important guarantees:\n\n- the editor is not mutated on failure\n- the editor is not mutated on cancellation\n- hung requests time out instead of spinning forever\n- preview mode lets you review before replace\n- only one enhancement runs at a time\n- output must contain exactly one sentinel block\n- invalid model-output failures say whether the model missed the sentinel, emitted multiple blocks, added extra text, or returned an empty block\n- GPT enhancer calls request concise text output where the Pi/OpenAI provider supports verbosity controls\n- a bad first model response is retried once with a stricter format reminder before Promptsmith fails closed\n- single collapsed Pi paste markers can be recovered from the clipboard; multi-marker drafts fail closed\n- oversized drafts fail clearly instead of being truncated silently\n- intent detection is local and deterministic; it does not use a second model call\n\n## Runtime support\n\n- **Interactive TUI:** full support\n- **RPC:** status and non-editor settings commands work, but in-place enhancement is blocked because Pi RPC cannot read the current editor buffer\n- **print/json:** editor-dependent actions are unsupported\n\n## Development\n\n```bash\ngit clone https://github.com/ayagmar/pi-promptsmith.git\ncd pi-promptsmith\npnpm install\npnpm run check\n```\n\nLoad the local extension in Pi:\n\n```bash\npi -e ./src/index.ts\n```\n\nMaintainer release notes live in [`docs/releasing.md`](./docs/releasing.md).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "prompt-enhancer",
+    "prompt-engineering",
+    "coding-agent",
+    "promptsmith",
+    "ai"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/ayagmar/pi-promptsmith#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ayagmar/pi-promptsmith.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/ayagmar/pi-promptsmith/main/promptsmith.gif"
+  },
+  "time": {
+    "created": "2026-03-12T17:24:01.126Z",
+    "modified": "2026-05-12T16:04:50.003Z",
+    "0.2.0": "2026-03-12T17:24:01.290Z",
+    "0.2.1": "2026-03-12T17:31:53.823Z",
+    "0.3.0": "2026-03-21T02:47:31.429Z",
+    "0.3.1": "2026-03-27T21:20:36.250Z",
+    "0.3.2": "2026-05-11T10:55:13.969Z",
+    "0.4.0": "2026-05-12T16:04:49.898Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 30,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 199
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 176
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 182
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 45
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 33
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 57
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 339
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 113
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 41
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 42
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 102
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 80
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 31
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

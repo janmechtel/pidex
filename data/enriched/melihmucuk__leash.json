@@ -1,0 +1,369 @@
+{
+  "name": "@melihmucuk/leash",
+  "latest_version": "1.0.11",
+  "description": "Security guardrails for AI coding agents",
+  "readme": "# Leash \ud83d\udd12\n\n[![npm version](https://img.shields.io/npm/v/@melihmucuk/leash.svg)](https://www.npmjs.com/package/@melihmucuk/leash)\n\n**Security guardrails for AI coding agents.** Sandboxes file system access, blocks dangerous commands outside project directory, prevents destructive git operations, catches agent hallucinations before they cause damage.\n\n## Why Leash?\n\nAI agents can hallucinate dangerous commands. Leash sandboxes them:\n\n- Blocks `rm`, `mv`, `cp`, `chmod` outside working directory\n- Protects sensitive files (`.env`, `.git`) even inside project\n- Blocks `git reset --hard`, `push --force`, `clean -f`\n- Resolves symlinks to prevent directory escapes\n- Analyzes command chains (`&&`, `||`, `;`, `|`)\n\n![Claude Code](assets/claude-code.png)\n\n## Example horror stories\n\n<img height=\"400\" alt=\"image\" src=\"https://github.com/user-attachments/assets/db503024-94ca-4443-b80e-b63fbc740367\" />\n\n<img height=\"400\" alt=\"image\" src=\"https://github.com/user-attachments/assets/94f0a4e5-db6c-4b14-bddd-b8984c51ed3d\" />\n\nLinks:\n\n1. [Claude CLI deleted my entire home directory (Dec 8th 2025)](https://www.reddit.com/r/ClaudeAI/comments/1pgxckk/claude_cli_deleted_my_entire_home_directory_wiped/)\n2. [Google Antigravity just deleted my drive (Nov 27th 2025)](https://www.reddit.com/r/google_antigravity/comments/1p82or6/google_antigravity_just_deleted_the_contents_of/)\n\n## Quick Start\n\n**All platforms except Pi:**\n\n```bash\n# Install leash globally\nnpm install -g @melihmucuk/leash\n\n# Setup leash for your platform\nleash --setup <platform>\n\n# Remove leash from a platform\nleash --remove <platform>\n\n# Update leash anytime\nleash --update\n```\n\n| Platform      | Command                     |\n| ------------- | --------------------------- |\n| OpenCode      | `leash --setup opencode`    |\n| Claude Code   | `leash --setup claude-code` |\n| Factory Droid | `leash --setup factory`     |\n\n**Pi Coding Agent:**\n\n```bash\npi install npm:@melihmucuk/leash\n```\n\nRestart your agent. Done!\n\n<details>\n<summary><b>Manual Setup</b></summary>\n\nIf you prefer manual configuration, use `leash --path <platform>` to get the path and add it to your config file.\n\n**Pi Coding Agent** - [docs](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md)\n\nAdd to `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"extensions\": [\"<path from leash --path pi>\"]\n}\n```\n\n**OpenCode** - [docs](https://opencode.ai/docs/plugins/)\n\nAdd to `~/.config/opencode/opencode.json` (or `opencode.jsonc` if you use that):\n\n```json\n{\n  \"plugin\": [\"<path from leash --path opencode>\"]\n}\n```\n\n**Claude Code** - [docs](https://code.claude.com/docs/en/hooks-guide)\n\nAdd to `~/.claude/settings.json`:\n\n```json\n{\n  \"hooks\": {\n    \"SessionStart\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"node <path from leash --path claude-code>\"\n          }\n        ]\n      }\n    ],\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Bash|Write|Edit\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"node <path from leash --path claude-code>\"\n          }\n        ]\n      }\n    ]\n  }\n}\n```\n\n**Factory Droid** - [docs](https://docs.factory.ai/cli/configuration/hooks-guide)\n\nAdd to `~/.factory/settings.json`:\n\n```json\n{\n  \"hooks\": {\n    \"SessionStart\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"node <path from leash --path factory>\"\n          }\n        ]\n      }\n    ],\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Execute|Write|Edit\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"node <path from leash --path factory>\"\n          }\n        ]\n      }\n    ]\n  }\n}\n```\n\n</details>\n\n## What Gets Blocked\n\n```bash\n# Dangerous commands outside working directory\nrm -rf ~/Documents                # \u274c Delete outside working dir\nmv ~/.bashrc /tmp/                # \u274c Move from outside\necho \"data\" > ~/file.txt          # \u274c Redirect to home\n\n# Protected files (blocked even inside project)\nrm .env                           # \u274c Protected file\necho \"SECRET=x\" > .env.local      # \u274c Protected file\nrm -rf .git                       # \u274c Protected directory\n\n# Dangerous git commands (blocked everywhere)\ngit reset --hard                  # \u274c Destroys uncommitted changes\ngit push --force                  # \u274c Destroys remote history\ngit clean -fd                     # \u274c Removes untracked files\n\n# File operations via Write/Edit tools\n~/.bashrc                         # \u274c Home directory file\n../../../etc/hosts                # \u274c Path traversal\n.env                              # \u274c Protected file\n```\n\n## What's Allowed\n\n```bash\nrm -rf ./node_modules             # \u2705 Working directory\nrm -rf /tmp/build-cache           # \u2705 Temp directory\nrm .env.example                   # \u2705 Example files allowed\ngit commit -m \"message\"           # \u2705 Safe git commands\ngit push origin main              # \u2705 Normal push (no --force)\necho \"plan\" > ~/.claude/plans/x   # \u2705 Platform config directories\nrm ~/.pi/agent/old.md             # \u2705 Platform config directories\n```\n\n<details>\n\n<summary><b>Detailed Examples</b></summary>\n\n### Dangerous Commands\n\n```bash\nrm -rf ~/Documents           # \u274c Delete outside working dir\nmv ~/.bashrc /tmp/           # \u274c Move from outside\ncp ./secrets ~/leaked        # \u274c Copy to outside\nchmod 777 /etc/hosts         # \u274c Permission change outside\nchown user ~/file            # \u274c Ownership change outside\nln -s ./file ~/link          # \u274c Symlink to outside\ndd if=/dev/zero of=~/file    # \u274c Write outside\ntruncate -s 0 ~/file         # \u274c Truncate outside\n```\n\n### Dangerous Git Commands\n\n```bash\ngit checkout -- .            # \u274c Discards uncommitted changes\ngit restore src/file.ts      # \u274c Discards uncommitted changes\ngit reset --hard             # \u274c Destroys all uncommitted changes\ngit reset --hard HEAD~1      # \u274c Destroys commits and changes\ngit reset --merge            # \u274c Can lose uncommitted changes\ngit clean -f                 # \u274c Removes untracked files permanently\ngit clean -fd                # \u274c Removes untracked files and directories\ngit push --force             # \u274c Destroys remote history\ngit push -f origin main      # \u274c Destroys remote history\ngit branch -D feature        # \u274c Force-deletes branch without merge check\ngit stash drop               # \u274c Permanently deletes stashed changes\ngit stash clear              # \u274c Deletes ALL stashed changes\n```\n\n### Redirects\n\n```bash\necho \"data\" > ~/file.txt     # \u274c Redirect to home\necho \"log\" >> ~/app.log      # \u274c Append to home\ncat secrets > \"/tmp/../~/x\"  # \u274c Path traversal in redirect\n```\n\n### Command Chains\n\n```bash\necho ok && rm ~/file         # \u274c Dangerous command after &&\nfalse || rm -rf ~/           # \u274c Dangerous command after ||\nls; rm ~/file                # \u274c Dangerous command after ;\ncat x | rm ~/file            # \u274c Dangerous command in pipe\ncd ~/Downloads && rm file    # \u274c cd outside + dangerous command\ncd .. && cd .. && rm target  # \u274c cd hops escaping working dir\n```\n\n### Wrapper Commands\n\n```bash\nsudo rm -rf ~/dir            # \u274c sudo + dangerous command\nenv rm ~/file                # \u274c env + dangerous command\ncommand rm ~/file            # \u274c command + dangerous command\n```\n\n### Compound Patterns\n\n```bash\nfind ~ -name \"*.tmp\" -delete          # \u274c find -delete outside\nfind ~ -exec rm {} \\;                 # \u274c find -exec rm outside\nfind ~/logs | xargs rm                # \u274c xargs rm outside\nfind ~ | xargs -I{} mv {} /tmp        # \u274c xargs mv outside\nrsync -av --delete ~/src/ ~/dst/      # \u274c rsync --delete outside\n```\n\n### Protected Files (blocked even inside project)\n\n```bash\nrm .env                      # \u274c Environment file\nrm .env.local                # \u274c Environment file\nrm .env.production           # \u274c Environment file\necho \"x\" > .env              # \u274c Write to env file\nrm -rf .git                  # \u274c Git directory\necho \"x\" > .git/config       # \u274c Write to git directory\nfind . -name \".env\" -delete  # \u274c Delete protected via find\n```\n\nNote: `.env.example` is allowed (template files are safe).\n\n### File Operations (Write/Edit tools)\n\n```bash\n/etc/passwd                  # \u274c System file\n~/.bashrc                    # \u274c Home directory file\n/home/user/.ssh/id_rsa       # \u274c Absolute path outside\n../../../etc/hosts           # \u274c Path traversal\n.env                         # \u274c Protected file\n.git/config                  # \u274c Protected directory\n```\n\n### What's Allowed (Full List)\n\n```bash\n# Working directory operations\nrm -rf ./node_modules\nmv ./old.ts ./new.ts\ncp ./src/config.json ./dist/\nfind . -name \"*.bak\" -delete\nfind ./logs | xargs rm\n\n# Temp directory operations\nrm -rf /tmp/build-cache\necho \"data\" > /tmp/output.txt\nrsync -av --delete ./src/ /tmp/backup/\n\n# Platform config directories\nrm ~/.claude/plans/old-plan.md\necho \"config\" > ~/.factory/cache.json\nrm ~/.pi/agent/temp.md\nrm ~/.config/opencode/cache.json\nfind ~/.claude -name '*.tmp' -delete\nrsync -av --delete ./src/ ~/.pi/backup/\n\n# Device paths\necho \"x\" > /dev/null\ntruncate -s 0 /dev/null\n\n# Read from anywhere (safe)\ncp /etc/hosts ./local-hosts\ncat /etc/passwd\n\n# Safe git commands\ngit status\ngit add .\ngit commit -m \"message\"\ngit push origin main\ngit checkout main\ngit checkout -b feature/new\ngit branch -d merged-branch      # lowercase -d is safe\ngit reset --soft HEAD~1          # soft reset is safe\ngit restore --staged .           # unstaging is safe\ngit stash\ngit stash pop\n```\n\n</details>\n\n## Performance\n\nNear-zero latency impact on your workflow:\n\n| Platform    | Latency per tool call | Notes                                    |\n| ----------- | --------------------- | ---------------------------------------- |\n| OpenCode    | **~20\u00b5s**             | In-process plugin, near-zero overhead    |\n| Pi          | **~20\u00b5s**             | In-process extension, near-zero overhead |\n| Claude Code | **~31ms**             | External process (~30ms Node.js startup) |\n| Factory     | **~31ms**             | External process (~30ms Node.js startup) |\n\nFor context: LLM API calls typically take 2-10+ seconds. Even the slower external process hook adds less than 0.3% to total response time.\n\n## Limitations\n\nLeash is a **defense-in-depth** layer, not a complete sandbox. It cannot protect against:\n\n- Kernel exploits or privilege escalation\n- Network-based attacks (downloading and executing scripts)\n- Commands not routed through the intercepted tools\n\nFor maximum security, combine Leash with container isolation (Docker), user permission restrictions, or read-only filesystem mounts.\n\n## Development\n\n```bash\ncd ~/leash\nnpm install\nnpm run build\n```\n\n## Contributing\n\nContributions are welcome! Areas where help is needed:\n\n- [ ] Plugin for AMP Code\n\n---\n\n_Keep your AI agents on a leash._\n",
+  "keywords": [
+    "ai",
+    "security",
+    "sandbox",
+    "guardrails",
+    "coding-agent",
+    "claude",
+    "openai",
+    "anthropic",
+    "llm",
+    "cli",
+    "plugin",
+    "hooks",
+    "file-system",
+    "protection",
+    "pi-package"
+  ],
+  "author": {
+    "name": "Melih Mucuk"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/melihmucuk/leash",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/melihmucuk/leash.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/pi/leash.js"
+    ]
+  },
+  "time": {
+    "created": "2025-12-23T11:32:18.871Z",
+    "modified": "2026-03-24T08:08:21.734Z",
+    "1.0.0": "2025-12-23T11:32:19.160Z",
+    "1.0.1": "2025-12-23T11:50:57.031Z",
+    "1.0.2": "2025-12-23T11:54:01.387Z",
+    "1.0.3": "2025-12-23T11:58:08.681Z",
+    "1.0.4": "2025-12-24T12:08:08.617Z",
+    "1.0.5": "2025-12-24T12:14:22.047Z",
+    "1.0.6": "2025-12-26T21:08:52.256Z",
+    "1.0.7": "2025-12-29T08:40:39.427Z",
+    "1.0.8": "2026-01-02T12:51:38.168Z",
+    "1.0.9": "2026-01-05T10:14:42.329Z",
+    "1.0.10": "2026-01-07T06:09:04.667Z",
+    "1.0.11": "2026-03-24T08:08:21.628Z"
+  },
+  "versions_count": 12,
+  "downloads_last_week": 44,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 269
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 455
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 558
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 182
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 38
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 54
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 17
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 17
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 11
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 97
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 41
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 26
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 38
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 68
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 33
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 38
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 38
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 26
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 51
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

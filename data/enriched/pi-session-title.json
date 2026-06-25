@@ -1,0 +1,36 @@
+{
+  "name": "pi-session-title",
+  "latest_version": "1.1.0",
+  "description": "Session-title extension for pi-compatible runtimes, including oh-my-pi",
+  "readme": "# pi-session-title\n\nSession-title extension for pi-compatible runtimes, including oh-my-pi.\n\nIt generates a concise session title from the first real prompt and persists it through the host extension API.\n\n## Installation\n\n### npm (recommended)\n\n```bash\nnpm install pi-session-title\n```\n\n### Manual\n\n```bash\ngit clone https://github.com/djdembeck/pi-session-title.git ~/.omp/agent/extensions/pi-session-title\ncd ~/.omp/agent/extensions/pi-session-title\nnpm install\nnpm run build\n```\n\n## How it works\n\nThe extension registers two event handlers:\n- `input` \u2014 fires in interactive sessions for user-originated input\n- `before_agent_start` \u2014 fires for all prompts before the agent loop. The extension only uses it as a fallback when `input` never fires (e.g., non-interactive/print mode).\n\nFor the first prompt-like input in a session it will:\n\n1. Skip extension-originated input and command-style input (`/`, `!`, `$`)\n2. Skip work when the session already has a name\n3. Load a prompt template if present\n4. Use the current session model to generate a title from the first prompt\n5. Call `setSessionName(title, \"auto\")` \u2014 auto-generated titles yield to user-renames (`/rename`)\n\nIn oh-my-pi interactive mode, this timing matters: `input` handlers run before the built-in first-message auto-title check, so setting the name there prevents omp from generating a competing default title.\n\n## Configuration\n\nThe extension is configured with environment variables.\n\n| Variable | Default | Description |\n|---|---|---|\n| `PI_TITLE_ENABLED` | `true` | Enable or disable title generation |\n| `PI_TITLE_TEMPLATE` | unset | Custom template path, relative to cwd or absolute |\n| `PI_TITLE_MAX_INPUT` | `2000` | Maximum characters from the first prompt sent to the model |\n| `PI_TITLE_MAX_TOKENS` | `30` | Maximum tokens requested for the generated title |\n\nExample:\n\n```bash\nexport PI_TITLE_ENABLED=true\nexport PI_TITLE_MAX_INPUT=1000\nexport PI_TITLE_MAX_TOKENS=20\n```\n\n## Template variables\n\nAvailable template variables:\n\n- `{{firstMessage}}`\n- `{{cwd}}`\n- `{{timestamp}}`\n\n## Template discovery\n\nTemplates are resolved in this order:\n\n1. `PI_TITLE_TEMPLATE`\n2. `.pi/prompts/title.md`\n3. `.omp/prompts/title.md`\n4. `~/.pi/agent/prompts/title.md`\n5. `~/.omp/agent/prompts/title.md`\n6. Built-in default template\n\nExample project template:\n\n```md\nGenerate a short title (max 6 words) for a coding session.\n\nUser request: {{firstMessage}}\nProject: {{cwd}}\n\nRespond with ONLY the title.\n```\n\n## Compatibility\n\nThis package is typed against `@mariozechner/pi-coding-agent`. At runtime it needs a host that exposes `getSessionName()` / `setSessionName()` on the extension API. For title generation via the model, the function attempts to load `@oh-my-pi/pi-ai` first and falls back to `@mariozechner/pi-ai` if that import is unavailable. Title generation is only skipped (without error) when neither module is resolvable.\nThe extension resolves API keys and request headers through both `getApiKeyAndHeaders` (pi-mono) and `getApiKey` (oh-my-pi) on the model registry, so it works across both runtime variants.\n\n## Development\n\n```bash\nnpm install\nnpm run typecheck\nnpm run build\nnpm test\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "session-title",
+    "title-generation",
+    "ai"
+  ],
+  "author": {
+    "name": "djdembeck"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/djdembeck/pi-session-title#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/djdembeck/pi-session-title.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-04-11T04:36:10.452Z",
+    "modified": "2026-04-14T23:23:42.075Z",
+    "1.0.0": "2026-04-11T04:36:10.691Z",
+    "1.1.0": "2026-04-14T23:23:41.753Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 10,
+  "download_trend": []
+}

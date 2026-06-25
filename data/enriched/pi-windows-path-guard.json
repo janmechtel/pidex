@@ -1,0 +1,39 @@
+{
+  "name": "pi-windows-path-guard",
+  "latest_version": "1.0.1",
+  "description": "Prevents Windows-native Pi file tools from silently writing to mangled paths when agents reuse Git Bash/MSYS paths like /c/Users/...",
+  "readme": "# pi-windows-path-guard\n\nA tiny Pi extension for Windows users.\n\n## Problem\n\nPi may use Git Bash for shell commands. Git Bash reports paths as `/c/Users/...`. If an agent passes that path into Windows-native file tools (read, write, edit), Node.js can resolve it to `C:\\c\\Users\\...` instead of `C:\\Users\\...`.\n\nThis creates a **false-success trap**: the agent reports \"Successfully wrote X bytes\", but the file lands in a phantom tree that Windows applications cannot find.\n\n## Behavior\n\nThis extension guards Pi file tool calls before execution:\n\n| Path format | Action |\n|-------------|--------|\n| `/c/Users/...` | Normalizes to `C:\\Users\\...` |\n| `/mnt/c/Users/...` | **Blocks** in Windows-native mode |\n| `C:\\c\\Users\\...` | **Blocks** as a known mangled trap |\n| `C:\\mnt\\c\\Users\\...` | **Blocks** as a known mangled trap |\n| `C:\\Users\\...` | Allows native Windows paths |\n| `\\\\wsl.localhost\\...` | Allows intentional UNC access |\n| `\\\\wsl.localhost\\Ubuntu-24.04\\...` | Allows WSL UNC paths |\n\n## Install\n\n```bash\npi install npm:pi-windows-path-guard\n```\n\nOr load directly for testing:\n\n```bash\npi -e ./src/index.ts\n```\n\n## Why\n\nThis prevents false-success writes where:\n- Agent sees bash pwd as `/c/Users/DESKTOP/workspaces`\n- Agent uses that path for write/read/edit\n- File lands at `C:\\c\\Users\\DESKTOP\\workspaces\\...`\n- VLC, PowerShell, and Windows apps cannot find the file\n\n## Proof\n\n**Before (without extension):**\n\n```\nwrite /c/Users/Me/workspace/file.txt \"content\"\n\u2192 write tool: \"Successfully wrote 7 bytes\"\n\u2192 actual location: C:\\c\\Users\\Me\\workspace\\file.txt\n\u2192 PowerShell Test-Path C:\\Users\\Me\\workspace\\file.txt: False\n```\n\n**After (with extension):**\n\n```\nwrite /c/Users/Me/workspace/file.txt \"content\"\n\u2192 extension normalizes to C:\\Users\\Me\\workspace\\file.txt\n\u2192 write tool: \"Successfully wrote 7 bytes\"\n\u2192 actual location: C:\\Users\\Me\\workspace\\file.txt\n\u2192 PowerShell Test-Path C:\\Users\\Me\\workspace\\file.txt: True\n```\n\n**Blocked paths:**\n\n```\nwrite /mnt/c/Users/Me/workspace/wsl.txt\n\u2192 Blocked: \"Blocked Windows path dialect trap: /mnt/c/... Use native Windows path C:\\Users\\...\"\n\nwrite C:\\c\\Users\\Me\\workspace\\bad.txt\n\u2192 Blocked: \"Blocked Windows path dialect trap: C:\\c\\... Use native Windows path C:\\Users\\...\"\n```\n\n## Guarded Tools\n\n- `read`\n- `write`\n- `edit`\n- `grep`\n- `find`\n- `ls`\n\n## Security Note\n\nThis extension intercepts all file tool calls on Windows and may block or mutate paths. Review the source before installing third-party Pi packages.\n\nSource: [GitHub](https://github.com/sensei/pi-windows-path-guard)\n\n## License\n\nMIT",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "windows",
+    "path",
+    "git-bash",
+    "msys",
+    "wsl"
+  ],
+  "author": {
+    "name": "Sensei"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Lododizzle/pi-windows-path-guard#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lododizzle/pi-windows-path-guard.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-04T03:53:03.430Z",
+    "modified": "2026-05-04T04:05:54.278Z",
+    "1.0.0": "2026-05-04T03:53:03.726Z",
+    "1.0.1": "2026-05-04T04:05:54.177Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 16,
+  "download_trend": []
+}

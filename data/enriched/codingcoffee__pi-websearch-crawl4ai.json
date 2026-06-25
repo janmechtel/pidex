@@ -1,0 +1,361 @@
+{
+  "name": "@codingcoffee/pi-websearch-crawl4ai",
+  "latest_version": "0.2.1",
+  "description": "a pi extension to let your LLM crawl & see the web",
+  "readme": "# pi-websearch-crawl4ai\n\nA [pi](https://github.com/badlogic/pi-mono) extension that lets the agent fetch\ncontent from the web via a running [Crawl4AI](https://docs.crawl4ai.com/) server.\n\n**Intended use:** running pi with the `bash` tool disabled (so `curl` / `wget`\nare unavailable) while still letting the model read and crawl web pages.\n\n## What it gives the LLM\n\nSix tools, all talking to a Crawl4AI server:\n\n| Tool              | Endpoint           | Purpose                                                   |\n| ----------------- | ------------------ | --------------------------------------------------------- |\n| `web_fetch`       | `POST /md`         | Fetch a URL \u2192 clean Markdown (filters: fit/raw/bm25/llm)  |\n| `web_fetch_html`  | `POST /html`       | Sanitized HTML for DOM-aware tasks                        |\n| `web_crawl`       | `POST /crawl`      | Multi-URL crawl with typed `BrowserConfig`/`CrawlerRunConfig` |\n| `web_execute_js`  | `POST /execute_js` | Run JS snippets on a page and read back JSON              |\n| `web_screenshot`  | `POST /screenshot` | Full-page PNG screenshot (returned inline)                |\n| `web_ask`         | `GET  /ask`        | Query the Crawl4AI library's own docs (for configuring it) |\n\nPlus commands: `/crawl4ai-status`, `/crawl4ai-url <url>`, `/crawl4ai-token <tok>`.\n\n## Prerequisites\n\nYou need a Crawl4AI server reachable from where pi runs. The fastest path:\n\n```bash\ndocker run -d \\\n  -p 11235:11235 \\\n  --name crawl4ai \\\n  --shm-size=1g \\\n  unclecode/crawl4ai:latest\n\n# Sanity check\ncurl http://localhost:11235/health\n```\n\nSee the [Crawl4AI Docker guide](https://github.com/unclecode/crawl4ai/blob/main/deploy/docker/README.md)\nfor GPU, LLM keys, `config.yml`, JWT auth, etc.\n\n## Install as a pi extension\n\n```bash\n# project-local\nmkdir -p .pi/extensions\nln -s \"$(pwd)/pi-websearch-crawl4ai\" .pi/extensions/crawl4ai\n\n# or global\nmkdir -p ~/.pi/agent/extensions\nln -s \"$(pwd)/pi-websearch-crawl4ai\" ~/.pi/agent/extensions/crawl4ai\n```\n\npi auto-discovers `index.ts` via the `\"pi\".extensions` field in `package.json`.\n\nAlternatively, for a one-off test:\n\n```bash\npi -e ./pi-websearch-crawl4ai/index.ts\n```\n\n## Configuration\n\nPrecedence: CLI flag > env var > default.\n\n| Setting   | Env                   | Flag                       | Default                   |\n| --------- | --------------------- | -------------------------- | ------------------------- |\n| Base URL  | `CRAWL4AI_BASE_URL`   | `--crawl4ai-url <url>`     | `http://localhost:11235`  |\n| Auth token| `CRAWL4AI_TOKEN`      | `--crawl4ai-token <tok>`   | (none)                    |\n\nAt runtime you can also:\n\n- `/crawl4ai-status` \u2014 show current config + `/health`\n- `/crawl4ai-url http://host:11235` \u2014 change base URL for this session\n- `/crawl4ai-token <jwt>` \u2014 set bearer token (empty clears it)\n\n## Example use\n\nRunning pi with only read-only tools and this extension:\n\n```bash\npi --tools read,write,edit,web_fetch,web_crawl\n> \"Read https://example.com and summarize it.\"\n```\n\nThe model will call `web_fetch` instead of reaching for `bash`/`curl`.\n\n## How `web_crawl` typed configs work\n\nCrawl4AI accepts configuration objects shaped as\n`{\"type\":\"ClassName\",\"params\":{...}}`. Example you (or the model) can pass:\n\n```json\n{\n  \"urls\": [\"https://example.com\", \"https://httpbin.org/html\"],\n  \"browser_config\": { \"type\": \"BrowserConfig\", \"params\": { \"headless\": true } },\n  \"crawler_config\": {\n    \"type\": \"CrawlerRunConfig\",\n    \"params\": { \"cache_mode\": \"bypass\", \"stream\": false }\n  }\n}\n```\n\nIf you need to remind the model what's available, it can call `web_ask` with a\nquery like `\"CrawlerRunConfig parameters\"` to pull the Crawl4AI library docs.\n\n## Security note\n\nExtensions run with your user's full permissions. The tools here can fetch\narbitrary URLs via your Crawl4AI server. If that's a problem, run Crawl4AI with\nrate limiting / allowlists configured in its `config.yml`, and/or restrict\nwhich tools pi activates via `--tools`.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "llm-tools",
+    "pi-coding-agent",
+    "crawl4ai",
+    "web-scraping",
+    "llm",
+    "agent",
+    "markdown",
+    "fetch"
+  ],
+  "author": {
+    "name": "Ameya Shenoy",
+    "url": "https://codingcoffee.dev"
+  },
+  "license": "MIT",
+  "homepage": "https://pi-websearch-crawl4ai.codingcoffee.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codingcoffee/pi-websearch-crawl4ai.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://pi-websearch-crawl4ai.codingcoffee.dev/og.png"
+  },
+  "time": {
+    "created": "2026-04-22T06:14:02.588Z",
+    "modified": "2026-04-26T19:14:55.712Z",
+    "0.1.0": "2026-04-22T06:14:02.822Z",
+    "0.1.1": "2026-04-22T13:07:16.440Z",
+    "0.1.2": "2026-04-22T13:12:07.235Z",
+    "0.1.3": "2026-04-23T03:16:07.018Z",
+    "0.2.0": "2026-04-26T19:13:22.717Z",
+    "0.2.1": "2026-04-26T19:14:55.617Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": 25,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 639
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 46
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 50
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 25
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 35
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 5
+    }
+  ]
+}

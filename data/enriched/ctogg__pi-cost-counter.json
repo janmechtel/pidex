@@ -1,0 +1,35 @@
+{
+  "name": "@ctogg/pi-cost-counter",
+  "latest_version": "0.1.1",
+  "description": "Pi extension that tracks LLM API costs across all sessions with daily JSONL logging and a /cost command",
+  "readme": "# pi Cost Tracker\n\nA [pi](https://github.com/earendil-works/pi-coding-agent) extension that tracks LLM API costs across all sessions. Every API call is logged to a local append-only ledger so you always know what you're spending.\n\n## Features\n\n- **Automatic tracking** \u2014 every LLM call is recorded with token counts, cost breakdown, provider, and model\n- **Multi-client safe** \u2014 uses append-only JSONL files, safe for concurrent writes from multiple pi instances\n- **`/cost` command** \u2014 view today's cost or a multi-day range with breakdowns by model and provider\n- **Zero configuration** \u2014 install and go, no API keys or setup required\n\n## Installation\n\n### From npm (recommended)\n\n```bash\npi install npm:@ctogg/pi-cost-counter\n```\n\n### From git\n\n```bash\npi install git:github.com/cristeahub/pi-cost-counter\n```\n\n### Local\n\n```bash\npi install /path/to/pi-cost-counter\n```\n\n### Quick test (temporary, current session only)\n\n```bash\npi -e npm:@ctogg/pi-cost-counter\npi -e /path/to/pi-cost-counter\n```\n\nAfter installation, restart pi or run `/reload` to activate.\n\n## Usage\n\n### `/cost` Command\n\nView cost summaries directly in pi:\n\n```\n/cost            Today's total + model breakdown\n/cost 7d         Last 7 days\n/cost 30d        Last 30 days\n/cost 365d       Last year\n```\n\nExample output:\n\n```\nCost for last 7 days (2026-04-11 \u2192 2026-04-17)\n\n  Total: $4.82  156.3K tokens \u00b7 87 calls\n\n  Daily breakdown\n  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  2026-04-11  $0.45\n  2026-04-12  $1.23\n  2026-04-13  \u2014\n  2026-04-14  $0.67\n  2026-04-15  $0.89\n  2026-04-16  $0.34\n  2026-04-17  $1.24\n\n  By model\n  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  anthropic/claude-sonnet-4-5                    $3.41  120.5K tok \u00b7 62 calls\n  anthropic/claude-haiku-3-5                     $0.89   28.1K tok \u00b7 18 calls\n  google/gemini-2.5-pro                          $0.52    7.7K tok \u00b7 7 calls\n\n```\n\n## Data Storage\n\nCost records are stored as JSONL (JSON Lines) files, organized by date:\n\n```\n~/.pi/cost-tracker/\n  2026/\n    04/\n      17.jsonl\n      18.jsonl\n    05/\n      01.jsonl\n```\n\n### Record Format\n\nEach line in a day file is a single JSON object representing one LLM API call:\n\n```json\n{\n  \"ts\": 1713369600000,\n  \"provider\": \"anthropic\",\n  \"model\": \"claude-sonnet-4-5\",\n  \"tokens\": {\n    \"input\": 1200,\n    \"output\": 340,\n    \"cacheRead\": 800,\n    \"cacheWrite\": 0\n  },\n  \"cost\": {\n    \"input\": 0.0036,\n    \"output\": 0.0051,\n    \"cacheRead\": 0.0008,\n    \"cacheWrite\": 0,\n    \"total\": 0.0095\n  }\n}\n```\n\n| Field               | Description                                         |\n| ------------------- | --------------------------------------------------- |\n| `ts`                | Unix timestamp in milliseconds                      |\n| `provider`          | API provider (e.g. `anthropic`, `google`, `openai`) |\n| `model`             | Model identifier (e.g. `claude-sonnet-4-5`)         |\n| `tokens.input`      | Input/prompt tokens                                 |\n| `tokens.output`     | Output/completion tokens                            |\n| `tokens.cacheRead`  | Tokens served from prompt cache                     |\n| `tokens.cacheWrite` | Tokens written to prompt cache                      |\n| `cost.input`        | Cost for input tokens (USD)                         |\n| `cost.output`       | Cost for output tokens (USD)                        |\n| `cost.cacheRead`    | Cost for cache-read tokens (USD)                    |\n| `cost.cacheWrite`   | Cost for cache-write tokens (USD)                   |\n| `cost.total`        | Total cost for this call (USD)                      |\n\n## Querying Data Outside pi\n\nSince the data is plain JSONL, you can query it with standard tools:\n\n```bash\n# Today's total cost\ncat ~/.pi/cost-tracker/2026/04/17.jsonl | jq -s 'map(.cost.total) | add'\n\n# Top models this month\ncat ~/.pi/cost-tracker/2026/04/*.jsonl | jq -s 'group_by(.model) | map({model: .[0].model, total: map(.cost.total) | add}) | sort_by(-.total)'\n\n# Total spend for April\ncat ~/.pi/cost-tracker/2026/04/*.jsonl | jq -s 'map(.cost.total) | add'\n\n# Number of API calls per day this month\nfor f in ~/.pi/cost-tracker/2026/04/*.jsonl; do\n  echo \"$(basename $f .jsonl): $(wc -l < $f) calls\"\ndone\n\n# Export to CSV\ncat ~/.pi/cost-tracker/2026/04/*.jsonl | jq -r '[.ts, .provider, .model, .cost.total] | @csv'\n```\n\n## How It Works\n\nThe extension hooks into pi's event system:\n\n1. **`message_end`** \u2014 fires after every message (user, assistant, tool result). The handler filters for assistant messages, extracts the `usage` object that pi attaches to every LLM response, and appends a JSONL record to the appropriate day file.\n\n2. **`/cost` command** \u2014 reads JSONL files for the requested date range, aggregates by day and by model, and displays a formatted summary.\n\n## Limitations\n\n- **Cost accuracy depends on pi's cost calculation** \u2014 the extension records whatever pi reports in the `usage.cost` fields. If a model's pricing is not configured in pi, costs may show as zero even though tokens were consumed.\n- **Local timezone** \u2014 day boundaries are based on your system's local time.\n- **No real-time sync** \u2014 the `/cost` command reads files at invocation time. It does not live-update while other pi clients are running. Run it again to see the latest.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "cost-tracking",
+    "llm-cost",
+    "token-usage"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/cristeahub/pi-cost-counter#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cristeahub/pi-cost-counter.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-17T19:56:59.874Z",
+    "modified": "2026-05-08T09:17:19.418Z",
+    "0.1.0": "2026-04-17T19:57:00.178Z",
+    "0.1.1": "2026-05-08T09:17:19.116Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

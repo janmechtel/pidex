@@ -1,0 +1,39 @@
+{
+  "name": "@muelsyse/pi-statusline-trellis",
+  "latest_version": "0.5.3",
+  "description": "Fixed two-line status footer for pi with Trellis runtime task display, model, thinking, context, git, token, worktree, and skill indicators",
+  "readme": "# @muelsyse/pi-statusline-trellis\r\n\r\n> \u672c\u9879\u76ee\u4e8c\u5f00\u4e8e [`@feniix/pi-statusline`](https://www.npmjs.com/package/@feniix/pi-statusline)\uff0c\u5728\u539f\u72b6\u6001\u680f\u80fd\u529b\u57fa\u7840\u4e0a\u589e\u52a0 Trellis runtime \u5f53\u524d\u4efb\u52a1\u5c55\u793a\u3002\r\n\r\nA fixed status display for pi. It shows two lines by default and adds a Claude Code-style Trellis task line when a current task is active.\r\n\r\nBy default it renders in the footer in interactive/RPC mode and stays inert in non-UI modes (`-p`, JSON mode).\r\nIt is not injected into model context and is not sent as messages.\r\nIn UI-capable sessions, it also exposes a `/statusline` tool for explicit retrieval.\r\n\r\n## Display\r\n\r\n```text\r\n[P1] Task title (in_progress) \u00b7 Muelsyse \u00b7 1 task(s)\r\nModel: ... | Thinking: ... | Ctx: ... | \u2387 ... | dirty: +... | \u2191.../\u2193...\r\n<repo> | cwd: ... | \ud81a\udc30 ... | Skill: ... | Act: ...\r\n```\r\n\r\nThe Trellis task line is omitted when no active Trellis task can be resolved from project-local runtime session state or legacy task files.\r\n\r\n## Included fields\r\n\r\n- Trellis current task, developer, and active task count, using Claude Code's middle-dot separator style when available\r\n- Model\r\n- Thinking level\r\n- Context usage percent\r\n- Git branch\r\n- Dirty file count\r\n- Input/output token totals\r\n- Repo name\r\n- Current working directory\r\n- Git worktree label\r\n- Last explicitly invoked skill\r\n- Live activity indicator\r\n\r\n## Live updates\r\n\r\nThe footer now updates continuously during active work instead of only at the end of a turn.\r\nThis includes:\r\n\r\n- after user input is submitted\r\n- when the agent starts and each turn starts\r\n- while assistant messages are streaming\r\n- while tools are starting, streaming updates, and finishing\r\n- when the agent returns control to the user\r\n\r\nTo avoid excessive redraws, streaming-triggered footer renders are throttled.\r\n\r\n## Activity behavior\r\n\r\nThe activity segment summarizes what pi is doing right now.\r\nExamples:\r\n\r\n- `Act: queued`\r\n- `Act: thinking`\r\n- `Act: responding`\r\n- `Act: bash`\r\n- `Act: bash x2`\r\n- `Act: idle`\r\n\r\n## Trellis task behavior\r\n\r\nWhen a Trellis current task is active, `pi-statusline` prepends a Claude Code-style task line with the developer and active task count appended on the right:\r\n\r\n```text\r\n[P1] Bootstrap Guidelines (in_progress) \u00b7 Muelsyse \u00b7 1 task(s)\r\n```\r\n\r\nTask discovery walks up from the current working directory to find a project-local `.trellis/` directory. Current tasks are resolved from `.trellis/.runtime/sessions/` first: `TRELLIS_CONTEXT_ID` selects the matching session file when present, and a single-session runtime fallback is used when no context key is available. If runtime session state is missing or invalid, pi-statusline falls back to the legacy `.trellis/.current-task` file for older Trellis projects.\r\n\r\nActive task count is computed from non-archived directories under `.trellis/tasks/` that contain `task.json`. pi-statusline intentionally does not fall back to `~/.trellis/.current-task`, so sessions outside a Trellis project do not display stale global tasks.\r\n\r\n## Skill behavior\r\n\r\nThe skill segment tracks the latest explicit skill command seen in user input.\r\nExamples:\r\n- `/skill:release` -> `Skill: release`\r\n- `/release` -> `Skill: release` if `release` is registered as a skill command in the current session\r\n\r\n## Token behavior\r\n\r\nToken totals are based on assistant usage in the session branch.\r\nDuring active streaming, the extension also uses the latest live assistant usage when available so the token display can update before the turn fully finishes.\r\n\r\n## Worktree behavior\r\n\r\n- linked worktree -> branch-derived label for that worktree\r\n- main worktree -> `\ud81a\udc30 main`\r\n- non-git repo -> `\ud81a\udc30 no git`\r\n\r\n## Palette configuration\r\n\r\n`pi-statusline` uses a built-in `defaultPalette`, but you can override any subset of colors through pi's standard settings files.\r\n\r\nSettings locations:\r\n\r\n- global: `~/.pi/agent/settings.json`\r\n- project: `.pi/settings.json`\r\n\r\nUse the `pi-statusline` key for non-secret configuration:\r\n\r\n```json\r\n{\r\n  \"pi-statusline\": {\r\n    \"palette\": {\r\n      \"model\": \"#008787\",\r\n      \"activity\": \"#5FAF00\"\r\n    }\r\n  }\r\n}\r\n```\r\n\r\n`pi-statusline` does not need secrets. As a general pi convention, keep `settings.json` for non-secret defaults; credentials belong in environment variables, OAuth/private auth files, or explicit custom config files used by extensions that support them.\r\n\r\nSupported palette keys:\r\n\r\n- `background`\r\n- `model`\r\n- `repo`\r\n- `thinking`\r\n- `skill`\r\n- `context`\r\n- `branch`\r\n- `dirty`\r\n- `token`\r\n- `separators`\r\n- `cwd`\r\n- `worktree`\r\n- `activity`\r\n\r\nBehavior:\r\n\r\n- project settings override global settings\r\n- missing keys fall back to `defaultPalette`\r\n- invalid color values are ignored\r\n- colors must be 6-digit hex values like `#008787`\r\n\r\n## Development\r\n\r\nRun from the repo root:\r\n\r\n```bash\r\nnpm run test\r\nnpm run typecheck\r\n```\r\n\r\nFor quick manual testing from this repository:\r\n\r\n```bash\r\npi -e ./extensions/index.ts\r\n```\r\n\r\nTo use this fork as a Pi package source, add it to `~/.pi/agent/settings.json`:\r\n\r\n```json\r\n{\r\n  \"packages\": [\r\n    \"npm:@muelsyse/pi-statusline-trellis\"\r\n  ]\r\n}\r\n```\r\n\r\nFor local source testing, use a package filter path without a leading `./`:\r\n\r\n```json\r\n{\r\n  \"packages\": [\r\n    {\r\n      \"source\": \"D:/github/pi-statusline-trellis\",\r\n      \"extensions\": [\"extensions/index.ts\"]\r\n    }\r\n  ]\r\n}\r\n```\r\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "statusline",
+    "footer",
+    "git",
+    "trellis"
+  ],
+  "author": {
+    "name": "Sebastian Otaegui",
+    "url": "https://github.com/feniix"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/gy1041/pi-statusline-trellis#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gy1041/pi-statusline-trellis.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-18T07:30:12.915Z",
+    "0.5.3": "2026-05-18T07:30:13.211Z",
+    "modified": "2026-05-18T07:30:13.428Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 7,
+  "download_trend": []
+}

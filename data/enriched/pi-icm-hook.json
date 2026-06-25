@@ -1,0 +1,40 @@
+{
+  "name": "pi-icm-hook",
+  "latest_version": "0.1.2",
+  "description": "Pi extension wrapping ICM (Infinite Context Memory) as native Pi tools and lifecycle hooks \u2014 semantic, cross-session, cross-project recall via the local icm CLI.",
+  "readme": "# pi-icm-hook\n\nA [Pi](https://github.com/earendil-works/pi-coding-agent) extension wrapping [ICM](https://github.com/rtk-ai/icm) \u2014 **persistent, semantic, cross-session memory** via the same SQLite database your editors already use.\n\n[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](./LICENSE) ![Version: 0.1.0](https://img.shields.io/badge/version-0.1.0-blue)\n\n## Why\n\nPi forgets between sessions. You wire up AGENTS.md with CLI instructions, but it's fragile \u2014 the model has to remember to call `icm recall` and `icm store` at the right times. Miss one, and context is lost.\n\nThis extension makes ICM **native to Pi**:\n\n- **8 tools** \u2014 `icm_recall`, `icm_store`, `icm_update`, `icm_forget`, `icm_consolidate`, `icm_health`, `icm_topics`, `icm_stats`\n- **Auto-recall** \u2014 memories injected into the system prompt at the start of every agent cycle\n- **Auto-save** \u2014 regex-based trigger detection saves decisions, fixes, preferences, learnings, and gotchas automatically\n- **Footer indicator** \u2014 `\ud83d\udcda N \u00b7 \ud83d\udcbe topic` on every response, showing recall count and what was saved\n\nOne SQLite file. Shared with Hermes, Claude Code, Cursor, OpenCode, Codex CLI \u2014 all your editors.\n\n## Quickstart\n\nThree steps, under two minutes if `icm` is already on your `$PATH`.\n\n**1. Verify ICM is installed.**\n\n```bash\nicm --version    # expected: e.g. \"icm 0.10.43\"\n```\n\nIf not found: <https://github.com/rtk-ai/icm>\n\n**2. Install the extension.**\n\n```bash\npi install npm:pi-icm-hook\n```\n\nFrom local:\n\n```bash\npi install ./icm.ts\n```\n\n**3. Restart Pi.** The footer `\ud83d\udcda N \u00b7 \ud83d\udcbe \u2014` at the end of responses confirms it's active.\n\nThat's it. No config file, no daemon, no prompts to copy-paste.\n\n## Tools\n\n| Tool | Description |\n|---|---|\n| `icm_recall` | Search memories by query, topic, or both. Returns ranked results. |\n| `icm_store` | Save a memory with topic, content, importance, and keywords. |\n| `icm_update` | Edit an existing memory by ID. |\n| `icm_forget` | Delete a memory by ID or clear an entire topic. |\n| `icm_consolidate` | Merge all memories in a topic into a single summary. |\n| `icm_health` | Audit memory health \u2014 staleness, consolidation needs. |\n| `icm_topics` | List all memory topics. |\n| `icm_stats` | Global memory statistics (count, average weight, date range). |\n\n## Lifecycle Hooks\n\n| Event | Action |\n|---|---|\n| `session_start` | Checks ICM availability. Gracesful degrade if missing. |\n| `before_agent_start` | Recalls memories matching the user's prompt. Injects them + a save directive into the system prompt. |\n| `message_end` | Runs trigger detection on the assistant's response. Auto-saves decisions, fixes, preferences, learnings, and gotchas. Injects the `\ud83d\udcda N \u00b7 \ud83d\udcbe topic` footer. |\n| `session_before_compact` | Saves a context marker before compaction truncates the session. |\n| `session_shutdown` | Cleanup. |\n\n## Auto-Save Triggers\n\nThe extension detects these categories and saves to the corresponding ICM topic:\n\n| Trigger | Topic Template | Example |\n|---|---|---|\n| Error resolved | `errors-resolved-{project}` | `errors-resolved-pi-icm-hook` |\n| Decision made | `decisions-{project}` | `decisions-chatterbox` |\n| Preference discovered | `preferences` | `preferences` (global) |\n| Learning / insight | `learnings-{project}` | `learnings-moon-backend` |\n| Gotcha / pitfall | `gotchas-{project}` | `gotchas-cloudflare-wrangler` |\n\n`{project}` is derived automatically from `basename(cwd)`.\n\n## Configuration\n\nEdit constants at the top of `icm.ts`:\n\n```typescript\nconst DEFAULT_CONFIG = {\n  recallLimit: 5,           // top-K memories to recall (default: 5)\n  prefetchEnabled: true,    // auto-inject on every agent cycle\n  defaultImportance: \"high\", // default for auto-saves\n  readTimeoutMs: 3000,      // timeout for recall/health/topics/stats\n  writeTimeoutMs: 5000,     // timeout for store/update/forget/consolidate\n  indicatorEnabled: true,   // show \ud83d\udcda \u00b7 \ud83d\udcbe footer on responses\n};\n```\n\n## How It Works\n\n```\nUser prompt\n  \u2502\n  \u251c\u2500\u2500 before_agent_start\n  \u2502   \u251c\u2500\u2500 icm recall <prompt> --format json --limit 5\n  \u2502   \u251c\u2500\u2500 Format recalled memories\n  \u2502   \u2514\u2500\u2500 Inject into system prompt + save directive\n  \u2502\n  \u251c\u2500\u2500 LLM generates response\n  \u2502   \u251c\u2500\u2500 Can call icm_recall / icm_store / etc. as tools\n  \u2502   \u2514\u2500\u2500 ...\n  \u2502\n  \u2514\u2500\u2500 message_end\n      \u251c\u2500\u2500 Detect triggers in assistant text (regex, no LLM cost)\n      \u251c\u2500\u2500 Fire-and-forget icm store for each match\n      \u2514\u2500\u2500 Inject \ud83d\udcda N \u00b7 \ud83d\udcbe topic footer\n```\n\nNo LLM calls wasted on memory management. Triggers are pure regex, recall is a single subprocess call at the start of each prompt cycle.\n\n## Related Projects\n\n- **[hermes-icm-memory](https://github.com/ta3pks/hermes-icm-memory)** \u2014 Same patterns, for the Hermes agent (Python)\n- **[ICM](https://github.com/rtk-ai/icm)** \u2014 The memory engine (Rust)\n- **[Pi](https://github.com/earendil-works/pi-coding-agent)** \u2014 The coding agent runtime\n\n## License\n\nBSD 3-Clause \u2014 see [LICENSE](./LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "icm",
+    "memory",
+    "persistent",
+    "semantic-search",
+    "context",
+    "recall"
+  ],
+  "author": {
+    "name": "Nikos Efthias"
+  },
+  "license": "BSD-3-Clause",
+  "homepage": "https://github.com/ta3pks/pi-icm-hook#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ta3pks/pi-icm-hook.git"
+  },
+  "pi": {
+    "extensions": [
+      "./icm.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-21T16:22:50.162Z",
+    "modified": "2026-05-21T16:24:54.600Z",
+    "0.1.0": "2026-05-21T16:22:50.359Z",
+    "0.1.1": "2026-05-21T16:24:19.055Z",
+    "0.1.2": "2026-05-21T16:24:54.491Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,38 @@
+{
+  "name": "pi-acm",
+  "latest_version": "0.3.12",
+  "description": "Active Context Management for pi \u2014 sliding window context management as a distributable pi extension",
+  "readme": "# pi-acm\n\nActive Context Management for [pi](https://github.com/badlogic/pi-mono) \u2014 sliding window context management as a distributable pi extension.\n\nKeeps long-running sessions coherent by sliding the context window forward instead of chopping history and generating lossy AI summaries. Critical messages survive via inception pinning. Expensive tool outputs get surgically trimmed. The LLM always knows its token position.\n\n## Install\n\n```bash\npi install npm:pi-acm\n```\n\nOr add to `.pi/settings.json`:\n\n```json\n{\n  \"packages\": [\"npm:pi-acm\"]\n}\n```\n\n## Quick Start\n\nOnce installed, ACM runs automatically. Every turn you'll see a footer status line:\n\n```\nACM: 187k/200k (93%) | \u21913 \u270212\n```\n\nAnd the LLM receives a hidden `<context-status>` tag before each turn.\n\n### Common commands\n\n```\n/acm              \u2014 show full context map\n/pin <id>         \u2014 pin a message as inception\n/unpin <id>       \u2014 remove pin\n/prune <id>       \u2014 hide a message from context\n/mark <id> <0-10> \u2014 set priority\n/hunt             \u2014 find the biggest token consumers\n/diagnose         \u2014 check session health\n```\n\n### Common tool calls (LLM-initiated)\n\n```\nacm_map                                    \u2014 context breakdown\nacm_hunt                                   \u2014 find bloat\nacm_pin({ id: \"a1b2c3d4\" })               \u2014 pin a message\nacm_prune({ id: [\"a1b2c3d4\", \"e5f6...\"] }) \u2014 prune multiple\nacm_snipe({ id: \"a1b2\", strategy: \"truncate\", max_chars: 200 })\nacm_compact({ dry_run: true })             \u2014 preview sliding window\nacm_compact({ keep_active_minutes: 30 })   \u2014 commit\nacm_diagnose()                             \u2014 health check\n```\n\n## How It Works\n\nACM is a pure pi extension \u2014 no pi-mono core modifications. It uses:\n\n- **`context` event** \u2014 filters messages before each LLM call (prune, snipe, pin prepend, window boundary)\n- **`session_before_compact`** \u2014 intercepts compaction and applies sliding window instead of AI summary\n- **`before_agent_start`** \u2014 injects the `<context-status>` whisper and ACM system prompt reminder\n- **`turn_start/end`** \u2014 tracks active working time for chess-clock compaction\n- **`pi.appendEntry()`** \u2014 persists all ACM metadata as sidecar JSONL entries (session file untouched)\n\n## Architecture\n\n```\nextensions/index.ts          Entry point\nsrc/\n  state.ts                   AcmState type, loadState, saveState\n  entry-map.ts               entry ID \u2194 context message mapping\n  context-filter.ts          context event handler (pipeline)\n  snipe-apply.ts             snipe strategy implementations\n  token-counter.ts           gpt-tokenizer estimates\n  chess-clock.ts             active time tracking\n  compaction.ts              session_before_compact handler\n  whisper.ts                 before_agent_start handler\n  id-resolver.ts             partial ID prefix matching\n  tools/\n    observe.ts               acm_map, acm_hunt, acm_diagnose\n    control.ts               acm_pin, acm_unpin, acm_prune, acm_mark\n    snipe.ts                 acm_snipe\n    compact.ts               acm_compact\n  ui/\n    commands.ts              user-facing slash commands\n    status.ts                footer status widget\nskills/acm/SKILL.md          LLM instructions\ntests/                       vitest unit tests\n```\n\n## Configuration\n\nDefault config in `.pi/settings.json` or `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"acm\": {\n    \"autoCompactOnPercent\": 85,\n    \"keepActiveMinutes\": 30\n  }\n}\n```\n\n(Config is stored in ACM sidecar entries \u2014 see `src/state.ts` for the full `AcmConfig` shape.)\n\n## What Gets Preserved\n\n- **Session JSONL is never modified** \u2014 all changes are in-memory (applied at `context` event time)\n- **Pinned messages survive everything** \u2014 they prepend context regardless of window boundary\n- **Pruned/sniped content is always accessible** via pi's session viewer or the raw `.jsonl` file\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "context-management",
+    "acm"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-03-18T20:52:09.243Z",
+    "modified": "2026-05-18T09:17:06.385Z",
+    "0.3.0": "2026-03-18T20:52:09.556Z",
+    "0.3.1": "2026-03-18T21:19:48.022Z",
+    "0.3.2": "2026-03-20T11:21:29.005Z",
+    "0.3.3": "2026-03-20T11:31:29.859Z",
+    "0.3.6": "2026-04-22T20:53:38.262Z",
+    "0.3.9": "2026-04-23T08:38:49.109Z",
+    "0.3.12": "2026-05-18T09:17:05.985Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 28,
+  "download_trend": []
+}

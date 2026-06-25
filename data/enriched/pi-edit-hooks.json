@@ -1,0 +1,37 @@
+{
+  "name": "pi-edit-hooks",
+  "latest_version": "0.2.1",
+  "description": "Code quality hooks for the pi coding agent \u2014 runs syntax checks on edit and format/lint/typecheck at turn end",
+  "readme": "# pi-edit-hooks\n\nCode quality hooks for the [pi coding agent](https://shittycodingagent.ai).\n\nRuns syntax checks inline as the agent edits files (`onEdit`) and runs\nformat/lint/typecheck at the end of each turn (`onStop`).\n\n## Install\n\n```bash\npi install npm:pi-edit-hooks\n```\n\n## Configuration\n\nCreate `.pi/edit-hooks.json` in your project, or globally at `~/.pi/agent/edit-hooks.json`.\n\n## Hooks\n\n| Hook | Trigger | Behavior | Variables |\n|------|---------|----------|-----------|\n| `onEdit` | After each `write`/`edit` tool call | Appends output to tool result (informational, never blocks). Shows resolved config file and command executed. | `{file}` |\n| `onStop` | After agent turn ends | Sends a follow-up message with each command and its output. Errors trigger a new agent turn; clean output is informational only. | `{files}`, `{file}` |\n\n## Variables\n\n- `{file}` \u2014 absolute path of the edited file\n- `{files}` \u2014 space-separated absolute paths of all files edited in the current turn, grouped by project (see below)\n- `{projectRoot}` \u2014 directory containing the `.pi/` folder\n\nCommands without a placeholder run as-is (useful for project-wide tools like `npx tsc --noEmit`).\n\n## Monorepo File Grouping\n\nIn monorepos, `{files}` is not a flat list of every edited file. Instead,\npi-edit-hooks groups files by their nearest workspace manifest (`pyproject.toml`,\n`package.json`, `go.mod`, etc.) and runs the `onStop` command once per group,\nwith `{files}` containing only the files that belong to that manifest's project\nand `{projectRoot}` pointing to its directory.\n\nThis means tools like `ruff`, `tsc`, and `go vet` are always invoked from the\ncorrect project root with the correct subset of files \u2014 no cross-project\ncontamination and no need to wrangle paths manually.\n\n## Array Commands\n\nA command value can be a string or an array of strings. When an array is given,\neach command runs in sequence \u2014 all steps always run regardless of exit codes:\n\n```json\n\"*.py\": [\n  \"uv run ruff format {files}\",\n  \"uv run ruff check --fix {files}\",\n  \"uv run ty check {files}\"\n]\n```\n\n## Path-Keyed Config\n\nApply different settings per subdirectory:\n\n```json\n{\n  \".\": {\n    \"onEdit\": { \"*.py\": \"python3 -m ast {file}\" },\n    \"onStop\": { \"*.py\": \"uv run ruff check {files}\" }\n  },\n  \"legacy/\": false,\n  \"packages/frontend/\": {\n    \"onStop\": { \"*.{ts,tsx}\": \"npx biome check {files}\" }\n  }\n}\n```\n\n`false` disables all hooks for that subtree.\n\n## Claude Code CLI\n\nThe package also ships a `pi-edit-hooks` binary compatible with Claude Code's\nstop-hook protocol:\n\n```json\n{\n  \"hooks\": {\n    \"Stop\": [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"pi-edit-hooks check\" }] }],\n    \"PostToolUse\": [{ \"hooks\": [{ \"type\": \"command\", \"command\": \"pi-edit-hooks accumulate\" }] }]\n  }\n}\n```\n\n## Example Configurations\n\nMinimal project setup:\n\n```json\n{\n  \"onEdit\": {\n    \"*.py\": \"python3 -c 'import ast,sys;ast.parse(open(sys.argv[1]).read())' {file}\",\n    \"*.{js,mjs,cjs}\": \"node --check {file}\",\n    \"*.{ts,tsx}\": \"esbuild {file} > /dev/null\"\n  },\n  \"onStop\": {\n    \"*.py\": [\n      \"uv run ruff format {files}\",\n      \"uv run ruff check --fix {files}\",\n      \"uv run ty check {files}\"\n    ],\n    \"*.{ts,tsx}\": \"npx tsc --noEmit\"\n  }\n}\n```\n\nMonorepo with per-subtree overrides:\n\n```json\n{\n  \".\": {\n    \"onEdit\": { \"*.py\": \"python3 -c 'import ast,sys;ast.parse(open(sys.argv[1]).read())' {file}\" },\n    \"onStop\": {\n      \"*.py\": [\n        \"uv run ruff format {files}\",\n        \"uv run ruff check --fix {files}\",\n        \"uv run basedpyright {files}\"\n      ]\n    }\n  },\n  \"legacy/\": false,\n  \"packages/frontend/\": {\n    \"onStop\": { \"*.{ts,tsx}\": \"npx biome check {files}\" }\n  }\n}\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "format",
+    "lint",
+    "typecheck",
+    "hooks"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/mackenney/pi-edit-hooks#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mackenney/pi-edit-hooks.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-20T22:35:04.646Z",
+    "modified": "2026-05-17T23:17:39.928Z",
+    "0.1.0": "2026-04-20T22:35:04.908Z",
+    "0.2.0": "2026-04-30T20:07:17.705Z",
+    "0.2.1": "2026-05-17T23:17:39.807Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 17,
+  "download_trend": []
+}

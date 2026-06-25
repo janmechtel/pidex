@@ -1,0 +1,40 @@
+{
+  "name": "pi-monitor-plugin",
+  "latest_version": "0.1.1",
+  "description": "Background, monitor, loop, and schedule jobs for the pi coding agent, with idle-aware session notifications. Ships a skill that watches GitHub for PRs awaiting your review and notifies your session.",
+  "readme": "# pi-monitor-plugin\n\nBackground, monitor, loop, and schedule jobs for the [pi coding agent](https://github.com/badlogic/pi-mono),\nwith idle-aware session notifications and a TUI job indicator. Ships as a standard\n**pi package**: one extension plus one skill.\n\n> **Status: planning / scaffold.** The architecture and milestones live in [PLAN.md](PLAN.md);\n> the deep research backing them lives in [docs/research/](docs/research/). The job engine is\n> not implemented yet. This is the pi-native successor of\n> [opencode-monitor-plugin](https://github.com/Shodocan/opencode-monitor-plugin) \u2014 and because\n> pi extensions run in-process with first-class message injection, it needs none of the\n> HTTP-bridge/MCP machinery the OpenCode version required.\n\n## The flagship use case\n\nA monitor runs a watcher script; the script polls GitHub for pull requests awaiting your\nreview and notifies your pi session:\n\n```\n/monitor --regex '^PI_EVENT ' -- ./skills/github-pr-watch/scripts/watch-prs.sh --interval 300\n```\n\nWhen a new review request appears, the session receives a structured event, summarizes the\nPR, and asks whether you want to start reviewing \u2014 politely: by default it never interrupts\na turn that is already running.\n\n## Capabilities (planned surface)\n\n- `/background <command>` \u2014 run a long shell command without blocking the current turn; get the capped output tail when it exits.\n- `/monitor --regex <pattern> [--before N] [--after N] [--debounce S] -- <command>` \u2014 watch a long-running command's output, deliver matching windows with context.\n- `/loop <interval> <prompt>` \u2014 repeat a prompt; ticks missed while the agent is busy coalesce into one delivery.\n- `/schedule in <duration> <prompt>` / `/schedule at <iso-date> <prompt>` \u2014 one-shot future prompt.\n- `/jobs` / `/cancel <jobID>` \u2014 inspect and stop jobs.\n- AI-callable tools (`jobs_background`, `jobs_monitor`, `jobs_loop`, `jobs_schedule`, `jobs_list`, `jobs_cancel`) so the agent can start jobs itself.\n- Idle-aware delivery: busy sessions get a toast immediately and the message on the next turn boundary; `--deliver steer` opts a watcher into interrupting.\n- Footer/widget indicator of active jobs.\n\n### Other things a watcher can do\n\nCI run babysitting, deploy watch, `tail -f` error watch, issue triage, test-on-save,\nDependabot/security alerts, release watch, long-build completion pings, disk-quota\nsentinels, k8s crashloop watch \u2014 anything that can print a `PI_EVENT` line (see\n[PLAN.md \u00a73.4](PLAN.md) for the protocol).\n\n## Install\n\nRequires Node \u2265 22.19 and pi \u2265 0.79. The GitHub watcher additionally needs an\nauthenticated [`gh`](https://cli.github.com/) CLI \u2014 the plugin never touches tokens itself.\n\n```bash\n# from npm (once published)\npi install npm:pi-monitor-plugin\n\n# from git, today\npi install git:github.com/Shodocan/pi-monitor-plugin\n\n# try without installing\npi -e git:github.com/Shodocan/pi-monitor-plugin\n\n# project-local (shared with your team via .pi/settings.json)\npi install -l npm:pi-monitor-plugin\n```\n\nLocal development:\n\n```bash\ngit clone https://github.com/Shodocan/pi-monitor-plugin\ncd pi-monitor-plugin && npm install\npi -e .          # ad-hoc load for the current run\n```\n\nThere is no build step: pi loads the TypeScript extension directly (jiti).\n\n## Security model\n\n- Pi packages run with full system access \u2014 review the source before installing, as with\n  any pi package.\n- Commands run through POSIX `/bin/sh -c` in their own process group; cancellation is\n  SIGTERM \u2192 5s grace \u2192 SIGKILL.\n- Delivered process output is nonce-fenced (so untrusted output cannot impersonate\n  instructions), ANSI/control-stripped, and best-effort secret-redacted.\n- Regex patterns are length-capped and ReDoS-vetted before a monitor starts.\n- The GitHub watcher stores no credentials \u2014 it relies entirely on ambient `gh` auth, and\n  keeps only seen-PR ids under `~/.local/state/pi-monitor/`.\n\n## Development\n\n```bash\nnpm install\nnpm run typecheck\nnpm test\n```\n\nBefore any release: `npm pack --dry-run` and a secret scan over the pack list.\n\n## License\n\n[MIT](LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "background-jobs",
+    "monitoring",
+    "notifications",
+    "github"
+  ],
+  "author": {
+    "name": "Walisson Casonatto"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Shodocan/pi-monitor-plugin#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Shodocan/pi-monitor-plugin.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-14T00:54:11.644Z",
+    "modified": "2026-06-18T21:40:15.858Z",
+    "0.1.0": "2026-06-14T00:54:11.872Z",
+    "0.1.1": "2026-06-18T21:40:15.736Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

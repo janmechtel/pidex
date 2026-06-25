@@ -1,0 +1,30 @@
+{
+  "name": "pi-macos-cua",
+  "latest_version": "0.1.1",
+  "description": "Pi extension that lets Pi drive local macOS apps through cua-driver.",
+  "readme": "# pi-macos-cua\n\nPi extension package for **local macOS computer-use** with\n[`cua-driver`](https://github.com/trycua/cua/tree/main/libs/cua-driver).\n\nThis version is intentionally **local-first**:\n\n- no CUA cloud API key\n- no container name\n- no remote sandbox requirement\n\nInstead, Pi talks to the locally installed `cua-driver` CLI and lets the\ndriver manage backgrounded macOS automation through `CuaDriver.app`.\n\n## How it works\n\n`cua-driver` already exposes a practical CLI surface for local macOS use:\n\n- `cua-driver serve`\n- `cua-driver status`\n- `cua-driver stop`\n- `cua-driver call <tool> <json>`\n- shorthand tool calls like `cua-driver list_apps`, `launch_app`, `click`, etc.\n\nThis package wraps that CLI in one Pi-native exec tool with built-in helper functions.\n\n## Registered Pi tools\n\n- `macos_cua_exec`\n\nInside `macos_cua_exec`, use the built-in helpers around the driver's own workflow:\n\n1. launch or find an app\n2. list/select a window\n3. snapshot with `get_window_state`\n4. act via `element_index` or pixel coordinates\n5. snapshot again\n\n## Why this backend\n\nFor Pi on macOS, `cua-driver` is the best fit because it is:\n\n- local\n- background-first\n- built specifically for native macOS apps\n- already usable from plain CLI commands\n\nThat means the extension does **not** need to build a full MCP client just to get started.\n\n## Prerequisites\n\nInstall `CuaDriver.app` and the CLI:\n\n```bash\n/bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/trycua/cua/main/libs/cua-driver/scripts/install.sh)\"\n```\n\nThen grant **Accessibility** and **Screen Recording** to `CuaDriver.app` in macOS System Settings.\n\nInside Pi, you can also run:\n\n```text\n/install-cua-driver\n```\n\nIf CuaDriver.app is missing, the macOS CUA commands/tool will tell you to run that command first.\n\n## Install this Pi package\n\n```bash\ncd pi-macos-cua\nnpm install\n```\n\nTry directly:\n\n```bash\npi -e ./extensions/index.ts\n```\n\nOr install as a Pi package:\n\n```bash\npi install /absolute/path/to/pi-macos-cua\n```\n\n## Optional configuration\n\nEnvironment variables:\n\n```bash\nexport PI_MACOS_CUA_BINARY=/usr/local/bin/cua-driver\nexport PI_MACOS_CUA_APP=/Applications/CuaDriver.app\nexport PI_MACOS_CUA_AUTOSTART=1\nexport PI_MACOS_CUA_START_TIMEOUT_MS=10000\n```\n\nOptional config file:\n\n- `~/.pi/agent/macos-cua.json`\n- `<project>/.pi/macos-cua.json`\n\n```json\n{\n  \"binaryPath\": \"/usr/local/bin/cua-driver\",\n  \"appPath\": \"/Applications/CuaDriver.app\",\n  \"autoStartDaemon\": true,\n  \"startTimeoutMs\": 10000\n}\n```\n\nThis extension relies on `cua-driver call --raw`, so if the driver's raw JSON format changes in a future release, the wrapper may need an update too.\n\n## Commands\n\n- `/install-cua-driver` \u2014 print the install command for `CuaDriver.app` (requires sudo, so you run it yourself)\n- `/macos-cua-status` \u2014 show resolved binary/app + daemon status\n- `/macos-cua-stop` \u2014 stop the background `cua-driver` daemon\n- `/macos-cua-diagnose` \u2014 paste `cua-driver diagnose` output into the editor\n\n## Usage notes\n\nImportant driver rules this extension follows:\n\n- prefer `launchApp()` instead of `open -a`\n- prefer `element_index` clicks over pixel clicks when AX elements exist\n- call `getWindowState()` before element-indexed actions\n- re-snapshot after UI-changing actions\n\n`macos_cua_exec` is an escape hatch for short deterministic JavaScript sequences.\nThe code runs inside a persistent Node REPL as the body of an async function, so:\n\n- use `await`\n- `return` a final value explicitly if you want one shown\n- use `state.foo = ...` to persist values across calls\n- keep `state` plain structured-cloneable data only (objects, arrays, strings, numbers, booleans, null)\n\nAvailable helpers inside `macos_cua_exec`:\n\n- `invoke(toolName, args)`\n- `checkPermissions(...)`\n- `listApps()`\n- `launchApp(...)`\n- `listWindows(...)`\n- `getWindowState(...)`\n- `click(...)`\n- `typeText(...)`\n- `setValue(...)`\n- `pressKey(...)`\n- `hotkey(...)`\n- `scroll(...)`\n- `sleep(ms)`\n- `state`\n- `clearState()`\n- `console.log(...)`\n\nExample:\n\n```js\nconst launched = await launchApp({ name: \"Safari\" });\nconst windows = await listWindows();\nconsole.log(\"window count\", windows.details.structuredContent?.windows?.length ?? 0);\nstate.lastWindows = windows.details.structuredContent;\nreturn state.lastWindows;\n```\n\nBecause this executes arbitrary JavaScript in the extension process, keep sequences short\nand deterministic. Timeouts are best-effort for cooperative async code; avoid tight infinite loops.\n\n## Future improvements\n\n- add richer rendering for AX trees and screenshots\n- add optional zoom / double-click wrappers\n- add safer confirmation flows for destructive GUI actions\n- add specialized browser-oriented helpers on top of the raw driver primitives\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "cua",
+    "computer-use",
+    "macos"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-07T19:22:04.541Z",
+    "0.1.1": "2026-05-07T19:22:04.803Z",
+    "modified": "2026-05-07T19:22:05.008Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

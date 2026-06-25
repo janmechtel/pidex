@@ -1,0 +1,48 @@
+{
+  "name": "pi-cursor-provider",
+  "latest_version": "0.1.11",
+  "description": "Pi extension providing access to Cursor models via OAuth and a local OpenAI-compatible gRPC proxy",
+  "readme": "# pi-cursor-provider\n\n[![npm version](https://img.shields.io/npm/v/pi-cursor-provider.svg)](https://www.npmjs.com/package/pi-cursor-provider)\n\n[Pi](https://github.com/badlogic/pi-mono) extension that provides access to [Cursor](https://cursor.com) models via OAuth authentication and a local OpenAI-compatible proxy.\n\n## How it works\n\n```\npi  \u2192  openai-completions  \u2192  localhost:PORT/v1/chat/completions\n                                      \u2193\n                              proxy.ts (HTTP server)\n                                      \u2193\n                              h2-bridge.mjs (Node HTTP/2)\n                                      \u2193\n                              api2.cursor.sh gRPC\n```\n\n1. **PKCE OAuth** \u2014 browser-based login to Cursor, no client secret needed\n2. **Model discovery** \u2014 queries Cursor's `GetUsableModels` gRPC endpoint\n3. **Local proxy** \u2014 translates OpenAI `/v1/chat/completions` to Cursor's protobuf/HTTP2 Connect protocol\n4. **Tool routing** \u2014 rejects Cursor's native tools, exposes pi's tools via MCP\n\n## Install\n\n```bash\n# Via pi install\npi install npm:pi-cursor-provider\n\n# Or manually\ngit clone https://github.com/ndraiman/pi-cursor-provider ~/.pi/agent/extensions/cursor-provider\ncd ~/.pi/agent/extensions/cursor-provider\nnpm install\n```\n\n## Usage\n\n```\n/login cursor     # authenticate via browser\n/model            # select a Cursor model\n```\n\n## Model Mapping\n\nCursor exposes many model variants that encode **effort level** (`low`, `medium`, `high`, `xhigh`, `max`, `none`) and **speed** (`-fast`) or **thinking** (`-thinking`) in the model ID. This extension deduplicates them so pi's reasoning effort setting controls the effort level.\n\n### How it works\n\nEach raw Cursor model ID is parsed into components:\n\n```\n{base}-{effort}[-fast|-thinking]\n```\n\nExamples:\n\n| Raw Cursor ID | Base | Effort | Variant |\n|---|---|---|---|\n| `gpt-5.4-medium` | `gpt-5.4` | `medium` | \u2014 |\n| `gpt-5.4-high-fast` | `gpt-5.4` | `high` | `-fast` |\n| `claude-4.6-opus-max-thinking` | `claude-4.6-opus` | `max` | `-thinking` |\n| `gpt-5.1-codex-max-high` | `gpt-5.1-codex-max` | `high` | \u2014 |\n| `composer-2` | `composer-2` | \u2014 | \u2014 |\n\nModels sharing the same `(base, variant)` with **\u22652 effort levels** and a sensible default (`medium` or no-suffix) are collapsed into a single entry with `supportsReasoningEffort: true`. Pi's thinking level maps to the effort suffix:\n\n| Pi Level | Cursor Suffix |\n|---|---|\n| `minimal` | `none` (if available) or `low` |\n| `low` | `low` |\n| `medium` | `medium` or no suffix (default) |\n| `high` | `high` |\n| `xhigh` | `max` (Claude) or `xhigh` (GPT) |\n\nThe proxy inserts the effort before `-fast`/`-thinking`:\n\n```\npi selects: gpt-5.4-fast  +  effort: high  \u2192  Cursor receives: gpt-5.4-high-fast\npi selects: gpt-5.4       +  effort: medium  \u2192  Cursor receives: gpt-5.4-medium\npi selects: composer-2     +  (no effort)     \u2192  Cursor receives: composer-2\n```\n\nWhen a group is **collapsed**, the proxy registers one model with `supportsReasoningEffort: true` and an internal effort map (see table above).\n\n**Collapsed** when Cursor returns either:\n\n- **Multiple** effort suffixes for the same `(base, -fast, -thinking)` group, or\n- **A single** variant whose parsed effort suffix is **non-empty** (for example only `claude-4.5-opus-high` is listed). The suffix is removed from the displayed ID so Pi's reasoning-effort setting supplies it.\n\n**Left as-is** (raw Cursor ID on that row, `supportsReasoningEffort: false`) when the group has **one** variant and the parsed effort suffix is **empty**\u2014typically IDs with no effort segment, such as `composer-2`, `gemini-3.1-pro`, or `kimi-k2.5`.\n\n### Disabling the mapping\n\nTo see all raw Cursor model variants without dedup:\n\n```bash\nPI_CURSOR_RAW_MODELS=1 pi\n```\n\n## Session Management\n\nThe proxy maintains conversation state per pi session, enabling multi-turn conversations with Cursor models while preserving forks, tool continuations, and interruptions correctly.\n\n### How it works\n\n- **Session tracking** \u2014 pi's session ID is injected into requests via a `before_provider_request` hook. The proxy keys bridge state and stored conversation state from that real session ID.\n- **Checkpoints** \u2014 Cursor returns a conversation checkpoint after completed turns. The proxy stores that checkpoint, plus the completed-turn count and a fingerprint of the completed structured history, and reuses it only when the incoming history still matches.\n- **Session-scoped state** \u2014 real pi session state is kept in memory until explicit cleanup or process restart. Anonymous fallback state can still be TTL-evicted.\n- **Lifecycle cleanup** \u2014 session state is cleaned up on pi lifecycle events such as session switch, fork, `/tree`, and shutdown.\n\n### Tool continuations\n\nWhen Cursor pauses for a tool call, the proxy keeps the live upstream bridge open and waits for pi to send the tool result on the next request. That tool result is sent back into the same in-flight Cursor run, so the tool continuation stays part of the original user turn instead of inflating completed history.\n\n### Interruptions\n\nIf the client disconnects or interrupts a turn mid-stream, the proxy cancels the upstream Cursor run and does **not** commit the pending checkpoint. Checkpoints are only committed after a turn finishes successfully.\n\n### Session fork\n\nWhen you navigate back in pi's session tree and branch from an earlier point, the proxy discards the stored checkpoint whenever the completed history no longer matches the stored checkpoint metadata. That includes both:\n\n- completed turn count mismatches, and\n- same-depth branch changes detected via completed-history fingerprint mismatch.\n\nAfter discarding a stale checkpoint, the proxy reconstructs proper protobuf conversation turns from the message history pi sends, so Cursor sees the actual conversation structure at the fork point.\n\n### Session resume\n\nConversation state is stored in memory. If the proxy restarts, checkpoints are lost. On the next request, pi sends the full conversation history, and the proxy reconstructs structured protobuf turns from that history instead of relying on an inline plaintext fallback.\n\nThat reconstruction preserves:\n\n- assistant messages\n- tool calls\n- tool results\n- final assistant text after tool results\n\n## Requirements\n\n- [Pi](https://github.com/badlogic/pi-mono)\n- [Node.js](https://nodejs.org) >= 18\n- Active [Cursor](https://cursor.com) subscription\n\n## Development\n\n```bash\nnpm install\nnpm test\n```\n\n## Debug log timeline\n\nWhen `PI_CURSOR_PROVIDER_DEBUG=1` is enabled, the proxy writes timestamped JSONL logs to `os.tmpdir()` by default. You can turn a log into a compact human-readable timeline with:\n\n```bash\nnpm run debug:timeline -- --latest\nnpm run debug:timeline -- /path/to/pi-cursor-provider-debug-2026-04-08T14-06-07-565Z-41184.log\n```\n\nAdd `--json` if you want the parsed summary as JSON instead of formatted text.\n\n## Credits\n\nOAuth flow and gRPC proxy adapted from [opencode-cursor](https://github.com/ephraimduncan/opencode-cursor) by Ephraim Duncan.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "cursor",
+    "oauth",
+    "proxy",
+    "grpc",
+    "openai-compatible"
+  ],
+  "author": {
+    "name": "Netanel Draiman"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ndraiman/pi-cursor-provider#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ndraiman/pi-cursor-provider.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-06T07:27:10.430Z",
+    "modified": "2026-04-09T14:51:27.257Z",
+    "0.1.0": "2026-04-06T07:27:10.582Z",
+    "0.1.1": "2026-04-06T07:43:26.056Z",
+    "0.1.2": "2026-04-06T09:07:35.115Z",
+    "0.1.3": "2026-04-06T11:00:30.534Z",
+    "0.1.4": "2026-04-06T11:53:53.894Z",
+    "0.1.5": "2026-04-06T13:56:16.929Z",
+    "0.1.6": "2026-04-06T14:39:02.468Z",
+    "0.1.7": "2026-04-07T04:30:05.344Z",
+    "0.1.8": "2026-04-07T05:46:18.558Z",
+    "0.1.9": "2026-04-07T06:41:18.757Z",
+    "0.1.10": "2026-04-07T09:14:33.186Z",
+    "0.1.11": "2026-04-09T14:51:27.152Z"
+  },
+  "versions_count": 12,
+  "downloads_last_week": null,
+  "download_trend": []
+}

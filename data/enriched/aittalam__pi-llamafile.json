@@ -1,0 +1,350 @@
+{
+  "name": "@aittalam/pi-llamafile",
+  "latest_version": "1.0.0",
+  "description": "Pi extension that supervises local llamafile-served model processes \u2014 start, stop, adopt, with progress visible on quit",
+  "readme": "# Llamafiles provider extension for pi\n\nA pi extension that supervises locally-run llamafile-style model servers\n(or any OpenAI-compatible server you can launch from a binary). It\nregisters a `llamafiles` provider with pi, starts the configured binary\nwhen you pick one of its models, and stops it when you switch away or\nquit.\n\n## Status\n\nImplementation complete; covered by 55 automated tests (42 unit + 13\nintegration via the SDK driver). `npm test` runs in ~15s and exits 0.\n\nSee [`SPECS.md`](SPECS.md) for the behavioral contract, [`PLAN.md`](PLAN.md)\nfor the implementation plan, and [`NOTES.md`](NOTES.md) for the pi API\nfindings that informed the design.\n\n## Features\n\n- **Process supervision** \u2014 starts the configured binary on `/model`,\n  waits for `/v1/models` to respond, then reports ready. One process per\n  pi session.\n- **Per-model port** \u2014 each model declares its own `port`; pi sends\n  requests there. Default `8080`.\n- **`{{port}}` substitution in `args`** \u2014 `port` is the single source of\n  truth; reference it in your binary's arg list as `{{port}}`.\n- **Adoption** \u2014 if a compatible server is already running on the port,\n  pi adopts it instead of spawning a duplicate.\n- **Foreign-port safety** \u2014 if a different server holds the port, pi\n  surfaces the conflict and tells you to free it manually. It never kills\n  processes it did not start.\n- **Visible quit progress** \u2014 when you exit pi while it owns a running\n  process, the extension prints \"Stopping llamafile ...\" and\n  \"Stopped llamafile ...\" to stderr so the user can see the wait.\n- **Transparent reload** \u2014 `/reload` does **not** prompt; the process\n  keeps running and the freshly loaded extension instance re-adopts it.\n- **Cleanup-by-design** \u2014 adopted processes are never stopped without\n  your consent.\n\n## Installation\n\nThree options, in order of recommendation:\n\n**From npm** (most convenient, gets gallery indexing):\n\n```bash\npi install npm:@aittalam/pi-llamafile\n```\n\n**From git** (pins to a tag, no npm account needed by you or by pi):\n\n```bash\npi install git:github.com/aittalam/pi-llamafile@v1.0.0\n```\n\n**From source** (for hacking on the extension):\n\n```bash\ngit clone https://github.com/aittalam/pi-llamafile ~/.pi/agent/extensions/pi-llamafile\ncd ~/.pi/agent/extensions/pi-llamafile\nnpm install\n```\n\nIn all cases, use `/reload` from a running pi session, or restart pi, to pick\nup changes.\n\n## Configuration\n\nDefine your llamafile models in `~/.pi/agent/models.json` under the\n`llamafiles` provider:\n\n```jsonc\n{\n  \"providers\": {\n    \"llamafiles\": {\n      \"models\": [\n        {\n          \"id\": \"qwen3-9b\",\n          \"name\": \"Qwen3 9B\",\n          \"command\": \"sh\",\n          \"args\": [\n            \"/path/to/qwen3-9b.llamafile\",\n            \"--server\",\n            \"--port\",\n            \"{{port}}\",\n            \"--jinja\"\n          ],\n          \"port\": 8080,\n          \"reasoning\": false,\n          \"input\": [\"text\"],\n          \"contextWindow\": 32768,\n          \"maxTokens\": 4096\n        }\n      ]\n    }\n  }\n}\n```\n\nOptional per-model fields beyond pi's standard set:\n\n| Field     | Description                                          |\n|-----------|------------------------------------------------------|\n| `command` | Executable to spawn. Required.                        |\n| `args`    | Argument list. `{{port}}` is substituted at spawn.    |\n| `port`    | TCP port the server listens on. Default `8080`.       |\n| `env`     | Extra environment variables for the spawned process.  |\n| `cwd`     | Working directory for the spawned process.            |\n\nSee [`SPECS.md` \u00a73.2](SPECS.md) for the complete schema and defaults.\n\n## Usage\n\n1. `pi --list-models` should show your llamafile models under\n   the `llamafiles` provider.\n2. Use `/model` to pick one. The extension spawns the binary, waits\n   for readiness, and reports `<name> is ready`.\n3. Switch with `/model` again. The current process is stopped and the\n   new one started.\n4. Switch to any non-llamafile model: the running llamafile is stopped.\n5. `/quit` (or `Ctrl+D`): the running llamafile is stopped. Two lines\n   appear on the terminal (stderr): `Stopping llamafile \"<name>\" ...`\n   then `Stopped llamafile \"<name>\".` Adopted servers (started outside\n   pi) are left running silently.\n6. `/llamafiles`: prints the current state.\n\n## Development\n\n```bash\nnpm install        # install dev deps\nnpm test           # 56 tests, unit + integration\nnpm run test:unit  # 45 unit tests, sub-second\nnpm run dev        # pi -e . \u2014 smoke-load against your real HOME\n```\n\nLogs from spawned binaries are appended to `~/.pi/llamafile_logs/<modelId>.log`.\n\n## Layout\n\n```\nSPECS.md          # behavioral contract (single source of truth)\nPLAN.md           # implementation plan\nNOTES.md          # pi API findings\nindex.ts          # thin wiring: events, commands\nsrc/\n  config.ts       # models.json loader\n  template.ts     # {{port}} substitution\n  process.ts      # LlamafileSupervisor\n  log.ts          # file log streams\n  notify.ts       # notification text\n  types.ts        # shared types\ntests/\n  unit/           # 3 files, 42 tests\n  integration/    # 13 files, all SDK-driven\n  helpers/        # fake-server, harness, port allocator\n  MANUAL.md       # checklist for things automation cannot reach\n```\n\n## License\n\nMIT.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "llamafile",
+    "llm",
+    "local-llm",
+    "openai-compatible"
+  ],
+  "author": {
+    "name": "Davide Eynard",
+    "email": "davide@mozilla.ai"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/aittalam/pi-llamafile#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aittalam/pi-llamafile.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-21T17:08:57.418Z",
+    "1.0.0": "2026-05-21T17:08:57.724Z",
+    "modified": "2026-05-21T17:08:57.889Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 11,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 89
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 4
+    }
+  ]
+}

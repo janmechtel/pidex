@@ -1,0 +1,34 @@
+{
+  "name": "pi-auto-mode-router",
+  "latest_version": "2.0.1",
+  "description": "Auto Mode Router extension for Pi: route prompts between frontend, logic, and terminal models with optional mid-turn domain switching.",
+  "readme": "# pi-auto-mode-router\n\nAuto Mode Router is a Pi extension that adds a virtual `auto/mode` model and routes each turn to the most appropriate model for **frontend**, **logic**, or **terminal** work.\n\nIt can also support **mid-turn** domain changes through a built-in `switch_domain` tool when a task spans both UI/design and implementation/backend work.\n\n## What it does\n\nWhen Auto Mode is selected, each new prompt goes through this flow:\n\n1. The prompt is analyzed with your chosen **analysis model**\n2. The router decides whether the task is primarily:\n   - **frontend**\n   - **logic**\n   - **terminal**\n3. Pi switches to the best configured model for that domain\n4. If the task is multi-domain, the extension can:\n   - detect that it spans multiple domains\n   - decompose it into ordered phases\n   - inject phase guidance into the system prompt\n   - let the model call `switch_domain` to move to the next domain\n\n## Highlights\n\n- Adds a virtual **Auto Mode** model to `/model`\n- Commands: `/auto-mode` and `/auto`\n- Searchable model picker for analysis/frontend/logic model selection\n- Multi-domain task detection and decomposition\n- Mid-turn model switching with `switch_domain`\n- Terminal-only tasks can stay on the analysis model\n- Status indicator such as `auto:armed`, `auto:frontend`, `auto:logic`, `auto:terminal`, `auto:frontend [1/3]`\n- Config stored in `~/.pi/agent/auto-mode-router.json`\n- Safety limit of 6 mid-turn switches per turn\n\n## Important implementation note\n\nThe current implementation does **not** do automatic file-extension or path-based routing during tool calls.\n\nSo while the model receives guidance about when to switch domains, actual mid-turn switching happens through:\n\n- initial prompt analysis and routing\n- multi-domain phase guidance\n- explicit `switch_domain` tool calls by the model\n\nThere is a reserved `tool_call` section in the code for future work, but no file-based auto-switching logic is currently implemented there.\n\n## Installation\n\n### Option 1: install from npm as a Pi package\n\n```bash\npi install npm:pi-auto-mode-router\n```\n\nThen restart Pi or run:\n\n```bash\n/reload\n```\n\n### Option 2: local development install\n\nIf you are developing locally, put the package under an auto-discovered extension location, for example:\n\n- `~/.pi/agent/extensions/auto-mode-router/`\n- `.pi/extensions/auto-mode-router/`\n\nThen run:\n\n```bash\n/reload\n```\n\n## Setup\n\n1. Run `/auto-mode config`\n2. Choose:\n   - analysis model\n   - frontend model\n   - logic model\n   - whether **Mid-turn switching** is on\n3. Save with `Ctrl+S`\n4. Open `/model`\n5. Select `auto/mode`\n6. Keep using Pi normally\n\n## Commands\n\n- `/auto-mode` \u2192 open menu\n- `/auto-mode on` \u2192 enable Auto Mode\n- `/auto-mode off` \u2192 disable Auto Mode\n- `/auto-mode status` \u2192 show current state\n- `/auto-mode config` \u2192 change models and mid-turn setting\n- `/auto` \u2192 short alias\n- `Alt+A` \u2192 toggle Auto Mode\n\n## Example\n\nUser prompt:\n\n```text\nBuild a user profile page. Add a backend profile API and a polished frontend card UI.\n```\n\nPossible routing flow:\n\n1. Analyzer detects a multi-domain task\n2. Phases are created:\n   - Phase 1: `[logic]` profile API and data handling\n   - Phase 2: `[frontend]` profile card UI and styling\n3. Pi starts with the logic model\n4. The model calls:\n\n```ts\nswitch_domain({ domain: \"frontend\", reason: \"API is done, moving to the UI\" })\n```\n\n5. Pi switches to the frontend model\n6. Status updates from `auto:logic [1/2]` to `auto:frontend [2/2]`\n\n## How it is built\n\nThis extension uses Pi extension APIs documented in the official docs, including:\n\n- `registerProvider()` for the virtual `auto/mode` model\n- `registerTool()` for `switch_domain`\n- `input` event handling for prompt analysis\n- `before_agent_start` for phase guidance injection\n- `model_select` handling for enabling/disabling Auto Mode\n- `agent_end` for cleanup and phase reporting\n- `ctx.ui.custom()`, `SettingsList`, and notifications for configuration UI\n- `complete()` from `@mariozechner/pi-ai` for classifier calls\n\n## Packaging for Pi\n\nThis package is structured as a Pi package and can be installed with `pi install npm:pi-auto-mode-router`.\n\nPi package docs used for this setup:\n\n- package must include `keywords: [\"pi-package\"]`\n- package should declare a `pi` manifest\n- core Pi libraries should stay in `peerDependencies`\n\nCurrent manifest:\n\n```json\n{\n  \"name\": \"pi-auto-mode-router\",\n  \"keywords\": [\"pi-package\"],\n  \"pi\": {\n    \"extensions\": [\"./index.ts\"]\n  }\n}\n```\n\n## Publishing to npm\n\nFrom this directory:\n\n```bash\nnpm publish --access public\n```\n\nUseful checks before publishing:\n\n```bash\nnpm pack --dry-run\nnpm view pi-auto-mode-router version\n```\n\n## Notes\n\n- Auto Mode is only useful when the selected analysis/frontend/logic models are available and authenticated in Pi\n- If the analysis model is missing or fails, the extension falls back to heuristic routing\n- Multi-domain execution guidance is injected into the system prompt for the turn\n- Mid-turn switching is capped to avoid loops\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "shittycodingagent",
+    "auto-mode",
+    "router",
+    "llm-routing",
+    "model-routing"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-25T15:12:39.037Z",
+    "modified": "2026-03-25T15:19:10.076Z",
+    "2.0.0": "2026-03-25T15:12:39.334Z",
+    "2.0.1": "2026-03-25T15:19:09.973Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

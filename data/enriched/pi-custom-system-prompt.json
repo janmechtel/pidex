@@ -1,0 +1,38 @@
+{
+  "name": "pi-custom-system-prompt",
+  "latest_version": "0.1.0",
+  "description": "Pi extension that loads a custom system prompt from `~/.pi/agent/system-prompts/*.md` and injects it on every agent turn, with commands to select, toggle, reload, and switch between replace and append modes.",
+  "readme": "# pi-custom-system-prompt\n\nA [pi](https://pi.dev) extension that loads a custom system prompt from a markdown file and injects it into every agent turn. Works with any model or provider \u2014 nothing is hardcoded.\n\nMultiple `.md` files can live in the prompt directory; pick which one is active with `/system-prompt-select`. All changes take effect on the very next message you send \u2014 no `/new` or session restart required.\n\n## Commands\n\n| Command | What it does |\n|---|---|\n| `/system-prompt-info` | Show loaded path, size, mode, enabled state, available files |\n| `/system-prompt-toggle` | Enable or disable the custom prompt |\n| `/system-prompt-reload` | Re-read the selected prompt file from disk |\n| `/system-prompt-mode [replace\\|append]` | Toggle or set the merge mode |\n| `/system-prompt-show` | Print the first ~800 chars of the loaded prompt |\n| `/system-prompt-select` | Pick a different prompt file from the directory |\n\n## Modes\n\n**`append`** (default) \u2014 keep Pi's default system prompt as the base, and add the custom prompt as an extra section. Safest for most models, since Pi's tool descriptions stay authoritative.\n\n**`replace`** \u2014 use the custom prompt as the base system prompt. Pi's tool descriptions, current date, working directory, and any `--append-system-prompt` you passed are appended after it.\n\n## Setup\n\n### 1. Install the extension\n\n```bash\npi install npm:pi-custom-system-prompt\n```\n\nOr try it without installing:\n\n```bash\npi -e npm:pi-custom-system-prompt\n```\n\n### 2. Create the prompt directory\n\n```bash\nmkdir -p ~/.pi/agent/system-prompts\n```\n\nThe extension reads from this directory by default. To use a different location, set the `PI_SYSTEM_PROMPT_DIR` environment variable.\n\n### 3. Add a markdown file\n\n```bash\n# Example: a focused prompt for a specific model\ncat > ~/.pi/agent/system-prompts/claude-code.md <<'EOF'\nYou are a careful, terse coding assistant.\n- Read files before editing them.\n- Prefer minimal diffs.\n- Explain non-obvious choices in one sentence.\nEOF\n\n# Another example: a personality-style prompt\ncat > ~/.pi/agent/system-prompts/pirate.md <<'EOF'\nYou are a pirate captain. Speak in pirate vernacular but stay accurate\nabout technical content. Never break character.\nEOF\n```\n\nThe first file (alphabetical) is auto-selected on first run. Use `/system-prompt-select` to switch between them.\n\n### 4. Verify and toggle\n\n```bash\n# inside pi:\n/system-prompt-info        # confirm the file loaded\n/system-prompt-toggle off  # disable without deleting the file\n/system-prompt-toggle on   # re-enable\n```\n\nThe footer shows the active state:\n\n```\nsystem-prompt: claude-code.md    # enabled, showing the file\nsystem-prompt: enabled           # enabled, no file selected\nsystem-prompt: disabled          # disabled\n```\n\n## How it works\n\n- The extension subscribes to `before_agent_start`, which fires on every user message. It reads the selected `.md` file from the prompt directory, then either appends it to or replaces Pi's resolved system prompt before sending to the model.\n- State (`enabled`, `mode`, `selectedFile`) persists to `~/.pi/agent/state/system-prompt.json` and is reloaded on the next start.\n- All commands are non-destructive: they mutate in-memory state, save to the state file, and take effect on the next message.\n- If the prompt directory is missing, has no `.md` files, or the selected file is empty/unreadable, the extension logs the reason to `/system-prompt-info` and falls back to Pi's default prompt with no error.\n\n## Removing the extension\n\n```bash\npi remove npm:pi-custom-system-prompt\n```\n\nThis unloads the extension but does not delete your prompt files in `~/.pi/agent/system-prompts/` or your saved state in `~/.pi/agent/state/system-prompt.json`. Delete those manually if you want a clean uninstall:\n\n```bash\nrm -rf ~/.pi/agent/system-prompts\nrm -f  ~/.pi/agent/state/system-prompt.json\n```\n\n## Environment variables\n\n| Variable | Default | Effect |\n|---|---|---|\n| `PI_SYSTEM_PROMPT_DIR` | `~/.pi/agent/system-prompts` | Override the directory the extension scans for `.md` prompt files |\n\n## Development\n\nThe extension lives in [`extensions/system-prompt.ts`](extensions/system-prompt.ts). To load it from a local checkout during development:\n\n```bash\npi -e /absolute/path/to/pi-custom-system-prompt/extensions/system-prompt.ts\n```\n\nFor a hot-reload loop, symlink it into the global extensions directory:\n\n```bash\nln -s \"$(pwd)/extensions/system-prompt.ts\" ~/.pi/agent/extensions/system-prompt.ts\n```\n\nThen `/reload` inside pi after each edit.\n\n### Layout\n\n```\npi-custom-system-prompt/\n\u251c\u2500\u2500 extensions/\n\u2502   \u2514\u2500\u2500 system-prompt.ts\n\u251c\u2500\u2500 package.json\n\u251c\u2500\u2500 tsconfig.json\n\u251c\u2500\u2500 README.md\n\u251c\u2500\u2500 CHANGELOG.md\n\u2514\u2500\u2500 LICENSE\n```\n\nThe `extensions/` directory is a pi convention: any `.ts` file inside it is auto-discovered. The `pi-package` keyword in `package.json` makes the package appear in the [pi package gallery](https://pi.dev/packages).\n\n## License\n\n[MIT](LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "extension",
+    "system-prompt",
+    "custom-prompt",
+    "prompt"
+  ],
+  "author": {
+    "name": "Nocte",
+    "email": "nocte19@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/nnocte/pi-custom-system-prompt#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nnocte/pi-custom-system-prompt.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-21T10:04:52.685Z",
+    "0.1.0": "2026-06-21T10:04:52.920Z",
+    "modified": "2026-06-21T10:04:53.066Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

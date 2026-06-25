@@ -1,0 +1,52 @@
+{
+  "name": "@aedge-io/typed-clone",
+  "latest_version": "1.1.0",
+  "description": "Type-safe, performant and extensible clone implementation",
+  "readme": "# typed-clone\n\n[![codecov](https://codecov.io/github/aedge-io/typed-clone/graph/badge.svg?token=S4AQB5UAJO)](https://codecov.io/github/aedge-io/typed-clone)\n![NPM Version](https://img.shields.io/npm/v/%40aedge-io%2Ftyped-clone)\n![JSR Version](https://img.shields.io/jsr/v/%40aedge-io/typed-clone)\n\n> Type-safe, performant, and extensible clone implementation.\n\n---\n\n### Motivation\n\nThis library was initially developed to provide a type-safe alternative to the naive `structuredClone`-based implementation in [grugway](https://github.com/aedge-io/grugway).\n\n- **Type-safe**: Clearly encodes types that can and cannot be meaningfully cloned through the type system. Not-cloneable types get returned as `Ref<T>` explicitly.\n- **Performant**: Fast enough for the 20% of data types that make up 80% of real-world usage. `structuredClone` fallback for the rest (e.g. typed arrays).\n- **Extensible**: Simple, symbol-based [clone protocol](https://github.com/aedge-io/typed-clone/tree/main/docs/clone_protocol.md) for custom types.\n\n### Use Cases\n\nThis library particularly shines when referential transparency and infallibility are desired, or when dealing with heterogeneous and complex data that usually requires hand-rolled copy/clone implementations. `typed-clone` offers a good baseline implementation in those cases.\n\nThe custom clone protocol also allows for a seamless interaction of standard data types with your custom types or domain model.\n\n---\n\n### Quick Start\n\n#### Runtime Requirements\n\n- **Bun:** \u22651.0.0\n- **Deno:** \u22651.14\n- **Node.js:** \u226517.0.0\n- **Browsers:** Support `structuredClone`\n\n#### Installation\n\n**Node.js / Bun:**\n\n```bash\n(bun | (p)npm) add @aedge-io/typed-clone\n```\n\n**Deno:**\n\n```bash\ndeno add jsr:@aedge-io/typed-clone\n```\n\n---\n\n### Usage\n\n#### Simple\n\n```typescript\nimport { clone } from \"@aedge-io/typed-clone\";\n\nconst clonedRec = clone({ msg: \"hello there!\" }); // { msg: string }\nconst clonedFn = clone(() => \"hello there again!\"); // Ref<() => string>\n```\n\n#### Complex\n\n```typescript\nimport { Clone, clone, Cloneable, CloneOptions } from \"@aedge-io/typed-clone\";\n\nclass NotCloneable {\n  constructor(readonly name: string, private age: number) {}\n  greet() {\n    return `Hi, I am ${this.name} and ${this.age} years old.`;\n  }\n}\n\nclass Point { // implements Cloneable<Point>\n  constructor(private x: number, private y: number) {}\n  [Clone](opts?: CloneOptions) {\n    return new Point(this.x, this.y);\n  }\n}\n\nconst randInt = () => Math.floor(Math.random() * 100);\n\nconst uintArray = new Uint8Array(new ArrayBuffer(4));\nuintArray.set([0, 1, 2, 3]);\n\nconst meta = {\n  createdAt: new Date(),\n};\n\nconst original = {\n  metadata: meta,\n  handlers: new Map([[\"rand\", randInt]]),\n  primitives: [\"string\", 42, true, BigInt(9001), Symbol(\"foo\")] as const,\n  ref: new NotCloneable(\"Bob\", 71),\n  points: {\n    unique: new Set([new Point(0, 1), new Point(1, 2)]),\n    metadata: meta,\n  },\n  buf: uintArray,\n  circularRef: {},\n};\noriginal.circularRef = original;\n\nconst cloned = clone(original, { transfer: [original.buf.buffer] });\n\n// cloned = {\n//   metadata: {\n//     createdAt: Date;\n//   };\n//   handlers: Map<string, Ref<() => number>>;\n//   primitives: readonly [string, number, boolean, bigInt, Ref<unique symbol>];\n//   ref: Ref<NotCloneable>;\n//   points: {\n//     unique: Set<Point>; /* `Point` supports clone protocol */\n//     metadata: {\n//         createdAt: Date;\n//     };\n//   };\n//   buf: Uint8Array<ArrayBuffer>;\n//   circularRef: { ... };\n// };\n\nconsole.log(\"deep clone:\", cloned !== original);\nconsole.log(\"metadata cloned:\", cloned.metadata !== original.metadata);\nconsole.log(\"date cloned:\", +cloned.metadata.createdAt === +meta.createdAt);\nconsole.log(\"map cloned:\", cloned.handlers !== original.handlers);\nconsole.log(\"fn is ref:\", cloned.handlers.get(\"rand\") === randInt);\nconsole.log(\"array cloned:\", cloned.primitives !== original.primitives);\nconsole.log(\"symbol is ref:\", cloned.primitives[4] === original.primitives[4]);\nconsole.log(\"class is ref:\", cloned.ref === original.ref);\nconsole.log(\"set cloned:\", cloned.points.unique !== original.points.unique);\nconsole.log(\"buf transferred:\", original.buf.buffer.byteLength === 0);\nconsole.log(\"circular ref preserved:\", cloned.circularRef === cloned);\nconsole.log(\n  \"shared refs preserved:\",\n  cloned.metadata === cloned.points.metadata,\n);\n```\n\n---\n\n### Performance\n\n> **clone** = `clone(value)` (default, shared-ref cache)\n\n> **clone (nc)** = `clone(value, { preserveRefs: false })`\n\n| Benchmark                             |    clone |     ops/s | clone (nc) |     ops/s |\n| ------------------------------------- | -------: | --------: | ---------: | --------: |\n| Plain record (8 keys)                 | 257.1 ns | 3,890,000 |   203.8 ns | 4,908,000 |\n| Plain record (64 keys)                |   2.3 \u00b5s |   440,400 |     2.2 \u00b5s |   463,400 |\n| Plain record (256 keys)               |  23.0 \u00b5s |    43,520 |    21.7 \u00b5s |    46,020 |\n| Nested records (d=4, 16 leaves)       |   4.3 \u00b5s |   232,000 |     2.8 \u00b5s |   351,900 |\n| Nested records (d=8, 256 leaves)      |  77.3 \u00b5s |    12,940 |    47.6 \u00b5s |    21,030 |\n| Nested records (d=12, 4096 leaves)    |   1.3 ms |       745 |   790.3 \u00b5s |     1,265 |\n| Array\\<primitive\\> (n=256)            | 317.2 ns | 3,152,000 |   333.8 ns | 2,996,000 |\n| Array\\<primitive\\> (n=8192)           |   9.0 \u00b5s |   111,300 |     8.9 \u00b5s |   112,900 |\n| Array\\<record\\> (n=256)               |  39.4 \u00b5s |    25,370 |    24.5 \u00b5s |    40,830 |\n| Array\\<record\\> (n=8192)              |   1.4 ms |       720 |   757.0 \u00b5s |     1,321 |\n| Map\\<string,record\\> (n=256)          |  47.4 \u00b5s |    21,100 |    35.4 \u00b5s |    28,290 |\n| Set\\<record\\> (n=256)                 |  47.1 \u00b5s |    21,230 |    35.2 \u00b5s |    28,380 |\n| Real: Frontend state slice            |   1.3 \u00b5s |   758,900 |   941.4 ns | 1,062,000 |\n| Real: JSON Schema (32 props)          |  19.5 \u00b5s |    51,230 |    12.7 \u00b5s |    78,500 |\n| Real: API collection (32 items)       |  96.4 \u00b5s |    10,370 |    75.4 \u00b5s |    13,260 |\n| Real: Agent session (32 turns)        |  50.2 \u00b5s |    19,930 |    33.7 \u00b5s |    29,690 |\n| Real: Normalized store (256 entities) | 111.2 \u00b5s |     8,992 |   103.0 \u00b5s |     9,708 |\n| Real: Dashboard data (8K rows)        | 349.9 \u00b5s |     2,858 |   322.3 \u00b5s |     3,103 |\n\nBy default, `typed-clone` keeps track of object references to support shared and circular references. The overhead is most pronounced for small data structures. By disabling it, clone operations can be up to ~50% faster.\n\nFor a comprehensive write-up including memory overhead and comparison to [rfdc](https://github.com/davidmarkclements/rfdc) and `structuredClone`, see [docs](https://github.com/aedge-io/typed-clone/tree/main/docs/performance.md).\n\n**Your mileage may vary though!** Run the full benchmark suite with `deno bench`.\n\n### Security\n\nUnlike similar packages, `typed-clone` guards against primitive prototype poisoning. However, this protection does not extend to prototype pollution in general, since the mitigations are quite runtime-dependent.\n\n- [Secure JSON.parse](https://github.com/fastify/secure-json-parse)\n- [MDN prototype pollution](https://developer.mozilla.org/en-US/docs/Web/Security/Attacks/Prototype_pollution)\n\n### Caveats\n\nGiven the structural nature of TypeScript's type system, certain edge-case subclasses currently don't get inferred correctly. Check out the [docs](https://github.com/aedge-io/typed-clone/tree/main/docs/type_safety.md) for a comprehensive overview.\n\n---\n\n### License\n\nMIT License \u2014 see [LICENSE.md](./LICENSE.md)\n\n### Resources\n\n- [MDN structuredClone](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm)\n- [V8 Memory Model](https://www.dashlane.com/blog/how-is-data-stored-in-v8-js-engine-memory)\n",
+  "keywords": [
+    "agent-skill",
+    "clanker-friendly",
+    "clone",
+    "copy",
+    "deep",
+    "deep-clone",
+    "deep-copy",
+    "deepclone",
+    "deepcopy",
+    "extensible",
+    "pi-package",
+    "protocol",
+    "recursive",
+    "safe",
+    "structured",
+    "type-safe",
+    "typed",
+    "types",
+    "typesafe"
+  ],
+  "author": {
+    "name": "aedge-io",
+    "email": "os@aedge.io"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/aedge-io/typed-clone#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aedge-io/typed-clone.git"
+  },
+  "pi": {
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-04-01T15:30:54.929Z",
+    "modified": "2026-04-07T15:24:30.345Z",
+    "0.0.0": "2026-04-01T15:30:55.213Z",
+    "1.0.0": "2026-04-03T02:54:08.575Z",
+    "1.1.0": "2026-04-07T15:24:30.068Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 9,
+  "download_trend": []
+}

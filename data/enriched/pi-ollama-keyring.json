@@ -1,0 +1,38 @@
+{
+  "name": "pi-ollama-keyring",
+  "latest_version": "1.0.0",
+  "description": "Ollama cloud provider for pi-coding-agent with multi-key rotation, live model discovery, and persistent key-pool management",
+  "readme": "# pi-ollama-keyring\n\nOllama **cloud** provider for [pi-coding-agent](https://github.com/badlogic/pi-mono) with multi-key rotation, live model discovery, and persistent key-pool management.\n\n## What makes this different\n\nThe official [`@0xkobold/pi-ollama`](https://www.npmjs.com/package/@0xkobold/pi-ollama) package supports a single API key and a stale hardcoded model list.\n\n`pi-ollama-keyring` was built for people running **multiple Ollama cloud API keys** who need:\n\n- a live model inventory pulled directly from their account\n- automatic key rotation when a key hits quota or rate limits\n- manual key selection that survives restarts\n- full tool-calling and thinking support through Pi\n\n## Installation\n\n```bash\npi install npm:pi-ollama-keyring\n```\n\nOr add to your global `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\"pi-ollama-keyring\"]\n}\n```\n\n## Configuration\n\nAdd your keys and settings to `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"pi-ollama\": {\n    \"cloudUrl\": \"https://ollama.com\",\n    \"apiKeys\": [\n      \"key-1\",\n      \"key-2\",\n      \"key-3\"\n    ],\n    \"activeKeyIndex\": 0\n  }\n}\n```\n\nA single key also works:\n\n```json\n{\n  \"pi-ollama\": {\n    \"apiKey\": \"your-key-here\"\n  }\n}\n```\n\n### Environment variables\n\n```bash\nexport OLLAMA_API_KEY=\"your-key\"\nexport OLLAMA_API_KEYS=\"key-1,key-2,key-3\"\nexport OLLAMA_HOST_CLOUD=\"https://ollama.com\"\nexport OLLAMA_ACTIVE_KEY_INDEX=\"0\"\n```\n\n### Config precedence (highest to lowest)\n\n1. Environment variables\n2. `pi.settings` runtime API\n3. `.pi/settings.json` (project-local)\n4. `~/.pi/agent/settings.json` (global)\n\n## Features\n\n- \u2601\ufe0f **Ollama Cloud** \u2014 talks directly to `api.ollama.com` via the `ollama` npm client\n- \ud83d\udd11 **Multi-key pool** \u2014 load as many API keys as you have\n- \ud83d\udd01 **Auto-rotation** \u2014 on quota, rate-limit, or auth failure the key pool is walked until a working key is found\n- \ud83d\udcbe **Persistent rotation** \u2014 manual key changes write `activeKeyIndex` back to your settings file so the active key survives restarts\n- \ud83c\udfaf **Live model discovery** \u2014 model list is fetched from your actual Ollama cloud account at startup, not a stale hardcoded list\n- \ud83d\udcca **Accurate context lengths** \u2014 uses `/api/show` for real context window sizes\n- \ud83d\udc41\ufe0f **Vision detection** \u2014 detected from capabilities and model name\n- \ud83e\udde0 **Thinking/reasoning** \u2014 native support for models that expose a thinking block\n- \ud83d\udee0\ufe0f **Tool calling** \u2014 Pi tools work end-to-end through the native Ollama chat stream\n- \ud83d\udd04 **Manual refresh** \u2014 re-fetch the cloud model list any time with `/ollama-refresh`\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/ollama-status` | Show cloud connection status and active key |\n| `/ollama-models` | List all discovered cloud models |\n| `/ollama-refresh` | Re-fetch the live model inventory |\n| `/ollama-info MODEL` | Show details for a specific model |\n| `/ollama-keys` | Show masked key-pool status |\n| `/ollama-rotate` | Rotate to the next key and persist the change |\n| `/ollama-use-key N` | Activate a specific key by 1-based index and persist |\n\n## How key rotation works\n\nKeys are stored in an ordered pool. On startup, the active key starts at `activeKeyIndex` (default `0`).\n\n**Automatic rotation** happens during any cloud request when a response matches a quota or rate-limit pattern:\n- HTTP 429, 402, 401, 403, 5xx\n- Body containing `quota`, `rate limit`, `unauthorized`, `payment required`, etc.\n\nThe pool is walked from the current key through all remaining keys until a working one is found. If all keys are exhausted the error is surfaced to Pi.\n\n**Manual rotation** via `/ollama-rotate` or `/ollama-use-key N` additionally writes `activeKeyIndex` back to `~/.pi/agent/settings.json` so the choice persists across restarts.\n\n## Provider name\n\nModels are registered under provider `ollama-cloud`:\n\n```\nollama-cloud/minimax-m2.7\nollama-cloud/kimi-k2.5\nollama-cloud/gpt-oss:20b\n```\n\nUse them in Pi like any other provider:\n\n```bash\npi --provider ollama-cloud --model gpt-oss:20b\n```\n\nOr add to `enabledModels` for `Ctrl+P` cycling:\n\n```json\n{\n  \"enabledModels\": [\n    \"ollama-cloud/minimax-m2.7\",\n    \"ollama-cloud/kimi-k2.5\",\n    \"ollama-cloud/gpt-oss:20b\"\n  ]\n}\n```\n\n## Model display\n\nEach model shows source, vision, and reasoning badges plus context size:\n\n```\n\u2601\ufe0f \ud83d\udc41\ufe0f \ud83e\udde0 kimi-k2.5 \u00b7 1.04T \u00b7 262K ctx\n\u2601\ufe0f \ud83e\udde0 minimax-m2.7 \u00b7 230B \u00b7 200K ctx\n\u2601\ufe0f gpt-oss:20b \u00b7 13.8B \u00b7 128K ctx\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "ollama",
+    "llm",
+    "cloud",
+    "key-rotation",
+    "keyring",
+    "ollama-cloud"
+  ],
+  "author": {
+    "name": "azlabsai"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/AZLabsAI/pi-ollama-keyring#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AZLabsAI/pi-ollama-keyring.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "image": "https://ollama.com/public/ollama.png"
+  },
+  "time": {
+    "created": "2026-04-09T16:42:10.972Z",
+    "1.0.0": "2026-04-09T16:42:11.351Z",
+    "modified": "2026-04-09T16:42:11.592Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

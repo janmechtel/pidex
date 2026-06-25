@@ -1,0 +1,41 @@
+{
+  "name": "@badliveware/pi-compaction-continue",
+  "latest_version": "0.1.5",
+  "description": "Watchdog nudge extension for Pi after idle compactions or stalled continuation turns.",
+  "readme": "# pi-compaction-continue\n\nAuto-sends a watchdog nudge when Pi stops while there may still be obvious work to resume.\n\nUse it for long sessions where a compaction or a stalled continuation turn can leave Pi idle even though the next useful action may be to continue.\n\n## Install\n\n```bash\npi install npm:@badliveware/pi-compaction-continue\n```\n\nNo external services, credentials, or extra CLIs are required.\n\n## How it works\n\nThe extension watches two low-risk recovery cases and sends an automated watchdog nudge only when Pi is idle. The nudge tells the agent that it is not a new user request, to self-check completion through a dedicated tool call, and then either continue real work or stop.\n\nRecovery cases:\n\n- **Idle compaction:** after a compaction, Pi is idle, no messages are queued, and either the compaction followed a context overflow or the current session branch contains an unresolved/resumable Ralph prompt. A stale active `.ralph/*.state.json` file alone is not enough.\n- **Stalled continuation turn:** the assistant ends while saying it will continue or proceed, or it answers the watchdog self-check with `done: false` but still does not continue actual work.\n\nIt snapshots/analyzes the branch before compaction and suppresses nudges when Ralph already advanced with `ralph_done`. It does nothing while tools are running or messages are already queued, because that means there is no idle gap to recover. Generic stall recovery is capped to three consecutive automatic nudges until a real tool call, a non-continuation assistant reply, or a substantive new user request resets the streak. The footer status shows `watchdog:on` or `watchdog:off`.\n\nThe watchdog prompt tells the agent not to acknowledge the nudge in prose. Instead it must call `watchdog_answer` first, then stop if the task is already done or continue from the next concrete step. The prompt still reminds looped agents that `<promise>COMPLETE</promise>` belongs only to genuinely finished loops.\n\n## Passive tracking\n\nPassive tracking is **off by default**. When enabled, the extension records structured events for:\n\n- watchdog recovery candidates it detected\n- watchdog nudges it actually sent\n- nudges it skipped and why\n- `watchdog_answer` tool calls\n\nTracking can write session entries, a JSONL log, or both.\n\nUser-global config path:\n\n```text\n~/.pi/agent/compaction-continue.json\n```\n\nProject overlay path:\n\n```text\n.pi/compaction-continue.json\n```\n\nExample:\n\n```json\n{\n  \"enabled\": true,\n  \"appendSessionEntries\": true,\n  \"log\": true,\n  \"maxRecentEvents\": 20\n}\n```\n\nEnvironment overrides:\n\n- `PI_COMPACTION_CONTINUE_CONFIG` \u2014 extra config file to load first\n- `PI_COMPACTION_CONTINUE_LOG` \u2014 force one JSONL log path\n- `PI_COMPACTION_CONTINUE_DIR` \u2014 change the default log directory\n\nUse the read-only `compaction_continue_state` tool to inspect the effective tracking status, loaded config paths, log path, and recent in-memory events.\n\n## Commands\n\n| Command | What it does |\n| --- | --- |\n| `/compaction-continue` | Show status, active loop detection, current assistant-stall streak, and whether passive tracking is enabled. |\n| `/compaction-continue on` | Enable auto-continue. |\n| `/compaction-continue off` | Disable auto-continue. |\n| `/ralph-compact-watchdog` | Compatibility alias for older local setups. |\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "compaction",
+    "ralph",
+    "watchdog",
+    "stall"
+  ],
+  "author": {
+    "name": "BadLiveware"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/BadLiveware/pi/tree/main/agent/extensions/public/compaction-continue#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BadLiveware/pi.git",
+    "directory": "agent/extensions/public/compaction-continue"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-26T09:44:10.111Z",
+    "modified": "2026-05-06T14:56:25.607Z",
+    "0.1.0": "2026-04-26T09:44:10.352Z",
+    "0.1.1": "2026-04-26T10:06:22.181Z",
+    "0.1.2": "2026-05-01T23:10:57.286Z",
+    "0.1.3": "2026-05-02T16:56:53.681Z",
+    "0.1.5": "2026-05-06T14:56:25.283Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": null,
+  "download_trend": []
+}

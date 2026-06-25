@@ -1,0 +1,37 @@
+{
+  "name": "@tranhoangnguyen0310/pi-flow-external",
+  "latest_version": "1.0.10-external.1",
+  "description": "External Claude Code and Codex delegation for pi.",
+  "readme": "# pi-flow external\n\nExternal Claude Code and Codex delegation for [pi](https://github.com/earendil-works/pi).\n\nThis fork intentionally narrows pi-flow's `Agent` and `workflow` subagent lanes to external CLI backends only:\n\n- **Claude Code** via profiles with `backend: claude`\n- **Codex CLI** via profiles with `backend: codex`\n- **Antigravity** via profiles with `backend: agy`\n\nUse pi's native subagent system for Pi-backed agents such as scout, reviewer, planner, worker, or oracle. Use this extension only when you explicitly want another agent harness.\n\n## Why this fork exists\n\nThe upstream pi-flow package can launch Pi, Codex, and Claude subagents through the same `Agent` tool. That is powerful, but it creates routing ambiguity when pi also exposes a native subagent system.\n\nThis fork enforces a global split:\n\n```text\nNative Pi delegation      -> native subagent tool\nExternal harnesses        -> Agent / workflow from this extension\n```\n\nThat keeps prompts predictable across projects:\n\n- \"Use scout/reviewer/planner\" means native Pi subagents.\n- \"Ask Claude Code\" means an `Agent` profile named like `claude-*`.\n- \"Ask Codex\" means an `Agent` profile named like `codex-*`.\n- \"Ask Antigravity\" means an `Agent` profile named like `agy-*`.\n\n## Install\n\nAfter publishing this fork to npm:\n\n```bash\npi install npm:@tranhoangnguyen0310/pi-flow-external\n```\n\nFor local development, install from this checkout if your pi installation supports local extension paths.\n\n## Define external profiles\n\nCustom profiles live in `~/.pi/agent/subagents/<name>.md`. Only profiles whose frontmatter sets `backend: claude`, `backend: codex`, or `backend: agy` are shown to, and accepted by, `Agent`/`workflow`.\n\nRecommended naming convention:\n\n```text\nclaude-explorer.md\nclaude-reviewer.md\ncodex-explorer.md\ncodex-reviewer.md\nagy-explorer.md\nagy-reviewer.md\n```\n\nClaude example:\n\n```md\n---\ndescription: Repository exploration through Claude Code.\nbackend: claude\nmodel: sonnet\nthinking: high\n---\n\nExplore the repository read-only. Identify architecture, entry points, tests, configuration, risks, and recommended first-read files.\n```\n\nCodex example:\n\n```md\n---\ndescription: Broad code search through Codex CLI.\nbackend: codex\nmodel: gpt-5.4-mini\nthinking: high\n---\n\nSearch broadly and summarize findings with file references. Do not edit files.\n```\n\nProfiles with `backend: pi` or missing `backend` are rejected by design. Use the native subagent system for those jobs.\n\n## Use Agent\n\n```ts\nAgent({\n  description: \"Claude repo map\",\n  subagent_type: \"claude-explorer\",\n  prompt: \"Map this repository read-only and summarize important files.\",\n});\n```\n\nSubagents start fresh in the same working directory. Parent messages and tool results are not inherited, so prompts must be self-contained.\n\nExternal profiles run local CLI commands in no-approval mode (`claude ... --dangerously-skip-permissions`, `codex exec ... --dangerously-bypass-approvals-and-sandbox`). Use them only in trusted repositories.\n\n## Use workflows\n\nThe `workflow` tool is still available for trusted JavaScript orchestration, but its `agent()` calls use the same external-only profile roster. It is useful for mixing several Claude/Codex lanes and synthesizing their outputs.\n\n## Runtime guardrails\n\nDirect `Agent` calls and workflow `agent()` calls share one global concurrency cap and one wall-clock timeout guardrail:\n\n```bash\npi --max-concurrent-subagents 4 --subagent-timeout-ms 600000\n```\n\nSet `--subagent-timeout-ms` to `0` to disable the timeout. Values are milliseconds.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "subagent",
+    "workflow",
+    "multi-agent",
+    "codex",
+    "claude"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/tranhoangnguyen03/pi-flow-external#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tranhoangnguyen03/pi-flow-external.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/tranhoangnguyen03/pi-flow-external/main/assets/subagents.png"
+  },
+  "time": {
+    "created": "2026-06-21T10:22:01.453Z",
+    "modified": "2026-06-21T10:46:24.070Z",
+    "1.0.10-external.0": "2026-06-21T10:22:01.897Z",
+    "1.0.10-external.1": "2026-06-21T10:46:23.965Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 281,
+  "download_trend": []
+}

@@ -1,0 +1,46 @@
+{
+  "name": "pi-lsp-lite",
+  "latest_version": "0.4.0",
+  "description": "LSP diagnostics for pi \u2014 errors and warnings on every edit, same turn. Go, Rust, TypeScript, Python, C/C++.",
+  "readme": "# pi-lsp-lite\n\n[![CI](https://img.shields.io/github/actions/workflow/status/mcphailtom/pi-lsp-lite/ci.yml?branch=main&label=CI)](https://github.com/mcphailtom/pi-lsp-lite/actions/workflows/ci.yml)\n[![npm](https://img.shields.io/npm/v/pi-lsp-lite)](https://www.npmjs.com/package/pi-lsp-lite)\n[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)\n\nYour agent can't see compiler errors. Now it can.\n\n[pi](https://github.com/mariozechner/pi) extension that runs language servers in the background and feeds diagnostics back inline after every edit. Errors appear on the same turn \u2014 no context switch, no separate command.\n\n**Go \u00b7 Rust \u00b7 TypeScript \u00b7 Python \u00b7 C/C++**\n\n## Install\n\n```bash\npi install npm:pi-lsp-lite\n```\n\nThat's it. If you have `gopls`, `rust-analyzer`, `typescript-language-server`, `pylsp`, or `clangd` on PATH, diagnostics start flowing automatically.\n\n## What you see\n\n```\n  edit \u2500 src/main.go\n  \u2713 Edited src/main.go (replaced 2 lines)\n\n  \u26a0 LSP diagnostics for src/main.go (2 errors):\n    error 12:5 [compiler] undefined: foo\n    error 18:2 [compiler] too many arguments in call to bar\n    + 1 diagnostic in 1 other file\n```\n\nThe agent sees these too \u2014 they're appended to the tool result, so it can self-correct on the same turn.\n\n## Commands\n\n| Command | What it does |\n|---------|-------------|\n| `/lsp-status` | Show running servers, PIDs, workspace roots, uptime |\n| `/lsp-diag` | Show all current diagnostics (or `/lsp-diag path/to/file` for one file) |\n| `/lsp-add` | Interactively add a new language server |\n| `/lsp-remove` | Disable a configured server |\n| `/lsp-toggle` | Flip a server on/off without removing config |\n| `/lsp-install` | Install a missing server binary |\n\n## Supported servers\n\n| Server | Language | Install |\n|--------|----------|---------|\n| `gopls` | Go | `go install golang.org/x/tools/gopls@latest` |\n| `rust-analyzer` | Rust | `rustup component add rust-analyzer` |\n| `typescript-language-server` | TypeScript/JS | `npm install -g typescript-language-server typescript` |\n| `pylsp` | Python | `pip install python-lsp-server` |\n| `clangd` | C/C++ | Xcode CLI tools / `apt install clangd` |\n\nMissing a server? `/lsp-add` lets you configure any LSP server that speaks stdio. Or add it to `.pi-lsp-lite.json`:\n\n```json\n{\n  \"servers\": {\n    \"haskell\": {\n      \"extensions\": [\".hs\"],\n      \"command\": \"haskell-language-server-wrapper\",\n      \"args\": [\"--lsp\"],\n      \"rootPatterns\": [\"cabal.project\", \"stack.yaml\"]\n    }\n  }\n}\n```\n\n## Configuration\n\nWorks without config. For customisation, create `.pi-lsp-lite.json` (project) or `~/.pi-lsp-lite.json` (global):\n\n| Field | Description | Default |\n|-------|-------------|---------|\n| `servers.<id>.diagnosticTimeout` | Per-attempt timeout (ms) | per-language |\n| `servers.<id>.maxRetries` | Retry attempts on timeout (0-10) | `3` |\n| `servers.<id>.disabled` | Disable this server | `false` |\n| `diagnosticTimeout` | Global default timeout (ms) | `5000` |\n| `documentIdleTimeout` | Close idle documents after (ms) | `120000` |\n\nProject config merges over global. Partial overrides work \u2014 only specify what you want to change.\n\n## How it works\n\n1. Agent writes/edits a file\n2. Extension detects the language, finds the workspace root\n3. Spawns (or reuses) an LSP server for that language + root\n4. Sends `didChange`, waits for `publishDiagnostics`\n5. If timeout: retries with exponential backoff + jitter (up to `maxRetries` times)\n6. Filters to errors + warnings, formats, appends to tool result + shows in TUI\n\nCross-file impact is detected via snapshot-diff: if editing `lib.ts` breaks `caller.ts`, you see \"+ N diagnostics in M other files\".\n\nServers are lazy (spawn on first edit), idle-shutdown after 240s, and clean up on session end.\n\n## Development\n\n```bash\ngit clone https://github.com/mcphailtom/pi-lsp-lite\ncd pi-lsp-lite && npm install\nnpm run check              # typecheck\nnpm test                   # unit tests (106, no servers needed)\nnpm run test:integration   # real server tests (needs servers on PATH)\n```\n\nSee [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).\n\n## License\n\n[MIT](LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "lsp",
+    "gopls",
+    "rust-analyzer",
+    "typescript-language-server",
+    "pylsp",
+    "clangd",
+    "python",
+    "cpp"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/mcphailtom/pi-lsp-lite",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcphailtom/pi-lsp-lite.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-11T10:41:41.975Z",
+    "modified": "2026-05-14T06:24:00.425Z",
+    "0.1.0": "2026-05-11T10:41:42.180Z",
+    "0.2.0": "2026-05-11T10:49:14.094Z",
+    "0.2.1": "2026-05-11T11:19:00.918Z",
+    "0.2.2": "2026-05-11T11:26:01.080Z",
+    "0.2.3": "2026-05-11T11:31:05.985Z",
+    "0.2.4": "2026-05-11T11:42:37.177Z",
+    "0.2.5": "2026-05-11T11:57:55.772Z",
+    "0.3.2": "2026-05-13T13:09:45.529Z",
+    "0.4.0": "2026-05-14T06:24:00.094Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": null,
+  "download_trend": []
+}

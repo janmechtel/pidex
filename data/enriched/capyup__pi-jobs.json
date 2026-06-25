@@ -1,0 +1,349 @@
+{
+  "name": "@capyup/pi-jobs",
+  "latest_version": "0.3.0",
+  "description": "Supervised job runtime extension for pi with isolated workers, audit artifacts, and retry-aware orchestration.",
+  "readme": "# pi-jobs\n\nLocal pi package for the supervised job runtime exposed through `job`, `jobs`, and `jobs_plan`.\n\nThis repository is the source of truth for job-related pi work.\nDo not maintain the live runtime copy by syncing from `pi-tools` anymore.\n\n## What lives here\n\n- `extensions/jobs/` - the job extension and supervisor runtime modules\n- `extensions/jobs/prompts/` - dynamically loaded guidance, tool prompt text, and worker prompt templates for easy local debugging\n- `tests/jobs/` - focused Node tests for status, audit artifacts, supervisor behavior, retry, throttle, UI helpers, and smoke fixtures\n- `scripts/jobs-audit-smoke.sh` - end-to-end temp-workspace smoke validation\n- `docs/specs/` - job design specs, including `jobs-supervisor-v3.md`\n- `docs/plans/` - implementation plans for job runtime work\n\n## Runtime model\n\nJobs Supervisor V3 treats each job as a supervised worker attempt.\n\n- The root process owns planning, scheduling, retry classification, acceptance checks, and synthesis.\n- Use job workers narrowly: not for ordinary main-quest work the root agent can handle well, not when parallelism is unnecessary, not when workers could touch the same files or need tight shared state, and not when the root agent should directly learn/debug the process details.\n- Use job workers when the user explicitly requests parallel jobs/agents, when the work would consume lots of context and only final deliverables matter, or for separable research/reporting/audit/review directions.\n- Fan-out is explicit. Prefer `jobs_plan`: a compact `matrix + promptTemplate + acceptanceTemplate` payload that the extension expands locally into N supervised jobs. Inline `jobs` is a small-batch escape hatch (<=4 jobs, <=8000 prompt bytes) and rejects oversized payloads with a pointer to `jobs_plan`.\n- Concurrency is explicit when capped: omitting `concurrency` runs every supplied leaf job concurrently; root agents should split large batches into explicit `jobs_plan` waves of about 4-6 jobs unless the user asks for full concurrency. Dynamic throttling is opt-in via `throttle.enabled: true`.\n- Each worker is a full child `pi --mode json -p --session <attempt>/session.jsonl` process with its own session/compaction boundary; the parent only supervises stdout JSONL, artifacts, and the structured report protocol.\n- Workers handle recoverable work-level errors themselves and should submit `job-report.json` via the child-only `job_report` tool or file fallback when practical.\n- Parent retry is reserved for launch/session/provider transient failures and no-signal worker incompletion.\n- `success` requires runtime success, acceptance pass when an acceptance contract exists, either a completed report or visible terminal completion when no acceptance contract exists, and finalized audit artifacts.\n- Legacy `JOB_STATUS` markers are only warning signals; they are not a completion protocol.\n\nBatch artifacts live under:\n\n```text\n.pi/jobs/<batchId>/\n  batch.json\n  events.jsonl\n  summary.md\n  plan.json                  # only present when jobs_plan was used\n  jobs/<jobId>.json\n  attempts/<jobId>/attempt-N/\n```\n\n`.pi/jobs/**` is a sensitive audit directory and may include full prompts, child sessions, stdout/stderr, and local paths.\n\n## Settings UI\n\nUse `/jobs-settings` to inspect or update the focused policy controls. File-only settings live in `.pi/jobs-settings.json`:\n\n```json\n{\n  \"workerExtensions\": {\n    \"include\": [\n      \"./extensions/provider-oauth.ts\",\n      \"npm:@example/pi-worker-provider\"\n    ]\n  }\n}\n```\n\n- report policy: fixed default, with acceptance report is optional audit evidence; without acceptance require report or visible terminal completion;\n- jobs_plan wave guidance: default enabled, about 4-6 jobs per explicit wave for large batches;\n- sync-first guidance: default enabled, keeps the extension oriented around blocking parent-tool runs and avoids scheduler/background/steer/resume complexity;\n- worker extensions: worker-only allowlist; job agents load `job-worker-runtime.ts` plus only `workerExtensions.include` entries. The default empty list loads no regular/discovered extensions into job agents, so provider, OAuth, or custom-model extensions required by worker models must be listed here. Nested jobs remain blocked by the `PI_CHILD_TYPE=job-worker` guard even when the jobs extension is allowlisted.\n\n## Artifact UI\n\nUse `/jobs-ui` to navigate persisted artifacts:\n\n```text\n/jobs-ui\n/jobs-ui help\n/jobs-ui <batchId>\n/jobs-ui <batchId> job <jobId>\n/jobs-ui <batchId> attempt <jobId> <attemptId|latest>\n/jobs-ui rerun failed <batchId>\n/jobs-ui rerun acceptance-failed <batchId>\n/jobs-ui rerun provider-transient <batchId>\n/jobs-ui rerun selected <batchId> <jobId> [jobId...]\n```\n\nThe UI is artifact-first: batch detail groups failures, job detail shows acceptance/report state, attempt detail shows runtime fields, thinking/tool activity, and artifact paths, and rerun preparation preserves parent batch provenance. Live `job` / `jobs` updates also show recent per-job thinking/activity lines while workers run.\n\n## Load it in pi\n\nInstall the published package from npm:\n\n```bash\npi install npm:@capyup/pi-jobs\n```\n\nFor local development, add this repository as a local package in `~/.pi/agent/settings.json`, or install it directly:\n\n```bash\npi install /Users/lucas/Developer/pi-jobs\n```\n\nPi will load the extension from:\n\n- `extensions/jobs/index.ts`\n\nPrompt and template text is intentionally kept outside TypeScript under `extensions/jobs/prompts/`. Those files are dynamically loaded from disk with `import.meta.url`-relative paths, so local edits can be tested by restarting/reloading pi without rebuilding a bundled prompt string.\n\n## Local validation\n\n```bash\ncd /Users/lucas/Developer/pi-jobs\nnpm run test\nnpm run smoke\n```\n\n## Key docs\n\n- `docs/specs/jobs-supervisor-v3.md` - authoritative V3 design history\n- `docs/job-failure-audit-2026-04-26.md` - incident audit and V3 replacement notes\n- `extensions/jobs/README.md` - tool usage and artifact overview\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "jobs",
+    "supervised-jobs"
+  ],
+  "author": {
+    "name": "capyup"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/capyup/pi-jobs#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/capyup/pi-jobs.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/jobs"
+    ]
+  },
+  "time": {
+    "created": "2026-05-15T05:32:27.155Z",
+    "modified": "2026-05-15T08:01:11.309Z",
+    "0.2.0": "2026-05-15T05:32:27.422Z",
+    "0.3.0": "2026-05-15T08:01:11.201Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 11,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 236
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 23
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 21
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

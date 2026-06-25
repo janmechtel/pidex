@@ -1,0 +1,42 @@
+{
+  "name": "@watercol/pi-lens-simple",
+  "latest_version": "1.0.0",
+  "description": "Unofficial simplified fork of pi-lens for AST tools, LSP tools, and post-write LSP diagnostics",
+  "readme": "<p align=\"center\">\n  <img src=\"https://raw.githubusercontent.com/apmantza/pi-lens/master/banner.png\" alt=\"pi-lens\" width=\"1100\">\n</p>\n\n# @watercol/pi-lens-simple\n\n`@watercol/pi-lens-simple` is an unofficial simplified fork of `pi-lens`, focused on AST search/replace, LSP navigation/diagnostics, and lightweight post-write feedback.\n\nThis package is not an official release from the original pi-lens project. It is based on pi-lens by Apostolos Mantzaris and keeps the original MIT license attribution.\n\n## What It Does\n\n`@watercol/pi-lens-simple` currently exposes a narrow tool surface:\n\n- AST-aware search and replace with ast-grep\n- LSP navigation and diagnostics\n- automatic LSP diagnostic feedback after `write` / `edit`\n- basic read/write bookkeeping for safer edits\n\nIt deliberately does not run the old automatic formatter/autofix pipeline, test runners, project scans, turn-end findings, widget diagnostics, Semgrep dispatch, or context-injection flows.\n\n## Install\n\n```bash\npi install npm:@watercol/pi-lens-simple\n```\n\n## Pi Extension Surface\n\n### Tools\n\n- `ast_grep_search`\n- `ast_grep_replace`\n- `lsp_navigation`\n- `lsp_diagnostics`\n\n### Commands\n\n- `/lens-toggle`\n- `/lens-allow-edit <path>`\n- `/lens-lsp-status`\n\n### Flags\n\n- `--no-lens`\n- `--no-lsp`\n- `--no-read-guard`\n\n### Hooks\n\n`@watercol/pi-lens-simple` registers only the slim lifecycle hooks needed for the current surface:\n\n- `resources_discover`\n- `session_start`\n- `turn_start`\n- `tool_call`\n- `tool_result`\n- `session_shutdown`\n\n## AST Search and Replace\n\n`ast_grep_search` and `ast_grep_replace` use ast-grep to match code by structure rather than text. Patterns must be valid code shapes for the target `lang`, with ast-grep metavariables added.\n\nGood starting patterns:\n\n| Language | Pattern | Use |\n|---|---|---|\n| TypeScript/JavaScript | `fetchMetrics($$$ARGS)` | call with any number of args |\n| TypeScript/JavaScript | `function $NAME($$$ARGS) { $$$BODY }` | function declaration |\n| TypeScript/JavaScript | `import { $NAMES } from $PATH` | named import |\n| Python | `class $NAME` | class declaration |\n| Python | `def $NAME($$$ARGS) $$$BODY` | function declaration; no colon or braces |\n| Python | `$OBJ.$METHOD($$$ARGS)` | method call |\n| Go | `func $NAME($$$ARGS) { $$$BODY }` | function declaration |\n| Rust | `fn $NAME($$$ARGS) { $$$BODY }` | function declaration |\n\nMetavariables:\n\n- `$X` matches one AST node and captures it.\n- `$$$` matches zero or more AST nodes without a capture.\n- `$$$ARGS` matches zero or more AST nodes and captures the list.\n\nUseful parameters:\n\n- `paths` scopes the search to specific files/folders.\n- `context` shows surrounding source lines.\n- `strictness: \"relaxed\"` can recover from punctuation-sensitive misses.\n- `insideKind`, `hasKind`, `follows`, and `precedes` synthesize an ast-grep YAML rule for structural constraints.\n- `rule` accepts a raw ast-grep YAML rule when the full DSL is needed.\n- `skip` paginates large result sets.\n\n`ast_grep_replace` is dry-run by default. Use `apply: true` only after reviewing the preview.\n\n## LSP Navigation and Diagnostics\n\n`lsp_diagnostics` actively checks one file, a folder, or an explicit `filePaths` batch:\n\n```text\nlsp_diagnostics({ filePath: \"src/file.ts\" })\nlsp_diagnostics({ filePaths: [\"src/a.ts\", \"src/b.ts\"], severity: \"all\" })\n```\n\n`lsp_navigation` provides IDE-style code intelligence:\n\n- `definition`\n- `references`\n- `hover`\n- `signatureHelp`\n- `documentSymbol`\n- `findSymbol`\n- `workspaceSymbol`\n- `codeAction`\n- `rename`\n- `rename_file`\n- `implementation`\n- `prepareCallHierarchy`\n- `incomingCalls`\n- `outgoingCalls`\n- `workspaceDiagnostics`\n- `capabilities`\n\nLine and character positions are 1-based. For position-based operations, pass `symbol` when you know the line but not the exact column. `signatureHelp` only works inside a function or method call's parentheses; if it returns empty, use `hover` or `definition` instead of retrying nearby declaration positions.\n\n## Post-Write/Edit Feedback\n\nAfter a `write` or `edit` tool result, pi-lens appends current LSP diagnostics for the changed file:\n\n```text\npi-lens LSP: src/file.ts - 2 diagnostic(s)\n```\n\nThis path is intentionally LSP-only. It does not call the legacy dispatch pipeline, formatters, autofixers, test runners, project scans, or turn-end context injection.\n\n## Read Guard\n\nThe slim read guard keeps basic file bookkeeping:\n\n- `read` records delivered line coverage.\n- `write` marks the file as agent-authored.\n- `edit` checks whether the target file has been read before editing.\n\nUse `/lens-allow-edit <path>` to allow a single edit, or `--no-read-guard` to disable the guard.\n\n## MCP Server\n\nThe bundled MCP server exposes only the slim tool set:\n\n- `pilens_ast_grep_search`\n- `pilens_ast_grep_replace`\n- `pilens_lsp_navigation`\n- `pilens_lsp_diagnostics`\n\nOther legacy MCP facades are not part of the current surface.\n\n## Skills\n\nThe package exposes only these skill directories:\n\n- `skills/ast-grep`\n- `skills/write-ast-grep-rule`\n- `skills/lsp-navigation`\n\nThese skills are written for the slim AST/LSP surface and avoid removed-tool recovery paths.\n\n## Development\n\n```bash\nnpm run lint          # strict type-check, includes tests\nnpm run build         # emit in-place JS used by vitest imports\nnpm test              # full vitest suite\nnpm run build:dist    # refresh dist for local package/MCP use; do not commit dist\n```\n\nBecause source imports use `.js` specifiers while development edits happen in `.ts`, run `npm run build` before targeted Vitest runs after TypeScript changes.\n",
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "pi-package",
+    "ast-grep",
+    "typescript",
+    "feedback",
+    "lsp",
+    "unofficial",
+    "fork"
+  ],
+  "author": {
+    "name": "Apostolos Mantzaris",
+    "url": "original pi-lens author"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "skills": [
+      "../../skills/ast-grep",
+      "../../skills/write-ast-grep-rule",
+      "../../skills/lsp-navigation"
+    ]
+  },
+  "time": {
+    "created": "2026-06-15T17:03:46.272Z",
+    "1.0.0": "2026-06-15T17:03:47.021Z",
+    "modified": "2026-06-15T17:03:47.231Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

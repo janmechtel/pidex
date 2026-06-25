@@ -1,0 +1,39 @@
+{
+  "name": "@lnilluv/pi-opencode-go-rotation",
+  "latest_version": "1.4.0",
+  "description": "Rotate between multiple OpenCode Go API keys with best-effort reactive key rotation",
+  "readme": "# pi-opencode-go-rotation\n\nRotate between multiple OpenCode Go API keys. The extension is best-effort and reactive: it rotates only when `opencode` surfaces a matching assistant error message.\n\n## Install\n\n```bash\npi install npm:@lnilluv/pi-opencode-go-rotation\n```\n\n## Setup\n\nAdd your API keys:\n\n```\n/opencode add personal sk-xxxx\n/opencode add work sk-yyyy\n/opencode add backup sk-zzzz\n```\n\nThe first key added becomes active immediately.\n\n## How it works\n\nThe extension sets the active key as a runtime override, which takes priority over `OPENCODE_API_KEY` environment variables and `auth.json` credentials.\n\nThe extension has two recovery paths:\n\n1. **Surfaced errors**: when `opencode` returns a matching 429/rate-limit/quota error, the extension marks the current key as on cooldown, switches to the next key not on cooldown, and applies it via `setRuntimeApiKey`.\n2. **Silent stalls**: when an `opencode-go` provider request has no response or stream activity for the watchdog window, the extension rotates keys, aborts the hung turn, and rewrites the abort as a retryable timeout error.\n\nThis is still reactive: it does not check usage or limits ahead of time.\n\nPi's built-in auto-retry picks up the new key on the next request.\n\nCooldowns default to 60 minutes. After cooldown expires, the key becomes available again.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/opencode` or `/opencode status` | Show all keys, active key marker, cooldown status |\n| `/opencode use <n>` | Switch to key number `n` (1-based) |\n| `/opencode next` | Advance to the next configured key and clear its cooldown before activating it |\n| `/opencode add <name> <key>` | Add a new key |\n| `/opencode rm <n>` | Remove key number `n` |\n| `/opencode reset` | Clear all cooldowns |\n| `/opencode cooldown <min>` | Set or view cooldown duration in minutes |\n| `/opencode watchdog [status\\|on\\|off\\|<seconds>]` | Configure silent-stall detection |\n\n## Configuration\n\nKeys are stored in `~/.pi/agent/opencode-keys.json` with file permissions `0600`.\n\n```json\n{\n  \"keys\": [\n    { \"name\": \"personal\", \"key\": \"sk-xxx\" },\n    { \"name\": \"work\", \"key\": \"sk-yyy\" }\n  ],\n  \"activeKeyIndex\": 0,\n  \"cooldownMinutes\": 60,\n  \"watchdogEnabled\": true,\n  \"watchdogIdleMs\": 90000,\n  \"cooldowns\": {}\n}\n```\n\n### Retry settings\n\nPair with pi's auto-retry for best results. In `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"retry\": {\n    \"enabled\": true,\n    \"maxRetries\": 3\n  }\n}\n```\n\nSet `maxRetries` to at least the number of keys so all keys get a chance before pi gives up.\n\n## Limitations\n\n- OpenCode Go currently has no API endpoint for checking usage, remaining quota, or limits proactively.\n- The watchdog is scoped to the `opencode-go` provider only. Other providers are not aborted or rotated.\n- A legitimate long-running request with no stream activity can be treated as stalled; tune with `/opencode watchdog <seconds>` or disable with `/opencode watchdog off`.\n- When all keys are rate-limited simultaneously, the extension force-advances to the next key and clears its cooldown.\n- Keys added via `/opencode add` are stored in plaintext. The config file is created with `0600` permissions.\n- If `opencode` later adds an API endpoint for Go plan usage/limit verification, this extension can be updated to use it.\n\n## License\n\nMIT",
+  "keywords": [
+    "pi-extension",
+    "pi-package",
+    "opencode",
+    "api-key-rotation",
+    "rate-limit"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/lnilluv/pi-opencode-go-rotation#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lnilluv/pi-opencode-go-rotation.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-11T14:13:37.816Z",
+    "modified": "2026-05-02T11:16:57.333Z",
+    "1.0.0": "2026-04-11T14:13:38.050Z",
+    "1.1.0": "2026-04-11T18:28:49.104Z",
+    "1.0.1-dev.0": "2026-04-11T18:30:54.547Z",
+    "1.1.1": "2026-04-12T15:31:03.746Z",
+    "1.2.0": "2026-04-12T15:49:23.384Z",
+    "1.3.0": "2026-04-22T05:36:14.498Z",
+    "1.4.0": "2026-05-02T11:16:57.004Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,37 @@
+{
+  "name": "pi-agent-shell",
+  "latest_version": "0.1.0",
+  "description": "High-performance interactive shell extension for pi \u2014 OS-level read-block detection gives agents a single turn() primitive with no polling or timing heuristics",
+  "readme": "# pi-agent-shell\n\nA high-performance, general-purpose interactive shell extension for [pi](https://github.com/nicobailon/pi).\n\nGives AI agents a single `turn()` primitive to interact with any CLI program \u2014 no polling, no timing heuristics, no program-specific adapters. Uses OS-level read-block detection to know exactly when a program is waiting for input.\n\n## Install\n\n```bash\npi install ~/Projects/pi-agent-shell\n```\n\n## How it works\n\nThe agent interacts with shell programs through one atomic operation:\n\n```\nturn(sessionId, input?) \u2192 { newOutput, prompt, waitingForInput, exited }\n```\n\nInternally, `turn()` writes input to a PTY, drains output, and waits for an OS-level signal that the process is blocked on a read syscall. The agent never polls or guesses timing \u2014 every round-trip is a decision, not a timing check.\n\n### OS read-block detection\n\n- **macOS**: process state probing via `ps` on the leaf foreground process\n- **Linux**: `/proc/{pid}/syscall` \u2014 syscall number 0 (read) or select/epoll variants\n- **Fallback**: quiet-window timeout when OS probing is unavailable (CI, containers)\n\n## Tool: `agent_shell`\n\n### Start a session\n\n```json\n{ \"command\": \"python3 game.py\" }\n\u2192 { \"sessionId\": \"abc-123\" }\n```\n\n### Take a turn\n\n```json\n{ \"sessionId\": \"abc-123\", \"input\": \"north\" }\n\u2192 { \"newOutput\": \"You enter a dark cave.\\n> \", \"prompt\": \"> \", \"waitingForInput\": true }\n```\n\n### Peek (non-blocking)\n\n```json\n{ \"sessionId\": \"abc-123\", \"peek\": true }\n\u2192 { \"newOutput\": \"...\", \"waitingForInput\": false }\n```\n\n### Kill a session\n\n```json\n{ \"sessionId\": \"abc-123\", \"kill\": true }\n```\n\n### Parameters\n\n| Parameter | Type | Default | Description |\n|-----------|------|---------|-------------|\n| `command` | string | \u2014 | Shell command to start a new session |\n| `sessionId` | string | \u2014 | Session to interact with |\n| `input` | string | \u2014 | Text to send (appends `\\n` if missing) |\n| `peek` | boolean | false | Non-blocking snapshot, no input |\n| `kill` | boolean | false | Terminate the session |\n| `cwd` | string | pi cwd | Working directory |\n| `env` | object | \u2014 | Additional environment variables |\n| `timeoutMs` | number | 30000 | Max wait time for `turn()` |\n| `quietMs` | number | 200 | Quiet-window fallback threshold |\n\n## User commands\n\n| Command | Description |\n|---------|-------------|\n| `/sessions` | List all active sessions |\n| `/attach [id]` | Reattach the session overlay to watch/interact |\n\n## Session overlay\n\nWhen a session is running, an overlay shows real-time output. Controls:\n\n- **Ctrl+B** \u2014 background the session (overlay hides, session keeps running)\n- **Ctrl+C** \u2014 kill the session\n- **\u2191/\u2193** \u2014 scroll through output\n\n## Architecture\n\nSee [ARCHITECTURE.md](ARCHITECTURE.md) for design details.\n\n## Development\n\n```bash\nnpm test        # run tests\n```\n\n## Limitations\n\n- **Line-oriented programs only** \u2014 full-screen TUI programs (vim, nano, htop) are not supported. The agent has better tools for file editing (`read`/`edit`/`write`), and most interactive CLI programs have non-interactive equivalents.\n- **Unix only** \u2014 requires PTY support (macOS, Linux). No Windows/ConPTY support.\n- **Local processes only** \u2014 no remote PTY or SSH session management.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "shell",
+    "pty",
+    "agent",
+    "interactive",
+    "cli"
+  ],
+  "author": {
+    "name": "Allen Lowe"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/lallenlowe/pi-agent-shell#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lallenlowe/pi-agent-shell.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-07T18:40:07.732Z",
+    "0.1.0": "2026-05-07T18:40:07.914Z",
+    "modified": "2026-05-07T18:40:08.140Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,33 @@
+{
+  "name": "pi-spawn",
+  "latest_version": "0.1.0",
+  "description": "Minimal subagent extension for pi \u2014 one tool, one prompt, orchestrator-driven concurrency",
+  "readme": "# pi-spawn\n\n> Minimal subagent extension for the pi coding agent \u2014 isolated in-process tasks with a fresh context window.\n\n## Install\n\n```bash\npi install npm:pi-spawn\n```\n\n## What it does\n\n`pi-spawn` adds a single `spawn` tool. Each call creates an isolated, in-process subagent session that runs one focused task and returns structured results. The subagent gets a completely fresh context window \u2014 it has zero access to your parent conversation history, so every file path, pattern, and requirement must be stated in the prompt.\n\nThere is no batching API and no concurrency parameter. The orchestrator (you, the calling model) controls concurrency naturally through your tool call pattern. Fire one `spawn` for a single task, fire several in one turn for parallel work, or chain them sequentially when steps depend on each other. pi's execution engine handles the rest.\n\n## Concurrency model\n\n| Pattern | When to use it | How |\n|---------|---------------|-----|\n| **Single** | One focused task | Call `spawn` once |\n| **Parallel** | Independent tasks | Fire multiple `spawn` calls in one turn |\n| **Serial** | Step B needs Step A's output | Call `spawn`, wait for result, then call again |\n| **Mixed** | Scout then build | Parallel scouts \u2192 parent merges findings \u2192 serial implementation |\n\n**Rule:** if spawn A's output feeds spawn B, use serial. Never fire both in one turn and hope A finishes first.\n\n## When to spawn vs when NOT to spawn\n\n**Spawn** when a task has a different focus than the parent and benefits from isolation: fresh code review, parallel reconnaissance across a codebase, research, validation, or non-trivial code generation where you do **not** already know the exact implementation.\n\n**Do NOT spawn** if you know the exact implementation \u2014 write the file directly instead.\n\n**Empty-shell test:** If removing the inline code from your prompt leaves an empty prompt, you are just dictating variable names line-by-line. Write the file directly.\n\n## Security model\n\n- **Tool inheritance:** The child inherits the parent's currently active built-in tool subset. If the parent is in a restricted mode (for example read-only plan mode), the child inherits that restriction.\n- **Recursion guard:** The `spawn` extension is explicitly excluded from the subagent's loaded extensions, preventing nested self-spawn.\n- **Same permissions:** Spawned agents run with the same model credentials and permissions as the parent.\n\n## Usage examples\n\n- \"Spawn a subagent to review `src/auth.ts` for security issues\"\n- \"Spawn three subagents in parallel: one to find all model definitions, one to find all provider configs, one to find all tool registrations\"\n- \"Spawn a subagent to research the best retry strategy for fetch, then implement it\"\n- \"Spawn a subagent to read `src/db/schema.ts` and validate that all foreign keys have matching indexes\"\n\n## Configuration\n\nYou can optionally override the thinking level for a single subagent via the `thinking` parameter:\n\n```\nspawn({\n  prompt: \"Refactor the error handling in src/api/client.ts\",\n  thinking: \"high\"\n})\n```\n\nIf omitted, the subagent defaults to the parent's current thinking level.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "subagent",
+    "spawn"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/agenticoding/pi-spawn#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agenticoding/pi-spawn.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-10T05:29:24.328Z",
+    "0.1.0": "2026-05-10T05:29:24.460Z",
+    "modified": "2026-05-10T05:29:24.750Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

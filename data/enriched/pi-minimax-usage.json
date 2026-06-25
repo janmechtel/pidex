@@ -1,0 +1,38 @@
+{
+  "name": "pi-minimax-usage",
+  "latest_version": "0.1.0",
+  "description": "Minimax M3 token usage, cost, prompt-cache savings, and 5h/weekly subscription quota in the Pi status line",
+  "readme": "# pi-minimax-usage\n\n[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/licenses/MIT)\n[![Node: >=18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](package.json)\n[![pi extension](https://img.shields.io/badge/pi-extension-purple)](https://pi.dev)\n\n[Pi](https://pi.dev) extension that shows real Minimax M3 token usage, cost, prompt-cache savings, and 5-hour / weekly subscription quota in the status line.\n\n## What you see in the TUI\n\nTwo compact widgets in the status line:\n\n| Widget | Example |\n|--------|---------|\n| `minimax` | `\u219145.2k R1.2M (96%) $0.0834 \u2193$0.0271` |\n| `minimax-quota` | `5h:13% R25m  wk:2% R3d14h` |\n\n`minimax` rolls up your **session** tokens, cost, cache hit rate, and what the cache saved you.\n`minimax-quota` shows your **subscription** 5-hour and weekly windows.\n\nWhen a window is fully used, the cell flips to `x` and the widget gets a `\u203c` prefix so the cap is visible at a glance:\n\n| State | Renders |\n|-------|---------|\n| 5h window fully used | `\u203c5h:x R25m  wk:2% R3d14h` |\n| Weekly fully used | `\u203c5h:13% R25m  wk:x R3d14h` |\n| Both maxed | `\u203c5h:x R25m  wk:x R3d14h` |\n\nRun `/minimax-usage` for the full breakdown (input, output, cache read/write, cost, savings, both quota windows with reset times).\n\n## Why this extension exists\n\nThe Minimax provider in `models.json` declares `cost` as zeros for `cacheRead`, `cacheWrite`, and `output` tokens. Pi's standard `calculateCost()` reads from that model definition, so without this hook the cost shown in the status line is always `$0.00` for cached/uncached output. This extension rewrites the `usage.cost` field on Minimax messages with the real M3 pricing from the official docs.\n\nThe 5h and weekly windows are fetched from `GET /v1/token_plan/remains` and rendered in a single compact status cell. The 1-minute poll is light \u2014 one tiny JSON request \u2014 and only runs while a session is active.\n\n## Install\n\n```bash\n# Option A: npm (once published)\npi install npm:pi-minimax-usage\n\n# Option B: local clone\ngit clone https://github.com/MarcBaumholz/pi-minimax-usage.git\ncd pi-minimax-usage\npi install .\n```\n\n## Setup\n\nThe extension needs a Minimax subscription key. It reads it from the first match of:\n\n1. **`MINIMAX_API_KEY` env var** (recommended for CI/containers)\n   ```bash\n   export MINIMAX_API_KEY=\"sk-cp-...\"\n   ```\n2. **`~/.pi/agent/auth.json`** under `providers.minimax.access` (Pi's standard auth store \u2014 populated by `/login minimax` if you have a provider that supports it)\n3. **`~/.pi/agent/models.json`** under `providers.minimax.apiKey` (the local convention)\n\n## Optional environment variables\n\n| Variable | Default | Purpose |\n|----------|---------|---------|\n| `MINIMAX_API_KEY` | _(none)_ | Subscription key. Overrides file-based lookups. |\n| `MINIMAX_API_BASE` | `https://api.minimax.io` | Base URL. Set to `https://api.minimaxi.com` for China. |\n| `MINIMAX_7DAY_CACHE=1` | off | If you have 7-day prompt retention enabled, halves the cache-read rate. |\n| `MINIMAX_QUOTA_POLL_MS` | `60000` | Polling interval in ms for the quota endpoint. Lower = more responsive, more requests. |\n\n## Pricing baked in\n\n| Token type | \u2264 512k context | > 512k (long-context) |\n|------------|----------------|-----------------------|\n| Input | $0.60 / 1M | $1.20 / 1M |\n| Output | $2.40 / 1M | $4.80 / 1M |\n| Cache read | $0.12 / 1M  (or $0.06 with 7-day retention) | $0.24 / 1M |\n| Cache write | $0.00  (passive caching \u2014 no write cost) | $0.00 |\n\nPricing is hardcoded from [platform.minimax.io/docs/guides/pricing-paygo](https://platform.minimax.io/docs/guides/pricing-paygo). If Minimax changes their pricing, open an issue.\n\n## Slash commands\n\n| Command | Effect |\n|---------|--------|\n| `/minimax-usage` | Full session + quota breakdown as a notification |\n\n## Compatibility\n\n- Pi \u2265 0.78 (uses the `message_end` and `setStatus` extension APIs)\n- Minimax subscription plan (Plus / Max / Ultra) \u2014 required for the quota endpoint\n- Models: any Minimax model on the Anthropic-compatible or OpenAI-compatible endpoint (the cost-rewrite hook only fires for messages with `provider === \"minimax\"`)\n\n## License\n\nMIT \u2014 see [LICENSE](./LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "extension",
+    "minimax",
+    "minimax-m3",
+    "usage",
+    "quota",
+    "cost-tracking",
+    "prompt-cache"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/MarcBaumholz/pi-minimax-usage#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MarcBaumholz/pi-minimax-usage.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/minimax-usage.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-04T10:10:18.579Z",
+    "0.1.0": "2026-06-04T10:10:18.804Z",
+    "modified": "2026-06-04T10:10:18.984Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,42 @@
+{
+  "name": "pi-sift",
+  "latest_version": "0.4.1",
+  "description": "Model-scored compression of large tool results for Pi Coding Agent",
+  "readme": "# pi-sift\n\nA [Pi Coding Agent](https://github.com/nicepkg/pi-coding-agent) extension that prevents large and unnecessary tool results from polluting the context. The model scores large results for relevance and replaces low-value content with concise summaries, optionally preserving critical line ranges verbatim (`keepLines`).\n\n## How it works\n\n1. When a tool result exceeds a size threshold, pi-sift injects a scoring instruction as a separate user message asking the model to decide: **keep** or **summarize**.\n2. On summarize, the model can specify `keepLines` \u2014 line ranges to preserve verbatim while compressing the rest.\n3. Before each API call, the context hook replaces scored content with the summary + kept lines.\n4. Heuristic dismiss auto-removes stale reads when files are re-read or edited, but preserves summarize+keepLines decisions.\n\n## Install\n\n```bash\npi install pi-sift\n```\n\nOr from source:\n\n```bash\npi install https://github.com/eengad/pi-sift\n```\n\n## Benchmark\n\nAn A/B benchmark script is included for evaluating pi-sift on [SWE-ReBench](https://github.com/swe-bench/SWE-ReX) tasks. See [A/B benchmark](#ab-benchmark) below for usage. Early results with Claude Opus 4.6 show token reductions of 17\u201359% on tasks where the model makes scoring decisions, though single-run variance is high and more data is needed.\n\n## Local development\n\n```bash\nnpm install\nnpm run build\nnpm test\n```\n\n## A/B benchmark\n\nRun baseline vs extension on SWE-ReBench tasks with Docker verification:\n\n```bash\nnpm run benchmark:swe-pipeline-ab\n```\n\nOverride defaults with env vars:\n\n```bash\nPI_BENCH_TASKS=0,1,2 \\\nPI_BENCH_CONFIGS=extension \\\nPI_BENCH_KEEP_WORKDIR=1 \\\nnpm run benchmark:swe-pipeline-ab\n```\n\nAnalyse session logs after a run:\n\n```bash\nnpm run analyse-session -- /tmp/tmp.XXX/task_0/extension_run1/sessions/*.jsonl\n```\n\n## Model compatibility\n\n- **Claude Opus 4.6** \u2014 works well. The model follows scoring instructions reliably and uses `keepLines` effectively.\n- **OpenAI Codex 5.3 (xhigh thinking)** \u2014 partially works. The model sees the scoring instruction (confirmed via debug logging) but only follows it ~33% of the time, skipping scoring and emitting tool calls instead. When it does follow, it produces valid summarize decisions. Tasks still resolve but with higher token usage than Opus.\n\n## Known issues\n\n### Streaming flash of `<context_lens>` blocks\nDuring streaming, `<context_lens>` blocks are briefly visible in the TUI before `message_end` strips them. Fixing in `message_update` is unsafe \u2014 the pi agent may rebuild message content from the stream buffer on each update (undoing mutations), and stripping before `message_end` would remove blocks before decision parsing runs. Cosmetic only; disappears when streaming completes.\n\n## Links\n\n- Design: [`DESIGN.md`](./DESIGN.md)\n- Improvement ideas: [`IMPROVEMENTS.md`](./IMPROVEMENTS.md)\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "context",
+    "summarization"
+  ],
+  "author": {
+    "name": "Eyal En Gad"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/eengad/pi-sift#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eengad/pi-sift.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-03-02T05:47:58.224Z",
+    "modified": "2026-03-12T13:34:18.002Z",
+    "0.1.0": "2026-03-02T05:47:58.360Z",
+    "0.1.1": "2026-03-02T05:49:25.387Z",
+    "0.1.2": "2026-03-02T05:53:17.198Z",
+    "0.1.3": "2026-03-03T01:15:06.795Z",
+    "0.2.0": "2026-03-03T19:13:52.856Z",
+    "0.4.0": "2026-03-04T03:41:15.455Z",
+    "0.4.1": "2026-03-12T13:34:17.903Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 13,
+  "download_trend": []
+}

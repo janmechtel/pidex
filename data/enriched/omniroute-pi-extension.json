@@ -1,0 +1,38 @@
+{
+  "name": "omniroute-pi-extension",
+  "latest_version": "2.2.0",
+  "description": "Pi Coding Agent extension for OmniRoute \u2014 manage combos, browse providers, and see which model actually served each response in the status bar",
+  "readme": "# OmniRoute Manager for Pi\n\nA [Pi Coding Agent](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) extension that integrates [OmniRoute](https://github.com/diegosouzapw/OmniRoute) \u2014 an AI gateway that routes requests across 44+ LLM providers with automatic fallback, load balancing, and cost optimization.\n\n## What it does\n\n- **Status bar** shows which model actually served each response \u2014 e.g. `CheapFix \u2192 gemini-2.5-flash-lite (gemini \u00b7 Google Account)`\n- **Combo preview** on model switch \u2014 immediately shows the routing order before you send a message\n- **Startup warnings** if any provider connections are expired or need re-authentication\n- **Combo management** \u2014 toggle on/off and switch active model without leaving pi\n- **Provider browser** \u2014 drill into providers to see accounts, connection health, and available models\n- **Model sync** \u2014 push all OmniRoute models and combos to pi's Ctrl+P model picker\n- **Log review** \u2014 analyse call history to find broken models, with replacement suggestions\n- **Add custom providers** \u2014 register OpenAI-compatible providers not built into OmniRoute\n\n## Install\n\n### Option 1 \u2014 curl (quickest)\n\n```bash\nmkdir -p ~/.pi/agent/extensions\ncurl -o ~/.pi/agent/extensions/omniroute-manager.ts \\\n  https://raw.githubusercontent.com/oscar-haha/omniroute-pi-extension/main/omniroute-manager.ts\n```\n\n### Option 2 \u2014 npm\n\n```bash\nnpm install -g omniroute-pi-extension\ncp \"$(npm root -g)/omniroute-pi-extension/omniroute-manager.ts\" \\\n  ~/.pi/agent/extensions/omniroute-manager.ts\n```\n\n### Configure pi to use OmniRoute as a provider\n\nAdd an `omni` provider to `~/.pi/agent/models.json`:\n\n```json\n{\n  \"providers\": {\n    \"omni\": {\n      \"baseUrl\": \"http://localhost:20128\",\n      \"api\": \"anthropic-messages\",\n      \"apiKey\": \"YOUR_OMNIROUTE_API_KEY\",\n      \"models\": [\n        { \"id\": \"CheapFix\", \"name\": \"CheapFix\" }\n      ]\n    }\n  }\n}\n```\n\nFind your OmniRoute API key in the OmniRoute dashboard under Settings \u2192 API Keys.\n\nThen run `/omni sync` inside pi to populate the full model list automatically.\n\n### Start pi\n\n```bash\npi\n```\n\nThe extension auto-loads. You'll see `OmniRoute ready \u2014 N combos` on startup.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/omni` | Status dashboard \u2014 health, active combos, provider issues |\n| `/omni toggle` | Interactive combo manager \u2014 Space toggles ON/OFF, Enter sets active model, Esc exits |\n| `/omni providers` | Browse providers \u2014 select one to see accounts and available models |\n| `/omni add-provider` | Register an OpenAI-compatible provider not built into OmniRoute |\n| `/omni sync` | Sync all OmniRoute models and combos to pi's Ctrl+P picker |\n| `/omni log-review` | Analyse call history \u2014 flags broken models and suggests replacements |\n| `/omni dashboard` | Show OmniRoute web dashboard URL |\n\n### `/omni toggle` keyboard controls\n\n```\n\u2191 / \u2193    Navigate combos\nSpace    Toggle combo ON / OFF\nEnter    Set combo as active model immediately\nEsc / q  Close\n```\n\nThe status bar updates to show the combo's routing order as soon as you switch, and then updates again after each response to show which model actually ran.\n\n### `/omni log-review`\n\nFetches the last 200 call logs and analyses each model in each combo:\n\n```\n\u2500\u2500\u2500 OpenSource [priority] \u2500\u2500\u2500\n  \u2705 groq/llama-3.3-70b-versatile     100% success \u00b7 avg 380ms\n  \u26a0\ufe0f  groq/llama-3.3-70b-versatile    context too large for free tier (8\u00d7 413) \u2014 works in shorter sessions\n  \u274c openrouter/auto                  0/5 success \u00b7 403\u00d71, 502\u00d74 \u2192 suggest replace\n  \u23f1  nvidia/deepseek-ai/deepseek-v3.2 100% success \u00b7 avg 49s (slow)\n  \u2753 nvidia/moonshotai/kimi-k2.5      (no history)\n```\n\nFor each broken model (\u274c) it then prompts you to remove it or pick a replacement from the same provider or others \u2014 filtered to exclude models already in the combo.\n\n## How it works\n\nPi sends requests to OmniRoute, which routes them to the best available provider based on your combo strategy (priority, weighted, round-robin, least-used). After each response, the extension polls OmniRoute's call logs until it finds the entry for that turn, then displays the actual model and account in pi's status bar.\n\n### Combos\n\nCombos are model groups with routing strategies. For example:\n\n```\nCheapFix [priority]:\n  1. qw/qwen3-coder-flash       \u2190 try first (free, fast)\n  2. gemini/gemini-2.5-flash-lite\n  3. groq/qwen/qwen3-32b\n  4. kr/claude-sonnet-4.5       \u2190 last resort fallback\n```\n\nCreate and edit combos in the OmniRoute dashboard. Toggle them on/off or switch active model from pi with `/omni toggle`.\n\n### Custom providers\n\nOmniRoute supports 44+ built-in providers. For others (like [OpenAdapter](https://openadapter.in)), use `/omni add-provider` to register any OpenAI-compatible endpoint.\n\n## Configuration\n\nEnvironment variables (all optional):\n\n| Variable | Default | Description |\n|----------|---------|-------------|\n| `OMNIROUTE_URL` | `http://127.0.0.1:20128` | OmniRoute API URL |\n| `OMNIROUTE_DASHBOARD` | `http://localhost:20128` | Dashboard URL shown in messages |\n\n## Requirements\n\n- [Pi Coding Agent](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) v0.60.0+\n- [OmniRoute](https://github.com/diegosouzapw/OmniRoute) v2.9.0+ running locally or on your network\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-coding-agent",
+    "omniroute",
+    "llm",
+    "ai-gateway",
+    "extension",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "Oscar Andrea"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/oscarandrea/omniroute-pi-extension#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oscarandrea/omniroute-pi-extension.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/omniroute-manager.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-04T21:04:24.189Z",
+    "modified": "2026-04-05T19:22:02.783Z",
+    "1.0.0": "2026-04-04T21:04:24.343Z",
+    "2.2.0": "2026-04-05T19:22:02.673Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,44 @@
+{
+  "name": "@orca-sec/pi-orca",
+  "latest_version": "1.2.2",
+  "description": "Official Orca integration package for Pi bash tool-call protection.",
+  "readme": "# @orca-sec/pi-orca\n\nOfficial Orca integration package for Pi. It intercepts Pi `bash` tool calls and evaluates shell commands with:\n\n```bash\norca evaluate --json --stdin\n```\n\nSafe commands proceed. Denied commands are blocked before Pi runs them. Orca errors follow the configured unavailable-mode policy.\n\n## Prerequisites\n\n- Pi installed.\n- Node.js 22.19 or newer.\n\n## Install\n\n```bash\npi install npm:@orca-sec/pi-orca\n```\n\nThis installs the matching `@orca-sec/orca` CLI and daemon dependency. Do not mix `pi install ./orca-pi` with `pi install npm:@orca-sec/pi-orca`; remove one source before switching to avoid duplicate extension registration and binary ambiguity.\n\nLocal development or validation:\n\n```bash\npi install ./orca-pi\npi -e ./orca-pi\n```\n\n## First Run\n\nNo per-session command is required. On session start, the extension quietly creates `.orca/policy.yaml` with the `generic-agent` preset when it is missing, then probes Orca health. The first protected bash call waits for this bootstrap while Pi startup remains non-blocking.\n\nRun `/orca-setup` to repeat the Pi-only policy and health setup manually. It does not run `orca start` or install plugins for other agent hosts. `/orca-start` is a deprecated alias for `/orca-setup` for one release.\n\n## Behavior\n\n- Non-`bash` tool calls are ignored.\n- `bash` tool calls are sent to Orca as JSON over stdin.\n- Orca `allow` lets the tool proceed.\n- Orca `deny` returns `{ block: true, reason }` to Pi.\n- Orca `error`, malformed JSON, spawn failures, or timeouts use the configured unavailable mode.\n\nUnavailable modes:\n\n- `auto`: interactive Pi sessions ask; noninteractive/json/print sessions block.\n- `ask`: prompt with Block, Run once anyway, Disable Orca for this session, or Show repair instructions.\n- `noninteractive-block`: block and show repair guidance.\n- `strict`: always block on Orca errors.\n- `allow-with-warning`: allow but warn that Orca is degraded.\n\nChange mode in Pi:\n\n```text\n/orca-mode\n/orca-mode strict\n/orca-mode allow-with-warning\n/orca-mode bypass on\n/orca-mode bypass off\n```\n\nSession bypass is in-memory only. It is cleared when the Pi session shuts down or reloads.\n\nThe status line reports `orca ready`, `orca missing`, `orca degraded`, or `orca bypass`.\n\nSet `ORCA_PI_AUTO_SETUP=false` to disable session bootstrap. The package-managed runtime is used by default; set `ORCA_PI_USE_PATH=true` only when you explicitly trust a compatible PATH installation. `ORCA_BIN=/absolute/path/to/orca` remains the highest-priority override when the file is executable.\n\n## Troubleshooting\n\nOrca not found:\n\n- Reinstall `npm:@orca-sec/pi-orca` so its version-locked runtime dependency can provision both binaries.\n- If overriding package resolution, confirm `ORCA_BIN` points to an executable Orca binary.\n\nDaemon unavailable:\n\n- Run `/orca-setup`, then `/orca-doctor`.\n- The daemon normally starts automatically on the first `orca evaluate` call.\n\nProtocol incompatible:\n\n- Update Orca and rerun `/orca-doctor`.\n- The extension fails closed by default in noninteractive mode.\n\nCommand unexpectedly blocked:\n\n- Read the Orca reason.\n- Do not rewrite the command to bypass Orca.\n- Ask the user whether to use an Orca allowlist or an explicit allow-once flow.\n\n## Security Notes\n\n- The extension does not execute the agent's bash command while evaluating it.\n- Orca is invoked with `spawn(file, args, { shell: false })`; no shell interpolation is used.\n- Request JSON is passed through stdin.\n- Raw commands are not logged by default.\n- Block messages use Orca's redacted reason and basic token redaction.\n- Noninteractive mode fails closed by default.\n- Session bypass is not persisted.\n- Session bypass is keyed to the Pi session id when Pi exposes one.\n- Malformed `bash` tool-call payloads fail closed.\n- Child process output is bounded before parsing.\n- The extension does not modify Pi tool input.\n- Non-bash tools are not blocked.\n\n## Version Compatibility\n\nThis package targets Pi packages using `pi.extensions` / `pi.skills` manifests and Pi extension APIs with `tool_call`, `registerCommand`, `ctx.cwd`, `ctx.mode`, and `ctx.hasUI`.\n\nIt targets Orca CLI builds exposing `orca evaluate --json --stdin` with schema version `1` and decisions `allow`, `deny`, or `error`.\n\n## Known Limitations\n\n- Slash commands (`/orca-setup`, deprecated `/orca-start`, `/orca-doctor`, `/orca-mode`) are registered at extension load time. In Pi noninteractive/print/json modes, command output may not be visible even when registration succeeds. Validate slash commands in an interactive Pi session or via unit tests.\n- Session bypass is in-memory only and clears when the Pi session ends or reloads.\n- Only Pi `bash` tool calls are evaluated. Other tools (for example `read`) are not intercepted.\n\n## Smoke Test Checklist\n\n1. `./zig-out/bin/orca evaluate --json --stdin` allows `git status`.\n2. `./zig-out/bin/orca evaluate --json --stdin` denies `rm -rf /`.\n3. `./zig-out/bin/orca evaluate --json --stdin` returns exit `64` for invalid schema.\n4. `cd orca-pi && npm test`.\n5. `cd orca-pi && npm pack --dry-run`.\n6. `pi -e ./orca-pi`.\n7. Safe bash tool call proceeds.\n8. Dangerous bash tool call blocks.\n9. Orca unavailable interactive mode asks.\n10. Orca unavailable noninteractive mode blocks.\n11. `/orca-setup`, `/orca-doctor`, and `/orca-mode` work.\n12. `pi install ./orca-pi`.\n13. `pi list` shows `@orca-sec/pi-orca` or the local package source.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "orca",
+    "security",
+    "guardrails",
+    "bash",
+    "tool-call"
+  ],
+  "author": {
+    "name": "Orca Security"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/christopherkarani/Orca#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/christopherkarani/Orca.git",
+    "directory": "orca-pi"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/orca.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-20T13:30:34.073Z",
+    "modified": "2026-06-24T12:32:16.137Z",
+    "1.2.0": "2026-06-20T13:30:34.365Z",
+    "1.2.1": "2026-06-20T16:31:49.963Z",
+    "1.2.2": "2026-06-24T12:32:16.003Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 380,
+  "download_trend": []
+}

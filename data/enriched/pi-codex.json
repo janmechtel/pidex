@@ -1,0 +1,50 @@
+{
+  "name": "pi-codex",
+  "latest_version": "0.1.1",
+  "description": "Use Codex from pi-coding-agent to review code or delegate tasks.",
+  "readme": "# pi-codex\n\nUse [Codex](https://github.com/openai/codex) from inside [pi-coding-agent](https://github.com/badlogic/pi-mono) to review code or delegate tasks. This is a port of OpenAI's [`codex` Claude Code plugin](https://github.com/openai/codex-plugin-cc) to the pi runtime.\n\n## What it adds\n\n| Command | What it does |\n|---|---|\n| `/codex:review` | Run a Codex code review against local git state |\n| `/codex:adversarial-review` | Codex review that challenges design choices and assumptions |\n| `/codex:rescue [task]` | Delegate a substantial debugging or implementation task to Codex |\n| `/codex:status` | List running and recent Codex jobs for the current repo |\n| `/codex:result <id>` | Print the final Codex output for a finished job |\n| `/codex:cancel <id>` | Cancel an active background Codex job |\n| `/codex:setup` | Check Codex install / auth and toggle the optional review gate |\n| `/codex:gate` | Run a stop-time Codex review of the previous turn (opt-in) |\n\nThe first three are pi prompt templates \u2014 model-driven, with size estimation and a \"wait vs. background\" prompt via the `codex_ask` interactive tool. The other five are extension-registered commands that shell out to the companion runtime directly, no model turn needed.\n\n## Requirements\n\n- Node.js 18.18+\n- A local `codex` binary on `PATH` and a working Codex auth (run `/codex:setup` to verify)\n- pi-coding-agent installed (`npm install -g @mariozechner/pi-coding-agent`)\n\n## Install\n\n```bash\npi install git:github.com/quantmind-br/pi-codex\n```\n\nOr for a local checkout while developing:\n\n```bash\npi install /path/to/pi-codex\n```\n\nAfter install, run any `/codex:*` command inside `pi`.\n\n## How it works\n\nThe wrapper layer is pi-native; the runtime is the upstream OpenAI companion script reused verbatim. On `session_start` the extension sets `PI_CODEX_ROOT` (and also `CLAUDE_PLUGIN_ROOT` for cross-compatibility) to the package directory, then runs `scripts/session-lifecycle-hook.mjs SessionStart`. On `session_shutdown` it runs the same hook with `SessionEnd`.\n\nThe deterministic commands (`status`, `result`, `cancel`, `setup`, `gate`) are registered via `pi.registerCommand(...)` and `spawn` the companion script directly. The model-driven prompt templates (`review`, `adversarial-review`, `rescue`) read raw arguments, optionally interact with the user via the `codex_ask` tool, and forward to `node \"${PI_CODEX_ROOT}/scripts/codex-companion.mjs\" <subcmd>`.\n\n## Differences vs. the Claude Code plugin\n\n- No automatic Stop-hook. The pre-ship Codex review is opt-in via `/codex:gate`.\n- No `codex-rescue` subagent. Pi does not auto-discover package-shipped agents, so the rescue forwarder logic lives directly in the `/codex:rescue` prompt template.\n- `AskUserQuestion` (Claude Code tool) is replaced by the `codex_ask` extension tool, which wraps `ctx.ui.select()`.\n- Two upstream concurrency bugs are patched in pi-codex's runtime copy (broker `BROKER_BUSY` no longer falls back to a direct app-server; background workers now have their job record persisted before the worker is spawned). See `CHANGELOG.md` \"Runtime patches\" for details.\n\n## Development\n\n```bash\nnpm install\nnpm run typecheck\nnpm test\n```\n\n## License\n\nApache-2.0. Original work copyright OpenAI; pi-codex port modifications copyright diogo. See `LICENSE` and `NOTICE`.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "codex",
+    "openai",
+    "code-review",
+    "delegation"
+  ],
+  "author": {
+    "name": "diogo"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/quantmind-br/pi-codex#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/quantmind-br/pi-codex.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extension/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts/codex:review.md",
+      "./prompts/codex:adversarial-review.md",
+      "./prompts/codex:rescue.md"
+    ]
+  },
+  "time": {
+    "created": "2026-04-30T22:59:37.852Z",
+    "modified": "2026-04-30T23:25:02.373Z",
+    "0.1.2": "2026-04-20T10:09:18.518Z",
+    "0.1.3": "2026-04-20T10:16:39.458Z",
+    "0.1.4": "2026-04-20T10:30:10.627Z",
+    "0.1.5": "2026-04-20T10:38:08.296Z",
+    "0.1.6": "2026-04-20T11:27:05.163Z",
+    "0.1.0": "2026-04-30T22:59:38.046Z",
+    "0.1.1": "2026-04-30T23:25:02.089Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 47,
+  "download_trend": []
+}

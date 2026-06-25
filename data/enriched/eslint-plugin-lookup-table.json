@@ -1,0 +1,44 @@
+{
+  "name": "eslint-plugin-lookup-table",
+  "latest_version": "0.1.6",
+  "description": "Detect redundant conditional chains and suggest lookup tables",
+  "readme": "# eslint-plugin-lookup-table\n\n[![npm version](https://img.shields.io/npm/v/eslint-plugin-lookup-table.svg)](https://www.npmjs.com/package/eslint-plugin-lookup-table)\n[![license](https://img.shields.io/npm/l/eslint-plugin-lookup-table.svg)](LICENSE)\n\nFinds repeated branching on the same discriminant and, when safe, autofixes it into a lookup table.\n\n## Why\n\nCode that branches on the same discriminant more than once scatters related data across separate conditionals. Adding a new case means updating each branch. Miss one and the behavior drifts.\n\nThis rule targets a narrow failure mode in AI-assisted coding: incremental copy-paste edits that add another branch instead of collapsing repeated branching into a lookup table.\n\n## Before\n\n```typescript\nconst label =\n  status === \"loading\" ? \"Loading...\"\n  : status === \"error\" ? \"Something went wrong\"\n  : status === \"success\" ? \"Done\"\n  : \"Unknown\";\n\nconst icon =\n  status === \"loading\" ? \"\u23f3\"\n  : status === \"error\" ? \"\u274c\"\n  : status === \"success\" ? \"\u2705\"\n  : \"\u2753\";\n\nconst color =\n  status === \"loading\" ? \"blue\"\n  : status === \"error\" ? \"red\"\n  : status === \"success\" ? \"green\"\n  : \"gray\";\n```\n\n## After (auto-fixed)\n\n```typescript\nconst _status_LOOKUP = {\n  \"loading\": { label: \"Loading...\", icon: \"\u23f3\", color: \"blue\" },\n  \"error\":   { label: \"Something went wrong\", icon: \"\u274c\", color: \"red\" },\n  \"success\": { label: \"Done\", icon: \"\u2705\", color: \"green\" },\n};\nconst _status_DEFAULT = { label: \"Unknown\", icon: \"\u2753\", color: \"gray\" };\nconst { label, icon, color } = _status_LOOKUP[status] ?? _status_DEFAULT;\n```\n\nOne row per case. One place to edit.\n\n---\n\n## Install\n\n```bash\nnpm install --save-dev eslint-plugin-lookup-table\n```\n\nRequires ESLint 9+ (flat config).\n\n## Setup\n\n```javascript\n// eslint.config.js\nimport lookupTable from \"eslint-plugin-lookup-table\";\n\nexport default [\n  {\n    plugins: { \"lookup-table\": lookupTable },\n    rules: { \"lookup-table/no-redundant-branching\": \"error\" },\n  },\n];\n```\n\nOr use the recommended config:\n\n```javascript\nimport lookupTable from \"eslint-plugin-lookup-table\";\nexport default [lookupTable.configs.recommended];\n```\n\n---\n\n## What it detects\n\nThe rule finds 2+ conditional structures in the same scope that branch on the same variable with the same set of values.\n\n### Detected forms\n\n| Form | Example |\n|------|---------|\n| Ternary chains | `x === \"a\" ? 1 : x === \"b\" ? 2 : 3` |\n| If-else chains | `if (x === \"a\") ... else if (x === \"b\") ...` |\n| Switch statements | `switch (x) { case \"a\": ... case \"b\": ... }` |\n| Early-return blocks | `if (x === \"a\") return {...}; if (x === \"b\") return {...};` |\n| Mixed forms | A ternary and a switch on the same discriminant |\n\n### Not detected\n\n- Different discriminants (`theme` vs `mode`) \u2014 intentional\n- Different branch sets (`a,b` vs `a,c`) \u2014 different structures\n- Single chains below threshold \u2014 nothing to consolidate\n- Chains in different scopes \u2014 cannot share a lookup table\n\n---\n\n## Options\n\n```javascript\n\"lookup-table/no-redundant-branching\": [\"error\", {\n  threshold: 2,                  // chains needed to trigger (default: 2)\n  includeSwitchStatements: true, // detect switch statements (default: true)\n  includeIfElseChains: true,     // detect if-else and early-return (default: true)\n  ignoreDiscriminants: [\"theme\"] // suppress specific discriminants\n}]\n```\n\n---\n\n## Autofix safety\n\nThe autofix runs only when the transformation is safe:\n\n| Condition | Behavior |\n|-----------|----------|\n| `const` declarations, contiguous, no side effects | Autofixes to lookup table |\n| Side effects in branches | Reports only |\n| Non-contiguous chains (code between them) | Reports only |\n| Non-const declarations | Reports only |\n| Early-return blocks | Reports only |\n\n---\n\n## AI-assisted edits\n\nThis rule catches a narrow failure mode in AI-assisted coding: incremental copy-paste changes that add another branch instead of collapsing repeated branching into a lookup table. It does not address every kind of AI-generated bug.\n\nThe extension runs local ESLint logic. It does not call an external service, make a separate model request, or send code to another API. It adds a small local lint step, so expect a bit of CPU use and some extra latency after edits. In pi.dev, a short diagnostic can be fed back into the same session when the rule finds an issue.\n\n---\n\n## AI harness integration\n\nThese configs run the rule after edits so you can catch redundant branching during the session, not just in CI.\n\n### pi.dev\n\nBundled \u2014 no separate package needed.\n\n```bash\npi install npm:eslint-plugin-lookup-table\n```\n\nThe extension runs local ESLint after write/edit events on TypeScript and JavaScript files. If it finds a violation, it can surface a short diagnostic back into the same session. It also registers a `/lint-branching` command for manual scans.\n\n### Claude Code\n\nCopy `.claude/` from `harness-configs/claude-code/` into your project root. The PostToolUse hook runs local ESLint after writes and edits on `.ts` and `.tsx` files.\n\n### opencode\n\nCopy `.opencode/` from `harness-configs/opencode/` into your project root. The plugin runs local ESLint after writes and edits on TypeScript files and logs diagnostics for the session.\n\n---\n\n## Architecture\n\n```\nsrc/\n\u251c\u2500\u2500 index.ts                       # Plugin entry\n\u251c\u2500\u2500 pi-extension.ts                # pi.dev extension (auto-lint on write/edit)\n\u251c\u2500\u2500 rules/\n\u2502   \u2514\u2500\u2500 no-redundant-branching.ts  # Rule: collect \u2192 group \u2192 report \u2192 fix\n\u2514\u2500\u2500 utils/\n    \u251c\u2500\u2500 types.ts                   # ChainDescriptor, Branch, etc.\n    \u251c\u2500\u2500 discriminant.ts            # Extract discriminant from === comparisons\n    \u251c\u2500\u2500 chain-extractor.ts         # Parse ternary, if-else, switch, early-return\n    \u251c\u2500\u2500 normalizer.ts              # Group chains by discriminant + structure\n    \u2514\u2500\u2500 autofix.ts                 # Generate lookup table replacement code\n```\n\n---\n\n## Contributing\n\n```bash\ngit clone https://github.com/lnilluv/eslint-plugin-lookup-table.git\ncd eslint-plugin-lookup-table\nnpm install\nnpm test        # 32 tests\nnpm run typecheck\nnpm run build\n```\n\n---\n\n## License\n\nMIT\n\n",
+  "keywords": [
+    "eslint",
+    "eslint-plugin",
+    "eslint-rule",
+    "pi-extension",
+    "pi-package",
+    "lookup-table",
+    "ai-slop",
+    "lint"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/lnilluv/eslint-plugin-lookup-table#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lnilluv/eslint-plugin-lookup-table.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/pi-extension.js"
+    ]
+  },
+  "time": {
+    "created": "2026-04-09T16:15:38.548Z",
+    "modified": "2026-04-22T05:36:21.264Z",
+    "0.0.1": "2026-04-09T16:15:38.766Z",
+    "0.0.2": "2026-04-09T18:13:45.097Z",
+    "0.0.3": "2026-04-09T18:16:28.915Z",
+    "0.1.0": "2026-04-09T20:37:20.477Z",
+    "0.1.1": "2026-04-09T21:47:17.041Z",
+    "0.1.3": "2026-04-10T09:45:47.872Z",
+    "0.1.4": "2026-04-10T19:26:53.650Z",
+    "0.1.5": "2026-04-13T12:53:15.447Z",
+    "0.1.6": "2026-04-22T05:36:20.774Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": 57,
+  "download_trend": []
+}

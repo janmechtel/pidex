@@ -1,0 +1,46 @@
+{
+  "name": "pi-conventions",
+  "latest_version": "0.4.0",
+  "description": "Pi package for enforcing codebase conventions through structure and naming policies.",
+  "readme": "# pi-conventions\n\n**Pi package** for enforcing deterministic codebase conventions: structure, naming, documentation, size, and lightweight dependency boundaries.\n\n## Install\n\n```bash\npi install npm:pi-conventions\n```\n\n## Quick start\n\n1. Restart pi or run `/reload` after install.\n2. Scaffold a config: `/conventions create` (or `create rust|typescript|ts|go|python|documentation|fallback`).\n3. Inspect with `/conventions`. Tune with `/skill:conventions-guard` if you want guided review.\n\nConfig lookup: project `.pi/conventions.json`, global fallback `~/.pi/agent/conventions.json`. Project replaces global by default; set `\"extendsGlobal\": true` to layer global policies underneath project rules.\n\nWhen active policies exist, the extension injects a compact `## Conventions` summary into the system prompt, and intercepts `write`/`edit` to enforce them.\n\n## Commands\n\n| Command                                | Use                                                                                                      |\n| -------------------------------------- | -------------------------------------------------------------------------------------------------------- |\n| `/conventions`                         | Show active config                                                                                       |\n| `/conventions create [<lang>]`         | Scaffold config (`rust`, `typescript`, `ts`, `go`, `python`, `documentation`, `fallback`)                |\n| `/conventions reload`                  | Reload after manual config edits                                                                         |\n| `/conventions check <path>`            | Evaluate one file or proposed path                                                                       |\n| `/conventions audit`                   | Read-only repo scan (Git-aware; falls back to built-in ignore list)                                      |\n| `/conventions audit --include-ignored` | Include Git-ignored files                                                                                |\n| `/conventions audit --changed`         | Audit only locally changed files (staged + unstaged + untracked; deleted files skipped)                  |\n| `--json`                               | Machine-readable output (works on `check` and `audit`)                                                   |\n| `--policy <name>`                      | Filter to one family: `structure`, `naming`, `documentation`, `size`, `dependencies`, `package`, `files` |\n\n## Config shape\n\n```json\n{\n  \"$schema\": \"./conventions.schema.json\",\n  \"extendsGlobal\": true,\n  \"ignorePaths\": [\"vendor/**\", \"**/*.generated.ts\"],\n  \"policies\": {\n    \"structure\": {\n      \"mode\": \"block\",\n      \"editMode\": \"warn\",\n      \"sourceRoots\": [\"src/\"],\n      \"forbiddenSegments\": [\"utils\", \"helpers\", \"common\", \"misc\"]\n    },\n    \"naming\": {\n      \"rules\": [\n        {\n          \"id\": \"naming.rs.modules\",\n          \"prefixes\": [\"src/\"],\n          \"pathKinds\": [\"file\"],\n          \"extensions\": [\"rs\"],\n          \"requireCase\": \"snake_case\",\n          \"forbiddenNames\": [\"util\", \"utils\", \"helper\", \"helpers\"]\n        }\n      ]\n    },\n    \"size\": {\n      \"limits\": [\n        {\n          \"id\": \"size.core.500\",\n          \"prefixes\": [\"src/\"],\n          \"extensions\": [\"ts\", \"tsx\", \"rs\", \"go\"],\n          \"exclude\": [\"src/**/*.generated.ts\"],\n          \"maxLines\": 500\n        }\n      ]\n    },\n    \"dependencies\": {\n      \"mode\": \"block\",\n      \"rules\": [\n        {\n          \"from\": [\"src/**/*.ts\"],\n          \"exclude\": [\"src/extract/**\"],\n          \"to\": [\"src/extract/verticals/**\"],\n          \"reason\": \"Reach verticals through src/extract/registry.ts only.\"\n        }\n      ]\n    },\n    \"documentation\": {\n      \"rules\": [\n        {\n          \"kind\": \"requireFileOverview\",\n          \"paths\": [\"src/**/*.ts\"],\n          \"exclude\": [\"src/**/*.d.ts\"]\n        },\n        {\n          \"kind\": \"todoFormat\",\n          \"paths\": [\"src/**\", \"test/**\"],\n          \"format\": \"TAG: concrete action - referent\"\n        }\n      ]\n    }\n  }\n}\n```\n\nEach rule/limit accepts an optional `id` (surfaced in diagnostics as `policy:id`) and `exclude` (suppresses the rule for matching paths). Top-level `ignorePaths` suppresses findings across all policies. See `schemas/conventions.schema.json` for the full schema.\n\n## Policies\n\n**Structure** \u2014 file placement, architecture zones, catch-all folder blocking (`utils`, `helpers`, `common`, `misc`), legacy zones, new top-level file control.\n\n**Naming** \u2014 case styles (`kebab-case`, `snake_case`, `camelCase`, `PascalCase`), forbidden generic names, scoped by prefix/extension/path kind.\n\n**Size** \u2014 `maxLines` and `maxBytes` budgets, optional `ignoreBlankLines`/`ignoreCommentLines`. Useful as a split-by-responsibility nudge.\n\n**Dependencies** \u2014 lightweight relative import boundaries (`from` \u2192 `to`, with `exclude`) and raw specifier patterns (`forbidSpecifiers`/`allowSpecifiers`). Each rule supports `allow` to whitelist public entrypoints (e.g. `src/features/*/index.ts`). Scans static `import`/`export ... from` and relative dynamic imports. Does **not** do TS compiler resolution, path aliases, package export maps, call graphs, or circular dep detection. Use a linter for those.\n\n**Documentation** \u2014 deterministic rules: `requireTsdocOnExports`, `requireFileOverview`, `forbidFileHeaders`, `forbidCommentPatterns`, `todoFormat`, `requireRationaleComments`.\n\n**Files** \u2014 deterministic repo shape checks: `require` (must exist), `forbid` (must not exist), or `source` + `requireAny` for source/companion pairing with `{stem}`/`{dir}`/`{path}` placeholders. Required-file checks fire during `audit`; pairing and forbid fire per-file (write/edit and check).\n\n**Package** \u2014 manifest hygiene for npm/Pi packages: `requireFields`, `requireFiles`, `piPackage.requireKeyword`, `piPackage.verifyResourcePaths` (verifies `pi.extensions[]`/`pi.skills[]` paths exist), and `npm.requireFilesCoverage` (verifies `package.json` `files` covers configured entries). All checks are local file/JSON \u2014 no network, no `npm publish`.\n\nAll policies default to `warn` and are additive \u2014 present only what you configure. Modes: `warn`, `confirm`, `block`. See `examples/` for focused starting points (`conventions.size.json`, `conventions.documentation.json`, `conventions.dependencies.json`, `conventions.package.json`, `conventions.files.json`, `conventions.extends-global.json`).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-skill",
+    "conventions",
+    "structure",
+    "naming",
+    "architecture"
+  ],
+  "author": {
+    "name": "Brandon"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/brandonkramer/pi-conventions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brandonkramer/pi-conventions.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-04-18T17:03:47.678Z",
+    "modified": "2026-05-08T03:02:30.233Z",
+    "0.1.0": "2026-04-18T17:03:47.871Z",
+    "0.2.1": "2026-05-02T00:29:58.024Z",
+    "0.2.2": "2026-05-02T01:31:15.379Z",
+    "0.2.3": "2026-05-07T19:23:42.536Z",
+    "0.2.4": "2026-05-07T20:15:02.753Z",
+    "0.3.0": "2026-05-08T00:54:37.591Z",
+    "0.4.0": "2026-05-08T03:02:29.979Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 14,
+  "download_trend": []
+}

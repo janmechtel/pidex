@@ -1,0 +1,31 @@
+{
+  "name": "@odradekk/vera-memory",
+  "latest_version": "0.4.0",
+  "description": "Structured memory system for Vera agent (SQLite + FTS5)",
+  "readme": "# vera-memory\r\n\r\nA minimal structured memory layer for Vera.\r\n\r\n## Purpose\r\n\r\n`vera-memory` stores and retrieves structured memories for Vera. It is intentionally small:\r\n\r\n- active use only\r\n- SQLite + FTS5\r\n- structured records\r\n- explicit CRUD and search tools\r\n- automatic Project Ledger summary projection before agent start\r\n- no automatic broad memory retrieval injection\r\n- no automatic writeback\r\n- no maintenance / review / cleanup pipeline\r\n- no vector database\r\n- no embeddings\r\n\r\n## Registered surface\r\n\r\n### Tools\r\n- `memory_remember`\r\n- `memory_search`\r\n- `memory_update`\r\n- `memory_forget`\r\n- `memory_status`\r\n\r\n### Command\r\n- `/memory`\r\n\r\n### Hooks\r\n- `session_start`\r\n- `before_agent_start`\r\n- `session_shutdown`\r\n\r\n### Project Ledger prompt projection\r\n\r\nOn `before_agent_start`, `vera-memory` reads project-scoped ledger records for:\r\n\r\n- `project.overview`\r\n- `project.plan`\r\n- `project.progress`\r\n- `project.constraints`\r\n\r\nIt appends those summaries as a compact `## Project Ledger` markdown block to the active system prompt. This is prompt-time projection of fixed project ledger identities only; ordinary memory search, writes, updates, and deletes still happen through explicit tools.\r\n\r\n## Data model\r\n\r\nCore storage uses:\r\n\r\n- `meta`\r\n- `memories`\r\n- `memories_fts`\r\n\r\nSee repository design docs for the exact V1 schema.\r\n\r\n## Config\r\n\r\nLoaded from:\r\n\r\n- `agent/config/memory.json`\r\n- project `.pi/config/memory.json`\r\n\r\nMinimal example:\r\n\r\n```json\r\n{\r\n  \"enabled\": true,\r\n  \"database\": {\r\n    \"path\": \"../state/memory.sqlite\"\r\n  },\r\n  \"defaults\": {\r\n    \"shortTtlDays\": 14\r\n  }\r\n}\r\n```\r\n\r\nNotes:\r\n\r\n- relative `database.path` values are resolved from the config file directory\r\n- config is merged in order: built-in defaults, `agent/config/memory.json`, then project `.pi/config/memory.json`; project values override agent values, and unspecified nested `database` / `defaults` keys inherit from earlier layers\r\n- if no config file exists, built-in defaults are used\r\n- `memory_remember` does not do upsert\r\n\r\nProject override example:\r\n\r\n```json\r\n{\r\n  \"defaults\": {\r\n    \"shortTtlDays\": 30\r\n  }\r\n}\r\n```\r\n\r\nThis project config changes only the short-memory TTL and inherits the database settings from the agent config or built-in defaults.\r\n\r\n## Behavior\r\n\r\nOrdinary memory search and writes are manual; Project Ledger prompt projection is automatic.\r\n\r\n- search only when memory may materially improve continuity or correctness\r\n- store only stable, reusable information\r\n- update only when the same stable object changed\r\n- forget only on explicit request, confirmed error, or clear replacement\r\n- Project Ledger summaries may be present in the system prompt without a `memory_search` call\r\n- files, runtime state, and docs override memory\r\n\r\n## Smoke\r\n\r\nRun:\r\n\r\n```bash\r\nnpm run smoke\r\n```\r\n\r\nThe smoke test covers the minimal V1 path:\r\n\r\n- tool registration\r\n- remember\r\n- search by query\r\n- search by identity\r\n- update\r\n- forget\r\n- status\r\n\r\nLoaded through `agent/settings.json` as `./packages/vera-memory`.\r\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "s1n"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-23T05:40:59.387Z",
+    "modified": "2026-06-12T12:05:44.130Z",
+    "0.1.0": "2026-04-23T05:40:59.611Z",
+    "0.2.0": "2026-04-23T11:25:38.868Z",
+    "0.3.0": "2026-05-05T15:03:37.268Z",
+    "0.4.0": "2026-06-12T12:05:44.039Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 18,
+  "download_trend": []
+}

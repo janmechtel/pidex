@@ -1,0 +1,32 @@
+{
+  "name": "@piotr-oles/pi-subagents",
+  "latest_version": "1.0.0",
+  "description": "Pi Agent extension: spawn specialized subagents with isolated sessions",
+  "readme": "# pi-subagents\n\nA [pi coding agent](https://github.com/earendil-works/pi) extension that lets the agent spawn specialized subagents \u2014 each running in its own isolated session with its own model, tools, and instructions.\n\n## Install\n\n```bash\npi install npm:@piotr-oles/pi-subagents\n```\n\n## Agent templates\n\nDefine agents as markdown files with YAML frontmatter. Two locations are supported:\n\n| Location | Scope |\n|---|---|\n| `~/.pi/agent/subagents/<name>.md` | Global \u2014 available in all projects |\n| `.pi/subagents/<name>.md` | Project \u2014 available in current project only |\n\nA project template overrides a global template with the same name.\n\n**Example** `.pi/subagents/coder.md`:\n\n```markdown\n---\ndescription: Specialist for writing and editing code\nmodel: anthropic/claude-opus-4-5\nthinking: low\nmax_turns: 30\nincluded_tools: bash, read, edit, write\n---\n\nYou are an expert software engineer. Focus only on the assigned task.\nWrite clean, well-tested code. Do not ask for clarification \u2014 make reasonable assumptions.\n```\n\n**Frontmatter fields:**\n\n| Field | Type | Description |\n|---|---|---|\n| `description` | string | Short description shown in the UI. Defaults to the filename. |\n| `model` | string | Model to use (e.g. `anthropic/claude-haiku-4-5`). Inherits from parent session if omitted. |\n| `thinking` | string | Thinking level: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`. |\n| `max_turns` | number | Hard turn limit. When reached the agent is given grace turns to wrap up. |\n| `grace_turns` | number | Extra turns after `max_turns` before the agent is force-stopped. |\n| `enabled` | boolean | Set to `false` to disable this agent type without deleting the file. |\n| `included_tools` | string | Comma-separated list of tool names available to this agent. Omit to inherit all tools from the parent session. |\n| `included_skills` | string | Comma-separated list of skill names available to this agent. Omit to inherit all skills. |\n| `included_subagents` | string | Comma-separated list of subagent template names this agent may spawn. |\n\nIf no matching template is found the agent falls back to `general-purpose`, or a plain default if that is also absent.\n\n## Tools\n\n### `subagent`\n\nSpawns a subagent to handle a task, or follows up on a previously completed one.\n\n| Parameter | Type | Description |\n|---|---|---|\n| `name` | string | Name of the agent template to use. Required for both spawn and follow-up. |\n| `id` | string | ID of a done subagent to follow-up. Omit when spawning fresh. |\n| `description` | string | Short description of the task (shown in UI). |\n| `prompt` | string | Task prompt sent to the subagent. |\n\nBlocks until the subagent completes and returns its result inline. To follow up on a finished subagent, call `subagent` again with the `id` returned in the previous result plus a new `prompt`.\n\n## How it works\n\n1. On `before_agent_start`, templates are reloaded from disk.\n2. When `subagent` is called, the extension resolves the template, builds an `AgentConfig`, and starts an isolated pi session.\n3. The subagent session inherits the parent's model registry and working directory but gets its own system prompt built from the template's instructions.\n4. The `subagent` tool is excluded from subagent sessions unless `included_subagents` is set \u2014 only then can a subagent spawn further subagents (limited to the listed templates).\n5. A concurrency queue limits how many agents run simultaneously; excess agents are queued and started as slots free up.\n\n## Flags\n\n```bash\npi --pi-subagents-max-concurrent 4    # max agents running at once (default: 4)\n```\n\nOr via environment variable:\n\n```bash\nPI_SUBAGENTS_MAX_CONCURRENT=2 pi\n```\n\n## `subagent:templates` command\n\nOpens an interactive menu listing all loaded agent templates with their source (global `\u25e6` / project `\u2022`) and model. Run via the pi command palette.\n\n## Development\n\n```bash\npnpm install\npnpm test\npnpm typecheck\npnpm check\n```\n\nTo test changes manually, pass the source entry point directly to pi:\n\n```bash\npi -ne -e packages/pi-subagents/src/index.ts\n```\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/piotr-oles/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/piotr-oles/pi-extensions.git",
+    "directory": "packages/pi-subagents"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-18T16:38:32.381Z",
+    "modified": "2026-06-23T16:55:32.944Z",
+    "0.1.0": "2026-06-18T16:38:32.768Z",
+    "0.2.0": "2026-06-18T16:53:34.633Z",
+    "1.0.0": "2026-06-23T16:55:32.842Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 370,
+  "download_trend": []
+}

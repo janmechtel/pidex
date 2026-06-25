@@ -1,0 +1,350 @@
+{
+  "name": "@karutoil/pi-lsp",
+  "latest_version": "2.0.0",
+  "description": "Instant tree-sitter syntax diagnostics for Pi coding agent \u2014 80+ languages, sub-ms parses, auto-checks after every edit",
+  "readme": "# pi-lsp\n\n**Instant tree-sitter LSP emulation + compiler-backed type checking for [Pi](https://pi.dev) coding agent.**\n\n- \ud83d\ude80 **Sub-millisecond** \u2014 in-process WASM parser, zero daemon, zero child processes\n- \ud83c\udf10 **80+ languages** \u2014 TypeScript, Python, Rust, Go, C/C++, Java, Bash, CSS, JSON, YAML, and more\n- \ud83d\udd0d **Auto-checks after every edit** \u2014 re-parses changed files, injects diagnostics, updates symbol index\n- \ud83e\udded **LSP-style navigation** \u2014 go to definition, find references, hover, document symbols\n- \u2705 **Two-tier validation** \u2014 tree-sitter catches syntax instantly; real compiler catches types before done\n- \ud83d\udce6 **Zero setup** \u2014 npm deps auto-installed, grammars bundled, no external binaries needed\n\n## Install\n\n```bash\npi install npm:pi-lsp\n```\n\nOr try without installing:\n\n```bash\npi -e npm:pi-lsp\n```\n\n## What It Does\n\n### Automatic (no action needed)\n\nAfter every `edit`, `write`, or bash file redirect (`> file`), pi-lsp instantly re-parses the file. If syntax errors are found, they're injected into the agent context automatically \u2014 the LLM sees the errors and can fix them.\n\n### Two-Tier Validation\n\n**Tier 1 \u2014 Syntax (tree-sitter, instant, sub-ms)**\nCatches missing brackets, unclosed blocks, invalid tokens across 80+ languages. Runs automatically after every edit.\n\n**Tier 2 \u2014 Semantics (real compiler, before task complete)**\nRuns the actual compiler/type checker (`tsc`, `cargo check`, `go build`, `mypy`, etc.) to catch type mismatches, missing imports, and logic errors that tree-sitter can't see. Auto-detects project type. Agent is instructed to run this before declaring work done.\n\n### Tools (agent can call these)\n\n| Tool | Description |\n|------|-------------|\n| `lsp_diagnostics` | Check a single file for syntax errors |\n| `lsp_project_diagnostics` | Scan the entire project for syntax errors |\n| `lsp_symbols` | List all symbols (functions, classes, variables) in a file |\n| `lsp_definition` | Go to definition of a symbol at line/column |\n| `lsp_references` | Find all references to a symbol in a file |\n| `lsp_hover` | Get node type and info at a position |\n| `run_type_check` | Run the project's compiler/type checker |\n\n### Commands (you can type these)\n\n| Command | Description |\n|---------|-------------|\n| `/lsp-check [path]` | Check a file or directory for syntax errors |\n| `/lsp-project` | Scan the entire project for syntax errors |\n| `/lsp-status` | Show parser status, loaded grammars, symbol index stats |\n| `/symbols` | Show symbol index statistics |\n| `/check` | Run the language type checker on the project |\n\n## Supported Languages\n\nTypeScript, TSX, JavaScript, JSX, Python, Rust, Go, C, C++, Java, C#, Swift, Kotlin, Scala, Ruby, Lua, Bash, Zsh, CSS, SCSS, HTML, JSON, YAML, TOML, Markdown, SQL, PHP, Elixir, Erlang, Haskell, OCaml, Nim, Zig, Dart, R, Julia, Perl, Vue, Svelte, Astro, GraphQL, Prisma, Dockerfile, CMake, Make, Nix, Fish, PowerShell, Protobuf, Terraform, HCL, Gleam, Solidity, Typst, LaTeX, and more \u2014 80+ total.\n\n## How It Works\n\n**Syntax layer** uses [tree-sitter](https://tree-sitter.github.io/tree-sitter/) compiled to WebAssembly via [web-tree-sitter](https://github.com/tree-sitter/tree-sitter/tree/master/lib/binding_web), with pre-built grammar WASMs from [tree-sitter-wasm](https://www.npmjs.com/package/tree-sitter-wasm). Everything runs in-process \u2014 no daemon, no child processes, no network calls.\n\n**Symbol index** extracts definitions using generic tree-sitter heuristics: any node with a `name` field whose type matches a definition pattern (`*_definition`, `*_declaration`, function_, class_, etc.). Works for all 80+ languages without per-language query files. Parsed trees are cached and incrementally updated on every edit.\n\n**Type check layer** auto-detects the project type from config files (`tsconfig.json`, `Cargo.toml`, `go.mod`, `pyproject.toml`, etc.) and runs the appropriate compiler/linter. Falls back through multiple commands if the primary tool isn't installed. Parses compiler output into structured diagnostics.\n\n## Example Output\n\n**Syntax diagnostics (instant):**\n```\n\ud83d\udd0d src/main.ts (typescript): 1 syntax error\n  \u274c L17:18 \u2014 Missing `}` in statement_block\n```\n\n**Document symbols:**\n```\n\ud83d\udccb 8 symbols in src/main.ts:\n\n  **function** (1):\n    L7:10 \u2014 `broken`\n  **import** (3):\n    L1:10 \u2014 `add`\n    L1:15 \u2014 `greet`\n    L1:22 \u2014 `Calculator`\n  **variable** (4):\n    L4:7 \u2014 `result`\n    L8:9 \u2014 `msg` (in broken)\n    L15:7 \u2014 `calc`\n    L17:7 \u2014 `val`\n```\n\n**Go to definition:**\n```\n\u2705 `add` (import) \u2192 L1:10\n```\n\n**Find references:**\n```\n\ud83d\udccc 2 reference(s) to `greet`:\n     L1:15 \u2014 in import_specifier\n     L8:15 \u2014 in call_expression\n```\n\n**Hover:**\n```\n**class**\n\\`\\`\\`\nclass\n\\`\\`\\`\n```\n\n**Type check (real compiler):**\n```\n\ud83d\udd0d 1 issue(s) found by npx tsc --noEmit:\n  \u274c L4:20 \u2014 Argument of type 'string' is not assignable to parameter of type 'number'.\n```\n\n**All clean:**\n```\n\u2705 Project clean \u2014 no syntax errors in 363/363 files\n\u2705 Type check passed \u2014 detected typescript, npx tsc --noEmit\n```\n\n## Architecture\n\n```\nAgent edits file\n    \u2193\ntree-sitter re-parses instantly (<1ms)\n    \u2193\nAuto-updates symbol index (cached trees)\n    \u2193\nSyntax errors? \u2192 injected into agent context\n    \u2193\nAgent uses lsp_symbols / lsp_definition / lsp_references as needed\n    \u2193\nAgent calls run_type_check before declaring done\n    \u2193\nReal compiler catches type/semantic errors\n    \u2193\nAgent fixes, re-runs check \u2192 clean \u2705\n```\n\n### Symbol extraction\n\nGeneric heuristic walks any tree-sitter tree. Classifies nodes by type name pattern:\n\n| Node type pattern | Kind | Languages |\n|-------------------|------|-----------|\n| `function_declaration`, `function_definition`, `function_item` | `function` | TS, Python, Rust, Go |\n| `class_definition`, `class_declaration`, `struct_item` | `class` | TS, Python, Rust |\n| `method_definition`, `method_declaration` | `method` | TS, Go |\n| `variable_declarator`, `assignment`, `let_declaration` | `variable` | TS, Python, Rust |\n| `interface_declaration`, `trait_item` | `interface` | TS, Rust |\n| `enum_declaration`, `enum_item` | `enum` | TS, Rust |\n| `import_specifier`, `use_declaration` | `import` | TS, Rust |\n\nA node must also have a `name` field (via `childForFieldName(\"name\")`) to be extracted. This filters out false positives like `return_statement` or `class_body` that match type patterns but aren't definitions.\n\n### Type check commands\n\n| Project type | Detected by | Command |\n|-------------|-------------|---------|\n| TypeScript | `tsconfig.json` | `npx tsc --noEmit` |\n| JavaScript | `package.json` | `npx eslint . --format unix` |\n| Rust | `Cargo.toml` | `cargo check --message-format short` |\n| Go | `go.mod` | `go build ./...` |\n| Python | `pyproject.toml`, `setup.py` | `ruff check`, `mypy .` |\n| Java (Maven) | `pom.xml` | `mvn compile -q` |\n| Java (Gradle) | `build.gradle` | `gradle compileJava -q` |\n| C/C++ (CMake) | `CMakeLists.txt` | `cmake --build build` |\n| C/C++ (Make) | `Makefile` | `make -k` |\n| Ruby | `Gemfile` | `ruby -c` |\n| PHP | `composer.json` | `php -l` |\n| Elixir | `mix.exs` | `mix compile --no-deps-check` |\n| Haskell | `stack.yaml`, `cabal.project` | `stack build`, `cabal build` |\n| Scala | `build.sbt` | `sbt compile` |\n| Swift | `Package.swift` | `swift build` |\n| Zig | `build.zig` | `zig build` |\n| Dart | `dub.json`, `dub.sdl` | `dart analyze` |\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "tree-sitter",
+    "lsp",
+    "diagnostics",
+    "syntax",
+    "parser"
+  ],
+  "author": {
+    "name": "karutoil"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/karutoil/pi-lsp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/karutoil/pi-lsp.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "image": "https://raw.githubusercontent.com/karutoil/pi-lsp/main/pi-lsp.png"
+  },
+  "time": {
+    "created": "2026-06-11T19:07:45.776Z",
+    "2.0.0": "2026-06-11T19:07:46.088Z",
+    "modified": "2026-06-11T19:07:46.337Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": 7,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 151
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 8
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

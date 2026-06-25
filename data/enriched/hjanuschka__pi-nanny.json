@@ -1,0 +1,39 @@
+{
+  "name": "@hjanuschka/pi-nanny",
+  "latest_version": "1.1.0",
+  "description": "Parental control extension for Pi - helps you go to bed instead of having 47 creative ideas at 3 AM",
+  "readme": "# \ud83d\udecf\ufe0f Pi-Nanny Extension\n\n> \"My ADHD ass having 47 creative new ideas at 3 am instead of sleeping\"\n\n**Pi-Nanny** is a parental control extension for [Pi](https://github.com/badlogic/pi) that helps you maintain a healthy sleep schedule by nagging you to go to bed when you're coding at ungodly hours.\n\nBorn from [this Twitter thread](https://x.com/badlogicgames/status/2021521786341556509) where [@badlogicgames](https://twitter.com/badlogicgames) said \"do it\" after [@hjanuschka](https://twitter.com/hjanuschka) suggested we need \"some 'its over go to bed' extension!\"\n\n## Features\n\n\u2728 **Progressive Enforcement**\n- \ud83c\udf19 Gentle warnings (midnight - 1 AM)\n- \ud83d\udea8 Strict mode after 5 ignored warnings\n- \ud83d\udd34 **Hard exit at 1:00 AM** - automatic shutdown with funny messages\n\n\ud83d\ude34 **Snooze System**\n- Temporary override with `/nanny snooze <minutes>`\n- Quick snooze with `Ctrl+Shift+S`\n- Can't snooze past hard exit time\n\n\ud83d\udcca **Status Tracking**\n- Persistent footer showing bedtime status\n- Warning counter for repeat offenders\n- Countdown to hard exit\n\n\ud83c\udfb2 **Random Exit Messages**\n- \"Good night sucker! \ud83d\ude34\"\n- \"Git commit yourself to bed. NOW. \ud83d\udecf\ufe0f\"\n- \"404: Wakefulness not found. Redirecting to sleep. \ud83c\udf19\"\n- ...and 17 more!\n\n## Installation\n\n### Quick Install (Recommended)\n\n```bash\n# Install from npm (easiest)\npi install npm:@hjanuschka/pi-nanny\n\n# Or install from git\npi install git:github.com/hjanuschka/pi-nanny@v1.0.0\n\n# Try without installing\npi -e npm:@hjanuschka/pi-nanny\n```\n\n### Manual Installation\n\n#### Global (All Projects)\n\n```bash\n# Copy to extensions directory\nmkdir -p ~/.pi/agent/extensions\ncp pi-nanny.ts ~/.pi/agent/extensions/\n\n# Or symlink for development\nln -s $(pwd)/pi-nanny.ts ~/.pi/agent/extensions/\n```\n\nThe extension will auto-load in all Pi sessions. Use `/reload` to reload after edits.\n\n#### Project-Local\n\n```bash\n# Copy to project extensions\nmkdir -p .pi/extensions\ncp pi-nanny.ts .pi/extensions/\n```\n\n## Usage\n\n### Commands\n\n#### `/nanny test [bedtime|hardexit|normal]` - Test Mode\nSimulate different times for testing without waiting until midnight:\n- `bedtime` - Simulate midnight (gentle warnings)\n- `hardexit` - Simulate 1 AM (forced shutdown)\n- `normal` - Switch back to real time\n\n```bash\n/nanny test bedtime   # See bedtime warnings\n/nanny test hardexit  # Trigger shutdown (careful!)\n/nanny test normal    # Back to real time\n```\n\nCan also use CLI flag:\n```bash\npi -e ./pi-nanny.ts --nanny-test-time=0   # Midnight\npi -e ./pi-nanny.ts --nanny-test-time=1   # 1 AM\n```\n\n#### `/nanny` - Check Status\nShows current configuration and bedtime status:\n- Enabled/disabled state\n- Bedtime hours\n- Hard exit time\n- Current violations\n- Snooze status\n\n#### `/nanny snooze [minutes]` - Snooze Warnings\nTemporarily disable bedtime enforcement (default: 15 minutes).\n- Cannot snooze past hard exit hour\n- Resets some of your warning counter\n- Use wisely!\n\n```bash\n/nanny snooze 30  # Snooze for 30 minutes\n/nanny snooze     # Snooze for 15 minutes (default)\n```\n\n#### `/nanny config` - Configure Hours\nUpdate bedtime schedule:\n- Bedtime start (default: 0 = midnight)\n- Bedtime end (default: 6 = 6 AM)\n- Hard exit hour (default: 1 = 1 AM)\n\n#### `/nanny disable` - Turn Off\nDisable Pi-Nanny for the current session.\n\n#### `/nanny enable` - Turn On\nRe-enable Pi-Nanny after disabling.\n\n#### `/nanny reset` - Reset Warnings\nReset the warning counter and strict mode.\n\n### Keyboard Shortcuts\n\n- **`Ctrl+Shift+S`** - Quick 15-minute snooze (only during bedtime, before hard exit)\n\n### Status Line\n\nPi-Nanny adds a status indicator to the footer:\n- `\ud83c\udf19 Bedtime! (ends in 5 hours)` - Warning mode\n- `\ud83d\udea8 Bedtime! Hard exit in 45m` - Approaching hard exit\n- `\ud83d\ude34 Snooze: 12m remaining` - Currently snoozed\n- `\ud83d\udea8 HARD EXIT - Shutting down soon!` - Past 1 AM\n\n## Configuration\n\nDefault configuration:\n```typescript\n{\n  bedtimeStart: 0,    // Midnight\n  bedtimeEnd: 6,      // 6 AM\n  hardExitHour: 1,    // 1 AM - force quit\n  strictMode: false,  // Starts gentle\n  enabled: true\n}\n```\n\n### How It Works\n\n1. **Midnight - 1 AM (Warning Mode)**\n   - Gentle reminders on each prompt\n   - Escalates to \"firm\" after 3 warnings\n   - Activates strict mode after 5 warnings\n\n2. **Strict Mode**\n   - Blocks each prompt with confirmation dialog\n   - Auto-timeout after 10 seconds\n   - Adds guilt to every bypass\n\n3. **1 AM - Hard Exit**\n   - 30-second countdown dialog\n   - No snooze allowed\n   - Automatic `ctx.shutdown()`\n   - Random funny exit message\n\n### Exit Messages\n\nSample messages shown during hard exit:\n- \"Good night sucker! \ud83d\ude34\"\n- \"That's it. I'm pulling the plug. Sweet dreams! \ud83d\udd0c\"\n- \"Your 3 AM ideas can wait. Trust me. \ud83c\udf19\"\n- \"Git commit yourself to bed. NOW. \ud83d\udecf\ufe0f\"\n- \"Stackoverflow will still be there in the morning. Bye! \ud83d\udc4b\"\n- \"404: Wakefulness not found. Redirecting to sleep. \ud83c\udf19\"\n- \"Ctrl+Alt+Delete your bad sleep habits. Good night! \u2328\ufe0f\"\n\n## Examples\n\n### Starting Pi at 2 AM\n```bash\n$ pi\n\ud83d\udea8 MANDATORY BEDTIME\nIt's past 1:00 AM. Pi is shutting down in 30 seconds.\n\nCtrl+Alt+Delete your bad sleep habits. Good night! \u2328\ufe0f\n\nNo snooze available. Get some sleep!\n[Yes] [No (default)]\n```\n\n### Warning During Bedtime\n```\n\ud83d\ude34 Even GPUs need to sleep sometimes.\n```\n\n### Snoozing Past Hard Exit\n```bash\n/nanny snooze 60\n\u26a0\ufe0f Can't snooze past 1:00 AM (hard exit). Max snooze: 45 minutes\n```\n\n## Development\n\nBuilt with Pi's extension API. Key features used:\n- **Event interception** - `input`, `agent_start`, `session_start`\n- **UI components** - `ctx.ui.confirm()`, `ctx.ui.notify()`, `ctx.ui.setStatus()`\n- **Custom commands** - `/nanny` with subcommands\n- **Keyboard shortcuts** - `Ctrl+Shift+S`\n- **Graceful shutdown** - `ctx.shutdown()`\n\n## Credits\n\n- **Idea**: [@kshvbgde](https://twitter.com/kshvbgde)'s late-night ADHD tweet\n- **Suggestion**: [@hjanuschka](https://twitter.com/hjanuschka) (that's me!)\n- **Blessing**: [@badlogicgames](https://twitter.com/badlogicgames) said \"do it\"\n- **Framework**: [Pi](https://github.com/badlogic/pi) by [@badlogicgames](https://twitter.com/badlogicgames)\n\n## License\n\nMIT - Use at your own risk of actually getting good sleep.\n\n## Contributing\n\nGot better exit messages? More creative nag lines? PRs welcome!\n\n---\n\n*Remember: The bugs will still be there tomorrow. Your sleep schedule won't.*\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "sleep",
+    "productivity",
+    "parental-control",
+    "bedtime",
+    "health"
+  ],
+  "author": {
+    "name": "Harald Januschka",
+    "email": "harald.januschka@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/hjanuschka/pi-nanny#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hjanuschka/pi-nanny.git"
+  },
+  "pi": {
+    "extensions": [
+      "pi-nanny.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-11T09:57:17.568Z",
+    "modified": "2026-02-11T10:17:21.101Z",
+    "1.0.0": "2026-02-11T09:57:17.790Z",
+    "1.1.0": "2026-02-11T10:17:20.598Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 80,
+  "download_trend": []
+}

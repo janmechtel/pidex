@@ -1,0 +1,355 @@
+{
+  "name": "@wierdbytes/pi-voice",
+  "latest_version": "0.4.1",
+  "description": "Spoken summary after each agent turn for the pi coding agent.",
+  "readme": "# @wierdbytes/pi-voice\n\nSpoken summary after each agent turn for the [pi](https://github.com/badlogic/pi-mono) coding agent.\n\nAfter the assistant finishes a user request, this extension:\n\n1. Picks the assistant text from the latest turn.\n2. Generates a short, expressive 1\u20132 sentence summary of it.\n3. Speaks the summary aloud through your system's audio player.\n\nIf a new agent turn starts while a previous summary is still playing,\nthe in-flight summary is cancelled and replaced. Stays silent in\nprint/RPC mode and when no Gemini API key is configured.\n\n## Install\n\n```bash\npi install npm:@wierdbytes/pi-voice\n```\n\nRestart pi to activate. Verify with `/voice status`.\n\nYou also need:\n\n- A Gemini API key (see **Auth** below).\n- A system audio player on `$PATH`:\n  - macOS: `afplay` (preinstalled).\n  - Linux: one of `paplay` (PulseAudio), `aplay` (ALSA), or `ffplay` (ffmpeg).\n  - Windows: PowerShell (preinstalled).\n\n## Auth\n\nResolved in this order, first hit wins:\n\n1. **`PI_VOICE_GEMINI_API_KEY`** \u2014 package-specific override env var.\n   Always wins, useful for power users who want voice to use a\n   different Google credential than the rest of pi.\n2. **pi's stored Google credential** \u2014 read via\n   `ctx.modelRegistry.getApiKeyForProvider(\"google\")`. This covers:\n   - any key set with `pi auth set google <key>` (stored in pi's\n     `auth.json`),\n   - custom-provider Google entries in `models.json`,\n   - the `GEMINI_API_KEY` environment variable that pi-ai falls back on.\n   The cached value is refreshed on `session_start`, on every\n   `agent_end`, and on every `/voice` subcommand, so a credential\n   rotated mid-session is picked up without restarting pi.\n3. **`GOOGLE_API_KEY`** \u2014 last-resort env fallback. pi-ai's registry\n   only maps `GEMINI_API_KEY` to the `google` provider, so we keep\n   `GOOGLE_API_KEY` as a separate hop for users who only have that one\n   exported.\n\nIf none of the above resolves to a non-empty key, the extension stays\nsilent on every `agent_end` and `/voice status` shows\n`key: none`. The status row labels each successful resolution with its\nsource (`PI_VOICE_GEMINI_API_KEY` / `pi:google` / `GEMINI_API_KEY` /\n`GOOGLE_API_KEY`).\n\n## Configuration\n\nState lives in `~/.pi/agent/wierd-voice/`:\n\n> Migrating from a previous version? On first run after upgrading,\n> the extension silently renames the legacy `~/.pi/agent/pi-wierd-voice/`\n> directory to `~/.pi/agent/wierd-voice/` so you keep your config and\n> last-played audio.\n\n- `config.json` \u2014 settings (created on first save).\n- `last.wav` \u2014 most recent synthesized audio. Overwritten each turn and\n  by `/voice say`. Used by `/voice replay`.\n\n`config.json` shape:\n\n```json\n{\n  \"muted\": false,\n  \"voice\": \"Umbriel\",\n  \"scope\": \"last\",\n  \"summarizerModel\": \"anthropic/claude-haiku-4-5\",\n  \"summarizerThinkingLevel\": \"medium\"\n}\n```\n\n- `muted` \u2014 when true, no playback (still kept current via /voice unmute).\n- `voice` \u2014 one of 30 prebuilt voices (see the overlay's Voice row).\n- `scope` \u2014 `last` (final assistant message only) or `sinceUser`\n  (assistant text + tool-call digests since the last user message).\n- `summarizerModel` \u2014 provider/model id for the summary sub-agent. Unset\n  \u21d2 uses the current session model.\n- `summarizerThinkingLevel` \u2014 reasoning effort for the summary sub-agent,\n  forwarded as `pi --thinking <level>`. One of\n  `off | minimal | low | medium | high | xhigh`. Unset \u21d2 inherit pi's\n  default for the chosen model. The overlay clamps the value to whatever\n  the highlighted model advertises in its `thinkingLevelMap` (same\n  contract as `/web fetch-model`).\n\nThe TTS model itself is hardcoded to `gemini-3.1-flash-tts-preview`.\n\n## Commands\n\nEvery persisted setting (voice, scope, summarizer model, mute) is\nconfigured through a single centered overlay. Bare `/voice` opens\nit; the rest of the surface is imperative actions.\n\n| Command            | What it does                                                                                                       |\n| ------------------ | ------------------------------------------------------------------------------------------------------------------ |\n| `/voice`           | Open the settings overlay (Up/Down between rows, Enter/Space cycles or opens submenu, Esc closes). Falls back to `status` in non-interactive sessions. |\n| `/voice status`    | Show config path, key source, voice, scope, summarizer, thinking level, muted, audio player.                       |\n| `/voice mute`      | Shortcut for the overlay's `Muted` row. Sets `muted=true` and aborts any in-flight job.                            |\n| `/voice unmute`    | Shortcut for the overlay's `Muted` row. Sets `muted=false`.                                                        |\n| `/voice say <text>`| Synthesize and play `<text>` directly. Bypasses the summarizer.                                                    |\n| `/voice replay`    | Re-spawn the audio player on the stored `last.wav`.                                                                |\n| `/voice reset`     | Restore defaults (`muted=false`, voice=Umbriel, scope=last, summarizer cleared).                                   |\n\nThe overlay rows:\n\n- **Muted** \u2014 cycle `false` / `true`. Same effect as `/voice mute`.\n- **Voice** \u2014 Enter opens a picker showing all 30 prebuilt Gemini\n  voices with their descriptors (`Umbriel  Easy-going`, `Kore  Firm`,\n  `Puck  Upbeat`, \u2026). Up/Down to scroll, Enter saves, Esc cancels. The\n  parent row label shows both, e.g. `Umbriel  \u00b7  Easy-going`.\n- **Summary scope** \u2014 cycle `last` / `sinceUser`.\n- **Summarizer model** \u2014 Enter opens a dual model + effort picker (a\n  port of `/web fetch-model`):\n  - Up/Down moves through every model with configured auth (mirrors\n    `/models`), plus a `(session model)` entry at the top that clears\n    the override.\n  - Left/Right cycles the reasoning effort, restricted to the levels\n    the highlighted model advertises in `thinkingLevelMap`. Switching\n    models re-clamps the effort (e.g. dropping `xhigh` when moving to\n    a model that doesn't support it).\n  - Enter saves both fields atomically; Esc abandons the choice.\n  - The row label in the parent overlay shows both, e.g.\n    `anthropic/claude-haiku-4-5  \u00b7  medium`.\n\nEvery change is persisted to `config.json` immediately (Esc just closes\nthe overlay; there is no separate \"save\" step \u2014 same UX as\n`/settings`).\n\n## CLI flags\n\n- `--no-voice` \u2014 disable voice playback for the current session.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "coding-agent",
+    "extension",
+    "voice",
+    "tts",
+    "gemini"
+  ],
+  "author": {
+    "name": "wierdbytes"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/wierdbytes/pi-wierd-stuff/tree/master/packages/voice",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wierdbytes/pi-wierd-stuff.git",
+    "directory": "packages/voice"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-07T21:34:05.245Z",
+    "modified": "2026-05-08T16:37:33.466Z",
+    "0.3.0": "2026-05-07T21:34:05.525Z",
+    "0.3.1": "2026-05-07T21:45:35.318Z",
+    "0.3.2": "2026-05-07T22:01:27.283Z",
+    "0.4.0": "2026-05-08T16:25:26.986Z",
+    "0.4.1": "2026-05-08T16:37:33.108Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 25,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 509
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 13
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 34
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 39
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 10
+    }
+  ]
+}

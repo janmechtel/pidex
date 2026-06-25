@@ -1,0 +1,47 @@
+{
+  "name": "agent-booster-pack-proof",
+  "latest_version": "2.0.1",
+  "description": "Proof-first Pi extension that uses a red-green-refactor cycle when behavior should be specified in tests first, with built-in parsing for popular test frameworks. Renamed from pi-proof; old name deprecated.",
+  "readme": "# agent-booster-pack-proof\n\nA proof-first extension for [Pi](https://pi.dev), the terminal coding agent.\n\nIt nudges the agent into a red-green-refactor loop when the next change needs a test. It stays out of the way for docs, config, and exploration.\n\n[![agent-booster-pack-proof demo](https://github.com/kreek/agent-booster-pack/raw/refs/heads/main/agent-booster-pack-proof/assets/release/demo.gif)](https://github.com/kreek/agent-booster-pack/raw/refs/heads/main/agent-booster-pack-proof/assets/release/demo.mp4)\n\n> **Renamed from `pi-proof`.** The old npm name is deprecated;\n> migrate to `agent-booster-pack-proof` for ongoing updates. This package is\n> one of four sibling packages in [Agent Booster Pack](https://github.com/kreek/agent-booster-pack);\n> install the meta-package `agent-booster-pack` for the full bundle.\n\n## Install\n\nInstall Pi:\n\n```bash\nnpm install -g @mariozechner/pi-coding-agent\npi\n```\n\nInstall agent-booster-pack-proof:\n\n```bash\npi install npm:agent-booster-pack-proof\n```\n\nIf Pi is already running, run `/reload`.\n\n## Use it\n\nAsk the agent to change behavior:\n\n```\nFix the off-by-one error in pagination\n```\n\nThe agent decides if proof mode fits. If it does, the agent writes a failing test, makes it pass, refactors, and finishes.\n\nToggle by hand:\n\n```\n/proof\n```\n\n## When proof mode helps\n\nReach for it when:\n\n- A bug has a clear failing case.\n- A feature adds or changes observable behavior.\n- A business rule needs to be locked down before code.\n\nSkip it when:\n\n- You are editing docs, config, manifests, or lockfiles.\n- You are scaffolding plumbing.\n- You are exploring and the behavior is not settled.\n\nBy default the extension is advisory. It tells the agent that proof mode is available. The agent decides. Once on, the loop is strict.\n\n## Why this works\n\nTests give the agent ground truth. Without it, the agent guesses.\n\nThe research backs this up. [TDFlow](https://arxiv.org/abs/2510.23761) (2025) found that human-written acceptance criteria improve agent accuracy by 12\u201346 points. [AlphaCodium](https://arxiv.org/abs/2401.08500) (2024) raised GPT-4 accuracy from 19% to 44% with a test-execute-fix loop. [Reflexion](https://arxiv.org/abs/2303.11366) (NeurIPS 2023) hit 91% on HumanEval, up from 80%.\n\nTests document, too. They show the next reader, human or agent, how the system actually behaves.\n\nWithout test discipline, agents tend to:\n\n- Implement before specifying behavior.\n- Change too much at once.\n- Mix features with refactors.\n- Declare success from plausibility, not proof.\n\n## How it works\n\nThree phases. Each phase tells the agent what is allowed.\n\n```mermaid\nstateDiagram-v2\n    OFF --> SPECIFYING : /proof or proof_start\n    SPECIFYING --> IMPLEMENTING : test fails\n    IMPLEMENTING --> REFACTORING : tests pass\n    REFACTORING --> SPECIFYING : new turn\n    REFACTORING --> OFF : /proof or proof_done\n```\n\n**SPECIFYING.** The agent writes a failing test. Production `write` and `edit` calls are blocked. Test files and config files pass through. A failing test advances to IMPLEMENTING. If the test fails because a module cannot be imported, the agent gets a one-shot allowance to create a minimal stub so the test can load \u2014 the allowance clears after the next run.\n\n**IMPLEMENTING.** The agent writes the smallest code that makes the test pass. A passing test advances to REFACTORING.\n\n**REFACTORING.** The agent restructures. Failing tests tell the agent to revert. No new behavior here.\n\nA new turn \u2014 not `proof_done` \u2014 closes the cycle and returns to SPECIFYING. The cycle counter ticks then.\n\nPhase transitions ride on test results. The extension runs tests after every file write and parses the output. SPECIFYING only advances after it sees a test file written or a manual test run; unrelated failures do not push the phase forward.\n\nSome files skip the loop: configs, lockfiles, docs, scaffolding. The extension recognizes them by path.\n\n## Test integration\n\nThe extension finds your test command from what it sees in the project:\n\n| Detected | Runs |\n|----------|------|\n| `package.json` with test script | `npm test` |\n| `Cargo.toml` | `cargo test` |\n| `go.mod` | `go test ./...` |\n| `pytest.ini` or `pyproject.toml` | `pytest` |\n\nIf it cannot tell, it asks once.\n\nIt recognizes test files by name: `*.test.*`, `*.spec.*`, `*_test.*`, `*_spec.*`, plus files under `__tests__/` or `test/`.\n\nIt parses output from:\n\n| Language | Frameworks |\n|----------|-----------|\n| JS/TS | Jest, Vitest, Mocha, Bun, AVA |\n| Python | pytest, unittest |\n| Go | go test |\n| Rust | cargo test |\n| Ruby | RSpec, Minitest |\n| Java/Kotlin | Gradle; JUnit/Maven (summary) |\n| C# | dotnet test |\n| Swift | XCTest, Swift Testing |\n| PHP | PHPUnit, Pest |\n| Elixir | ExUnit |\n| Universal | TAP |\n\nWhen per-test lines aren't found, the parser falls back to summary regex. Parsed results show in the tool result and in the HUD.\n\n## HUD\n\nWhen proof mode is on, a widget shows:\n\n- The phase, color-coded.\n- The cycle count.\n- Passed, failed, duration.\n- Up to seven test results, with an overflow indicator.\n\nIt updates after each test run.\n\n## Tools\n\n| Interface | What it does |\n|-----------|--------------|\n| `proof_start` | Agent tool. Enters proof mode. |\n| `proof_done` | Agent tool. Exits proof mode. |\n| `/proof` | Slash command. Manual toggle. |\n\nThe legacy `tdd_start`, `tdd_done`, and `/tdd` still work.\n\n## Limits\n\nThis extension enforces the loop, not the quality of the tests.\n\n- Shallow user stories give shallow confidence.\n- Proof mode is opt-in per task. The extension does not force it on every change.\n- Only SPECIFYING blocks writes. IMPLEMENTING and REFACTORING steer through prompts.\n- Shell-based production writes during SPECIFYING are warned, not blocked.\n- The import-only stub allowance lets SPECIFYING produce a minimal production stub when the test file cannot load.\n- A new turn closes the cycle, not `proof_done`. A long turn can stay in REFACTORING across many writes.\n- No state between sessions.\n- No LLM review. The extension trusts the test runner.\n\n## Development\n\n```bash\ngit clone git@github.com:kreek/agent-booster-pack.git\ncd agent-booster-pack/agent-booster-pack-proof\nnpm install\nnpm run install-hooks\nnpm test\n```\n\nThe pre-commit hook runs `biome check --staged`.\n\n```\nsrc/\n  index.ts        Extension entry, phase machine, HUD, tools\n  parsers.ts      Test output parsers (13 frameworks)\ntest/\n  parsers.test.ts Parser tests\n```\n\nTo add a parser, append a `TestLineParser` to `defaultParsers` in `src/parsers.ts`. For development installs from a local checkout, `npm run install-ext` symlinks the repo into `~/.pi/agent/extensions/agent-booster-pack-proof`.\n\n## Eval\n\nThe extension ships with an eval harness built on [pi-do-eval](https://github.com/kreek/pi-do-eval). It runs Pi with agent-booster-pack-proof loaded against small coding projects and scores proof-first compliance, test quality, and correctness.\n\n```bash\ncd eval\nnpm install\nnpm run eval -- list                                          # list trials, variants, suites\nnpm run eval -- run small                                     # fast regression\nnpm run eval -- run --trial temp-api --variant typescript-vitest\nnpm run view                                                  # http://localhost:3333\nnpm run eval -- regress small                                 # compare against previous run\n```\n\n`small` is for day-to-day changes. `full` is for releases.\n\nSuites run serially. `--concurrency` opts into parallel runs, but the harness refuses values above 1 when the worker or judge provider is subscription-backed.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "proof",
+    "proof-first",
+    "red-green-refactor",
+    "testing",
+    "agent-workflow",
+    "coding-agent",
+    "vitest",
+    "jest",
+    "pytest",
+    "rspec"
+  ],
+  "author": {
+    "name": "Alastair Dawson"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/kreek/agent-booster-pack#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kreek/agent-booster-pack.git",
+    "directory": "agent-booster-pack-proof"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "video": "https://github.com/kreek/agent-booster-pack/raw/refs/heads/main/agent-booster-pack-proof/assets/release/demo.mp4",
+    "image": "https://github.com/kreek/agent-booster-pack/raw/refs/heads/main/agent-booster-pack-proof/assets/release/demo.gif"
+  },
+  "time": {
+    "created": "2026-05-07T05:32:09.838Z",
+    "modified": "2026-05-07T07:20:42.886Z",
+    "2.0.0": "2026-05-07T05:32:10.120Z",
+    "2.0.1": "2026-05-07T07:20:42.776Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,351 @@
+{
+  "name": "@capyup/pi-obsidian",
+  "latest_version": "0.2.0",
+  "description": "pi extension that wraps the Obsidian CLI as typed tools \u2014 read, list, search, outline, create, append, open, backlinks, tags, and daily-append against the active vault.",
+  "readme": "# pi-obsidian\n\nA [pi](https://pi.dev) extension that wraps the [Obsidian CLI](https://help.obsidian.md/cli) and exposes a typed family of `obsidian_*` tools the agent can call directly. Lets pi read, list, search, outline, create, append, and open notes in your active Obsidian vault \u2014 without dropping into shell.\n\n## Why\n\nThe raw `obsidian` CLI requires a `vault=<id>` prefix on every call (see your `obsidian.json` config). That id is opaque, the CLI has dozens of subcommands, and the agent has to remember argument shapes across turns. This extension does three things:\n\n1. **Auto-resolves the active vault** from `obsidian.json` (or `PI_OBSIDIAN_VAULT_ID` override).\n2. **Surfaces a curated subset of CLI commands as typed tools** \u2014 clean parameter schemas, no string-glue.\n3. **Tells the model when to use them**: each tool has a `promptSnippet` and `promptGuidelines` so pi prefers `obsidian_read` over the generic file-read tool when the file lives inside an Obsidian vault.\n\n## Tools\n\n| Tool | What it does | Maps to |\n|---|---|---|\n| `obsidian_read` | Read a note by vault-relative path | `obsidian read path=\u2026` |\n| `obsidian_list` | List files in a folder, optionally filtered by extension | `obsidian files folder=\u2026 ext=\u2026` |\n| `obsidian_search` | Grep-style content search with line context, optional folder scope | `obsidian search:context query=\u2026 path=\u2026 limit=\u2026` |\n| `obsidian_outline` | Heading tree of a note | `obsidian outline path=\u2026` |\n| `obsidian_create` | Create a new note (optional content / overwrite / open) | `obsidian create path=\u2026 content=\u2026` |\n| `obsidian_append` | Append content to a note | `obsidian append path=\u2026 content=\u2026` |\n| `obsidian_prepend` | Prepend content (after frontmatter) | `obsidian prepend path=\u2026 content=\u2026` |\n| `obsidian_open` | Open a note in the Obsidian app, optional new tab | `obsidian open path=\u2026` |\n| `obsidian_backlinks` | List backlinks to a note | `obsidian backlinks path=\u2026` |\n| `obsidian_tags` | List vault tags or per-note tags, optional counts | `obsidian tags \u2026` |\n| `obsidian_daily_append` | Append to today's daily note | `obsidian daily:append content=\u2026` |\n\n## Install\n\n```bash\npi install npm:@capyup/pi-obsidian             # from npm (recommended)\npi install git:github.com/capyup/pi-obsidian   # from git\npi install /path/to/pi-obsidian                # from local checkout (dev)\n```\n\n## Prerequisites\n\n- **Obsidian 1.12+** with the CLI enabled: Settings \u2192 General \u2192 Command line interface\n- **Obsidian app must be running** with at least one vault open\n- macOS: Obsidian binary at `/Applications/Obsidian.app/Contents/MacOS/obsidian` (auto-detected)\n- Linux / Windows: `obsidian` must be on `PATH`, or set `PI_OBSIDIAN_BIN`\n\n## Vault selection\n\nThe extension auto-detects the active vault by reading `obsidian.json`:\n\n| Platform | Path |\n|---|---|\n| macOS | `~/Library/Application Support/obsidian/obsidian.json` |\n| Linux | `~/.config/obsidian/obsidian.json` |\n| Windows | `%APPDATA%/obsidian/obsidian.json` |\n\nSelection logic:\n\n1. `PI_OBSIDIAN_VAULT_ID` env var, if set\n2. The vault marked `\"open\": true` in `obsidian.json`\n3. Most recently opened vault (highest `ts`)\n\n## Environment variables\n\n| Var | Effect |\n|---|---|\n| `PI_OBSIDIAN_VAULT_ID` | Force a specific vault id |\n| `PI_OBSIDIAN_VAULT_PATH` | Optional companion to the above (for diagnostics) |\n| `PI_OBSIDIAN_BIN` | Override the path to the `obsidian` binary |\n\n## Examples (what pi does for you)\n\n```\npi> read ops/index.md from my vault\nagent calls obsidian_read { path: \"ops/index.md\" } \u2192 returns markdown\n\npi> what notes mention \"tailscale exit node\"?\nagent calls obsidian_search { query: \"tailscale exit node\" } \u2192 grep-style hits\n\npi> log this decision into today's daily note\nagent calls obsidian_daily_append { content: \"- decided to ...\" }\n\npi> open the new playbook tab in Obsidian\nagent calls obsidian_open { path: \"ops/tailscale/tailscale-add-windows.md\", newtab: true }\n```\n\n## Development\n\n```bash\ngit clone https://github.com/capyup/pi-obsidian\ncd pi-obsidian\nnpm install\nnpm run typecheck         # tsc --noEmit\nnpm run pack:check        # npm pack --dry-run (verify files glob)\n```\n\n## Limitations / future\n\n- Currently does not expose `properties:*` (frontmatter property) tools \u2014 TODO.\n- Does not expose `command id=\u2026` (Obsidian command palette executor) \u2014 could add if useful.\n- Multi-vault: currently picks one active vault per call. If you want explicit per-call vault selection, use `PI_OBSIDIAN_VAULT_ID`.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "obsidian",
+    "vault",
+    "notes",
+    "markdown"
+  ],
+  "author": {
+    "name": "capyup"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/capyup/pi-obsidian#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/capyup/pi-obsidian.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/obsidian/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-10T16:31:25.792Z",
+    "modified": "2026-05-11T08:28:48.189Z",
+    "0.1.0": "2026-05-10T16:31:26.066Z",
+    "0.2.0": "2026-05-11T08:28:48.087Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 11,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 212
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 36
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 20
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 22
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 17
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 20
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

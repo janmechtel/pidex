@@ -1,0 +1,35 @@
+{
+  "name": "pi-agentation",
+  "latest_version": "0.1.1",
+  "description": "Pi extension that receives Agentation webhooks and turns them into queued user messages",
+  "readme": "# pi-agentation\n\nA Pi extension that receives Agentation webhook payloads and turns them into\nreal Pi user messages.\n\nPlease note: this is a very early version. Pi did most of the coding.\n\n## What it does\n\n- starts a small local webhook server inside Pi\n- accepts Agentation `submit` webhook payloads\n- also accepts Agentation MCP-style action payloads with `output`\n- forwards the formatted prompt into Pi with `pi.sendUserMessage(...)`\n- uses `deliverAs: \"followUp\"` while Pi is busy\n\n## Install\n\n### From npm\n\n```bash\npi install npm:pi-agentation\n```\n\n### From git\n\n```bash\npi install git:github.com/denniseijpe/pi-agentation\n```\n\n## Usage\n\nStart the listener manually inside Pi:\n\n```bash\n/agentation-start\n```\n\nOr provide a custom port:\n\n```bash\n/agentation-start 8080\n```\n\nStop it when you are done:\n\n```bash\n/agentation-stop\n```\n\n## Configuration in your app\n\nEnvironment variables:\n\n- `PI_AGENTATION_HOST` default: `127.0.0.1`\n- `PI_AGENTATION_PORT` default: `4761`\n- `PI_AGENTATION_PATH` default: `/agentation`\n- `PI_AGENTATION_TOKEN` optional shared token passed as `?token=...`\n\nExample:\n\n```bash\nPI_AGENTATION_PORT=4761 pi\n```\n\n### Or using mise.toml\n\nIf you use [mise](https://mise.jdx.dev/), add this to your project's `mise.toml`:\n\n```toml\n[env]\nPI_AGENTATION_PORT = \"4761\"\nPI_AGENTATION_TOKEN = \"your-secret-token\"\n```\n\nThis allows you to have seperate ports for different projects.\n\n## Agentation setup\n\nInstall the [agentation package from npm](https://www.npmjs.com/package/agentation).\n\nPoint Agentation at:\n\n```text\nhttp://127.0.0.1:4761/agentation\n```\n\nIf you enable a token (recommended):\n\n```text\nhttp://127.0.0.1:4761/agentation?token=your-secret-token\n```\n\nExample React usage (SPA):\n\n```tsx\nimport { Agentation } from \"agentation\";\n\nif (process.env.NODE_ENV === \"development\") {\n\tlocalStorage.setItem(\n\t\t\"feedback-toolbar-settings\",\n\t\tJSON.stringify({\n\t\t\t...JSON.parse(localStorage.getItem(\"feedback-toolbar-settings\") ?? \"{}\"),\n\t\t\twebhooksEnabled: false,\n\t\t\tautoClearAfterCopy: true,\n\t\t}),\n\t);\n}\n\nexport function App() {\n  return (\n    <>\n      {/* your app */}\n      <Agentation webhookUrl=\"http://127.0.0.1:4761/agentation?token=your-secret-token\" />\n    </>\n  );\n}\n```\n\nExample React usage (SSR / Next.js):\n\n```tsx\nimport { useEffect } from \"react\";\nimport { Agentation } from \"agentation\";\n\nfunction useAgentationSettings() {\n  useEffect(() => {\n    if (typeof window === \"undefined\") {\n      return;\n    }\n    if (process.env.NODE_ENV === \"development\")  {\n      const raw = localStorage.getItem(\"feedback-toolbar-settings\");\n      const saved = raw ? JSON.parse(raw) : {};\n      localStorage.setItem(\n        \"feedback-toolbar-settings\",\n        JSON.stringify({\n          ...saved,\n          webhooksEnabled: false,\n          autoClearAfterCopy: true,\n        }),\n      );\n    }\n  }, []);\n}\n\nexport function App() {\n  useAgentationSettings();\n\n  return (\n    <>\n      {/* your app */}\n      <Agentation webhookUrl=\"http://127.0.0.1:4761/agentation?token=your-secret-token\" />\n    </>\n  );\n}\n```\n\n## Behavior\n\n- If Pi is idle, the Agentation message is sent immediately.\n- If Pi is busy, the message is queued with Pi's follow-up queue.\n- Duplicate webhook submissions are ignored for a short dedupe window.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/agentation-start [port]` | Start the webhook listener (optional port) |\n| `/agentation-stop` | Stop the webhook listener |\n| `/agentation-status` | Show current listener status |\n\n## Notes\n\n- The server does **not** auto-start; run `/agentation-start` after loading Pi.\n- The server binds to localhost by default.\n- `annotation.add` and other non-`submit` toolbar events are ignored on purpose.\n- This extension is focused on getting Agentation prompts into Pi, not on syncing replies back.\n- If you switch or fork sessions, the listener stops with the old session. Re-run `/agentation-start` in the new session.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "agentation"
+  ],
+  "author": {
+    "name": "Dennis Eijpe"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/denniseijpe/pi-agentation#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/denniseijpe/pi-agentation.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-24T12:12:44.522Z",
+    "modified": "2026-05-18T17:33:12.571Z",
+    "0.1.0": "2026-04-24T12:12:44.641Z",
+    "0.1.1": "2026-05-18T17:33:12.471Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 11,
+  "download_trend": []
+}

@@ -1,0 +1,39 @@
+{
+  "name": "pi-runtime-extensions",
+  "latest_version": "0.1.1",
+  "description": "Dynamically load/unload extensions at runtime (inside session) for Pi Coding Agent with /ext:load, /ext:list, and /ext:unload commands.",
+  "readme": "# pi-runtime-extensions\n\nLoad/unload Pi extensions dynamically during a running session.\n\n`pi-runtime-extensions` adds three commands:\n\n- `/ext:load <path>`\n- `/ext:list` - toggle on/off runtime extensions\n- `/ext:unload` - remove runtime extensions\n\nThe goal is simple: let you bring an extension into the current Pi runtime without restarting Pi with `-e ...`, while keeping the load temporary and easy to undo.\n\n## Install\n\n```\npi install npm:pi-runtime-extensions\n\n# or\n\npi -e npm:pi-runtime-extensions\n```\n\n## When to use this\n\nUse `pi-runtime-extensions` when you want to:\n\n- quickly try a local extension during an active Pi session\n- toggle debugging or utility extensions on and off\n- load project-local tools without restarting Pi manually\n- explore extension workflows interactively\n\nIf you want long-term, always-on project behavior, normal Pi extension discovery is still the better fit.\n\n## What it does\n\nWhen you load an extension, this package:\n\n1. creates a small runtime wrapper under `.pi/runtime-extensions/`\n2. adds only its managed runtime paths to `.pi/settings.json#extensions`\n3. triggers a Pi reload\n4. removes those managed runtime paths again when the session shuts down\n\nThis means:\n\n- extensions can be loaded dynamically from a command\n- relative imports in the original extension still work\n- unloaded extensions stay visible in the toggle list as `[off]`\n- unrelated project extensions are left alone\n- existing `.pi/extensions/` contents are preserved\n\n## Why runtime, not session?\n\nThese extensions are **runtime-loaded**, not persisted as a durable session binding model.\n\nThey live only for the active Pi run and are cleaned up when the session exits. So \u201cruntime extensions\u201d is the more accurate mental model.\n\n## Commands\n\n### `/ext:load <path>`\nLoad an extension file into the current Pi runtime.\n\nExamples:\n\n```text\n/ext:load ./pi-extensions/pi-pi.ts\n/ext:load ./pi-extensions/damage-control.ts\n/ext:load ~/code/my-ext/index.ts\n```\n\nIf the target extension imports sibling files, that still works. The runtime wrapper re-exports the original file instead of copying it, so relative imports resolve from the original source location.\n\n### `/ext:list`\nOpen a toggle list of tracked runtime extensions.\n\nEach entry shows as:\n\n- `[on] ...` for enabled\n- `[off] ...` for disabled\n\nPress Enter on an item to toggle it on or off.\n\nThe list also includes:\n\n- `+ Load extension...`\n\nwhich prompts for a new extension path.\n\n### `/ext:unload`\nRemove a tracked runtime extension completely.\n\nUnlike `/ext:list`, this does not just switch an entry to `[off]`. It removes the selected entry from:\n\n- `.pi/runtime-extensions-manifest.json`\n- `.pi/settings.json#extensions`\n- the managed runtime wrapper directory\n\n## Runtime layout\n\nManaged files live under `.pi/`:\n\n```text\n.pi/\n  runtime-extensions/\n    damage-control-a1b2c3d4/\n      index.ts\n    pi-pi-e5f6a7b8/\n      index.ts\n  runtime-extensions-manifest.json\n  settings.json\n```\n\n### Important behavior\n\n- This package does **not** wipe `.pi/extensions/`\n- It does **not** remove unrelated `.pi/settings.json#extensions` entries\n- It only manages the runtime extension paths it created itself\n\n## How it works\n\nThe package does **not** copy the original extension source into `.pi/extensions/`.\n\nInstead, it generates a wrapper like this:\n\n```ts\nexport { default } from \"/absolute/path/to/original-extension.ts\";\nexport * from \"/absolute/path/to/original-extension.ts\";\n```\n\nThat approach matters because many Pi extensions use relative imports such as:\n\n```ts\nimport { something } from \"./helper.ts\";\n```\n\nIf the source file were copied into another directory, those imports would break. Re-exporting the original file avoids that.\n\n## Install / use\n\n### Local project usage\n\nFrom this repository:\n\n```bash\npi -e .\n```\n\nBecause the package declares its Pi extension entry in `package.json`, Pi can load it directly from the project root.\n\n### As a package\n\nIf you publish/install it as a Pi package, load it the same way you load other Pi extensions/packages.\n\n## Development\n\n```bash\nbun run test\n\nbun run cov\n\nbun run typecheck\n```\n\n## Notes\n\n- This package is intentionally conservative about cleanup.\n- It treats managed runtime wrappers as ephemeral runtime state.\n- If you want permanent project extensions, put them in `.pi/extensions/` yourself instead of using `/ext:load`.\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-coding-agent",
+    "pi-extension",
+    "runtime-extensions",
+    "dynamic-extensions",
+    "slash-commands",
+    "agent-runtime",
+    "llm",
+    "ai"
+  ],
+  "author": null,
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/tunnckoCore/pi-runtime-extensions",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tunnckoCore/pi-runtime-extensions.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-13T03:03:19.193Z",
+    "modified": "2026-04-13T03:05:06.541Z",
+    "0.1.0": "2026-04-13T03:03:19.339Z",
+    "0.1.1": "2026-04-13T03:05:06.429Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 47,
+  "download_trend": []
+}

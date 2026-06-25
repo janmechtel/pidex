@@ -1,0 +1,39 @@
+{
+  "name": "pi-protected-paths",
+  "latest_version": "0.1.1",
+  "description": "Blocks write/edit/read of sensitive files (.env, .git, node_modules, SSH keys, credentials, and more)",
+  "readme": "# pi-protected-paths\n\nSafety net extension for [pi](https://pi.dev). Blocks `write`/`edit`/`read` operations to sensitive files so your coding agent doesn't accidentally corrupt critical project files or leak secrets.\n\n## Install\n\n```bash\npi install npm:pi-protected-paths\n```\n\n## Quick Start\n\n```bash\npi -e ./index.ts\n```\n\n## What it protects\n\n**Secrets & environment:** `.env`, `.env.*` (except `.env.example`), `.dev.vars`\n\n**Auth & credentials:** `.npmrc`, `.yarnrc.yml`, `.yarnrc`, `.netrc`, `_netrc`, `service-account.json`, `credentials.json`\n\n**SSH & private keys:** `.ssh/` directory, `id_rsa`, `id_dsa`, `id_ed25519`, `id_ecdsa`, `*.pem`, `*.key`, `*.p12`, `*.pfx`\n\n**Cloud platform config:** `.aws/`, `.docker/`, `.gnupg/`\n\n**Secrets management:** `.sops.yaml`, `.sops.yml`, `.vault-token`, `secrets/`\n\n**Version control:** `.git/`, `.gitconfig`, `.git-credentials`\n\n**Dependencies:** `node_modules/`\n\nFor the full table, see [AGENTS.md](./AGENTS.md).\n\n## How it works\n\nHooks into pi's `tool_call` event with two layers:\n\n### Write/Edit Protection\nWhen a `write` or `edit` tool call targets a protected path, it returns `{ block: true }` and shows a warning notification.\n\n### Bash Read Protection (NEW)\nAgents commonly **bypass** write/edit restrictions by using shell tools (`cat`, `grep`, `head`, `cp`, etc.) to read protected files directly. Protected-paths now intercepts every **`bash`** tool call and checks whether the command references a protected path as a **read target** \u2014 blocking it before execution.\n\nDetected patterns:\n| Pattern | Example | Blocked? |\n|---------|---------|----------|\n| Read command + path | `cat .env`, `grep KEY .env` | \u2705 |\n| Input redirection | `< .env`, `cat < .env` | \u2705 |\n| Shell sourcing | `source .env`, `. ./.env` | \u2705 |\n| Copy/move of protected file | `cp .env /tmp/`, `mv .env ../` | \u2705 |\n| Command substitution | `echo $(cat .env)` | \u2705 |\n| Sandbox-prefixed | `cat /workspace/typescript/.env` | \u2705 |\n| `.env.example` (template) | `cat .env.example` | \u274c (allowed) |\n\n### Combining with pi-sandbox-proxy\n\nUse alongside [pi-sandbox-proxy](../pi-sandbox-proxy/) for defense-in-depth:\n- **Protected paths** blocks local file reads of secrets via bash\n- **Proxy** gates all network operations (vuln scanning, approval flows)\n- **Container sandbox** isolates filesystem operations in Docker\n\n```bash\npi -e ./index.ts -e ../pi-sandbox-proxy/index.ts -e ../pi-container-sandbox/index.ts\n```\n\n## Architecture\n\n```\nindex.ts                     # Entry \u2014 activates protected paths\nfeatures/\n\u2514\u2500\u2500 protected-paths.ts       # tool_call hook with filename-aware blocking\n```\n\nSingle dependency: `@earendil-works/pi-coding-agent`.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "protected-paths",
+    "security",
+    "file-protection",
+    "sensitive-files"
+  ],
+  "author": {
+    "name": "Sawyer Cutler",
+    "email": "sawyer@dirtroad.dev"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/thegreataxios/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thegreataxios/pi-extensions.git",
+    "directory": "pi-protected-paths"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-09T02:13:26.060Z",
+    "modified": "2026-05-10T15:22:53.224Z",
+    "0.1.0": "2026-05-09T02:13:26.235Z",
+    "0.1.1": "2026-05-10T15:22:53.093Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

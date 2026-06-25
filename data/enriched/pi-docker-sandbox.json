@@ -1,0 +1,31 @@
+{
+  "name": "pi-docker-sandbox",
+  "latest_version": "1.0.0",
+  "description": "Lightweight Docker sandbox for pi coding agent",
+  "readme": "# pi-docker-sandbox\n\nLightweight Docker sandbox for the [pi coding agent](https://github.com/earendil-works/pi-coding-agent).\n\n**Default: complete isolation.** No network, no host filesystem. The agent runs in an empty container with Chromium, Playwright, Node 22, git, and essential CLI tools.\n\n## Quick start\n\n```bash\n# Install the extension\npi install npm:pi-docker-sandbox\n\n# Build the sandbox image (once)\ndocker build -t agent-sandbox:latest .\n\n# Start pi \u2014 sandbox is on by default\npi\n```\n\n## Flags\n\n| Flag | Default | Purpose |\n|------|---------|---------|\n| `--no-sandbox` | \u2014 | Disable sandbox entirely |\n| `--sandbox-network` | off | Allow outbound network (enables `browser` tool) |\n| `--sandbox-mount-cwd` | off | Mount the project at `/workspace` (rw) |\n| `--sandbox-mount-skills` | off | Mount agent skill directories at `/skills` (ro) |\n| `--sandbox-mount-ssh` | off | Forward `$SSH_AUTH_SOCK` for git over SSH |\n| `--sandbox-memory` | `4g` | Memory limit |\n| `--sandbox-cpus` | `2` | CPU limit |\n| `--sandbox-name` | auto | Reusable container name |\n\n## Commands\n\n| Command | Purpose |\n|---------|---------|\n| `/sandbox` | Show container status, flags, and resource usage |\n| `/sandbox doctor` | Verify tools inside the container |\n| `/sandbox stop` | Stop the sandbox container |\n| `/sandbox restart` | Restart the sandbox container |\n| `/sandbox rebuild` | Rebuild the sandbox Docker image |\n| `/sandbox prune` | Remove all stopped `pi-agent-*` containers |\n| `/sandbox network on\\|off` | Toggle outbound network access |\n| `/sandbox ssh on\\|off` | Toggle SSH agent forwarding |\n| `/sandbox cwd on\\|off` | Toggle project CWD mount |\n| `/sandbox skills on\\|off` | Toggle skill directory mounts |\n\nToggles (`network`, `ssh`, `cwd`, `skills`) persist across reloads and\nrequire a container restart to take effect.\n\n## Architecture\n\n```\npi starts\n  \u2514\u2500 session_start \u2192 SandboxManager.start()\n       \u251c\u2500 docker run agent-sandbox:latest\n       \u251c\u2500 Proxy read/write/edit/bash via docker exec\n       \u251c\u2500 Inject system prompt with sandbox state\n       \u2514\u2500 Register cleanup on SIGINT/SIGTERM/exit\n  \u2514\u2500 session_shutdown \u2192 SandboxManager.stop()\n```\n\n### Module structure\n\n| Module | Responsibility |\n|--------|---------------|\n| `types.ts` | Interfaces: `DockerClient`, `FileStore`, `SandboxHandle`, `UIContext`, \u2026 |\n| `docker.ts` | Docker CLI abstraction (`q`, `createRealDockerClient`, `stopSync`) |\n| `path-translation.ts` | `toRemote()` \u2014 host\u2192container path mapping |\n| `prompt.ts` | `buildSystemPrompt()` \u2014 sandbox status for agent system prompt |\n| `toggles.ts` | `ToggleStore` \u2014 persisted feature toggles (survives `ctx.reload()`) |\n| `sandbox.ts` | `SandboxManager` \u2014 container lifecycle, exec, path translation |\n| `tools.ts` | `createReadOps`, `createWriteOps`, `createBashOps` \u2014 tool adapters |\n| `commands.ts` | `/sandbox` subcommand routing (`handleSandboxCommand`) |\n| `index.ts` | Extension entry point \u2014 flags, tool registration, event wiring |\n\n## Image contents\n\n- **Chromium** (system package) + **Playwright** (preconfigured, no browser download)\n- **Node 22 LTS** (from `node:22-bookworm-slim`)\n- **git**, **curl**, **jq**, **ripgrep**, **fd**, **openssh-client**\n- Non-root `node` user (uid 1000)\n\n## Companion extensions\n\nFor a complete web research setup, pair this sandbox with:\n\n- [pi-webai](https://pi.dev/packages/pi-webaio) \u2014 web browsing and AI-powered extraction\n- [pi-textbrowser](https://pi.dev/packages/pi-textbrowser) \u2014 lightweight text-mode browser\n- [pi-smart-fetch](https://pi.dev/packages/pi-smart-fetch) \u2014 intelligent content fetching\n\nAll three run inside the sandbox when network is enabled (`--sandbox-network`).\n\n## Development\n\n```bash\n# Install dependencies\nnpm install\n\n# Run tests\nnpm test\n\n# Type check\nnpx tsc --noEmit\n```",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "sandbox",
+    "docker"
+  ],
+  "author": {
+    "name": "Jack Senechal"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-30T07:49:02.138Z",
+    "1.0.0": "2026-05-30T07:49:02.347Z",
+    "modified": "2026-05-30T07:49:02.520Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

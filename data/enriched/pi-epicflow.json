@@ -1,0 +1,357 @@
+{
+  "name": "pi-epicflow",
+  "latest_version": "0.14.2",
+  "description": "Pi skill + prompt + agents for shipping multi-feature work autonomously: decompose a design.md into a DAG of small features, each on its own git worktree+branch off a long-lived epic branch, squash-merged back, then opened as a single PR. Halt only when t",
+  "readme": "# pi-epicflow\n\n> **Ship multi-feature work as one clean PR.** A [pi](https://pi.dev)\n> extension that decomposes a `design.md` into a DAG of small features, runs\n> each on its own git worktree + short-lived branch, squash-merges back into\n> a long-lived **epic branch**, and opens a **single reviewable PR to main**\n> when the whole epic is done. Halts only when truly blocked.\n>\n> **v0.5** adds a hybrid planning architecture: every feature writes a\n> binding plan before any code edit, and features tagged `needs_planner:\n> true` get a dedicated `feature-planner` subagent pass that produces a\n> contract `plan.md`. **Spikes** (`kind: spike`) are first-class features\n> whose deliverable is a decision artifact in `deviations.md`, not code\n> \u2014 use them to resolve open questions before they corrupt downstream\n> features.\n\n[![smoke](https://github.com/shankar029/pi-epicflow/actions/workflows/smoke.yml/badge.svg)](https://github.com/shankar029/pi-epicflow/actions/workflows/smoke.yml)\n[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)\n[![pi >= 0.74](https://img.shields.io/badge/pi-%E2%89%A50.74-5f87ff.svg)](https://pi.dev)\n\n---\n\n## What is this, and what does it need?\n\n**pi-epicflow is a plugin for [pi](https://pi.dev), an open-source\nterminal coding agent.** It is _not_ a standalone CLI or an IDE\nextension &mdash; you run `pi` in your repo, and this package adds two\nskills (`epic-feature-workflow`, `project-memory`), 9 slash commands,\n11 sub-agent personas, and 9 CLI scripts that pi knows how to invoke.\n\nIf you've never used pi:\n\n1. **Install pi first** &mdash; see [pi.dev](https://pi.dev) (one-line\n   installer; works on macOS, Linux, WSL, Windows).\n2. **Then install this extension** &mdash; `pi install npm:pi-epicflow@^0.14`\n   (full quickstart below).\n3. **Use it via pi** &mdash; `cd your-repo && pi`, then run a slash\n   command like `/project-init` or `/epic-design`.\n\nIf you've used Claude Code, Aider, or Cursor: pi is in the same family\n(a terminal agent that edits your repo). pi-epicflow is the layer on\ntop that turns pi from \"smart pair-programmer\" into \"autonomous shipper\nof multi-feature epics with a persistent project brain.\"\n\n**Without pi installed, nothing in this package does anything.**\n\n---\n\n---\n\n## The problem this solves\n\nWhen you ask an AI coding agent to ship a non-trivial change end-to-end \u2014\n5\u201320 features, multiple files, real tests \u2014 the day-1 workflow falls apart:\n\n- **Context budget.** Implementing a dozen features in one context window\n  burns tokens, slows every turn, and makes the agent fragile to long-tail\n  errors. Each new line of code makes every prior line more expensive to\n  re-read.\n- **Unreviewable PRs.** A 5,000-line single-PR change-set is a rubber-stamp\n  request, not a review. You spot the problems three weeks later in prod.\n- **No checkpoint.** When a test breaks at hour 3, or the agent\n  misinterprets a spec, or your laptop runs out of battery, the run\n  restarts from zero. There's no \"resume from feature 7\".\n- **Silent scope drift.** Without an explicit per-feature scope, the agent\n  helpfully edits files no one asked about. The reviewer can't separate\n  intentional changes from drift.\n- **No memory across runs.** Mistakes the agent made on epic N \u2014 the\n  ambiguous spec, the misunderstood acceptance criterion, the test-fixture\n  trap \u2014 get made *again* on epic N+1 because nothing fed back into the\n  agent's instructions.\n\n**pi-epicflow** is the workflow + tooling that fixes all five. The shape is\nstraightforward: human + agent co-design \u2192 agent decomposes into a DAG of\n20\u201360-minute features \u2192 each feature runs on its own git worktree \u2192\nsquash-merges into a long-lived epic branch \u2192 single PR to main when the\nwhole epic completes. Halts are explicit, deviations are logged, and a\n`lessons.md` grows after every epic so the agent literally gets better at\ndecomposing the next one.\n\n## How it works \u2014 the mental model\n\n```\n  design.md  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n  (you write this, in pi or alone)  \u2502\n                                    \u2502\n                                    \u25bc\n                          \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n                          \u2502 /epic-design    \u2502    pi co-authors design.md\n                          \u2502 (in-place)      \u2502    in `.pi/epics/<id>/`\n                          \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518    ingests BRDs first,\n                                   \u2502             gist\u2192approve\u2192write\n                                   \u25bc\n                          \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n                          \u2502 /epic-review-   \u2502   (optional) unbiased\n                          \u2502   design        \u2502    critic sub-agent pass\n                          \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518    before decomposition\n                                   \u2502\n                                   \u25bc\n                          \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n                          \u2502 /epic-decompose \u2502    pi proposes 3\u20137 features\n                          \u2502 (one turn)      \u2502    with deps, scope, ACs\n                          \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518    you approve once\n                                   \u2502\n                                   \u25bc\n           decomposition.yaml (committed)\n                                   \u2502\n                                   \u25bc\n                          \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n                          \u2502 /epic-run-auto  \u2502   orchestrator loop\n                          \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n                                   \u2502\n              for each ready feature in DAG order:\n                                   \u2502\n      \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n      \u25bc                  \u25bc               \u25bc                      \u25bc\n  worktree+branch    [feature-planner]  feature-worker         feature-reviewer\n  spawned            subagent (only     subagent (fresh        subagent (fresh\n  off epic branch    when needs_planner context, reads plan.md context, validates\n                     :true; writes      if present, mandatory  plan-vs-impl +\n                     plan.md)           plan section in \u00a74)    AC + scope)\n                                                              \u2502\n                                                              \u25bc\n                                                       squash-merge into\n                                                       epic branch, delete\n                                                       branch+wt, archive\n                                                       feature, deviations.md\n                                   \u2502\n                                   \u25bc\n                          all features merged?\n                                   \u2502\n                                   \u25bc\n                          \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n                          \u2502 epic-reviewer  \u2502    final pre-PR pass over\n                          \u2502 subagent       \u2502    the cumulative diff\n                          \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n                                   \u25bc\n                          \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n                          \u2502 pi-epic-complete\u2502   rebase epic onto main,\n                          \u2502                 \u2502   distill deviations \u2192\n                          \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518   global lessons.md,\n                                   \u25bc                push, open ONE PR\n                          single PR \u2192 main\n                          (one clean, reviewable diff)\n```\n\nFive keys to why this scales where naive \"agent in one big context\" doesn't:\n\n1. **Each feature gets a fresh subagent context.** A worker that spends 80 KB\n   of tokens implementing F03 doesn't pollute the orchestrator's context or\n   F04's worker's context. The orchestrator's own context grows only by the\n   size of each feature's 1 KB worker-report.\n2. **Each feature gets its own git worktree.** No `git stash` dance. No\n   branch-switching mid-implementation. Workers can in principle run in\n   parallel; today they're serialized for atomic squash-merge into the\n   epic branch.\n3. **The decomposition is YAML, not chat.** Once approved, it's the\n   contract. Any departure goes into `deviations.md` with a reason.\n   Reviewable. Diffable. Version-controlled.\n4. **Plan before code, always.** Every worker fills a structured Plan\n   section in `feature.md` \u00a74 (files-to-touch, AC interpretations,\n   ambiguities, anti-scope) *before* the first edit. Features tagged\n   `needs_planner: true` additionally get a dedicated `feature-planner`\n   subagent pass that produces a binding `plan.md` \u2014 the worker treats\n   it as a contract, and the reviewer checks plan-vs-impl alignment.\n   Surfaces ambiguity at planning time (cheap) instead of\n   implementation time (expensive).\n5. **Halts, not guesses.** When the agent is unsure (planner can't\n   resolve, test fails 3x, merge conflict, ambiguous spec), it writes a\n   halt report with the exact resume command and stops. A bad guess at\n   hour 3 wastes hours; a halt loses minutes.\n\nDeeper rationale lives in [`docs/design.md`](docs/design.md).\n\n## Two pillars\n\n**pi-epicflow ships two complementary pillars.** Use either, or both.\n\n### Pillar 1 \u2014 Epic workflow (what this README has been about so far)\n\nMulti-feature deliverables. `design.md` \u2192 DAG of small features \u2192\nworktree-per-feature \u2192 squash-merge \u2192 single PR. The three-command\nflow (`pi-epic-init`, `/epic-decompose`, `/epic-run-auto`) and the\nworked example below cover it.\n\n### Pillar 2 \u2014 Project memory (new in v0.13, expanded in v0.14)\n\nPersistent, file-based **project brain** that pi reads on entry and\nwrites to autonomously \u2014 no slash commands required for routine\nwrites. Solves the everyday pi pain that the epic workflow doesn't\ntouch:\n\n- Decisions made on Tuesday evaporating by Wednesday.\n- Out-of-scope items getting forgotten the moment the session ends.\n- Pi re-asking the same question across sessions.\n- Pi shipping `TODO: implement later` stubs.\n- Pi drifting from \"fix the auth bug\" into a user-model refactor\n  nobody asked for.\n- (v0.14) Re-stating the same personal/team rules in every repo's\n  `conventions.md`.\n\n**Nine artifacts in `.pi/project/`** (six core + three Phase 2 from v0.14):\n\n| File | Purpose | Since |\n|---|---|---|\n| `index.md` | Always-loaded router with progressive-disclosure \"Read for X\" table (\u2264150 lines) | v0.13 (rewritten v0.14) |\n| `charter.md` | Goal, non-goals, quality bar, owner persona | v0.13 |\n| `conventions.md` | Always/never rules \u2014 includes hard anti-stub rule | v0.13 |\n| `decisions.md` | ADR-lite log of choices and alternatives | v0.13 |\n| `backlog.md` | Deferred work, each entry tagged with revisit-trigger | v0.13 |\n| `sessions.md` | Per-session log: goal, status, summary, linked DEC/BL ids | v0.13 |\n| `gotchas.md` | Standalone gotcha log (was a section in decisions.md). G-NNN ids. | v0.14 |\n| `questions.md` | Tracked open questions until resolution. Q-NNN ids; resolution writes DEC-NNN with `resolves: Q-NNN`. | v0.14 |\n| `modules/<name>.md` | Optional per-module card (purpose, public surface, dependencies, gotchas). User-authored from `_template.md`. | v0.14 |\n\n**Plus one optional cross-repo overlay** at `~/.pi/global-memory/` (v0.14):\n\n```\n~/.pi/global-memory/      # opt-in; one per user account, not per repo\n\u251c\u2500\u2500 index.md             # routing for the overlay\n\u251c\u2500\u2500 charter.md           # personal/team identity (optional)\n\u251c\u2500\u2500 conventions.md       # cross-repo always/never rules (GC-NNN)\n\u2514\u2500\u2500 decisions.md         # cross-repo defaults (GD-NNN), e.g. \"ruff+uv for all Python\"\n```\n\nLoaded **after** per-repo `.pi/project/` on session entry. **Per-repo\nalways wins on conflict.** Trigger phrases for global writes are\nexplicit (\"globally always X\" / \"across all my repos\" / \"in every\n<lang> project of mine\"); bare \"always do X\" still fires the\nper-repo trigger. See [DEC-006](.pi/project/decisions.md#dec-006--global-cross-repo-brain-as-additive-overlay-doesnt-supersede-dec-004).\n\n**Five mechanics make it work:**\n\n1. **Stated session goal.** Pi asks for the goal on the first non-trivial\n   turn (proposing one if it can infer). The goal becomes a guardrail \u2014\n   off-goal turns prompt \"park or pivot?\". Pi proactively proposes closing\n   the session on goal achievement.\n2. **Trigger-driven writes.** Pi watches for \"defer\", \"decided\", \"always\n   do X\", \"out of scope\", \"open question\" and writes the entry the\n   moment the phrase fires \u2014 not at session end. Survives crashed\n   sessions (the **ASSUME INTERRUPTION** operating principle from\n   v0.13.2).\n3. **End-of-task sweep.** Before any \"done\" report, pi re-scans for\n   missed triggers and diffs code-changed vs brain-recorded.\n4. **Append-only with supersedes.** Nothing is edited or deleted.\n   Reversals are new entries pointing to what they replace. Capacity\n   caps trigger user-confirmed archive rollovers, never silent deletes\n   \u2014 stable ids never recycle across archives (v0.14).\n5. **Steward + specialists.** The main session stays small and on-goal.\n   Substantive work is delegated to custom `epicflow-*` sub-agent\n   personas with bounded budgets and strict output contracts.\n\n**Six custom sub-agent personas** (replace the generic\npi-subagents ones, which drift and time out):\n\n- `epicflow-scout` \u2014 read-only repo recon, \u226430 reads\n- `epicflow-researcher` \u2014 web research, \u22644 queries, citations required\n  (with `curl` fallback when `pi-web-access` isn't installed)\n- `epicflow-worker` \u2014 bounded impl (\u22645 files), anti-stub self-check\n- `epicflow-reviewer` \u2014 7-check diff review, anti-stub grep\n- `epicflow-oracle` \u2014 top-3-risks architectural critique\n- `epicflow-steward` \u2014 **brain-only** maintenance with strict\n  write-allowlist (`.pi/project/` and `~/.pi/global-memory/` only).\n  Refuses any code / test / git / config edit. Delegation target for\n  unattended `/project-review` sweeps across multiple repos. (v0.14)\n\n**Five slash commands (mostly optional):**\n\n```\n/project-init           # one-shot scaffold of .pi/project/ for this repo\n/project-init-global    # one-shot scaffold of ~/.pi/global-memory/ (v0.14, run once per user)\n/project-onboard        # optional warm-up summary at session start\n/project-review         # periodic audit + ripe-backlog surfacing; A-0..A-8 checks\n/session-end            # manual force-close (pi normally proposes this)\n```\n\nDay-to-day, you invoke none of these except the two one-shot inits.\nThe `project-memory` skill is autoloaded in any repo with\n`.pi/project/` and handles reads / writes / goal-tracking transparently.\n\n**Capacity & rollover (v0.14).** Each artifact has a soft cap; when\nexceeded, `/project-review` recommends a manual archive split (e.g.\n`git mv decisions.md decisions-archive-2026.md`, start a fresh live\nfile, log a row in `index.md`). Caps: decisions 500/2 yr, backlog\n200/180 d open, sessions 150/1 yr, gotchas 200/2 yr, questions\n50 open + 200 resolved / 1 yr open. Conventions and charter are\nuncapped. Stable ids never recycle.\n\nSee:\n- [v0.14 end-to-end guide](https://shankar029.github.io/pi-epicflow/#/blog/v0-14-end-to-end-guide) \u2014 the canonical \"how to use this\" walkthrough.\n- [v0.13.0 plan](PLAN-v0.13.0.md) and [v0.14.0 plan](PLAN-v0.14.0.md) \u2014 design records.\n- [`skills/project-memory/SKILL.md`](skills/project-memory/SKILL.md) \u2014 canonical spec.\n\n---\n\n## Two modes (for the epic workflow)\n\n- **Auto mode** (default, recommended) \u2014 the three slash commands above.\n  `/epic-decompose` and `/epic-run-auto` drive the whole pipeline, delegating\n  each feature to a `feature-worker` subagent and each pre-merge review to a\n  `feature-reviewer` subagent. Requires\n  [`pi-subagents`](https://www.npmjs.com/package/pi-subagents).\n- **Manual mode** \u2014 you call the `pi-*` CLI scripts from your shell or from a\n  regular pi session, doing the implementation yourself or in pi's main\n  context. Same scripts, same state on disk, same halt codes \u2014 just no\n  subagent delegation. Useful when subagents aren't available, when you want\n  to inspect every step, or when one of the features genuinely needs a human.\n\nMix freely: start in auto mode, drop to manual for a tricky feature, hop\nback into auto. The on-disk state in `.pi/epics/<id>/` is the single source\nof truth and doesn't care which mode wrote it.\n\n## A worked example: shipping `todoq` (a tiny Python CLI)\n\nGiven a `design.md` that specifies a four-command todo CLI (`add`, `list`,\n`done`, `rm`) with JSON-backed storage, here's the full transcript:\n\n```bash\n# 1. Bootstrap the epic from your shell.\n$ cd ~/code/todoq && git checkout main && git pull\n$ pi-epic-init todoq --from /tmp/todoq-design.md\n[epic-workflow] created branch: epic/todoq\n[epic-workflow] seeded design.md from /tmp/todoq-design.md\n\n# 2. Open pi in the repo.\n$ pi\n```\n\nThen in pi:\n\n```\nyou \u25b8 /epic-decompose\npi  \u25b8 [reads design.md + lessons.md + epic-config.yaml]\n      [proposes the YAML below + ASCII dep-graph]\n      F01 storage          \u2500\u2500\u2510\n      F02 add-and-list      \u251c\u2500\u2500 F03 done-and-rm\n      F01 storage          \u2500\u2500\u2518\n      Looks good, or want changes?\nyou \u25b8 approved, write it and commit\npi  \u25b8 [detects pyproject.toml \u2192 proposes test_cmd: python -m pytest -q]\n      [writes decomposition.yaml + epic-config.yaml]\n      [runs pi-epic-validate-decomposition \u2192 OK, 3 features, DAG valid]\n      [git commit -m \"decomp: 0001-todoq into F01..F03\"]\n      decomposition.yaml committed as 49a2071.\n      next: /epic-run-auto\n\nyou \u25b8 /epic-run-auto\npi  \u25b8 \u2500\u2500\u2500 EPIC STATUS \u2500\u2500\u2500\n      epic: 0001-todoq  branch: epic/todoq\n      phase: spawning F01\n      ...\n      \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n      [spawns feature-worker on ../todoq-F01]\n      [worker implements + tests \u2192 pytest -q green]\n      [spawns feature-reviewer \u2192 APPROVE]\n      [pi-feature-complete F01 \u2192 squash-merge into epic/todoq]\n      \u2500\u2500\u2500 EPIC STATUS \u2500\u2500\u2500\n      phase: spawning F02\n      done: F01 \u2713\n      ...\n```\n\n\u2026repeating for F02 and F03, finishing with an epic-wide review pass and a\npush of `epic/todoq`. The PR step opens `gh pr create` if `gh` is on your\nPATH; otherwise it prints the command for you to run.\n\n**Total wall-clock for 3 small features: ~15 minutes.** Two STATUS\nheartbeats per feature, zero attention required between them.\n\nWant something bigger? The 12-feature `minikv` validation epic (an in-memory\nKV server with snapshots, expiry, and an admin CLI) ran end-to-end in ~87\nminutes \u2014 7-level DAG, four features touching the same `server.js`, zero\nstalls, zero merge conflicts, 119/119 tests green.\n\n## When NOT to use this\n\n- **Single-PR changes.** If the work fits in one PR, just open it. The\n  workflow's overhead pays off starting at ~3 features.\n- **Cross-repo work.** One epic = one repo. For polyrepo changes, run\n  parallel epics and coordinate via PRs.\n- **Multi-user concurrent.** Two humans on one epic branch is not\n  supported \u2014 there's no locking on `.pi/epics/<id>/`. Coordinate via PR\n  review or work on different epics.\n- **Throwaway exploration.** Spelunking, prototyping, \"what if we tried\u2026\"\n  \u2014 just run pi without ceremony. Use this when you've decided to ship.\n\n---\n\n## Table of contents\n- [The problem this solves](#the-problem-this-solves)\n- [How it works \u2014 the mental model](#how-it-works--the-mental-model)\n- [Two modes](#two-modes)\n- [A worked example](#a-worked-example-shipping-todoq-a-tiny-python-cli)\n- [When NOT to use this](#when-not-to-use-this)\n- [Install](#install)\n- [Quickstart \u2014 the three-command flow](#quickstart--the-three-command-flow)\n- [Quickstart \u2014 manual mode](#quickstart--manual-mode)\n- [Quickstart \u2014 auto mode (deep-dive)](#quickstart--auto-mode-deep-dive)\n- [What gets created on disk](#what-gets-created-on-disk)\n- [Scripts](#scripts)\n- [Halt codes](#halt-codes)\n- [FAQ](#faq)\n- [Design](#design)\n- [Lessons](#lessons)\n- [Uninstall](#uninstall)\n- [Compatibility](#compatibility)\n- [License](#license)\n\n---\n\n## Install\n\n### From GitHub (recommended for v0.x)\n\n```bash\n# globally (writes to ~/.pi/agent/settings.json)\npi install git:github.com/shankar029/pi-epicflow\n\n# or pin to a tag\npi install git:github.com/shankar029/pi-epicflow@v0.1.0\n\n# or project-scope only (writes to ./.pi/settings.json)\npi install -l git:github.com/shankar029/pi-epicflow\n```\n\n### What the install does\n\n1. Registers the skill (`epic-feature-workflow`) and prompt (`/epic-run-auto`)\n   so pi loads them in any session.\n2. Runs `install/postinstall.mjs` which:\n   - Copies `feature-worker.md`, `feature-reviewer.md`, and `feature-planner.md` into\n     `~/.pi/agent/agents/` so `pi-subagents` can discover them.\n   - Symlinks `pi-epic-*` and `pi-feature-*` from the package into\n     `~/.local/bin` so you can call them from any shell.\n   - Auto-installs `npm:pi-subagents` (required for auto mode) and\n     `npm:pi-intercom` (recommended) at the same scope you installed\n     pi-epicflow \u2014 so the first `/epic-run-auto` doesn't have to stop and\n     install them mid-run. Already-installed packages are detected and\n     skipped. Set `PI_EPICFLOW_NO_AUTOINSTALL_DEPS=1` to skip this step.\n3. Prints a hint if `~/.local/bin` isn't on your `PATH` yet.\n\nAll side-effects are **idempotent** and **defensive** \u2014 they never clobber\nyour local edits; on conflict they write `*.new` siblings and warn. If the\nauto-install of pi-subagents/pi-intercom fails (offline, registry down,\netc.) the pi-epicflow install itself still succeeds and prints the exact\nmanual command.\n\nVerify:\n\n```bash\nwhich pi-epic-init pi-feature-start pi-feature-complete   # all should resolve\nls ~/.pi/agent/agents/feature-*                            # 3 files: worker, reviewer, planner\npi list | grep -E 'pi-subagents|pi-intercom'               # both should appear\n```\n\n### Skipping the auto-install of pi-subagents / pi-intercom\n\nAuto mode needs `pi-subagents`; manual mode does not. If you only ever\nintend to drive the workflow from your shell (no `/epic-run-auto`), you can\nopt out of the auto-install:\n\n```bash\nPI_EPICFLOW_NO_AUTOINSTALL_DEPS=1 pi install git:github.com/shankar029/pi-epicflow\n```\n\nYou can install them later by hand whenever you want auto mode:\n\n```bash\npi install npm:pi-subagents\npi install npm:pi-intercom   # nicer in-chat prompts; optional but recommended\n```\n\n---\n\n## Quickstart \u2014 the three-command flow\n\nFrom your repo, on the branch you want to PR into:\n\n> **Using `git worktree`?** If your repo uses a bare-clone + worktrees\n> layout (e.g. created via `mkrepo.sh`), `cd` into the worktree subdir\n> first \u2014 the outer bare-clone dir isn't a working tree.\n> See [`docs/git-worktrees.md`](docs/git-worktrees.md) for the full\n> walkthrough.\n\n```bash\n# 1. Bootstrap the epic. Creates the epic branch + journal folder.\npi-epic-init my-feature --from /path/to/design.md\n\n# 2. Open pi in the repo.\npi\n```\n\nThen in the pi chat:\n\n```\n/epic-design             # pi co-authors design.md in-place (ingests BRDs first, gist\u2192approve\u2192write)\n/epic-review-design      # (optional) unbiased critic sub-agent pass\n/epic-decompose          # pi proposes features, you approve, pi writes + validates + commits\n/epic-run-auto           # pi ships every feature, runs the reviewer, opens the PR\n```\n\nThat's the whole workflow. Four commands (three if you skip the critic), no file paths to memorize.\n\n`/epic-run-auto` is **self-bootstrapping**: if you skip `/epic-decompose`,\nit'll run that flow first automatically. Pass `--no-bootstrap` to force a\nhalt instead if you'd rather decompose by hand.\n\nIf you want to **drive the loop manually** (no subagents, no auto-mode), the\nmanual-mode section below shows the bare shell commands behind each step.\n\n---\n\n## Quickstart \u2014 manual mode\n\nDrive the workflow by hand from your shell. Best when you want pi in the\nloop only for parts of the work, or for environments where `pi-subagents`\nisn't available.\n\n```bash\n# 0. one-time per repo: stand on the branch you want to PR into\ncd ~/code/myrepo\ngit checkout main && git pull\n\n# 1. write a design.md somewhere (in or out of the repo) describing the goal\n$EDITOR /tmp/my-design.md\n\n# 2. initialize an epic (creates an epic/<slug> branch + .pi/epics/<id>/ tree)\npi-epic-init my-feature --from /tmp/my-design.md --title \"Add X to Y\"\n\n# 3. write decomposition.yaml \u2014 list the features, deps, scope_files, ACs\n$EDITOR .pi/epics/0001-my-feature/decomposition.yaml\npi-epic-validate-decomposition\ngit add .pi/ && git commit -m \"decomp\"\n\n# 4. loop: start, implement (anywhere, in any way), complete\nwhile next=$(pi-epic-next-feature); [ \"$next\" != \"DONE\" ] && [[ \"$next\" != HALT:* ]]; do\n  pi-feature-start \"$next\"                      # creates feat/<slug>/<fid>-... worktree\n  # \u2026 implement under the printed worktree path, commit on the feature branch \u2026\n  pi-feature-complete \"$next\"                   # runs tests, squash-merges, archives\ndone\n\n# 5. wrap up\npi-epic-complete                                # rebases, distills lessons, opens PR\n```\n\n`pi-epic-status` will give you a one-screen view of where the epic is at any\npoint.\n\n---\n\n## Quickstart \u2014 auto mode (deep-dive)\n\nThe three-command flow above is auto mode. This section explains what each\nslash command actually does so you can debug if anything goes sideways.\n\nAfter `pi install npm:pi-subagents`:\n\n```bash\ncd ~/code/myrepo\ngit checkout main && git pull\n$EDITOR /tmp/my-design.md\npi-epic-init my-feature --from /tmp/my-design.md\n\n# fresh pi session in the same dir\npi\n# inside pi:\n/epic-decompose                  # propose + approve + commit decomposition.yaml\n/epic-run-auto                   # run the loop\n```\n\nWhat you'll see in chat:\n\n```\n\u2500\u2500\u2500 EPIC STATUS \u2500\u2500\u2500\nepic:    0001-my-feature  branch: epic/my-feature\nphase:   spawning F02\ndone:    F01 \u2713\nready:   F03, F04 (waiting)\nlast:    F01 merged (APPROVE, 1 worker run, 1 review cycle)\nbudget:  features merged 1/4, deviations 0, halts 0\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n```\n\n\u2026repeating for every transition. On any blocker, you get a clearly-marked\n`\u2500\u2500\u2500 EPIC HALTED \u2500\u2500\u2500` block with a halt-report path and an exact resume\ncommand.\n\nOptional flags after `/epic-run-auto`:\n- `--max-features=N` \u2014 stop after N features merged this run (useful for\n  iterative review).\n- `--no-reviewer` \u2014 skip the per-feature `feature-reviewer` pass.\n- `--no-bootstrap` \u2014 halt instead of auto-running `/epic-decompose` when\n  decomposition.yaml is empty.\n\nOptional flags after `/epic-decompose`:\n- `--features=N` \u2014 ask pi to aim for N features (default 3\u20137).\n- `--auto-commit` \u2014 skip the \"commit this?\" prompt at the end.\n\n---\n\n## What gets created on disk\n\n```\nyour-repo/\n\u251c\u2500\u2500 .pi/\n\u2502   \u251c\u2500\u2500 STATE.md                                # pointer: active epic + active feature\n\u2502   \u2514\u2500\u2500 epics/\n\u2502       \u2514\u2500\u2500 0001-<slug>/                        # one folder per epic, numbered\n\u2502           \u251c\u2500\u2500 meta.yaml                       # status, branch, links, timestamps\n\u2502           \u251c\u2500\u2500 design.md                       # the input you wrote\n\u2502           \u251c\u2500\u2500 decomposition.yaml              # features + deps + ACs\n\u2502           \u251c\u2500\u2500 epic-config.yaml                # test_cmd, budgets, worktree pattern\n\u2502           \u251c\u2500\u2500 deviations.md                   # append-only log of design departures\n\u2502           \u251c\u2500\u2500 lessons-candidate.md            # distilled by pi-epic-complete\n\u2502           \u251c\u2500\u2500 run-log.jsonl                   # one line per event (gitignored)\n\u2502           \u251c\u2500\u2500 halt-<UTC>.md                   # only on halt (gitignored auto-commit)\n\u2502           \u251c\u2500\u2500 epic-review.md                  # final pre-PR review (auto mode)\n\u2502           \u2514\u2500\u2500 features/\n\u2502               \u251c\u2500\u2500 <fid>-<slug>/               # active feature folder\n\u2502               \u2502   \u251c\u2500\u2500 meta.yaml\n\u2502               \u2502   \u251c\u2500\u2500 feature.md\n\u2502               \u2502   \u251c\u2500\u2500 worker-report.md        # auto mode (gitignored)\n\u2502               \u2502   \u2514\u2500\u2500 review-report.md        # auto mode (gitignored)\n\u2502               \u2514\u2500\u2500 done/<fid>-<slug>/          # archived after squash-merge\n\u2514\u2500\u2500 ../<repo>-<fid>/                            # per-feature git worktree\n```\n\nBranches:\n- `epic/<slug>` \u2014 long-lived; receives squash-merges; pushed when the epic\n  completes.\n- `feat/<epic-slug>/<fid>-<slug>` \u2014 short-lived; deleted by\n  `pi-feature-complete` after squash-merge.\n\n---\n\n## Scripts\n\n| Script | Job |\n|---|---|\n| `pi-epic-init <slug> [--from <design-file>] [--base <branch>] [--no-planner]` | Create the epic folder + branch + STATE.md. `--base` overrides the parent branch (default: repo's default branch); recorded in `meta.yaml` and used by `pi-epic-complete` as the PR target. `--no-planner` disables the `feature-planner` subagent for every feature in this epic (`disable_planner: true` in meta.yaml). Auto-commits a `.gitignore` for pi runtime state. |\n| `pi-epic-validate-decomposition` | Sanity-check `decomposition.yaml`: no cycles, no unknown deps, IDs unique, scope_files unique, etc. |\n| `pi-epic-next-feature` | Print the next feature id to work on. Prefers any **in-progress** feature (resume) over the lowest-numbered **ready** one. Prints `DONE` when all merged, `HALT:<reason>` on DAG corruption. |\n| `pi-feature-start <fid>` | Create the feature worktree + branch, write `feature.md` / `meta.yaml`, auto-commit any pending `.pi/epics/<id>/` edits (except `halt-*.md`) on the epic branch, advance epic `status: design \u2192 in-progress` on first call. |\n| `pi-feature-complete <fid> [--skip-tests]` | Run the epic's `test_cmd` on the feature branch, squash-merge it into the epic branch, delete the feature branch + worktree, archive the feature folder to `features/done/`. |\n| `pi-epic-status` | One-screen overview: epic, branch, done/in-flight/ready, deviations count, halts. |\n| `pi-epic-complete [--no-pr] [--draft]` | Rebase the epic branch onto the latest default branch, run the full test suite, distill `deviations.md` \u2192 `lessons-candidate.md` \u2192 global `lessons.md`, push, and (if `gh` is available) open the PR. Archive the epic to `.pi/epics/done/`. |\n\nAll scripts share `_common.sh` (yaml read/write, slugify, git helpers) and\neach prints actionable error messages on failure.\n\n---\n\n## Halt codes\n\nThe orchestrator (and the manual workflow, via the scripts) halts rather than\nguess when:\n\n| Code | Trigger | Operator action |\n|---|---|---|\n| **H1** | Tests failing after retries, or post-merge tests red | Inspect; fix or clarify ACs; resume |\n| **H2** | Dirty working tree outside `.pi/epics/<id>/` | Commit/stash/revert outside the journal scope; resume |\n| **H3** | `pi-epic-next-feature` returned an unknown feature id (decomposition drift) | Reconcile `decomposition.yaml` vs `features/`; resume |\n| **H4** | Feature failed review 3+ times | Inspect review reports; rewrite scope or AC; resume |\n| **H5** | Environment fatal \u2014 disk full, git corrupt, missing toolchain | Fix the host; resume |\n| **H6** | Merge conflict on squash-merge into epic branch | Resolve on epic branch (`pi-feature-complete --skip-tests`); resume |\n| **H7** | Subagent stalled past the \u00a7STALL HANDLING budget (auto mode only) | Inspect last forensics; decide manual takeover or respawn |\n| **H9** | `feature-planner` subagent returned BLOCKED (unresolvable ambiguity, missing call sites, contradictory AC) | Read `plan.md` + `planner-report.md`; fix decomposition AC or run a spike; resume |\n\nEvery halt writes `.pi/epics/<id>/halt-<UTC>.md` with the failing step, the\nworker/review reports involved, what the human needs to decide, and the exact\nresume command.\n\n---\n\n## FAQ\n\n**Q: How is this different from just opening a feature branch and asking pi to implement it?**\nThe single-branch approach works for changes that fit in one context window\n(~one PR's worth). pi-epicflow buys you (a) **context isolation per feature**\nvia subagents, (b) **resumability** \u2014 you can crash, switch machines, or come\nback tomorrow and `/epic-run-auto` again, (c) **review-friendly history** \u2014\nthe epic branch is one squash-commit per feature, not one bag of agent\nintermediates, and (d) **cross-epic learning** via `lessons.md`. Below ~3\nfeatures it's not worth the ceremony; above ~5 it pays for itself many\ntimes over.\n\n**Q: Do I have to use auto mode?**\nNo. Manual mode is a first-class path \u2014 same scripts, same on-disk state,\nsame halt codes, you're just the one calling `pi-feature-start` /\n`pi-feature-complete` from your shell. Use auto mode when you want to walk\naway; use manual mode when you want a human in the loop on every feature.\n\n**Q: Does pi-epicflow work with `git worktree`?**\nYes \u2014 it uses worktrees automatically. Every feature gets its own\nper-feature worktree (`<repo>-F01-<slug>/`) created by `pi-feature-start`\nand removed by `pi-feature-complete`. You don't manage these directly.\nIf your *own* checkout uses a bare-clone + worktrees layout (e.g. via\n`mkrepo.sh`), see [`docs/git-worktrees.md`](docs/git-worktrees.md) for\nthe two valid setups (reuse default-branch worktree vs dedicated epic\nworktree) and the common gotchas (`not in a git repository` from the\nouter bare dir, seeding an epic from a non-default branch, etc.).\n\n**Q: What if pi proposes a bad decomposition?**\nYou iterate. `/epic-decompose` shows the YAML in chat and asks for feedback\n*before* writing to disk. You can say things like *\"merge F03 and F04\"*,\n*\"split F02 into model + CLI\"*, *\"F05 doesn't really depend on F03\"*. Pi\nrevises and re-presents. Only on your explicit approval does it write +\nvalidate + commit. Then `/epic-run-auto` is bound by that contract \u2014 any\ndeparture goes into `deviations.md` with a reason.\n\n**Q: What is the `feature-planner` subagent and when does it run?**\nA pre-implementation pass that produces a binding `plan.md` for features\nflagged `needs_planner: true` in `decomposition.yaml`. The planner reads\nthe design, the decomposition entry, any `reference_paths:` (POC code,\nprior-art docs), and the repo \u2014 then writes files-to-touch, AC\ninterpretations with literal expected behavior, ambiguities, and\nanti-scope. The worker treats `plan.md` as a contract; the reviewer\nchecks plan-vs-impl alignment. Triggered by a 7-item checklist in\n`/epic-decompose` (any 2 of: unverified-callsites, format-sensitive-ac,\nscope-crosses-modules, deep-dep-chain, large-estimate, many-acs,\ncross-cutting-verb). Threshold tunable via\n`PI_EPICFLOW_PLANNER_THRESHOLD`. Disable per-feature with\n`needs_planner: false`, or per-epic with `pi-epic-init --no-planner`.\n\n**Q: What is a spike?**\nA feature whose deliverable is a *decision*, not code. Used when an open\nquestion blocks 2+ downstream features (\"CRC32 vs xxhash?\", \"which seam\ndo we decorate?\", \"hand-roll parser or use lark?\"). Declared in\n`decomposition.yaml` as `kind: spike` with `S<NN>` ids that share a\ncounter with features. Spike workers investigate (read code, prototype,\nbenchmark), then write a structured Decision / Evidence / Impact entry\nin `deviations.md`. `pi-feature-complete` skips tests for spikes and\nsquash-merges the decision artifact into the epic branch.\n`feature-reviewer` runs in spike-mode and checks decision quality, not\ntest results. Spikes are capped at 8 estimated hours.\n\n**Q: What if a feature's tests fail?**\nThe `feature-worker` retries up to 3 times with different strategies. After\nthat it returns `BLOCKED`. The orchestrator escalates: spawns a fresh\nworker once, and if still BLOCKED, halts with **H1** and writes\n`.pi/epics/<id>/halt-<UTC>.md` with the failing tests, the worker's notes,\nand the exact resume command. You fix the underlying issue (bad AC,\nmisunderstood spec, flaky test) and re-run `/epic-run-auto` \u2014 it picks up\nexactly where it left off.\n\n**Q: Can I run features in parallel?**\nNot today. The orchestrator serializes feature execution so that\n`pi-feature-complete`'s squash-merge into the epic branch is atomic.\nWorktrees support parallel execution structurally \u2014 lifting the\nserialization requires a per-feature lock around the merge, which is on\nthe roadmap.\n\n**Q: What happens if I close pi mid-run?**\nNothing breaks. All state is on disk in `.pi/epics/<id>/`. Open pi again,\ntype `/epic-run-auto`, and it picks up from the next ready feature. If a\nworker was mid-flight when you closed, the in-progress feature's worktree\nis still there \u2014 the dispatcher prefers in-progress features over starting\nnew ones (lesson L-010), so the same feature resumes.\n\n**Q: Does this work on Windows?**\nWSL only. The scripts assume Unix paths, symlinks, and standard `git\nworktree`. Native Windows is untested and likely broken.\n\n**Q: Does it work with `pi -p` / non-interactive sessions?**\nManual mode does \u2014 the `pi-*` scripts are pure CLI. Auto mode is built\naround a chat session because the orchestrator posts STATUS heartbeats and\nhandles stall notices. You *can* run `/epic-run-auto` non-interactively\nbut you lose the visibility into what's happening; not recommended.\n\n**Q: How do I update?**\n```bash\npi update git:github.com/shankar029/pi-epicflow\n```\nRestart any open pi session to pick up new prompts/skills (they're loaded\nat session start). The bin symlinks update automatically.\n\n**Q: Does this lock me in?**\nNo. Everything pi-epicflow produces is plain git \u2014 branches, worktrees,\nsquash commits, and a `.pi/` directory of YAML/markdown state. If you\nstop using it tomorrow, nothing in your repo breaks. You can also drive\nthe entire workflow manually from your shell with no pi at all.\n\n---\n\n## Design\n\nThe deeper design rationale (worktree topology, why squash-merge, the\ndeviation log, lesson distillation, the orchestrator state machine, etc.) is\nin [`docs/design.md`](docs/design.md).\n\nThe orchestrator's behavior contract is in\n[`prompts/epic-run-auto.md`](prompts/epic-run-auto.md) \u2014 read this if you're\nwriting your own orchestrator or want to understand exactly what\n`/epic-run-auto` does.\n\nThe skill's instructions to pi are in\n[`skills/epic-feature-workflow/SKILL.md`](skills/epic-feature-workflow/SKILL.md).\n\n---\n\n## Lessons\n\n`skills/epic-feature-workflow/lessons.md` is an append-only log of empirical\nrules discovered during real runs (e.g. *\"decomposition AC should name the\nerror class when it says 'throws'\"*, *\"halt files must not ride the\nauto-commit train\"*, *\"prefer in-progress over ready in the dispatcher to\navoid leaking worktrees\"*). New lessons get appended each time\n`pi-epic-complete` distills `deviations.md` from a finished epic.\n\nL-001 through L-052 are documented today (v0.8.1 added L-050 \u2014 derive install lists from repo contents, never from a hardcoded parallel list (postinstall.mjs's hardcoded 3-agent list shipped a broken v0.7.0 L-043 gate for four releases until v0.8.0 real-app verification caught it); L-051 \u2014 workers should contact_supervisor before installing dependencies that touch shared metadata files (package-lock.json, Cargo.lock, etc.), not just self-report deviations after the fact (under parallel mode this pattern is a real H6 risk); L-052 \u2014 pi-epic-complete must tolerate \"no origin remote\" for offline + sample workflows; v0.8.0 added L-048 \u2014 in-process orchestrator queue beats IPC for single-host parallelism (no `flock`, no lock-dir, coordination lives in the orchestrator's loop variables) and L-049 \u2014 conflict pre-check from declared `scope_files` is the cheap mechanical guard against parallel-merge collisions (data is already in the decomposition; false positives serialize when they could've paralleled; false negatives reduce to existing scope-discipline rule); v0.7.3 added L-047 \u2014 heuristics must be verified on a real app, not just smoke fixtures; real-app verification on a Vite+React TODO sample surfaced two compounding L-045 bugs synthetic fixtures could not have caught (App.tsx missing from the ts_react shell list AND wiring targets buried behind config files in the hint); release-checklist now requires a real-app verification pass for any heuristic-shaped feature; v0.7.2 added L-046 \u2014 detect + suggest, not detect + install; `epic-config.yaml` gains a `required_toolchain` block (`{name, min_version, validate_cmd, install_hint}` entries) and `pi-epic-validate-decomposition` runs each `validate_cmd` and refuses to validate if any fails, emitting the `install_hint` verbatim for the operator to run; pi-epicflow intentionally does NOT auto-install (security/portability/state-pollution/concern-boundary rationale spelled out in L-046); `.mise.toml` / `.tool-versions` defer to the toolchain manager; `--skip-toolchain-check` bypass; v0.7.1 added L-045 \u2014 integration shells are part of the work, not part of the toolchain; ~58 deviations across harmony + gen-ui all shared the same shape (worker built the new thing but forgot to wire it into the host app); `pi-epic-validate-decomposition` now refuses decompositions where AC contains trigger verbs (`wire`/`register`/`integrate`/etc.) without a language-appropriate integration shell in scope_files; `--skip-shell-check` bypass; L-044 was distilled the same day v0.7.0 shipped \u2014 public-facing surface lags code by default; codified in `docs/RELEASE-CHECKLIST.md` so future releases bump the site, the README lesson pointer, and any other landing surface as a hard gate; v0.7.0 added L-043 \u2014 per-feature reviewers are blind to cross-feature bugs by design; harmony's stale-lockfile B1 and gen-ui's `MapHarmonyAgent` no-op stub motivated the `feature-epic-reviewer` agent + `pi-epic-complete` epic-review gate; v0.6.3 added L-042 \u2014 framework epics need explicit verification features (sample apps, conformance harnesses) in the original decomposition, motivating `pi-epic-extend` as a first-class verb; v0.6.2 added L-036/L-037/L-038/L-039/L-040/L-041 from the harmony + gen-ui retrospectives; v0.6.1 added L-035 \u2014 defer the parallel-dispatch orchestrator, ship `pi-epic-status --ready` as the manual-parallelism aid; v0.6.0 added L-032/L-033/L-034 from the obra/superpowers review and the v0.6 verification-gate + soft-halt release; v0.5.2 added L-028/L-029/L-030/L-031 from the gen-ui epic decomposition review). Contributions of new lessons via\nPR are welcome and encouraged.\n\n---\n\n## Uninstall\n\n```bash\npi remove git:github.com/shankar029/pi-epicflow\n```\n\nThis removes the package from pi's settings. The postinstall side-effects\n(symlinks under `~/.local/bin/`, agent files in `~/.pi/agent/agents/`) are\n**not** automatically reverted \u2014 they may be hand-edited and the install\nscript is deliberately non-destructive. Remove them by hand if desired:\n\n```bash\nrm ~/.local/bin/pi-epic-* ~/.local/bin/pi-feature-*\nrm ~/.pi/agent/agents/feature-worker.md ~/.pi/agent/agents/feature-reviewer.md ~/.pi/agent/agents/feature-planner.md\n```\n\n---\n\n## Compatibility\n\n- **pi** \u2265 0.74 (uses the `packages` settings schema and the standard skill\n  loader).\n- **node** \u2265 18 (postinstall script uses `node:fs`, ESM, top-level await).\n- **git** \u2265 2.20 (`git worktree`).\n- **python3** \u2265 3.8 (YAML helpers + validation; stdlib only).\n- **Shell:**\n  - Linux / macOS: **bash** \u2265 4.x. Scripts in `skills/epic-feature-workflow/scripts/`.\n  - Windows: **PowerShell** \u2265 5.1 (preinstalled). PowerShell-native\n    siblings in `skills/epic-feature-workflow/scripts-win/`. WSL is\n    *not* required and not recommended for .NET / NuGet / ADO feed\n    workflows. The postinstall detects `process.platform === \"win32\"`\n    and installs `pi-<name>.cmd` shims into `BIN_DST` that exec the\n    `.ps1` with `-ExecutionPolicy Bypass`, so corporate Restricted\n    policies are not a blocker. **Status:** v0.12.0 ships Phase 1\n    (init + doctor); see `PLAN-v0.12.0.md` for phase rollout.\n- **OS:** Linux \u2705, macOS \u2705 (best-effort \u2014 same bash scripts), Windows \u2705\n  (native PowerShell, as of v0.12.0).\n- **Auto mode** additionally requires `pi-subagents` \u2265 0.24.\n  `pi-intercom` is optional but improves the in-chat prompts.\n\n### Windows-specific setup\n\n1. Install Git for Windows (\u2265 2.20) \u2014 ships with the `git` binary.\n2. Install Python \u2265 3.8 from <https://www.python.org/downloads/windows/>\n   (the Windows Store stub is auto-detected and skipped; install the\n   real interpreter).\n3. Recommended one-time git config for the per-feature worktrees:\n   ```powershell\n   git config --global core.longpaths true\n   ```\n   Also enable Windows long-path support system-wide via\n   `HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\\LongPathsEnabled = 1`\n   (or Group Policy: *Computer Configuration \u2192 Administrative Templates\n   \u2192 System \u2192 Filesystem \u2192 Enable Win32 long paths*).\n4. Run `pi install git:github.com/shankar029/pi-epicflow` from any\n   PowerShell or `cmd.exe`. The postinstall picks the Windows scripts\n   automatically.\n5. Verify with `pi-epicflow-doctor` \u2014 it runs Windows-specific checks\n   (PowerShell version, ExecutionPolicy, `core.longpaths`, etc.) and\n   prints actionable hints for anything missing.\n\n---\n\n## License\n\nMIT. See [LICENSE](LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "epic",
+    "feature-flow",
+    "workflow",
+    "git-worktree",
+    "agentic",
+    "subagents",
+    "orchestrator"
+  ],
+  "author": {
+    "name": "shankar029"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/shankar029/pi-epicflow#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shankar029/pi-epicflow.git"
+  },
+  "pi": {
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-04T06:17:42.230Z",
+    "modified": "2026-06-09T07:00:57.722Z",
+    "0.14.1": "2026-06-04T06:17:42.605Z",
+    "0.14.2": "2026-06-09T07:00:57.436Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 43,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 228
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 44
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 4
+    }
+  ]
+}

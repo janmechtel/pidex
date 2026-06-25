@@ -1,0 +1,40 @@
+{
+  "name": "pi-claude-plugins",
+  "latest_version": "0.1.5",
+  "description": "Pi extension that exposes Claude marketplace plugin skills from ~/.claude/plugins/marketplaces into the current pi session.",
+  "readme": "# pi-claude-plugins\n\nA [pi](https://github.com/badlogic/pi-mono) extension that imports **enabled Claude marketplace plugin skills and commands** into the current pi session.\n\nIt bridges Claude's plugin marketplace layout into pi by exposing:\n\n- **skills** as pi skills\n- **command markdown files** as pi prompt templates / slash commands\n\nThe extension only loads plugins that are currently enabled in Claude after checking both:\n\n- `~/.claude/plugins/installed_plugins.json`\n- `~/.claude/settings.json`\n\n## What gets loaded\n\n### Skills\n\nThe extension loads skill files from these locations:\n\n- `~/.claude/plugins/marketplaces/*/skills/*/SKILL.md`\n- `~/.claude/plugins/marketplaces/*/plugins/*/skills/*/SKILL.md`\n\nThese are returned to pi as `skillPaths` through the `resources_discover` hook.\n\n### Command markdown files\n\nThe extension also loads command markdown files from these locations:\n\n- `~/.claude/plugins/marketplaces/*/commands/*.md`\n- `~/.claude/plugins/marketplaces/*/plugins/*/commands/*.md`\n\nThese are returned to pi as `promptPaths`, so they show up like pi prompt templates / slash commands.\n\n## Install\n\n```bash\npi install npm:pi-claude-plugin\n```\n\n## Remove\n\n```bash\npi remove npm:pi-claude-plugin\n```\n\n## How plugin enablement works\n\nThe extension does **not** load every plugin found on disk.\nIt first reads:\n\n- `~/.claude/plugins/installed_plugins.json`\n- `~/.claude/settings.json`\n\nA plugin is loaded only if:\n\n- it exists in `installed_plugins.json`\n- it matches the current scope (`user` or current project)\n- it is **not** explicitly disabled in `settings.json`\n\nIf `~/.claude/settings.json` contains:\n\n```json\n{\n  \"enabledPlugins\": {\n    \"playwright-cli@playwright-cli\": false\n  }\n}\n```\n\nthen that plugin is ignored completely, even if it is installed.\n\n### Plugin key format\n\nClaude's installed plugins file uses keys like:\n\n- `planning-with-files@planning-with-files`\n- `frontend-design@claude-plugins-official`\n- `playwright-cli@playwright-cli`\n\nThis extension maps marketplace paths to those keys as follows.\n\n#### Top-level marketplace skills\n\nFor:\n\n- `~/.claude/plugins/marketplaces/<marketplace>/skills/<skill>/SKILL.md`\n\nit loads the skill when either of these plugin keys is enabled:\n\n- `<marketplace>@<marketplace>`\n- `<skill>@<marketplace>`\n\nThis supports marketplace-level plugin layouts like:\n\n- `~/.claude/plugins/marketplaces/minimax-skills/skills/minimax-pdf/SKILL.md`\n\nwhere Claude installs/enables only `minimax-skills@minimax-skills`, plus per-skill plugin layouts where each top-level skill has its own key.\n\n#### Nested plugin skills\n\nFor:\n\n- `~/.claude/plugins/marketplaces/<marketplace>/plugins/<plugin>/skills/<skill>/SKILL.md`\n\nit checks whether this plugin key is enabled:\n\n- `<plugin>@<marketplace>`\n\n#### Top-level marketplace commands\n\nFor:\n\n- `~/.claude/plugins/marketplaces/<marketplace>/commands/*.md`\n\nit checks whether this marketplace-level plugin key is enabled:\n\n- `<marketplace>@<marketplace>`\n\nThis matches layouts like:\n\n- `~/.claude/plugins/marketplaces/planning-with-files/commands/*.md`\n\n#### Nested plugin commands\n\nFor:\n\n- `~/.claude/plugins/marketplaces/<marketplace>/plugins/<plugin>/commands/*.md`\n\nit checks whether this plugin key is enabled:\n\n- `<plugin>@<marketplace>`\n\n## Scope rules\n\n`installed_plugins.json` can contain both user-scoped and project-scoped plugin installs.\n\nThis extension respects that:\n\n- **user** scope \u2192 always loaded\n- **project** scope \u2192 only loaded when the current pi working directory is inside that `projectPath`\n\nSo if a Claude plugin is enabled only for one project, this extension will only expose it in pi when you are inside that same project tree.\n\n## Ignored paths\n\nThe extension intentionally ignores:\n\n- hidden files and directories (`.`-prefixed)\n- `node_modules/`\n- `build/`\n- `dist/`\n- `out/`\n- symlinked directories/files\n\nThis avoids duplicate, generated, or unrelated content being imported.\n\n## Runtime behavior\n\nOn startup and on `/reload`, the extension:\n\n1. reads `~/.claude/plugins/installed_plugins.json`\n2. reads `~/.claude/settings.json`\n3. determines which Claude plugins are enabled for the current pi cwd\n4. scans the supported skill and command locations\n5. filters out anything not enabled or explicitly disabled\n6. returns the remaining files to pi via `resources_discover`\n\nThe extension also prints and notifies a summary like:\n\n- number of loaded skill files\n- number of loaded command markdown files\n\n## Why some Claude resources may still not appear\n\nEven when a file exists on disk, it will not be loaded if:\n\n- the plugin is not present / enabled in `installed_plugins.json`\n- the plugin is explicitly disabled in `~/.claude/settings.json`\n- the plugin is project-scoped for a different project\n- the file is outside the supported path patterns\n- the file is inside a hidden/ignored directory\n\n## Skill collisions and validation warnings\n\nThis extension forwards Claude plugin resources into pi, but **pi still applies its own resource rules**.\n\nThat means:\n\n- pi skill names must still be unique within the session\n- pi may skip colliding skills if multiple files declare the same `name:` in frontmatter\n- pi may emit warnings if a skill's `name` does not match its parent directory\n\nThese warnings come from pi's skill loader, not from this extension itself.\n\n## Limitations\n\n- This extension does not execute Claude plugin hooks or plugin runtime logic\n- It only imports filesystem resources that map cleanly into pi:\n  - skills (`SKILL.md`)\n  - command markdown files (`*.md` in `commands/`)\n- It does not import arbitrary plugin code, agents, hooks, or non-markdown command formats\n- It does not import or bridge Claude plugin MCP integrations / MCP servers\n\n## When to reload\n\nRun `/reload` in pi after:\n\n- enabling or disabling Claude plugins\n- changing `~/.claude/plugins/installed_plugins.json`\n- changing `~/.claude/settings.json`\n- installing/removing marketplace plugins\n- adding/removing skills or command markdown files in the marketplace directories\n\n## Files\n\n- Extension entry point: `extensions/index.ts`\n- Package manifest: `package.json`\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "claude",
+    "plugins",
+    "skills",
+    "commands",
+    "extension"
+  ],
+  "author": {
+    "name": "Ross Z"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ross-jill-ws/pi-claude-plugins#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ross-jill-ws/pi-claude-plugins.git"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-07T22:05:41.092Z",
+    "modified": "2026-05-07T21:50:53.908Z",
+    "0.1.1": "2026-04-07T22:05:41.232Z",
+    "0.1.2": "2026-04-07T22:13:19.409Z",
+    "0.1.3": "2026-04-07T22:27:58.744Z",
+    "0.1.4": "2026-04-07T22:31:30.138Z",
+    "0.1.5": "2026-05-07T21:50:53.790Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 37,
+  "download_trend": []
+}

@@ -1,0 +1,34 @@
+{
+  "name": "pi-qwen-mode-proxy",
+  "latest_version": "1.0.1",
+  "description": "Sampling mode proxy for Qwen models served via llama.cpp \u2014 switch between thinking, coding, and instruct modes",
+  "readme": "# pi-qwen-mode-proxy\n\nSampling mode proxy extension for [pi](https://pi.dev) that intercepts OpenAI-completions API requests to a llama.cpp server and injects mode-specific sampling parameters for Qwen models (tested with Qwen 3.6 27B). Parameters taken from the recommendation note on model page (https://huggingface.co/Qwen/Qwen3.6-27B).\n\n## Modes\n\n| Parameter | \ud83e\udde0 Thinking | \ud83d\udcbb Coding | \ud83d\udcdd Instruct |\n|-----------|:-----------:|:---------:|:-----------:|\n| temperature | 1.0 | 0.6 | 0.7 |\n| top_p | 0.95 | 0.95 | 0.80 |\n| top_k | 20 | 20 | 20 |\n| min_p | 0.0 | 0.0 | 0.0 |\n| presence_penalty | 0.0 | 0.0 | 1.5 |\n| repetition_penalty | 1.0 | 1.0 | 1.0 |\n\n- **Thinking** \u2014 Creative, exploratory tasks. High temperature for diverse output.\n- **Coding** \u2014 Precise, deterministic coding tasks. Lower temperature for consistent results.\n- **Instruct** \u2014 Instruction-following with presence penalty to encourage topic variety.\n\n## Installation\n\n### npm\n\n```bash\npi install npm:pi-qwen-mode-proxy\n```\n\n### git\n\n```bash\npi install git:github.com/YOUR_USERNAME/pi-qwen-mode-proxy\n```\n\n### local\n\n```bash\npi install /path/to/pi-qwen-mode-proxy\n```\n\n## Usage\n\nRequires a llama.cpp server serving a Qwen model, registered as the `llamacpp` provider in `~/.pi/agent/models.json`:\n\n```json\n{\n  \"providers\": {\n    \"llamacpp\": {\n      \"baseUrl\": \"http://10.10.10.11:8080/v1\",\n      \"api\": \"openai-completions\",\n      \"apiKey\": \"llamacpp\",\n      \"compat\": {\n        \"supportsDeveloperRole\": true,\n        \"supportsReasoningEffort\": true,\n        \"thinkingFormat\": \"qwen-chat-template\"\n      },\n      \"models\": [\n        {\n          \"id\": \"llamacpp\",\n          \"name\": \"(Local AI)\",\n          \"reasoning\": true,\n          \"input\": [\"text\"],\n          \"contextWindow\": 131072,\n          \"maxTokens\": 16384,\n          \"cost\": { \"input\": 0, \"output\": 0, \"cacheRead\": 0, \"cacheWrite\": 0 }\n        }\n      ]\n    }\n  }\n}\n```\n\n### Commands\n\n```\n/mode              Show current mode and parameters\n/mode thinking     Switch to thinking mode\n/mode coding       Switch to coding mode\n/mode instruct     Switch to instruct mode\n```\n\nThe current mode is displayed in the status bar footer and persists across `/reload` via session storage.\n\n## How It Works\n\nThe extension hooks into pi's `before_provider_request` event, which fires after pi builds the OpenAI chat completions payload but before it's sent over the network. When the target model is `llamacpp`, the handler injects the six sampling parameters (`temperature`, `top_p`, `top_k`, `min_p`, `presence_penalty`, `repetition_penalty`) corresponding to the active mode.\n\nNo custom provider or streaming implementation is needed \u2014 the extension works as a lightweight interceptor on top of pi's built-in `openai-completions` provider.\n\n## Configuration\n\nThe model ID filter defaults to `llamacpp`. If your provider/model uses a different ID, edit `extensions/index.ts` and change the `TARGET_MODEL` constant.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "qwen",
+    "llama.cpp",
+    "llamacpp"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/darthrax/pi-qwen-mode-proxy",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/darthrax/pi-qwen-mode-proxy.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-04-25T20:00:26.711Z",
+    "modified": "2026-04-25T20:09:50.941Z",
+    "1.0.0": "2026-04-25T20:00:26.866Z",
+    "1.0.1": "2026-04-25T20:09:50.811Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 7,
+  "download_trend": []
+}

@@ -1,0 +1,36 @@
+{
+  "name": "@e9n/pi-kysely",
+  "latest_version": "0.1.1",
+  "description": "Shared Kysely database registry for pi \u2014 multi-dialect SQL with table-level RBAC",
+  "readme": "# @e9n/pi-kysely\n\nShared Kysely database registry for [pi](https://github.com/mariozechner/pi-mono). Provides a single managed database connection (SQLite, PostgreSQL, or MySQL) that other extensions access via the event bus, with table-level RBAC and a built-in migration system.\n\n## Features\n\n- **Shared database** \u2014 one connection pool for all extensions in a session\n- **Multi-driver** \u2014 SQLite (default), PostgreSQL, and MySQL\n- **Table-level RBAC** \u2014 extensions own prefixed tables and grant selective access to others\n- **Migration system** \u2014 generate SQL diffs and apply versioned migrations with checksum integrity\n- **Event bus API** \u2014 extensions interact via `kysely:*` events (no direct import needed)\n- **`/kysely` command** \u2014 inspect registered databases and applied migrations at runtime\n\n## Setup / Settings\n\nAdd to `~/.pi/agent/settings.json` (global) or `.pi/settings.json` (project):\n\n**SQLite (default)**\n```json\n{\n  \"kysely\": {\n    \"driver\": \"sqlite\",\n    \"sqlitePath\": \"db/kysely.db\",\n    \"databaseName\": \"default\",\n    \"autoCreateDefault\": true\n  }\n}\n```\n\n**PostgreSQL**\n```json\n{\n  \"kysely\": {\n    \"driver\": \"postgres\",\n    \"databaseUrl\": \"postgres://user:pass@localhost:5432/app\"\n  }\n}\n```\n\n**MySQL**\n```json\n{\n  \"kysely\": {\n    \"driver\": \"mysql\",\n    \"databaseUrl\": \"mysql://user:pass@localhost:3306/app\"\n  }\n}\n```\n\n| Key | Default | Description |\n|-----|---------|-------------|\n| `driver` | `\"sqlite\"` | Database driver: `sqlite`, `postgres`, or `mysql`. |\n| `sqlitePath` | `\"db/kysely.db\"` | SQLite file path (relative to agent dir or `.pi/`). Supports `~`. |\n| `databaseName` | `\"default\"` | Name for the default registered database. |\n| `databaseUrl` | \u2014 | Connection URL for postgres/mysql. Falls back to `DATABASE_URL` env var. |\n| `autoCreateDefault` | `true` | Auto-create the default database on session start. |\n\n`sqlitePath` is resolved relative to the settings file's directory (`~/.pi/agent` for global, `.pi/` for project). Absolute paths and `~` are supported.\n\n## Event Bus API\n\nOther extensions communicate with pi-kysely entirely via events. No direct imports required.\n\n### Schema & Queries\n\n| Event | Description |\n|-------|-------------|\n| `kysely:schema:register` | Apply DDL via Kysely schema builder (create tables, indexes) |\n| `kysely:query` | Execute a parameterised raw SQL query |\n\n### Migrations\n\n| Event | Description |\n|-------|-------------|\n| `kysely:migration:generate` | Diff desired schema vs live DB and return migration SQL |\n| `kysely:migration:apply` | Apply stored migration files (skips already-applied by name + checksum) |\n| `kysely:migration:status` | List applied migrations, optionally filtered by actor |\n\n### RBAC\n\n| Event | Description |\n|-------|-------------|\n| `kysely:grant` | Grant table operations to another extension |\n| `kysely:revoke` | Revoke previously granted access |\n| `kysely:grants` | List current grants |\n\n### Lifecycle\n\n| Event | Direction | Description |\n|-------|-----------|-------------|\n| `kysely:ready` | emitted | Database is initialised and ready; payload contains registered databases and default driver |\n| `kysely:info` | listened | Probe whether pi-kysely is available; reply callback receives the ready payload |\n| `kysely:ack` | emitted | Write confirmation when a `requestId` is included in the payload |\n\n### RBAC model\n\nEach extension owns tables prefixed with `<extensionId>__` (e.g. `notes__items`). Owners can grant `select`, `insert`, `update`, or `delete` on their tables to other extensions. RBAC is an in-process cooperative guard \u2014 not an OS-level sandbox.\n\n### Migration integrity\n\nMigrations are identified by actor + name and checksummed (SHA-256, first 16 hex chars). Modifying a migration file after it has been applied causes a checksum mismatch error. Migrations are applied in sorted name order and stop on first error.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/kysely` or `/kysely status` | List registered databases (name, driver, label) |\n| `/kysely close <name>` | Unregister and destroy one database connection |\n| `/kysely close-all` | Unregister and destroy all database connections |\n| `/kysely migrations [actor]` | List applied migrations, optionally filtered by actor |\n\n## Install\n\n```bash\npi install npm:@e9n/pi-kysely\n```\n\nDatabase drivers (`better-sqlite3`, `pg`, `mysql2`) are bundled as dependencies.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "kysely",
+    "pi-extension"
+  ],
+  "author": {
+    "name": "Espen Nilsen",
+    "email": "hi@e9n.dev"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/espennilsen/pi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/espennilsen/pi.git",
+    "directory": "extensions/pi-kysely"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-17T09:11:32.696Z",
+    "modified": "2026-04-26T19:52:42.594Z",
+    "0.1.0": "2026-02-17T09:11:33.026Z",
+    "0.1.1": "2026-04-26T19:52:42.483Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}
