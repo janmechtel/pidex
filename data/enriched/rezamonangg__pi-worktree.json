@@ -1,0 +1,37 @@
+{
+  "name": "@rezamonangg/pi-worktree",
+  "latest_version": "0.1.3",
+  "description": "Pi package that routes agent file and shell work into an isolated git worktree.",
+  "readme": "# pi-worktree\n\nPi package that keeps agent work out of the main checkout by routing file and shell tools into an isolated Git worktree.\n\n## What it does\n\n`pi-worktree` bundles:\n\n- a Pi extension that creates and activates task worktrees\n- safety routing for file tools and bash\n- lifecycle tools for status, diff, sync, commit, stop, and cleanup\n- a `worktree-router` skill that teaches agents when to use the workflow\n- a colored footer status item showing the active worktree path and branch\n\nWhen active, Pi stays attached to the original repository, but tool execution happens inside the active worktree.\n\n```text\n\u29c9 .worktree/refactor/selector-code-style | \u2387 refactor/selector-code-style\n```\n\n## Install\n\nFrom this checkout:\n\n```bash\npi install /Users/mrscraper56/Projects/Code/Personal/monang/my-pi/packages/pi-worktree\n```\n\nOr from any directory with the same absolute path:\n\n```bash\ncd /\npi install /Users/mrscraper56/Projects/Code/Personal/monang/my-pi/packages/pi-worktree\n```\n\nRestart Pi or run `/reload` after reinstalling.\n\n## Quick test\n\nOpen Pi inside any Git repository:\n\n```bash\ncd /path/to/repo\npi\n```\n\nAsk:\n\n```text\nuse worktree for this feature: add a small README note\n```\n\nThe extension detects the activation phrase and blocks file/bash tools until `worktree_start` succeeds.\n\nVerify:\n\n```text\nCall worktree_status\n```\n\nExpected shape:\n\n```text\npi-worktree active: /path/to/repo/.worktree/feat/example on feat/example\n```\n\nCheck bash routing:\n\n```text\nRun bash: pwd && echo \"$PI_WORKTREE_ROOT\" && git branch --show-current\n```\n\nExpected:\n\n```text\n/path/to/repo/.worktree/feat/example\n/path/to/repo/.worktree/feat/example\nfeat/example\n```\n\n## Tools\n\n### `worktree_start`\n\nCreates and activates a worktree.\n\nInputs:\n\n```ts\n{\n  prompt?: string;\n  branch?: string;\n  baseRef?: string;\n  trustMise?: boolean;\n}\n```\n\nBranch inference:\n\n- feature \u2192 `feat/<slug>`\n- bug/fix \u2192 `fix/<slug>`\n- docs \u2192 `docs/<slug>`\n- refactor \u2192 `refactor/<slug>`\n- test \u2192 `test/<slug>`\n\nWorktree path preserves branch segments:\n\n```text\nbranch: refactor/selector-code-style\npath:   .worktree/refactor/selector-code-style\n```\n\n### `worktree_status`\n\nShows active state, full worktree path, branch, and `git status --short --branch`.\n\n### `worktree_resolve_file`\n\nShows where a path will route without reading or writing it.\n\n```text\nworktree_resolve_file({ path: \"src/main.ts\" })\n```\n\nExpected while active:\n\n```text\nsrc/main.ts -> /repo/.worktree/<branch>/src/main.ts\n```\n\n### `worktree_diff`\n\nShows `git diff --stat` and `git diff` for the active worktree. Output is truncated safely.\n\n### `worktree_sync`\n\nFetches and rebases the active worktree onto latest upstream without touching the main checkout.\n\nDefault target detection:\n\n1. `origin/HEAD`\n2. `origin/main`\n3. local `main`\n4. `HEAD`\n\n### `worktree_commit`\n\nCommits inside the active worktree only. Requires explicit UI confirmation.\n\nInputs:\n\n```ts\n{\n  message: string;\n  all?: boolean;\n}\n```\n\n### `worktree_stop`\n\nDeactivates routing. Optionally removes the worktree.\n\nInputs:\n\n```ts\n{\n  remove?: boolean;\n  force?: boolean;\n}\n```\n\nDirty worktrees are not removed unless `force: true` is passed.\n\n### `worktree_rescue_leftovers`\n\nLists leftover `.worktree` directories and can remove clean leftovers.\n\n## Routing behavior\n\nWhen active:\n\n| Input path | Result |\n|---|---|\n| `src/a.ts` | routes to active worktree |\n| `./src/a.ts` | routes to active worktree |\n| `/repo/src/a.ts` | remaps to `/repo/.worktree/<branch>/src/a.ts` |\n| `/repo/.worktree/<active>/src/a.ts` | allowed |\n| `/repo/.worktree/<other>/src/a.ts` | blocked |\n| `~/.pi/agent/skills/tdd/SKILL.md` | allowed as a Pi-managed path |\n| `/etc/passwd` | blocked |\n| `../outside` | blocked |\n\nSafety checks use real filesystem resolution and block symlink escapes. Pi-managed paths (`~/.pi` and the running Pi package) pass through so skills, package docs, and Pi internals remain readable while routing is active.\n\n## Bash behavior\n\nThe package overrides Pi's `bash` tool with a spawn hook.\n\nWhen active:\n\n- cwd is the active worktree root\n- `PI_WORKTREE_ROOT` is set\n- `PI_WORKTREE_BRANCH` is set\n- `PI_WORKTREE_REPO_ROOT` is set\n\nPi's process cwd and status bar may still show the original repo. Use `worktree_status` or `pwd` to verify effective execution location.\n\n## Footer\n\nThe extension installs a compact custom footer with the fields used during agent work:\n\n```text\n\u29c9 .worktree/refactor/selector-code-style @ \u2387 refactor/selector-code-style | my-pi | GPT-5.5 think:high | ctx 29.5%/272k AC | cache 3.0M\n```\n\nFields:\n\n- model name\n- thinking effort\n- current directory basename\n- worktree label/path (`main-worktree` when routing is inactive)\n- branch\n- context usage with auto-compaction marker (`AC`)\n- cache-read total\n\nColors:\n\n- model/thinking: magenta\n- directory/worktree icon/path: cyan\n- branch icon/name: green\n- context/cache: blue\n- separator: dim gray\n- pending: yellow\n- conflict: red warning\n\nIf a Pi version does not support custom footers, `pi-worktree` falls back to its old extension status item.\n\n## `@` picker limitation\n\nThe package routes execution, not Pi's resource index.\n\nWorktree-only new files may not appear in Pi's `@` picker because the picker indexes the original repo context. You can still type normal relative paths manually; file tools route them to the active worktree.\n\nExample:\n\n```text\ndocs/plans/2026-06-01-selector-code-style.md\n```\n\nFuture work: hook Pi resource/autocomplete events if the API supports path source override.\n\n## Development\n\n```bash\ncd packages/pi-worktree\nnpm install\nnpm test\nnpm run typecheck\n```\n\n## Package resources\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./extensions/index.ts\"],\n    \"skills\": [\"./skills\"]\n  }\n}\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "worktree"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/rezamonangg/pi-worktree#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rezamonangg/pi-worktree.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-02T01:49:48.419Z",
+    "modified": "2026-06-09T01:51:47.775Z",
+    "0.1.0": "2026-06-02T01:49:48.638Z",
+    "0.1.1": "2026-06-02T07:30:48.996Z",
+    "0.1.2": "2026-06-02T16:02:06.559Z",
+    "0.1.3": "2026-06-09T01:51:47.668Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": null,
+  "download_trend": []
+}

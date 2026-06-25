@@ -1,0 +1,39 @@
+{
+  "name": "pbl-skills",
+  "latest_version": "1.3.0",
+  "description": "Product Backlog management for pi and Claude Code \u2014 skills, extensions, and tools to manage a product backlog inside your repo",
+  "readme": "# pbl-skills\n\n> Product Backlog management for pi \u2014 commands, tools, and skills to manage your product backlog inside your repo.\n\n**pbl-skills** turns your repo into a lightweight product management workspace. It structures your backlog as plain markdown folders, gives you interactive TUI widgets for visualization and reordering, and bundles a suite of AI-assisted skills for creating, refining, splitting, and completing backlog items.\n\nRead **[The Product Backlog Should Live in Your Repo](https://mariomelo.com/en/the-product-backlog-should-live-in-your-repo)** for the theory behind this approach.\n\n---\n\n## Why?\n\n| Problem | How pbl-skills solves it |\n|---|---|\n| Backlog lives in Jira/Notion, far from the code | Backlog lives in `product-backlog/` \u2014 same repo, same branch |\n| Prioritization gets stale | Interactive reorder via `/pbl-view --order` (or press `o` in the view) makes it effortless |\n| Stories aren't ready to code | Structured 3 C's pipeline: Card \u2192 Conversation \u2192 Confirmation |\n| No visibility into backlog health | Anti-pattern scanner detects bottlenecks, stale items, over-refinement |\n| Too much manual bash | Tools like `create_backlog_item` replace `mkdir` + write calls |\n\n---\n\n## Installation\n\n```bash\npi install -l npm:pbl-skills\n```\n\n---\n\n## What you get\n\n### 4 Commands (TUI widgets)\n\n| Command | What it does |\n|---|---|\n| `/pbl-view` | Segmented progress bar + color-coded item list. Supports `--order` for interactive reorder, `--widget` for static widget. |\n| `/pbl-metrics` | Backlog health check + velocity sparkline \u2014 scans for 5 anti-patterns and shows a health widget + status bar indicator |\n| `/pbl-done` | Interactive \"mark as done\" selector (with keyboard search/filter) |\n| `/pbl-timeline` | Chronological event history (created, refined, confirmed, done, split) |\n\n### 3 Tools (LLM-callable)\n\n| Tool | What it does |\n|---|---|\n| `create_backlog_item` | Creates a new PBI folder with `Card.md` and history entry \u2014 no bash needed |\n| `split_backlog_item` | Splits an item using Hamburger Method results \u2014 updates original + creates new |\n| `show_backlog_widget` | Toggles the visualization widget programmatically |\n\n### 7 Skills (AI-assisted workflows)\n\n| Skill | What it does |\n|---|---|\n| `pbl-kickoff` | Bootstrap a full product idea into backlog items (structured interview) |\n| `pbl-add` | Add a new item with a short 3-question interview (creates CONNEXTRA Card) |\n| `pbl-refine` | Refine a raw item through a structured 3 C's interview |\n| `pbl-split` | Split a large item into two independent items (Hamburger Method) |\n| `pbl-implement` | Bridge from a refined item to coding \u2014 generates test skeleton + identifies design files |\n| `pbl-diagnose` | Deep analysis of backlog health \u2014 identifies anti-patterns, explains root causes, and offers to act on flagged items |\n| `pbl-done` | Mark an item as done with Definition of Done gate |\n\n### Scripts\n\n| Script | What it does |\n|---|---|\n| `scripts/pbl-index.js` | Regenerates `product-backlog/.index.md` (item counts, status summaries, recent history) |\n\n---\n\n## How it works\n\n### The 3 C's pipeline\n\nEvery backlog item progresses through three states, tracked by which files exist:\n\n```\nraw        refined       ready\n  \u25cf \u2500\u2500\u2500\u2500\u2500\u2500\u2192 \u25c9 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2192 \u25c6\nCard.md    +Conversation.md   +Confirmation.md\n```\n\n- **raw** \u2014 just a `Card.md` with a CONNEXTRA story (As a\u2026 I want\u2026 So that\u2026)\n- **refined** \u2014 `Card.md` + `Conversation.md` (structured refinement decisions)\n- **ready** \u2014 all three files present, ready for `/pbl-implement` to bridge into code\n\n### Folder structure\n\n```\nproduct-backlog/\n\u251c\u2500\u2500 CLAUDE.md              \u2190 auto-generated guide for AI agents\n\u251c\u2500\u2500 .index.md              \u2190 auto-generated index (fast path for diagnosis)\n\u251c\u2500\u2500 .history/              \u2190 one file per event: YYYY-MM-DD_{slug}_{event}\n\u251c\u2500\u2500 .removed-items/        \u2190 soft-deleted items (can be restored)\n\u251c\u2500\u2500 done/                  \u2190 completed items\n\u251c\u2500\u2500 0010-user-login/\n\u2502   \u251c\u2500\u2500 Card.md            \u2190 CONNEXTRA user story\n\u2502   \u251c\u2500\u2500 Conversation.md    \u2190 refinement decisions\n\u2502   \u2514\u2500\u2500 Confirmation.md    \u2190 prose acceptance criteria\n\u251c\u2500\u2500 0020-profile-page/\n\u2502   \u2514\u2500\u2500 Card.md\n\u2514\u2500\u2500 0030-payment-flow/\n    \u251c\u2500\u2500 Card.md\n    \u2514\u2500\u2500 Conversation.md\n```\n\n### Anti-pattern detection\n\n`/pbl-metrics` checks for 5 common issues:\n\n1. **Refinement bottleneck** \u2014 >3 items discussed but never confirmed\n2. **Ready but not started** \u2014 >5 items fully refined, waiting\n3. **Stale refined** \u2014 item refined 5+ done events ago (may be outdated)\n4. **Stale unrefined** \u2014 item created 8+ events ago, never refined\n5. **DoD may be stale** \u2014 `docs/adr/` has files newer than the Definition of Done\n\nAdditionally, `/pbl-metrics` shows a delivery velocity sparkline (last 10 weeks).\n\nThe status bar shows a live indicator: \ud83d\udfe2 healthy, \ud83d\udfe1 warnings, \ud83d\udd34 errors.\n\n---\n\n## Quickstart\n\n```bash\n# 1. Install the package\npi install -l npm:pbl-skills\n\n# 2. Start pi (or Claude Code) in your repo\npi\n\n# 3. Kickoff a new product (or add items one by one)\n/pbl-kickoff\n\n# 4. View your backlog\n/pbl-view\n\n# 5. Refine the top unrefined item\n/pbl-refine\n\n# 6. Check health + velocity\n/pbl-metrics\n\n# 7. Start coding\n/pbl-implement\n```\n\n---\n\n## Requirements\n\n- **pi** (`@earendil-works/pi-coding-agent`) \u2014 peer dependency\n- **typebox** \u2014 for tool parameter validation (peer dependency)\n- Node.js \u2265 18\n\n---\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "product-backlog",
+    "agile",
+    "user-stories",
+    "scrum"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/mariomelo/pbl-skills#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/mariomelo/pbl-skills.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "image": "https://f004.backblazeb2.com/file/npm-stuff/pi-pbl-skills/screenshot.png",
+    "video": "https://f004.backblazeb2.com/file/npm-stuff/pi-pbl-skills/pbi-skills.mp4"
+  },
+  "time": {
+    "created": "2026-05-30T18:29:24.852Z",
+    "modified": "2026-06-01T20:10:53.659Z",
+    "1.1.0": "2026-05-30T18:29:25.064Z",
+    "1.3.0": "2026-06-01T20:10:53.538Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 11,
+  "download_trend": []
+}

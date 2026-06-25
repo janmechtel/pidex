@@ -1,0 +1,48 @@
+{
+  "name": "pi-json-tools",
+  "latest_version": "5.2.2",
+  "description": "Smart Recovery for Qwen Coder - Auto hallucination detection, auto reminder, smart recovery for qwen2.5-coder family",
+  "readme": "# \ud83d\udee0\ufe0f pi-json-tools\n\n> **Smart Recovery Extension for Local LLMs on Pi Agent**\n> Auto-detect hallucination \u00b7 Hallucinated path gate \u00b7 Smart JSON recovery \u00b7 Multi-language\n\n[\n\n![npm version](https://img.shields.io/npm/v/pi-json-tools?color=%2300d4aa&style=flat-square)\n\n](https://www.npmjs.com/package/pi-json-tools)\n[\n\n![license](https://img.shields.io/npm/l/pi-json-tools?style=flat-square)\n\n](./LICENSE)\n[\n\n![pi agent](https://img.shields.io/badge/pi--agent-extension-blueviolet?style=flat-square)\n\n](https://pi.ai)\n[\n\n![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square&logo=typescript)\n\n](https://www.typescriptlang.org/)\n\n---\n\n## Why This Exists\n\nLocal LLMs like **Qwen Coder**, **Llama**, **Mistral**, and others are powerful but have common issues:\n\n- Output commands as free text instead of valid JSON tool calls\n- Generate hallucinations like double braces, empty code blocks, or chat template artifacts\n- Forget tool-call format after a few turns\n- Reference fabricated file paths that do not exist\n\n**pi-json-tools** fixes all of this automatically \u2014 no model switching required.\n\n---\n\n## Features\n\n- Hallucination Detection \u2014 auto-detect broken output patterns\n- Hallucinated Path Gate \u2014 block commands with fabricated paths before execution\n- Smart JSON Parser \u2014 parse and recover malformed output into valid tool calls\n- Auto Reminder \u2014 remind the model to use JSON format every N turns\n- Timeout Protection \u2014 safe bash execution with configurable timeout\n- Multi-language \u2014 auto-detect Indonesian, Chinese, Japanese, Korean, Arabic, English\n- Auto Retry \u2014 retry parsing up to maxRetries times before giving up\n- Auto Model Detection \u2014 auto-switch to JSON mode if model does not support native tools\n\n---\n\n## Installation\n\n### Local\n\n    npm install pi-json-tools\n\n### Global\n\n    npm install -g pi-json-tools\n\nRegister in pi agent config (~/.pi/agent/settings.json):\n\n    {\n      \"packages\": [\n        {\n          \"source\": \"npm:pi-json-tools\",\n          \"extensions\": [\"+extensions/qwen-json-tools.ts\"]\n        }\n      ]\n    }\n\n---\n\n## Configuration\n\nFile: ~/.pi/agent/pi-json-tools.json\n\n    {\n      \"logging\": true,\n      \"maxRetries\": 2,\n      \"timeout\": 30000,\n      \"language\": \"auto\",\n      \"injectEnvContext\": true,\n      \"models\": [\n        \"qwen\", \"gemma\", \"llama\", \"mistral\", \"phi\", \"deepseek\",\n        \"yi\", \"solar\", \"vicuna\", \"orca\", \"wizard\", \"openchat\",\n        \"neural\", \"nous\", \"hermes\", \"zephyr\", \"falcon\"\n      ]\n    }\n\nOptions:\n- logging (boolean, default: true) \u2014 enable logging to ~/.pi/agent/pi-json-tools.log\n- maxRetries (number, default: 2) \u2014 max JSON parse retry attempts\n- timeout (number, default: 30000) \u2014 bash execution timeout in ms\n- language (string, default: auto) \u2014 auto, id, zh, en, ja, ko, ar\n- injectEnvContext (boolean, default: true) \u2014 inject real env context at session start\n- models (string[]) \u2014 list of model name keywords to intercept\n\n---\n\n## How It Works\n\n    LLM Output\n        |\n        v\n    Smart JSON Parser --> No tool call? --> Truncation retry / Pass as chat\n        |\n        v\n    Hallucinated Path Gate --> Detected? --> Block + warn\n        |\n        v\n    Execute Tool / Bash\n\n---\n\n## Supported Tools\n\n    bash \u00b7 read \u00b7 write \u00b7 edit \u00b7 grep \u00b7 find \u00b7 ls\n\n### Accepted JSON Formats\n\nStandard:\n    {\"name\": \"bash\", \"arguments\": {\"command\": \"ls -la\"}}\n\nQwen alternative:\n    {\"tool\": \"bash\", \"input\": {\"command\": \"pwd\"}}\n\nDirect command:\n    {\"command\": \"npm install\"}\n\nOpenAI function call:\n    {\"type\": \"function\", \"function\": {\"name\": \"bash\", \"arguments\": {\"command\": \"ls\"}}}\n\n---\n\n## Hallucination Patterns Detected\n\n- double_brace \u2014 double closing braces at end of output\n- empty_array \u2014 empty array with stray comma\n- artifact \u2014 Qwen chat template leaking into output\n- path_error \u2014 wrong command format\n- empty_codeblock \u2014 empty code block\n\n## Hallucinated Paths Blocked\n\n- @mariozechner in path \u2014 pi agent internal path fabrication\n- piadmin \u2014 non-existent admin path\n- /app/config.json \u2014 generic hallucinated config path\n- /dist/cli.js \u2014 hallucinated CLI path\n- keybindings.json \u2014 editor config hallucination\n\n---\n\n## Logging\n\nLogs saved to ~/.pi/agent/pi-json-tools.log\n\nTo disable:\n    { \"logging\": false }\n\n---\n\n## Multi-language Support\n\nLanguage is auto-detected from user input:\n\n- Indonesian \u2014 keyword matching (apa, ini, tolong, coba, etc.)\n- Chinese \u2014 CJK character range\n- Japanese \u2014 Hiragana/Katakana range\n- Korean \u2014 Hangul range\n- Arabic \u2014 Arabic character range\n- English \u2014 default fallback\n\n---\n\n## Pi Agent Events Used\n\n- session_start \u2014 reset state, show version\n- agent_start \u2014 reset retry counter\n- turn_start \u2014 reset per-turn state\n- before_agent_start \u2014 inject system prompt\n- context \u2014 inject real env context\n- message_end \u2014 parse, gate, and execute\n\n---\n\n## Troubleshooting\n\nModel keeps hallucinating?\nType /reset or exit and re-enter Pi (Ctrl+D twice).\n\nCommands not executing?\nCheck ~/.pi/agent/pi-json-tools.log and verify JSON format.\n\nTimeout too short?\nIncrease timeout in config, e.g. 60000 for 60 seconds.\n\nWrong reminder language?\nSet language manually: id, en, zh, ja, ko, ar.\n\nModel not intercepted?\nAdd the model name keyword to the models array in config.\n\n---\n\n## Project Structure\n\n    pi-json-tools/\n    \u251c\u2500\u2500 extensions/\n    \u2502   \u2514\u2500\u2500 qwen-json-tools.ts\n    \u251c\u2500\u2500 CHANGELOG.md\n    \u251c\u2500\u2500 package.json\n    \u2514\u2500\u2500 README.md\n\n---\n\n## Contributing\n\n1. Fork this repository\n2. Create a branch: git checkout -b feat/feature-name\n3. Commit: git commit -m \"feat: add feature X\"\n4. Push: git push origin feat/feature-name\n5. Open a Pull Request\n\nTo add hallucination patterns, edit HALLUCINATED_PATH_PATTERNS in qwen-json-tools.ts.\n\n---\n\n## License\n\nMIT \u00a9 DayuWidayadi\n\n---\n\nMade with love for the Pi Agent and local LLM community.\nIf this extension helps you, please give it a star on GitHub!\n",
+  "keywords": [
+    "pi-package",
+    "qwen-coder",
+    "smart-recovery"
+  ],
+  "author": {
+    "name": "DayuWidayadi"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-05-01T06:25:13.665Z",
+    "modified": "2026-05-03T07:45:49.298Z",
+    "1.0.0": "2026-05-01T06:25:13.793Z",
+    "2.0.0": "2026-05-01T06:31:14.053Z",
+    "2.1.0": "2026-05-01T06:34:53.805Z",
+    "3.0.0": "2026-05-01T06:40:34.193Z",
+    "3.0.1": "2026-05-01T06:44:51.422Z",
+    "3.0.2": "2026-05-01T06:45:16.331Z",
+    "4.0.0": "2026-05-01T07:01:13.567Z",
+    "4.0.1": "2026-05-01T07:14:27.316Z",
+    "4.1.0": "2026-05-03T04:53:52.172Z",
+    "4.2.0": "2026-05-03T05:31:30.503Z",
+    "5.0.0": "2026-05-03T05:50:14.481Z",
+    "5.0.1": "2026-05-03T05:56:19.417Z",
+    "5.0.2": "2026-05-03T06:00:43.279Z",
+    "5.0.3": "2026-05-03T06:15:09.316Z",
+    "5.0.4": "2026-05-03T06:22:54.785Z",
+    "5.0.5": "2026-05-03T06:24:44.779Z",
+    "5.0.6": "2026-05-03T06:27:09.632Z",
+    "5.2.0": "2026-05-03T07:27:59.303Z",
+    "5.2.2": "2026-05-03T07:45:49.193Z"
+  },
+  "versions_count": 19,
+  "downloads_last_week": null,
+  "download_trend": []
+}

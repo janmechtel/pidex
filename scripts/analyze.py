@@ -25,6 +25,7 @@ PLOTS = DATA / "plots"
 PLOTS.mkdir(parents=True, exist_ok=True)
 
 # ── Load ──────────────────────────────────────────────────────────────────────
+import re as _re
 records = [json.loads(f.read_text()) for f in (DATA / "enriched").glob("*.json")]
 df = pd.DataFrame(records)
 # also pull publisher from raw packages
@@ -32,7 +33,38 @@ raw = json.loads((DATA / "raw" / "packages.json").read_text())
 pub_map = {p["name"]: p.get("publisher") for p in raw}
 df["publisher"] = df["name"].map(pub_map)
 
-print(f"Loaded {len(df)} enriched packages")
+# ── Join GitHub metadata (stars, forks, last push, is_fork) ──────────────────
+def extract_slug(repo_field):
+    url = repo_field.get("url", "") if isinstance(repo_field, dict) else str(repo_field or "")
+    m = _re.search(r'github\.com[:/]([^/]+)/([^/.]+)', url)
+    return f"{m.group(1)}__{m.group(2).rstrip('.git')}" if m else None
+
+gh_dir = DATA / "github"
+gh_rows = []
+for _, row in pd.DataFrame(records).iterrows():
+    slug = extract_slug(row.get("repository") or {})
+    if not slug:
+        gh_rows.append({})
+        continue
+    gh_file = gh_dir / f"{slug}.json"
+    if not gh_file.exists():
+        gh_rows.append({})
+        continue
+    gh = json.loads(gh_file.read_text())
+    gh_rows.append({
+        "gh_stars":       gh.get("stargazers_count"),
+        "gh_forks":       gh.get("forks_count"),
+        "gh_open_issues": gh.get("open_issues_count"),
+        "gh_is_fork":     gh.get("fork", False),
+        "gh_pushed_at":   gh.get("pushed_at"),
+        "gh_watchers":    gh.get("watchers_count"),
+    })
+
+gh_df = pd.DataFrame(gh_rows, index=df.index)
+df = pd.concat([df, gh_df], axis=1)
+df["gh_pushed_at"] = pd.to_datetime(df["gh_pushed_at"], errors="coerce")
+
+print(f"Loaded {len(df)} enriched packages  |  with GitHub data: {df['gh_stars'].notna().sum()}")
 
 # ── 1. Type breakdown ─────────────────────────────────────────────────────────
 def infer_type(keywords):
@@ -139,6 +171,50 @@ if trend_rows:
     plt.savefig(PLOTS / "06_trajectories.png", dpi=130)
     plt.close()
 
+# ── 4b. GitHub stars analysis ─────────────────────────────────────────────
+gh_has = df[df["gh_stars"].notna()].copy()
+if len(gh_has):
+    print(f"\n=== GitHub stars (top 20) ===")
+    top_stars = gh_has[["name","gh_stars","gh_forks","gh_is_fork","downloads_last_week","type"]]\
+               .sort_values("gh_stars", ascending=False)
+    print(top_stars.head(20).to_string(index=False))
+
+    # Stars vs downloads scatter
+    fig, ax = plt.subplots(figsize=(10, 7))
+    scatter_df = gh_has.dropna(subset=["gh_stars","downloads_last_week"])
+    ax.scatter(scatter_df["gh_stars"], scatter_df["downloads_last_week"],
+               alpha=0.5, s=50, color="steelblue")
+    # label top by stars
+    for _, row in scatter_df.nlargest(15, "gh_stars").iterrows():
+        ax.annotate(row["name"].split("/")[-1], (row["gh_stars"], row["downloads_last_week"]),
+                    fontsize=6.5, ha="left", va="bottom")
+    ax.set_xlabel("GitHub stars")
+    ax.set_ylabel("npm downloads / week")
+    ax.set_title("Stars vs Downloads  (are they correlated?)")
+    ax.set_xscale("symlog")
+    ax.set_yscale("symlog")
+    plt.tight_layout()
+    plt.savefig(PLOTS / "06b_stars_vs_downloads.png", dpi=130)
+    plt.close()
+
+    # Stars distribution
+    fig, ax = plt.subplots(figsize=(8, 4))
+    gh_has["gh_stars"].clip(upper=gh_has["gh_stars"].quantile(0.95))\
+        .plot(kind="hist", bins=40, ax=ax, color="gold", title="GitHub stars distribution (clipped at p95)")
+    plt.tight_layout()
+    plt.savefig(PLOTS / "06c_stars_dist.png", dpi=130)
+    plt.close()
+
+    # Freshness — days since last push
+    now = pd.Timestamp.utcnow().tz_localize(None)
+    gh_has["days_since_push"] = (now - gh_has["gh_pushed_at"].dt.tz_localize(None)).dt.days
+    fresh = gh_has[["name","gh_stars","downloads_last_week","days_since_push"]]\
+                  .dropna(subset=["days_since_push"])
+    print(f"\n=== Stalest packages (not pushed in >90 days) ===")
+    stale = fresh[fresh["days_since_push"] > 90].sort_values("downloads_last_week", ascending=False)
+    print(stale.head(15)[["name","days_since_push","downloads_last_week"]].to_string(index=False))
+    print(f"\n=== Most starred packages ===")
+    print(top_stars.head(15)[["name","gh_stars","gh_forks","gh_is_fork","downloads_last_week"]].to_string(index=False))
 # ── 5. Word clouds ────────────────────────────────────────────────────────────
 def make_wordcloud(texts, title, fname):
     combined = " ".join(t for t in texts if isinstance(t, str))

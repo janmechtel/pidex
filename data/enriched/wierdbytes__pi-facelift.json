@@ -1,0 +1,50 @@
+{
+  "name": "@wierdbytes/pi-facelift",
+  "latest_version": "0.5.0",
+  "description": "Cosmetic facelift for built-in pi tool output \u2014 open-right rounded frames, syntax-highlighted reads, status-aware bash summaries, find/grep.",
+  "readme": "# `@wierdbytes/pi-facelift`\n\nCosmetic facelift for built-in [pi coding agent](https://github.com/earendil-works/pi/tree/main/packages/coding-agent)\ntool output.\n\n> inspired by [`pi-pretty`](https://github.com/buddingnewinsights/pi-pretty)\n\n![multi-edit split diff with `Edit i/N` blocks, word-level emphasis on paired add/del rows, untinted context lines, and chrome that picks up the host theme's `userMessageBg`](./media/diff.png)\n![read / bash / ls / find / grep rendered with the open-right rounded frame](./media/demo.png)\n\n## What you get\n\n- **`read`** \u2014 syntax-highlighted file content with line numbers, plus\n  inline image rendering (Kitty / iTerm2 protocols, with tmux passthrough).\n- **`bash`** \u2014 open-right frame with the duration + status pinned to the\n  bottom border\n\n  Status colour follows the host theme tokens (`success` while finished,\n  `warning` while running, `error` on non-zero / timeout / abort) so the\n  chrome blends with whatever palette the user is running. The exit\n  summary is consistent across statuses (`\u2713 exit 0`, `\u2717 exit N`,\n  `\u26a1 timed out`, `\u26a1 aborted`). Duration is shown as `3.3s` / `1m3s` /\n  `2h5m`.\n\n  > Frame primitives (top/bottom borders, rail, multi-line title\n  > sub-tree) live in [`@wierdbytes/pi-common/tool-frame`][cf] and are\n  > shared with `@wierdbytes/pi-web` so every tool that opts into\n  > `renderShell: \"self\"` looks the same.\n\n  [cf]: ../common/README.md#tool-frame\n- **`ls`** \u2014 Nerd Font file icons + tree-oriented rendering.\n- **`find` / `grep`** \u2014 grouped / highlighted rendering on top of pi's\n  built-in tool implementations (no extra search backend, no extra\n  dependencies).\n- **`write` / `edit`** \u2014 GitHub-style side-by-side diff with syntax\n  highlighting and word-level emphasis (powered by\n  [`@wierdbytes/pi-common/diff`][cd]). All edits in one tool call share\n  a single layout by default (split when every diff fits, unified when\n  any would wrap) so `Edit 1 split, Edit 2 unified` mixed renders\n  don't happen \u2014 configurable via `diffLayout` (see below).\n\n  [cd]: ../common/README.md#diff\n\n## Install\n\n```bash\npi install npm:@wierdbytes/pi-facelift\n```\n\n## Terminal support for inline images\n\nInline image previews work in **Ghostty**, **Kitty**, **iTerm2**, and\n**WezTerm**. Inside `tmux`, pi-facelift uses passthrough escape\nsequences:\n\n```tmux\nset -g allow-passthrough on\n```\n\n(or run once in a session: `tmux set -g allow-passthrough on`)\n\n## Configuration\n\n### `/facelift` slash command\n\nRun `/facelift` to open the settings overlay. Bare invocation opens the\nmodal; subcommands print or reset state:\n\n| Command            | Effect                                                          |\n| ------------------ | --------------------------------------------------------------- |\n| `/facelift`        | Open the settings overlay.                                      |\n| `/facelift status` | Print current config + the config-file path.                    |\n| `/facelift reset`  | Reset every knob to defaults and persist.                       |\n\nThe overlay matches the look of `/voice`, `/web`, `/statusline` from the\nsame monorepo. Changes are persisted to disk immediately on each tweak.\n\n### Config file\n\nPer-package state lives at:\n\n```\n~/.pi/agent/wierd-facelift/config.json\n```\n\n(or `${PI_AGENT_DIR}/wierd-facelift/config.json` if `PI_AGENT_DIR` is\nset). The file is seeded on first run and re-sanitised on every load,\nso hand-edits with typos won't crash the extension \u2014 unknown fields\nfall back to defaults.\n\nCurrent schema:\n\n```jsonc\n{\n  // \"consistent\" (default): one layout per tool call. If every diff\n  //   in the call fits without excessive line wrapping \u2192 split; else\n  //   \u2192 unified for all. Avoids `Edit 1 split, Edit 2 unified` mixed\n  //   renders in a single edit call.\n  // \"split\"     : always side-by-side, even when long lines wrap.\n  // \"unified\"   : always stacked single-column.\n  // \"per-edit\"  : each diff picks independently (original pi-diff\n  //               behaviour; can produce mixed layouts).\n  \"diffLayout\": \"consistent\"\n}\n```\n\n### Environment variables (cosmetic knobs)\n\nThese stay env-only because they're either rendering tunables (Shiki,\nicons, image protocols) or boot-time toggles:\n\n| Variable                       | Default         | Notes                                                                         |\n| ------------------------------ | --------------- | ----------------------------------------------------------------------------- |\n| `FACELIFT_THEME`               | `github-dark`   | Shiki theme. Falls back to `~/.pi/agent/settings.json` `theme` if unset.      |\n| `FACELIFT_MAX_HL_CHARS`        | `80000`         | Files larger than this skip syntax highlighting (still get line numbers).     |\n| `FACELIFT_MAX_PREVIEW_LINES`   | `80`            | Body preview length for collapsed renderers.                                  |\n| `FACELIFT_CACHE_LIMIT`         | `128`           | Max number of highlighted blocks held in memory.                              |\n| `FACELIFT_ICONS`               | `nerd`          | Set to `none` / `off` to disable Nerd Font icons in `ls`/`find`/`grep`.       |\n| `FACELIFT_IMAGE_PROTOCOL`      | auto            | Force `kitty` / `iterm2` / `none`. Auto-detected from `$TERM_PROGRAM` etc.    |\n| `DIFF_LAYOUT`                  | (none)          | One-shot override for `diffLayout` on first-run seeding.                      |\n\n## Development\n\nThis package lives in the [`pi-wierd-stuff`](../../README.md) monorepo.\n\n```bash\nbun install                        # from the repo root\ncd packages/facelift\nbun run test                       # 64 tests\nbun run test:watch                 # vitest watch mode\nbun run demo                       # render every tool block to your terminal\n```\n\nThe `demo` script (`scripts/demo.ts`) is a visual harness \u2014 it boots the\nextension with mocked SDK tools and prints every renderer (read with\nlive shiki highlighting, bash in success / non-zero / streaming /\ntimeout states, ls tree, find groups, grep matches) so you can eyeball\nthe open-right rounded frame, status-aware coloring, and the duration /\nexit summary in the bottom border.\n\nTypecheck (uses the global `tsc`):\n\n```bash\nbunx tsc --noEmit --target esnext --module nodenext \\\n  --moduleResolution nodenext --strict --skipLibCheck \\\n  --allowImportingTsExtensions \\\n  index.ts\n```\n\n## License\n\nMIT \u2014 see [LICENSE](./LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "coding-agent",
+    "extension",
+    "tui",
+    "syntax-highlighting",
+    "shiki",
+    "pretty",
+    "facelift"
+  ],
+  "author": {
+    "name": "wierdbytes"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/wierdbytes/pi-wierd-stuff/tree/master/packages/facelift",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wierdbytes/pi-wierd-stuff.git",
+    "directory": "packages/facelift"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-08T18:59:36.639Z",
+    "modified": "2026-06-22T15:46:29.922Z",
+    "0.1.0": "2026-05-08T18:59:36.927Z",
+    "0.1.1": "2026-05-08T19:53:09.762Z",
+    "0.3.0": "2026-05-08T23:25:53.554Z",
+    "0.3.1": "2026-05-09T00:05:55.495Z",
+    "0.3.2": "2026-05-12T19:13:27.964Z",
+    "0.4.0": "2026-05-13T19:40:15.608Z",
+    "0.4.1": "2026-05-13T20:02:01.864Z",
+    "0.4.2": "2026-05-13T20:29:31.211Z",
+    "0.4.3": "2026-05-13T20:40:03.332Z",
+    "0.4.4": "2026-05-14T15:19:55.462Z",
+    "0.5.0": "2026-06-22T15:46:29.620Z"
+  },
+  "versions_count": 11,
+  "downloads_last_week": null,
+  "download_trend": []
+}

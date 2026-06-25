@@ -1,0 +1,350 @@
+{
+  "name": "pi-deep-review",
+  "latest_version": "0.2.0",
+  "description": "Deep PR review extension for Pi with deterministic context packing and Responses API streaming",
+  "readme": "# Deep Review Extension\n\nRun a 2-phase deep PR review flow inside your current Pi session:\n\n1. Context packing for the current branch/repo\n2. Direct Responses API streaming through OpenAI Codex or OpenAI Platform (reasoning + final answer)\n\n## Setup\n\n```bash\n# 1) OpenAI Codex auth (default; ChatGPT Plus/Pro)\n# Run inside Pi:\n# /login openai-codex\n\n# Optional: OpenAI Platform auth for --provider openai\nexport OPENAI_API_KEY=your_key_here\n\n# 2) Required for token budgeting in context pack stage\ncargo install tokencount\n\n# 3) Install/update package (choose one)\n\n# standalone extension package (npm)\npi install npm:pi-deep-review\n\n# standalone extension package (git)\npi install git:github.com/ferologics/pi-deep-review\n```\n\nThen in Pi:\n\n```text\n/deep-review \"review the code\"\n```\n\nTypical runtime is ~6\u201320 minutes depending on repo size, Scribe graph expansion, and model latency.\n\n## Recommended extras\n\n- `gh` (GitHub CLI): auto-includes PR title/body in context metadata when available.\n- `npx @sibyllinesoft/scribe@1.0.4` (or global `@sibyllinesoft/scribe`): related/dependent code expansion.\n  - Note: Cargo `scribe-cli` is a different CLI flavor and is not supported by this extension.\n\n## Commands\n\n- `/deep-review <query> [options]`\n- `/deep-review-stop`\n\n## Defaults\n\n- Provider: `openai-codex`\n- Model: `gpt-5.5`\n- Reasoning effort: `xhigh`\n- Summary: `auto`\n- Verbosity: `high` on pro models, otherwise `medium`\n- Context-pack budget target: auto-sized from the selected provider/model\n- Base ref: auto-detected (`origin/main`, `origin/master`, `main`, `master`, `HEAD~1`)\n\n## Options\n\n- `--query <text>` (alternative to positional query; cannot be combined with positional query text)\n- `--project <path>`\n- `--base <ref>`\n- `--context-pack <path>` (skip generation and use existing context pack)\n- `--budget <tokens>` (override the auto-sized context-pack budget target; cannot combine with `--context-pack`)\n- `--provider openai-codex|openai`\n- `--model <id>` (common ids: `gpt-5.5`, `gpt-5.4`, `gpt-5.2`, `gpt-5.5-pro`, `gpt-5.4-pro`, `gpt-4.1`)\n- `--effort minimal|low|medium|high|xhigh`\n- `--verbosity low|medium|high` (default: `high` on pro models, otherwise `medium`)\n- `--summary auto|detailed|null`\n- `--no-summary` (shortcut for `--summary null`)\n- `--org <id>` (OpenAI Platform only)\n- `--project-id <id>` (OpenAI Platform only)\n- `--debug`\n- `--help`\n\n## Example\n\n```text\n/deep-review \"find bugs and regressions\"\n/deep-review \"find bugs and regressions\" --model gpt-5.4\n/deep-review \"find bugs and regressions\" --provider openai --model gpt-5.5-pro\n```\n\nModel availability depends on the OpenAI account / token backing the request. By default, `/deep-review` uses the ChatGPT Codex backend (`openai-codex`) and OAuth from `/login openai-codex`; pass `--provider openai` to use OpenAI Platform credentials from `OPENAI_API_KEY`.\n\n## Architecture (high level)\n\n```mermaid\nflowchart LR\n    A[/deep-review/] --> B[Context pack stage]\n    B --> C[Git diff + changed files]\n    B --> D[Scribe recall]\n    B --> E[Deterministic rank + budget fit]\n    E --> F[Pack + manifests + report.json]\n    F --> G[Responses API review]\n    G --> H[Final markdown + handoff artifacts]\n```\n\nDetailed maintainer architecture and decision log:\n`extensions/deep-review/ARCH.md`\n\n## Context-pack artifacts\n\nGenerated pack output includes:\n\n- `pr-context.txt`\n- `pr-context.changed.files.txt`\n- `pr-context.related.files.txt`\n- `pr-context.omitted.files.txt`\n- `pr-context.related.omitted.files.txt`\n- `pr-context.related.selection.tsv`\n- `pr-context.scribe.targets.tsv`\n- `pr-context.report.json`\n\n## Notes\n\n- If `--context-pack <path>` is provided, generation is skipped.\n- Context packing is deterministic and executed directly in the extension (no nested `pi -p` skill hop).\n- Related-file omissions are explicitly reported with reasons.\n- By default, context-pack budget is derived from the selected provider/model metadata as the lower of:\n  - `contextWindow - maxTokens`\n  - `75% of contextWindow`\n- Deep-review also corrects stale `gpt-5.4` OpenAI/OpenAI Codex registry metadata to a `1.05M`-class context window before budgeting.\n- This preserves the old ~`272000` input-target behavior on `400k/128k` class models while still scaling up on larger models like `gpt-5.4` and `gpt-5.4-pro`.\n- If model metadata is unavailable, deep-review falls back to a `272000` token pre-reserve target.\n- Manual `--budget` values are still capped by the selected model's hard input limit (`contextWindow - maxTokens`) when model metadata is available.\n- Context-pack generation then subtracts request headroom (query + protocol overhead), so effective pack budget can be lower than the configured or auto-derived target.\n- Related candidates that are already in changed files are de-duplicated from related omission stats/manifests.\n- Related test/test-data files are only eligible when close to changed modules (shared path affinity or short graph distance).\n- `--debug` writes context-pack + responses debug artifacts to a temp directory.\n- Maintainer internals and decision log: `extensions/deep-review/ARCH.md`.\n- Streamed reasoning/answer text is not shown live in widget text; full markdown is posted at completion.\n- Final answer/thinking/report files are written to a temp handoff directory and linked in output.\n- The extension attempts to copy the final answer to clipboard automatically.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "code-review",
+    "openai"
+  ],
+  "author": {
+    "name": "ferologics"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ferologics/pi-deep-review#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ferologics/pi-deep-review.git"
+  },
+  "pi": {
+    "extensions": [
+      "index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-02-11T13:16:53.020Z",
+    "modified": "2026-06-02T16:57:46.087Z",
+    "0.1.0": "2026-02-11T13:16:53.287Z",
+    "0.1.1": "2026-03-18T09:41:44.889Z",
+    "0.2.0": "2026-06-02T16:57:45.834Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 17,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 80
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 3
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 94
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 5
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 4
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 29
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 6
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 1
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 162
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 150
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 32
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

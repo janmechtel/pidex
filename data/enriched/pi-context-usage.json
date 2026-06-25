@@ -1,0 +1,36 @@
+{
+  "name": "pi-context-usage",
+  "latest_version": "1.0.2",
+  "description": "Pi extension that shows context window usage visualization",
+  "readme": "# pi-context-usage\n\nA [pi](https://github.com/badlogic/pi-mono) extension package that adds:\n\n- `/context` \u2014 a dot-grid visualization of current context usage\n- `/context details` \u2014 a deeper breakdown of system prompt, active tools, and conversation turns\n- `/release <major|minor|patch>` \u2014 the repository release workflow\n\n> DEMO:   \n>\n> ![demo](./docs/recording.gif)\n\n## Usage\n\n### Context summary\n\n```text\n/context\n```\n\nShows a dot-grid summary with five breakdown categories:\n\n```text\nContext Usage\n\n\u25cd \u2699 \u25cf \u25cf \u25cf \u25cf \u25cf \u25cf \u25cf \u25cf \u25cf\n\u25cf \u25cf \u25cf \u25cf \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7\n\u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7\n\u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7\n\u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7\n\u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7\n\u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7\n\u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u00b7 \u25cb \u25cb \u25cb \u25cb \u25cb\n\nclaude-sonnet-4-5   31.4k / 200.0k tokens (16%)\n\n\u25cd System Prompt:    1.7k (1%)\n\u2699 Tools:              275 (0%)\n\u25cf Messages:        29.4k (15%)\n\u00b7 Empty:           152.2k (76%)\n\u25cb Buffer:           16.4k (8%)\n```\n\n### Context details\n\n```text\n/context details\n```\n\nWhen UI is available, this opens a keyboard-driven overlay that keeps the grid summary at the top and adds expandable sections for:\n\n- **System Prompt** \u2014 visible system prompt token estimate from `ctx.getSystemPrompt()`\n- **Tools** \u2014 active tool breakdown from `pi.getAllTools()` filtered by `pi.getActiveTools()`\n- **Conversation** \u2014 one line per user turn, plus inline compaction summaries and per-message drill-down\n\nKeyboard shortcuts in the overlay:\n\n- `\u2191/\u2193` move focus\n- `Enter` or `\u2192` expand a section/row\n- `\u2190` collapse a section/row\n- `Tab` jump between top-level sections\n- `PageUp/PageDown`, `Home/End` scroll faster\n- `Esc` or `q` close\n\nWhen UI is not available, `/context details` falls back to a plain-text dump.\n\nExample plain-text output:\n\n```text\nSystem / Tools Details\n\nItem                Tokens  Chars\nSystem prompt         6.2k  24,800\nread                    70     279\nbash                    61     244\nedit                   142     567\nTotal visible parts    6.5k  25,890\n\nNote: visible parts sum to 2.2k tokens, while the top summary uses 14.3k cached prompt tokens from the last assistant cache. That cache number includes provider-side scaffolding and cached context that extensions cannot inspect.\n\nConversation (6 turns)\nPer-turn and cumulative values are visible-entry estimates from estimateTokens(message); they will not match the summary's provider/cache totals.\n\n #1  10:00  U  Can you inspect the repo and summarize how /context currently works?      55      55 cum est\n #2  10:01  U  Now sketch a plan for a /context details mode with a deeper breakdown.      36      91 cum est\n  \u03a3  10:06  \u03a3  Earlier discussion established the design\u2026      38     197 cum est\n #3  10:10  U  Add the system prompt and active-tools breakdown next.      65     262 cum est\n```\n\n## Install\n\n### As a pi package\n\n```bash\npi install git:github.com/championswimmer/pi-context-usage\n```\n\n### Manual (project-local)\n\nCopy or symlink this directory into `.pi/extensions/pi-context-usage/`.\n\n## Development\n\n```bash\n# Load extension directly into a live pi session\npi -e ./src/index.ts\n\n# After sending at least one message\n/context\n/context details\n\n# Standalone mock tests\nbun run test:mock\nbun run test:mock-details\n```\n\n## How it works\n\n### Summary buckets\n\n| Category     | Symbol | Theme color | Token source |\n|--------------|--------|-------------|--------------|\n| System Prompt | `\u25cd` | `accent` | `Math.ceil(systemPrompt.length / 4)` \u2014 estimated from visible system prompt text |\n| Tools        | `\u2699` | `muted` | Sum of `Math.ceil((name + description + JSON.stringify(parameters)).length / 4)` over active tools |\n| Messages     | `\u25cf` | `success` | `usedTokens - systemPromptTokens - toolTokens` \u2014 conversation entries |\n| Empty        | `\u00b7` | `dim` | `contextWindow - usedTokens - bufferTokens` \u2014 unused space |\n| Buffer       | `\u25cb` | `warning` | `model.maxTokens` \u2014 reserved for model output |\n\nAll visible estimates use a `chars / 4` heuristic. The grid distributes cells proportionally across the five categories.\n\n### Details view estimates\n\n- **System prompt tokens**: `Math.ceil(systemPrompt.length / 4)`\n- **Per-tool tokens**: `Math.ceil((name + description).length / 4) + Math.ceil(JSON.stringify(parameters).length / 4)`\n- **Turn tokens**: summed via pi's exported `estimateTokens(message)` heuristic\n\nBecause pi does not expose the exact provider-serialized request payload, the visible `system prompt + tools` total is intentionally labeled as an approximation. The cache-provided number in `details` remains the authoritative cached-prompt value, and it is not directly comparable to the visible estimates.\n\n## Release automation\n\n```text\n/release patch\n/release minor\n/release major\n```\n\nThe `/release` command will:\n\n- verify the git working tree is clean\n- run `npm run test:mock`\n- bump `package.json` and `package-lock.json`\n- create a `release: vX.Y.Z` commit\n- create a `vX.Y.Z` git tag\n- push the branch and tag to GitHub\n- let `.github/workflows/publish.yml` publish to npm via Trusted Publishing\n\nPrerequisites:\n\n- you are on the branch you want to release from\n- you can push to the repository remote\n- npm Trusted Publishing is configured for this package and `publish.yml`\n\n## Release skill\n\nThis repo includes a `release` skill in `.agents/skills/release/` that teaches pi when and how to use the repo's release flow. If the skill is loaded manually, it will direct the agent to prefer:\n\n```text\n/release major|minor|patch\n```\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "ISC",
+  "homepage": "https://github.com/championswimmer/pi-context-usage#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/championswimmer/pi-context-usage.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-29T23:30:50.889Z",
+    "modified": "2026-06-10T02:47:47.901Z",
+    "0.1.0": "2026-04-29T23:30:51.169Z",
+    "0.1.1": "2026-04-29T23:45:17.646Z",
+    "0.2.0": "2026-04-30T23:04:44.076Z",
+    "0.3.0": "2026-04-30T23:51:32.717Z",
+    "0.4.0": "2026-05-04T02:19:22.326Z",
+    "0.4.1": "2026-05-04T02:45:03.433Z",
+    "1.0.1": "2026-06-10T02:42:57.000Z",
+    "1.0.2": "2026-06-10T02:47:47.651Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 90,
+  "download_trend": []
+}

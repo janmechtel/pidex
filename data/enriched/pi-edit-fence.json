@@ -1,0 +1,38 @@
+{
+  "name": "pi-edit-fence",
+  "latest_version": "1.0.2",
+  "description": "Stop concurrent pi sessions from clobbering each other's edits. Per-file locks, auto-claim on edit, retry-later, lease expiry, crash recovery. No git worktrees.",
+  "readme": "# pi-edit-fence\n\nRun two or more pi sessions in the same directory without losing work.\n\npi-edit-fence gives each session lightweight, per-file locks that it claims automatically as it edits, so two sessions never overwrite each other's work. No git worktrees, no manual setup, same directory. Without it, concurrent sessions editing the same file just let the last write win, silently discarding the other session's changes.\n\n## How it works\n\nEach session auto-claims a lock the moment it edits a file. If another live session tries to edit a file you hold, its edit is fenced.\n\n- **Per-file by default.** Editing `src/api/handlers.ts` locks that exact file. A second session editing `src/api/routes.ts` is never blocked. Only a true same-file collision is stopped.\n- **Temporary, not fatal.** A blocked edit waits briefly for the lock to free. If it is still held, the agent gets a retry-later message telling it to work elsewhere and come back, not to abort.\n- **Self-releasing.** Locks auto-expire after the owner stops editing that file (lease). When another session is waiting, the idle lease shortens so a finished owner hands over fast.\n- **Crash-safe.** A session that crashes leaves its lock behind. The next session detects the dead process and reclaims it. No stuck locks.\n- **Shared files warn, never block.** Config and lockfiles (`package.json`, `tsconfig*.json`, `*.config.*`, `.env*`, root-level files, `.pi/**`) are coordination-free zones: you get a heads-up, the edit proceeds.\n\nThe lock registry lives at `<cwd>/.pi/ownership.json` and is runtime data, auto-added to `.pi/.gitignore`.\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:pi-edit-fence\n```\n\nFrom git, without waiting for an npm publish:\n\n```bash\npi install git:github.com/anh-chu/pi-edit-fence\n```\n\nBy default this writes to user settings (`~/.pi/agent/settings.json`). Use `-l` to install into project settings (`.pi/settings.json`) so a team shares it.\n\nTry it for one run without installing:\n\n```bash\npi -e npm:pi-edit-fence\n```\n\nOr drop `extensions/edit-fence.ts` into `~/.pi/agent/extensions/` for a global, no-npm install.\n\n## Usage\n\nIt works with zero configuration. Open the same project in two pi sessions and edit away. Same-file collisions are fenced; everything else runs free.\n\n### Agent tool\n\n- `release_path` \u2014 an agent can release its lock(s) the instant it finishes an area, for immediate handover. Locks also auto-expire, so this is optional hygiene.\n\n### Commands (type in the pi prompt)\n\n- `/claims` \u2014 list live locks and who holds them\n- `/claim <key>` \u2014 manually claim a file or subtree\n- `/release [key]` \u2014 drop one or all of your locks\n- `/steal <key>` \u2014 force-reassign a lock to your session (use when an owner is stuck or idle)\n\n## Configuration\n\nEdit the tunables at the top of `extensions/edit-fence.ts`:\n\n| Constant             | Default            | Meaning                                                                             |\n| -------------------- | ------------------ | ----------------------------------------------------------------------------------- |\n| `SCOPE`              | `\"file\"`           | `\"file\"` locks the exact file. `\"dir\"` locks a subtree for area-level coordination. |\n| `CLAIM_DEPTH`        | `2`                | Subtree depth when `SCOPE === \"dir\"` (2 keeps `src/api` and `src/ui` distinct).     |\n| `LEASE_MS`           | `5 min`            | Idle time before a lock auto-expires.                                               |\n| `CONTENDED_LEASE_MS` | `10 s`             | Shorter idle lease applied while another session is waiting.                        |\n| `WAIT_MS`            | `15 s`             | How long a blocked edit waits before returning the retry-later message.             |\n| `SHARED_PATTERNS`    | configs, lockfiles | Glob patterns treated as warn-only shared zones.                                    |\n\n### File scope vs dir scope\n\n- **`\"file\"` (default)** matches the real threat: two sessions writing the same file. Zero false fences on sibling files.\n- **`\"dir\"`** is for coordination: keep two agents out of the same area entirely, even across different files. Use it when files in an area share tight coupling (common imports, generated code) that a per-file lock would miss.\n\n## Limitations\n\n- **Single host.** Liveness uses the local process table. On a shared filesystem with sessions on different machines, lease expiry still bounds staleness, but cross-host liveness is not reliable.\n- **Shared zone is unfenced by design.** Concurrent edits to `package.json` and other shared files are not prevented, only warned. Coordinate those manually.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "concurrency",
+    "file-lock",
+    "worktree-free"
+  ],
+  "author": {
+    "name": "anh-chu"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/anh-chu/pi-edit-fence#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anh-chu/pi-edit-fence.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-06-15T08:26:57.504Z",
+    "modified": "2026-06-16T10:30:24.850Z",
+    "1.0.0": "2026-06-15T08:26:57.990Z",
+    "1.0.1": "2026-06-16T10:01:35.113Z",
+    "1.0.2": "2026-06-16T10:30:24.756Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 32,
+  "download_trend": []
+}

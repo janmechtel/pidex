@@ -1,0 +1,41 @@
+{
+  "name": "@eamode/pi-commit",
+  "latest_version": "1.2.0",
+  "description": "pi extension for automatic changelog-friendly Conventional Commits with submodule support.",
+  "readme": "# pi-commit\n\nA [pi](https://github.com/earendil-works/pi) extension for automatic, changelog-friendly Conventional Commits.\n\n`/autocommit` inspects git changes, commits dirty submodules deepest-first, generates a Conventional Commit message with an isolated model, previews/confirms in interactive mode, and runs `git commit` with hooks enabled by default.\n\n<img src=\"assets/screenshot.png\" alt=\"pi-commit screenshot\" width=\"640\">\n\n## Installation\n\n```bash\npi install npm:@eamode/pi-commit\n# or, for a project-local install committed in .pi/settings.json:\npi install -l npm:@eamode/pi-commit\n```\n\nReload pi if it is already running:\n\n```txt\n/reload\n```\n\n## Usage\n\n```txt\n/autocommit\n```\n\nDefault behavior: `/autocommit --all --recursive --context recent`\n\n```txt\n/autocommit --staged              # commit only staged changes\n/autocommit --all                 # stage all changes before committing\n/autocommit --recursive           # include nested submodules\n/autocommit --no-recursive        # only commit the current/root repo\n/autocommit --dry-run             # preview without staging or committing\n/autocommit --no-verify           # bypass git hooks intentionally\n/autocommit --model <provider/model>\n/autocommit --model=<provider/model>\n/autocommit --context none|recent|session\n/autocommit --no-ai               # skip AI and use a deterministic fallback message\n/autocommit --message-timeout 15000\n/autocommit --max-diff-bytes 0    # omit full diffs from message generation\n/autocommit --yes                 # skip confirmation prompts\n```\n\nIf hooks fail, `/autocommit` stops and shows their output. Use `--no-verify` only when you intentionally want to bypass hooks.\n\n## Configuration\n\nOptional `.pi-commit.json` in the working directory. It is parsed as JSONC, so `//` comments and trailing commas are allowed. Command flags override config values for one run.\n\nStart from the included example if desired:\n\n```bash\ncp .pi-commit.example.json .pi-commit.json\n```\n\n```jsonc\n{\n  // Model used to generate commit messages. Omit to inherit the current pi model.\n  \"model\": \"openai-codex/gpt-5.4-mini\",\n  // Message generation: \"ai\" uses a model; \"fallback\" skips AI and uses changed-file heuristics.\n  \"messageMode\": \"ai\",\n  // Maximum time to wait for AI message generation before falling back. Set 0 to disable.\n  \"messageTimeoutMs\": 45000,\n  // \"staged\" commits only staged changes; \"all\" stages all changes first.\n  \"defaultMode\": \"all\",\n  // Commit dirty nested submodules before the parent repository.\n  \"recursive\": true,\n  // Conversation context for message generation: \"none\", \"recent\", or \"session\".\n  \"contextMode\": \"recent\",\n  // Number of latest user prompts included when contextMode is \"recent\".\n  \"recentPromptCount\": 5,\n  // Maximum conversation context size passed to the message generator.\n  \"maxContextBytes\": 8000,\n  // Maximum staged diff size passed to the message generator for each repository. Set 0 to omit full diffs.\n  \"maxDiffBytes\": 30000,\n  // Ask before creating commits in interactive UI mode. false behaves like --yes.\n  \"confirmBeforeCommit\": true,\n}\n```\n\n| Key | Values | Default | Description |\n| --- | --- | --- | --- |\n| `model` | pi model id, e.g. `openai-codex/gpt-5.4-mini` | current pi model | Model for commit-message generation. Use `openai-codex/...` for ChatGPT Plus/Pro login, or `openai/...` with an OpenAI API key. If unset, generation uses the current parent pi model; if unavailable, failed, or timed out, a deterministic fallback message is used. |\n| `messageMode` | `\"ai\"` or `\"fallback\"` | `\"ai\"` | `\"fallback\"` skips AI generation entirely and creates deterministic messages from the change set. |\n| `messageTimeoutMs` | number | `45000` | Maximum time to wait for AI message generation before falling back; `0` disables the timeout. |\n| `defaultMode` | `\"staged\"` or `\"all\"` | `\"all\"` | `\"staged\"` commits already staged changes; `\"all\"` stages tracked and untracked changes before committing. |\n| `recursive` | boolean | `true` | Commit dirty nested submodules before the parent repo. |\n| `contextMode` | `\"none\"`, `\"recent\"`, or `\"session\"` | `\"recent\"` | Prompt context included in generation; `\"session\"` uses all available user prompts up to `maxContextBytes`. |\n| `recentPromptCount` | number | `5` | Latest user prompts included when `contextMode` is `\"recent\"`. |\n| `maxContextBytes` | number | `8000` | Maximum conversation context passed to the generator. |\n| `maxDiffBytes` | number | `30000` | Maximum staged diff passed to the generator per repo; `0` omits full diffs and uses file names plus diff stat. |\n| `confirmBeforeCommit` | boolean | `true` | Ask before committing in interactive UI mode; `false` behaves like `--yes`. |\n\n## Commit messages and submodules\n\nMessages use Conventional Commits for future changelog generation: accurate types (`feat`, `fix`, `refactor`, `docs`, `chore`, etc.), meaningful scopes, subjects usually under 90 chars and capped around 120, non-imperative descriptions of what changed, and optional bodies for motivation/impact.\n\nExample:\n\n```txt\nfeat(autocommit): nested submodule commits generated deepest-first\n\nRecursive dirty-repo discovery was added so submodules are committed before\nthe superproject and parent gitlink updates are captured correctly.\n```\n\nNested repositories are committed deepest-first:\n\n```txt\nnested submodule -> submodule -> parent repository\n```\n\n## Development and release\n\nTypeScript extension files are loaded directly by pi; no compile or bundle step is required.\n\n```bash\nnpm install\nnpm run typecheck\nnpm run pack:dry-run\n```\n\nReleases use [semantic-release](https://semantic-release.gitbook.io/) from Conventional Commits on `main` and publish to npmjs. Before releasing locally, log in to npmjs for `@eamode` or export `NPM_TOKEN`, ensure `main` is clean/up to date, then run:\n\n```bash\ngit checkout main\ngit pull --ff-only\nnpm ci\nnpm run typecheck\nnpm run release:dry-run\nnpm run release\n```\n\n`npm run release` runs `semantic-release --no-ci`, computes the next version, creates the git tag, and publishes `@eamode/pi-commit`.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "conventional-commits",
+    "git",
+    "autocommit"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/EAmode/pi-commit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EAmode/pi-commit.git"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/EAmode/pi-commit/main/assets/screenshot.png"
+  },
+  "time": {
+    "created": "2026-05-17T23:04:49.255Z",
+    "modified": "2026-06-10T14:44:38.824Z",
+    "1.0.0": "2026-05-17T23:04:49.455Z",
+    "1.0.1": "2026-05-17T23:23:34.425Z",
+    "1.1.0": "2026-05-17T23:56:33.933Z",
+    "1.1.1": "2026-05-18T18:31:50.427Z",
+    "1.1.2": "2026-05-19T21:00:59.175Z",
+    "1.1.3": "2026-05-21T16:13:27.938Z",
+    "1.1.4": "2026-05-21T16:19:51.624Z",
+    "1.2.0": "2026-06-10T14:44:38.680Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 43,
+  "download_trend": []
+}

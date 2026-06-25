@@ -1,0 +1,36 @@
+{
+  "name": "pi-mdxml-context",
+  "latest_version": "0.1.7",
+  "description": "Pi extension that converts Markdown context to XML-like structure at model send time",
+  "readme": "# pi-mdxml-context\r\n\r\nPi extension that converts Markdown context into XML-like structure at model send time, while keeping the original Markdown in the session history.\n\nIt is meant for agent workflows where Markdown files are convenient for humans, but explicit XML-like boundaries can make complex context easier for models to parse.\n\r\n## Roadmap\r\n\r\nSee [ROADMAP.md](ROADMAP.md) for the maintenance direction (stabilization, performance/token efficiency, design boundaries, template compliance, and public-release quality) and the candidate maintenance seeds.\r\n\r\n## Features\r\n\r\n- Converts Markdown context files before model requests\n- Converts Markdown tool results without mutating saved session history\n- Preserves source metadata on the generated XML root element\n- Supports frontmatter, GFM, code blocks, tables, wikilinks, and Obsidian-style callouts\n- Provides preview and A/B toggle commands\n- Skips conversion when XML output grows too large\n\n## How it works\n\nThe extension uses Pi runtime hooks:\n\n- `before_agent_start` converts loaded Markdown context files.\n- `tool_result` tracks recently-read Markdown content.\n- `context` converts Markdown tool results only in the provider-bound context.\n\nThe session still stores the original Markdown. Conversion happens only for the model request.\n\r\n## Install\r\n\r\nClone or copy this project into a Pi extension location, for example:\n\r\n```text\r\n.pi/extensions/pi-mdxml-context/\r\n```\r\n\r\nThen install dependencies:\r\n\r\n```sh\r\nnpm install\r\n```\r\n\r\nReload Pi:\r\n\r\n```text\r\n/reload\r\n```\r\n\nPi loads the extension from `package.json` via:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./index.ts\"]\n  }\n}\n```\n\r\n## Commands\r\n\r\n| Command | Description |\n| --- | --- |\n| `/mdxml:on` | Enable send-time conversion. |\n| `/mdxml:off` | Disable send-time conversion. |\n| `/mdxml:status` | Show conversion state and recent stats. |\n| `/mdxml:preview path/to/file.md` | Preview XML-like output for a Markdown file. |\n| `/mdxml:preview recent:1` | Preview XML-like output for the most recent Markdown tool result. |\n\nPreview arguments support completion for Markdown paths and `recent:N` targets.\n\n## Output shape\n\nExample root element:\n\n```xml\n<markdown_context source=\"tool_result\" path=\"docs/example.md\" tool=\"read\" original_format=\"markdown\" converted_by=\"pi-mdxml-context\">\n  <section depth=\"1\" title=\"Example\">\n    <paragraph>Hello <strong>world</strong>.</paragraph>\n  </section>\n</markdown_context>\n```\n\nThe output is strict-ish XML: a single root, escaped text, escaped attributes, and fixed tag names. Schema validation is intentionally out of scope for the first version.\n\n## Safety notes\n\n- Conversion is enabled by default after the extension loads.\n- `/mdxml:off` disables conversion immediately.\n- The extension does not rewrite saved session messages.\n- Large conversions are skipped when output exceeds the configured expansion guard.\n\r\n## Development\r\n\r\n```sh\r\nnpm install\r\nnpm run check\r\n```\r\n\r\n## Release\r\n\r\nPublishing is automated through GitHub Actions:\r\n\r\n1. Merge a version bump in `package.json` to `main`.\r\n2. **Auto Release** validates the package, creates the semver tag, and opens a GitHub release.\r\n3. Auto Release dispatches **Publish to npm** (`publish.yml`) for that tag.\r\n4. Publish uses npm OIDC trusted publishing (`id-token: write`); no `NPM_TOKEN` secret is required.\r\n\r\n### Verify tag to npm publish\r\n\r\nAfter a release tag is created:\r\n\r\n```sh\r\n# Confirm Auto Release dispatched publish for the tag\r\ngh run list --workflow publish.yml --limit 5\r\n\r\n# Inspect the publish run for the tag\r\ngh run view <run-id> --log\r\n\r\n# Confirm the package version is on npm\r\nnpm view pi-mdxml-context@<version> version\r\n```\r\n\r\nFor a manual publish check, dispatch publish from the tag:\r\n\r\n```sh\r\ngh workflow run publish.yml --ref v<version> -f ref=v<version>\r\n```\r\n\r\n## License\r\n\r\nMIT\r\n",
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "pi-package",
+    "markdown",
+    "xml",
+    "context"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/eiei114/pi-mdxml-context",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eiei114/pi-mdxml-context.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-26T17:14:16.200Z",
+    "modified": "2026-06-25T20:08:39.787Z",
+    "0.1.0": "2026-05-26T17:14:16.488Z",
+    "0.1.2": "2026-06-05T14:23:13.477Z",
+    "0.1.7": "2026-06-25T20:08:39.550Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 9,
+  "download_trend": []
+}

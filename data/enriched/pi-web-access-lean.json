@@ -1,0 +1,350 @@
+{
+  "name": "pi-web-access-lean",
+  "latest_version": "0.1.1",
+  "description": "Lean web search, URL fetching, code search, GitHub repo cloning, and PDF extraction for Pi coding agent",
+  "readme": "# Pi Web Access Lean\n\nWeb search, code search, URL fetching, GitHub repository cloning, and PDF extraction for Pi Coding Agent.\n\n**Fork of [nicobailon/pi-web-access](https://github.com/nicobailon/pi-web-access). Full credit for the original extension, feature design, and implementation goes to the upstream project and its author.**\n\nThis fork keeps the web-access tools that are commonly useful in coding-agent sessions and keeps the tool surface small.\n\n## Upstream credit\n\nThis repository is a lean fork of the original [`pi-web-access`](https://github.com/nicobailon/pi-web-access) extension by [Nico Bailon](https://github.com/nicobailon).\n\nThe original extension includes the broader feature set: web search, content extraction, curator workflow, Gemini/Web fallback paths, YouTube/video understanding, and related tooling. This fork intentionally removes parts of that surface for a smaller Pi Coding Agent footprint; it is not a replacement for the full upstream package.\n\n## Features\n\n- `web_search`: web search through Exa or Perplexity\n- `code_search`: code, documentation, and API search through Exa MCP code context, with fallback search\n- `fetch_content`: readable markdown extraction for URLs\n- GitHub repository handling: clone repositories locally instead of scraping rendered HTML\n- PDF extraction: extract text PDFs and save markdown output\n- HTML extraction: Readability, Next.js RSC parsing, and Jina Reader fallback\n- Activity widget for request/response visibility\n\n## Design\n\nPi loads extension tool schemas into the agent context. Large schemas and rarely used workflows increase every prompt, including prompts that never use web access.\n\nThis package is built around a smaller default surface:\n\n- three tools: search, code search, fetch content\n- no interactive search-review workflow\n- no browser-cookie handling\n- no video processing pipeline\n- no provider paths that require unrelated credentials\n- concise tool descriptions\n\nThe result is a smaller extension footprint while preserving the main web and code-research paths used by a coding agent.\n\n## Benchmarks\n\nMeasurement command shape:\n\n```bash\nPI_CODING_AGENT_DIR=\"$TMP\" \\\npi -p --no-session \\\n  --no-skills --no-context-files --no-prompt-templates --no-themes \\\n  --mode json \\\n  --model openai-codex/gpt-5.5 \\\n  --thinking minimal \\\n  \"Reply exactly OK\"\n```\n\nMeasured extension input-token footprint:\n\n- Original `pi-web-access`: **+1,180 input tokens**\n- `pi-web-access-lean`: **+302 input tokens**\n- Reduction: **878 input tokens**\n\n## Install\n\nFrom npm:\n\n```bash\npi install npm:pi-web-access-lean\n```\n\nOr add it to Pi settings:\n\n```json\n{\n  \"packages\": [\"npm:pi-web-access-lean\"]\n}\n```\n\nFrom GitHub:\n\n```bash\npi install git:github.com/Nabsku/pi-web-access-lean\n```\n\nFrom a local checkout, useful while developing:\n\n```bash\ngit clone https://github.com/Nabsku/pi-web-access-lean.git\npi install /path/to/pi-web-access-lean\n```\n\nRequires Pi Coding Agent with extension support.\n\n## Configuration\n\nConfiguration is read from `~/.pi/web-search.json`. All fields are optional.\n\n```json\n{\n  \"exaApiKey\": \"exa-...\",\n  \"perplexityApiKey\": \"pplx-...\",\n  \"provider\": \"auto\",\n  \"githubClone\": {\n    \"enabled\": true,\n    \"maxRepoSizeMB\": 350,\n    \"cloneTimeoutSeconds\": 30,\n    \"clonePath\": \"/tmp/pi-github-repos\"\n  },\n  \"shortcuts\": {\n    \"activity\": \"ctrl+shift+w\"\n  }\n}\n```\n\nProvider selection:\n\n- `auto`: Exa first, then Perplexity when configured\n- `exa`: Exa only\n- `perplexity`: Perplexity only\n\nEnvironment variables take precedence where supported:\n\n- `EXA_API_KEY`\n- `PERPLEXITY_API_KEY`\n\n## Tools\n\n### `web_search`\n\nSearch the web and return an answer with sources.\n\n```typescript\nweb_search({ query: \"TypeScript best practices 2026\" })\nweb_search({ queries: [\"query 1\", \"query 2\"] })\nweb_search({ query: \"AI agent observability\", recencyFilter: \"week\" })\nweb_search({ query: \"React Server Components\", domainFilter: [\"react.dev\"] })\nweb_search({ query: \"Pi Coding Agent extensions\", provider: \"exa\" })\nweb_search({ query: \"benchmark result\", includeContent: true })\n```\n\nParameters:\n\n- `query` / `queries`: single query or batch of queries\n- `numResults`: results per query, default `5`, max `20`\n- `recencyFilter`: `day`, `week`, `month`, or `year`\n- `domainFilter`: domains to include; prefix with `-` to exclude\n- `provider`: `auto`, `exa`, or `perplexity`\n- `includeContent`: fetch page content for results in the background\n\n### `code_search`\n\nSearch for code examples, documentation, APIs, and debugging references.\n\nUses Exa MCP `code-context` when available. Falls back to code-focused web search.\n\n```typescript\ncode_search({ query: \"React useEffect cleanup pattern\" })\ncode_search({ query: \"Express middleware error handling\", maxTokens: 10000 })\n```\n\nParameters:\n\n- `query`: programming question, API, library, or debugging topic\n- `maxTokens`: context budget, default `5000`, max `50000`\n\n### `fetch_content`\n\nFetch URLs and extract readable content as markdown.\n\n```typescript\nfetch_content({ url: \"https://example.com/article\" })\nfetch_content({ urls: [\"https://a.example\", \"https://b.example\"] })\nfetch_content({ url: \"https://github.com/owner/repo\" })\nfetch_content({ url: \"https://example.com/report.pdf\" })\n```\n\nParameters:\n\n- `url` / `urls`: single URL/path or multiple URLs\n- `forceClone`: clone GitHub repositories that exceed the size threshold\n\n## Extraction flow\n\n```text\nweb_search(query)\n  \u2192 Exa direct API or MCP\n  \u2192 Perplexity, when configured\n\nfetch_content(url)\n  \u2192 GitHub URL? clone repository or use GitHub API fallback\n  \u2192 HTTP fetch\n      \u2192 PDF? extract text, save markdown to ~/Downloads/\n      \u2192 HTML? Readability \u2192 RSC parser \u2192 Jina Reader fallback\n      \u2192 text/json/markdown? return directly\n```\n\n## Commands\n\n### Activity monitor\n\nToggle with **Ctrl+Shift+W** to see live request/response activity:\n\n```text\n\u2500\u2500\u2500 Web Search Activity \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  API  \"typescript best practices\"     200    2.1s \u2713\n  GET  docs.example.com/article        200    0.8s \u2713\n  GET  blog.example.com/post           404    0.3s \u2717\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n```\n\n## Development\n\n```bash\nnpm install\nnpm test\n```\n\n## Files\n\n- `index.ts`: extension entry, tools, activity widget\n- `search.ts`: search routing for Exa and Perplexity\n- `code-search.ts`: code/docs search via Exa MCP\n- `extract.ts`: URL/path routing, HTTP extraction, fallback orchestration\n- `github-extract.ts`: GitHub URL parsing, clone cache, content generation\n- `github-api.ts`: GitHub API fallback for large repositories and commit SHAs\n- `exa.ts`: Exa search provider, direct API and MCP proxy\n- `perplexity.ts`: Perplexity API client with rate limiting\n- `pdf-extract.ts`: PDF text extraction, saves markdown output\n- `rsc-extract.ts`: RSC flight data parser for Next.js pages\n- `utils.ts`: shared formatting and error helpers\n- `activity.ts`: activity tracking widget\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "web-search",
+    "fetch"
+  ],
+  "author": {
+    "name": "Nico Bailon / lean fork"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Nabsku/pi-web-access-lean#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nabsku/pi-web-access-lean.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-29T08:33:16.515Z",
+    "modified": "2026-05-29T08:36:28.053Z",
+    "0.1.0": "2026-05-29T08:33:16.780Z",
+    "0.1.1": "2026-05-29T08:36:27.939Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 15,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 219
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 19
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 14
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

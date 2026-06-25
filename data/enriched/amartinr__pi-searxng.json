@@ -1,0 +1,39 @@
+{
+  "name": "@amartinr/pi-searxng",
+  "latest_version": "1.0.3",
+  "description": "A minimalist SearXNG web search extension for Pi",
+  "readme": "# @amartinr/pi-searxng\n\nA **minimalist** SearXNG web search extension for [Pi](https://github.com/earendil-works/pi).\n\nThis is a focused, no-frills implementation that provides only web search and result caching \u2014 no content fetching, no repository cloning, no external dependencies beyond SearXNG.\n\n> **Note:** This is an independent fork of [jcha0713/pi-searxng](https://github.com/jcha0713/pi-searxng), stripped down to its core search functionality with improved caching.\n\n## Features\n\n- **Web Search** - Search the web via a SearXNG instance\n- **Cached Results** - Retrieve previous search results by ID for follow-up queries\n- **Smart Caching** - Deterministic IDs, freshness TTL, LRU eviction, and deduplication\n- **Safesearch** - Configurable content filtering (`off`, `moderate`, `strict`)\n\n## Design Philosophy\n\nThis extension follows a **minimalist** approach:\n\n- **Web search only** \u2014 No content fetching, no HTML-to-Markdown conversion\n- **No repository cloning** \u2014 Unlike the original, it doesn't clone GitHub repos\n- **No external tools** \u2014 Doesn't require `git` or any system dependencies\n- **Self-contained** \u2014 Everything runs in-process, no background services\n- **Updated imports** \u2014 Uses current `@earendil-works/` scoped packages (Pi coding agent, TUI, TypeBox)\n\nIf you need content extraction or repo browsing, consider using other Pi extensions for those tasks.\n\n## Installation\n\n```bash\npi install npm:@amartinr/pi-searxng\n```\n\nOr try without installing:\n\n```bash\npi -e npm:@amartinr/pi-searxng\n```\n\n## Building\n\n```bash\nnpm install\nnpm run build\n```\n\nThis compiles the TypeScript source in `src/` to JavaScript in `dist/`.\n\n## Configuration\n\nCreate `~/.pi/agent/extensions/pi-searxng/config.json`:\n\n```json\n{\n  \"searxngUrl\": \"http://localhost:8080\",\n  \"timeoutMs\": 30000,\n  \"maxResults\": 10,\n  \"safesearch\": \"off\"\n}\n```\n\n| Field | Type | Default | Description |\n|---|---|---|---|\n| `searxngUrl` | string | `http://localhost:8080` | URL of the SearXNG instance (can also be set via `SEARXNG_URL` env var) |\n| `timeoutMs` | number | `30000` | HTTP request timeout in milliseconds |\n| `maxResults` | number | `10` | Maximum number of results returned per search |\n| `safesearch` | string | `\"off\"` | Content filtering level (`\"off\"`, `\"moderate\"`, `\"strict\"`) |\n\nOr use an environment variable:\n\n```bash\nexport SEARXNG_URL=http://localhost:8080\n```\n\n## Tools\n\n### `web_search`\n\nSearch the web using SearXNG. Results are automatically cached for subsequent identical queries.\n\n**Parameters:**\n- `query` (string, required) - Search query\n- `limit` (number, optional) - Max results to return (overrides `maxResults` from config). Note: the actual number returned depends on SearXNG's internal configuration.\n\n**Returns:** A `searchId` in the `details` field, which can be used with `get_search_results` or passed to subsequent calls.\n\n### `get_search_results`\n\nRetrieve cached search results by ID. Returns the original query and all cached results.\n\n**Parameters:**\n- `searchId` (string, required) - Search ID returned from a previous `web_search` call\n\n**Returns:** The original search query and the cached results. If the `searchId` is not found, returns an error message.\n\n## Error Handling\n\nBoth tools return error messages within the response content when something fails:\n\n- **`web_search`** \u2014 If SearXNG is unreachable, returns a descriptive error (including the HTTP status and response body).\n- **`get_search_results`** \u2014 Returns \"Search not found\" if the `searchId` doesn't exist in the cache.\n\n## Result Format\n\nResults are returned as numbered entries with the following structure:\n\n```\n1. **Result Title**\n   https://example.com\n   Short snippet of the result content...\n```\n\nEach result includes the **title**, **URL**, and a **snippet** (truncated to 200 characters).\n\n## Caching\n\nThe package includes an in-memory cache that reduces redundant calls to SearXNG:\n\n- **Deterministic IDs** \u2014 The `searchId` is an MD5 hash of the query text, so the same query always produces the same ID. This enables cache deduplication and lookup via `get_search_results`.\n- **Freshness TTL** \u2014 Cache entries are considered fresh for a configurable period (default: **15 min**). Stale entries trigger a new search instead of returning cached results.\n- **Eviction TTL** \u2014 Entries that haven't been accessed within **24 hours** are automatically removed.\n- **LRU eviction** \u2014 When the cache exceeds **200 entries**, the oldest (least recently used) entries are evicted.\n- **Lazy cleanup** \u2014 Cleanup runs automatically at the start of each tool call.\n\n### Cache configuration\n\nThese fields can be added to `~/.pi/agent/extensions/pi-searxng/config.json`:\n\n| Field | Type | Default | Description |\n|---|---|---|---|\n| `cacheFreshnessMs` | number | `900000` (15 min) | How long cache entries are considered fresh before re-searching |\n| `cacheTtlMs` | number | `86400000` (24 hours) | Max time an entry stays in cache without being accessed |\n| `cacheMaxSize` | number | `200` | Max number of entries before LRU eviction kicks in |\n\n## Requirements\n\n- Node.js 18+\n- A running SearXNG instance (for web search)\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-extension",
+    "pi-package",
+    "pi",
+    "searxng",
+    "web-search"
+  ],
+  "author": {
+    "name": "A. Martin",
+    "email": "abel.martin.ruiz@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/amartinr/pi-searxng#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amartinr/pi-searxng.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-05-21T16:27:57.875Z",
+    "modified": "2026-06-01T08:03:13.505Z",
+    "1.0.0": "2026-05-21T16:27:58.216Z",
+    "1.0.1": "2026-05-22T17:23:29.546Z",
+    "1.0.2": "2026-05-23T22:12:39.770Z",
+    "1.0.3": "2026-06-01T08:03:13.382Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 51,
+  "download_trend": []
+}

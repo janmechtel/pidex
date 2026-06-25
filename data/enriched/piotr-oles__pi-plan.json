@@ -1,0 +1,34 @@
+{
+  "name": "@piotr-oles/pi-plan",
+  "latest_version": "1.0.0",
+  "description": "Pi Agent extension: save named markdown plans to disk and ask user to confirm before executing",
+  "readme": "# pi-plan\n\nA [pi coding agent](https://github.com/earendil-works/pi) extension that adds a `review-plan` tool \u2014 lets the agent write a named markdown plan to disk and present it in an interactive terminal widget for the user to approve, request changes, or ask a question before execution begins.\n\n## Install\n\n```bash\npi install npm:@piotr-oles/pi-plan\n```\n\n## Usage\n\nThe extension registers a `review-plan` tool. The intended workflow is:\n\n1. The agent writes the plan file using the built-in `write` tool (path under `~/.pi/plan/<repo>/<name>.md`)\n2. The agent calls `review-plan` with the relative path\n\nInstruct the agent to follow this pattern:\n\n```\nWrite the plan file to ~/.pi/plan/<repo>/<name>.md first, then call review-plan with the relative path.\n```\n\nOr reference it in a prompt template / skill file to enforce it project-wide.\n\n## How it works\n\nWhen the agent calls `review-plan`:\n\n1. Ensures `~/.pi/plan/` is a git repository (initialises it on first use)\n2. Commits the plan file with message `create: <name>.md`\n3. Hides the working indicator and shows an interactive widget with the following options:\n   - **Open in [Editor]** *(shown when running inside Zed, VS Code, Cursor, or Windsurf)* \u2014 opens the plan file in your IDE so you can edit it; the widget stays open so you can still approve or request changes afterwards\n   - **Request changes** \u2014 edit the file then select this; the agent gets a diff of your edits and is told to update the plan, then call `review-plan` again\n   - **Approve** \u2014 edit the file (optionally) then select this; the agent gets a diff of any edits and is told to proceed with execution\n   - **Ask question** \u2014 type a free-form question; the agent receives it and can reply before you decide\n\n4. After the user responds, any edits made to the file before selecting are committed (`approve: <name>.md` / `request-changes: <name>.md`) and a diff is computed and sent back to the agent\n\n## Widget responses\n\n| Selection | Agent receives |\n|-----------|----------------|\n| **Open in [Editor]** | Editor opens; widget re-shows with a `\u2713 Opened in \u2026` confirmation. Agent is not notified. |\n| **Approve** (no edits) | `approve` result, empty diff \u2014 told to proceed |\n| **Approve** (with edits) | `approve` result + git diff \u2014 told to address comments, fix up plan, then proceed |\n| **Request changes** (with edits) | `request-changes` result + git diff \u2014 told to address comments, update plan, call `review-plan` again |\n| **Request changes** (no edits) | `request-changes` result, empty diff \u2014 told to ask the user what to change |\n| **Ask question** | `question` result with the question text |\n| **Esc / cancel** | `cancel` result |\n\n## Git history\n\nAll plan versions are tracked in a git repo at `~/.pi/plan/`. Each interaction creates a commit:\n\n- `create: <name>.md` \u2014 initial write by the agent\n- `approve: <name>.md` \u2014 user approved (records any edits made before approving)\n- `request-changes: <name>.md` \u2014 user requested changes (records edits)\n\n## Development\n\n```bash\npnpm install\npnpm test\npnpm typecheck\npnpm check\n```\n\nTo test changes manually, pass the source entry point directly to pi:\n\n```bash\npi -ne -e packages/pi-plan/src/index.ts\n```\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/piotr-oles/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/piotr-oles/pi-extensions.git",
+    "directory": "packages/pi-plan"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-03T14:42:37.195Z",
+    "modified": "2026-06-23T16:54:14.122Z",
+    "0.0.0": "2026-06-03T14:42:37.483Z",
+    "0.1.0": "2026-06-03T14:44:34.134Z",
+    "0.1.1": "2026-06-03T17:36:14.234Z",
+    "0.2.0": "2026-06-10T14:56:47.216Z",
+    "1.0.0": "2026-06-23T16:54:14.002Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,41 @@
+{
+  "name": "@ghoseb/pi-damage-control",
+  "latest_version": "0.11.2",
+  "description": "AST-based Damage Control extension for Pi",
+  "readme": "# pi-damage-control\n\n[![npm](https://img.shields.io/npm/v/@ghoseb/pi-damage-control)](https://www.npmjs.com/package/@ghoseb/pi-damage-control)\n\n## About\n\n`pi-damage-control` is an AST-based Damage Control extension for [Pi](https://pi.dev).\nIt blocks or asks before destructive shell/file tool calls while avoiding false positives\nfrom inert prose, markdown, heredocs, and task descriptions.\n\n## Installation\n\n```bash\npi install npm:@ghoseb/pi-damage-control\n# OR\n# pi install git:github.com/ghoseb/pi-damage-control\n```\n\n## How it works\n\n- Parses Bash with `just-bash`; no regex fallback.\n- Evaluates semantic command rules from `config/default-policy.yaml`.\n- Extracts file intents from Bash and Pi file tools.\n- Applies path policies for zero-access, read-only, no-delete, and outside-`$CWD` writes.\n- Asks for confirmation when policy action is `ask`; blocks fail-closed when UI is unavailable.\n\n## How to configure\n\nCreate a project policy at:\n\n```text\n.pi/damage-control.yaml\n```\n\nor a global policy at:\n\n```text\n~/.pi/agent/damage-control.yaml\n```\n\nProject policy wins over global policy; otherwise the bundled default is used.\n\nSee the bundled default policy: [`config/default-policy.yaml`](./config/default-policy.yaml).\nFor the full policy language reference, see [`docs/policy.md`](./docs/policy.md).\n\n### Config language\n\nTop-level policy shape:\n\n```yaml\nversion: 2\nsettings:\n  defaultAction: ask\n  parseFailure: ask\n  showStatus: true\nrules: []\n```\n\n#### Path policy\n\nPath rules live in the same top-level `rules` list as command rules. Their\n`type` encodes the path policy subtype:\n\n- `path:zeroAccess` \u2014 blocks read, write, delete, and move.\n- `path:readOnly` \u2014 applies to write, delete, and move; reads are allowed.\n- `path:noDelete` \u2014 applies to delete and move.\n\nEach path rule has:\n\n```yaml\n- id: path-secrets-env\n  type: path:zeroAccess\n  action: block\n  reason: environment files may contain secrets\n  match:\n    path:\n      any: .env*\n      except: [.env.example]\n```\n\n`match.path.any` can be a string or a list of strings:\n\n```yaml\nmatch:\n  path:\n    any: [LICENSE, LICENSE.*, COPYING, COPYING.*]\n```\n\nSupported path pattern forms:\n\n- exact/basename: `README.md`, `.env`\n- directory: `.git/`, `node_modules/`\n- glob-ish `*`: `*.pem`, `docker-compose.*.yml`\n- current-working-directory macros: `$CWD`, `!$CWD`\n\nExample outside-project write confirmation:\n\n```yaml\n- id: path-outside-project-write\n  type: path:readOnly\n  reason: writes outside the project require confirmation\n  match:\n    path:\n      outside: $CWD\n      except: [/tmp/, /dev/null]\n```\n\n#### Command rules\n\nCommand rules use `type: command`:\n\n```yaml\n- id: git-reset-hard\n  type: command\n  action: block\n  reason: git reset --hard discards worktree changes\n  match:\n    command: git\n    subcommand: reset\n    flags:\n      any: [--hard]\n```\n\nCommon matcher fields:\n\n- `command`: exact command name.\n- `commandAny`: one of several command names.\n- `subcommand`: first non-option command operand.\n- `subcommandAny`: one of several subcommands.\n- `argsAny`: any listed argument must be present.\n- `argsAll`: all listed arguments must be present.\n- `argsNone`: none of the listed arguments may be present.\n- `argsContainAny` / `argsContainAll`: substring matching over arguments.\n- `flags.any` / `flags.all` / `flags.none`: semantic flag matching.\n- `optionsBeforeSubcommand.value`: value-taking global options before subcommand detection, useful for `git -C repo ...`.\n- `visibleTextAny` / `visibleTextAll` / `visibleTextNone`: match visible static text, useful for SQL executors.\n\nRules have `enabled: true` by default. Runtime `/dc:block` and `/dc:unblock`\ntemporarily toggle that enabled state by rule id.\n\nActions:\n\n- `allow`\n- `ask`\n- `block`\n\n`action` is optional on any rule. When omitted it falls back to\n`settings.defaultAction` (which defaults to `ask`).\n\nDisabled-by-default rules are opt-in at runtime:\n\n```yaml\n- id: git-commit\n  type: command\n  enabled: false\n  action: block\n  reason: git commit blocked by active rule\n  match:\n    command: git\n    subcommand: commit\n```\n\nExample:\n\n```yaml\nversion: 2\nsettings:\n  defaultAction: ask\n  parseFailure: ask\n  showStatus: true\nrules:\n  - id: path-secrets-env\n    type: path:zeroAccess\n    action: block\n    reason: environment files may contain secrets\n    match:\n      path:\n        any: .env*\n        except: [.env.example]\n  - id: path-outside-project-write\n    type: path:readOnly\n    reason: writes outside the project require confirmation\n    match:\n      path:\n        outside: $CWD\n        except: [/tmp/, /dev/null]\n  - id: git-commit\n    type: command\n    enabled: false\n    action: block\n    reason: git commit blocked by active rule\n    match:\n      command: git\n      subcommand: commit\n```\n\n## Commands available\n\n- `/dc:block [rule-id ...]` \u2014 enables rules at runtime; `all` enables all rules;\n  with no args, resets to config defaults.\n- `/dc:unblock <rule-id ...>` \u2014 disables rules at runtime; `all` disables all rules.\n- `/dc:yolo` \u2014 toggles bypass of all Damage Control checks.\n- `/dc:reload` \u2014 reloads policy.\n- `/dc:status` \u2014 shows active policy and runtime state.\n\n## Acknowledgements\n\n## License\n\nMIT \u00a9 Baishampayan Ghose\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "damage-control",
+    "bash",
+    "safety"
+  ],
+  "author": {
+    "name": "Baishampayan Ghose"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ghoseb/pi-damage-control#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/ghoseb/pi-damage-control.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-08T18:09:20.078Z",
+    "modified": "2026-05-29T05:23:19.834Z",
+    "0.9.1": "2026-05-08T18:09:20.308Z",
+    "0.10.0": "2026-05-09T08:02:10.434Z",
+    "0.10.1": "2026-05-11T05:11:52.266Z",
+    "0.11.0": "2026-05-12T10:36:26.383Z",
+    "0.11.1": "2026-05-12T12:49:22.175Z",
+    "0.11.2": "2026-05-29T05:23:19.700Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": null,
+  "download_trend": []
+}

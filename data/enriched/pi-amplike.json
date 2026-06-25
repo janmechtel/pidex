@@ -1,0 +1,60 @@
+{
+  "name": "pi-amplike",
+  "latest_version": "1.3.6",
+  "description": "Pi skills and extensions that provide Amp Code-like workflows (handoff, permissions, mode selector, web access).",
+  "readme": "# pi-amplike\n\n[Pi](https://github.com/badlogic/pi-mono) skills and extensions that give Pi similar capabilities to [Amp Code](https://ampcode.com/) out of the box.\n\n<p align=\"center\">\n<img src=\"demo.gif\" alt=\"Pi subagents and /btw in action\" width=\"700\" />\n</p>\n\n## Features\n\n### Session Management\n- **Handoff** - Create a new focused session with AI-generated context transfer:\n  - **`/handoff <goal>`** command - Manually create a handoff session (potentially with `-mode <name>` / `-model <name>` parameter to switch models for the new session)\n  - **`handoff` tool** - The agent can invoke this (with optional `mode`/`model` parameters) when you explicitly request a handoff\n- **`session_query`** tool - The agent in handed-off sessions automatically gets the ability to query the parent session for context, decisions, or code changes; analysis uses the queried session's own model\n- Use `/resume` to switch between and navigate handed-off sessions\n\n### Subagents and BTW\n- **`subagent`** tool - The agent can create one or multiple parallel task-focused, non-interactive subagents to save context and speed up work\n- **`/btw <prompt>`** command - Same semantics as in Claude Code, basically a user-triggered subagent running and finishing asynchronously and independently on the main agent\n\n### Permissions\n- **`/permissions`** command toggles bash command allow/deny permissions, directly read from AmpCode's configuration files.\n\n### Prompt Modes\n- **`/mode`** command with interactive mode selector/configuration UI (a mode is a model + thinking + color preset, active mode is shown in prompt editor border)\n- **Shortcuts**:\n  - **`Ctrl+Shift+S`** - mode selector\n  - **`Ctrl+Space`** - cycle modes\n\n### Web Access\n- **web-search** - Search the web via Jina Search API\n- **visit-webpage** - Extract webpage content as markdown (using Jina API), or download images\n\n### Amp Skill Compatibility\n- Auto-loads Amp skill directories when present:\n  - `~/.config/agents/skills`\n  - `~/.config/amp/skills`\n  - `.agents/skills` (project-local)\n\n## Installation\n\n### Option A: Install from npm (recommended)\n\n```bash\npi install npm:pi-amplike\n```\n\n### Option B: Install from git\n\n```bash\npi install https://github.com/pasky/pi-amplike\n```\n\n### Option C: Local development\n\n```bash\ngit clone https://github.com/pasky/pi-amplike ~/.pi/packages/pi-amplike\ncd ~/.pi/packages/pi-amplike\nnpm install\n```\n\nThen add `\"packages/pi-amplike\"` to the `\"packages\"` array in `~/.pi/agent/settings.json`.\n\n## Setup\n\nGet a Jina API key for web skills (optional, works with rate limits without it):\n\n```bash\nexport JINA_API_KEY=\"your-key\"  # Add to ~/.profile or ~/.zprofile\n```\n\nGet an API key at [jina.ai](https://jina.ai/). Even if you charge only the minimum credit, it's going to last approximately forever.\n\n## Usage\n\n### Session Handoff\n\nWhen your conversation gets long or you want to branch off to a focused task, you can use handoff in two ways:\n\n**Manual handoff via command:**\n```\n/handoff now implement this for teams as well\n/handoff -mode rush execute phase one of the plan\n/handoff -model anthropic/claude-haiku-4-5 check other places that need this fix\n```\n\nOptional flags (can be combined):\n- `-mode <name>` \u2014 start the new session in a named mode (e.g. `rush`, `smart`, `deep`)\n- `-model <provider/id>` \u2014 start the new session with a specific model (e.g. `anthropic/claude-haiku-4-5`)\n\nWithout these flags, `/handoff` keeps the current model and thinking level in the new session.\n\nThe handoff summary is always generated with the *current* session's model before switching.\n\n**Agent-invoked handoff:**\nThe agent can also initiate a handoff when you explicitly ask for it:\n```\n\"Please hand this off to a new session to implement the fix\"\n\"Create a handoff session to execute phase one\"\n```\n\nThe `handoff` tool also accepts optional `mode` and `model` parameters.\n\nBoth methods create a new session with:\n- AI-generated summary of relevant context from the current conversation\n- List of relevant files that were discussed or modified\n- Clear task description based on your goal\n- Reference to parent session (accessible via `session_query` tool)\n\n#### Session Navigation\n\nUse Pi's built-in `/resume` command to switch between sessions, including handed-off sessions. The handoff creates sessions with descriptive names that make them easy to find.\n\n#### Querying Past Sessions\n\nThe `session_query` tool lets the model look up information from previous sessions. It's automatically used when a handoff includes parent session reference, but can also be invoked directly. The analysis call uses the queried session's own model (falling back to the current model if unavailable):\n\n```\nsession_query(\"/path/to/session.jsonl\", \"What files were modified?\")\nsession_query(\"/path/to/session.jsonl\", \"What approach was chosen?\")\n```\n\n\n### Subagents\n\nAsk your agent to \"use subagents to ...\" whenever you know you have a context-hungry task ahead that you would like to run isolated from the main context window.\n\nWhen your agent is working on something and you suddenly got a question, use `/btw` to ask it. Of course, you can even ask multiple questions in parallel. The `/btw` subagent is ephemeral like tool subagents, but unlike tool subagents it sees the full contxt of your session (besides the fact that it can also use tools to read files).\n\n### Permissions\n\nThe permissions extension enforces Amp-style bash command permissions automatically. Use the `/permissions` command to toggle modes:\n\n```\n/permissions    # toggles between enabled and yolo\n```\n\n- **enabled** (default): Amp permission rules from `~/.config/amp/settings.json` are enforced\n- **yolo**: All bash commands are allowed without any checks; `YOLO mode` shown in status bar\n\nThe selected mode is persisted in `~/.pi/agent/amplike.json` and restored on the next pi invocation.\n\n### Prompt Modes\n\n```text\n/mode              # mode picker\n/mode configure    # open mode configuration UI\n/mode <name>       # switch directly\n/mode store <name> # store current model+thinking into a mode\n```\n\nNotes:\n- The extension bootstraps with default modes are `rush`, `smart`, and `deep`; they somewhat mirror Amp defaults.\n- Modes config is loaded from `.pi/modes.json` (project), falling back to `~/.pi/agent/modes.json` (global).\n- Deleting all modes or setting `\"modes\": {}` in your modes file disables mode overlay behavior (shortcuts + editor mode border), while keeping `/mode` config UI available.\n\n### Web Search\n\n```bash\n~/.pi/packages/pi-amplike/skills/web-search/search.py \"python async tutorial\"\n```\n\n### Visit Webpage\n\n```bash\n~/.pi/packages/pi-amplike/skills/visit-webpage/visit.py https://docs.example.com/api\n```\n\n## Components\n\n| Component | Type | Description |\n|-----------|------|-------------|\n| [amp-skills](extensions/amp-skills.ts) | Extension | Adds Amp-compatible skill discovery paths (`~/.config/agents/skills`, `~/.config/amp/skills`, `.agents/skills`) |\n| [permissions](extensions/permissions.ts) | Extension | Reads `amp.commands.allowlist` and `amp.permissions` from `~/.config/amp/settings.json` (and `.agents/settings.json`) and intercepts bash tool calls accordingly; `/permissions` toggles between `enabled` and `yolo` (all commands allowed, status bar indicator, persisted in `~/.pi/agent/amplike.json`) |\n| [handoff](extensions/handoff.ts) | Extension | `/handoff [-mode <name>] [-model <provider/id>] <goal>` command + `handoff` tool (with `mode`/`model` params) for AI-powered context transfer |\n| [modes](extensions/modes.ts) | Extension | Prompt mode manager with model/thinking/color presets, editor border overlay, and shortcuts |\n| [session-query](extensions/session-query.ts) | Extension | `session_query` tool for querying parent sessions; uses the queried session's own model for analysis |\n| [session-query](skills/session-query/) | Skill | Instructions for using the session_query tool |\n| [web-search](skills/web-search/) | Skill | Web search via Jina API |\n| [visit-webpage](skills/visit-webpage/) | Skill | Webpage content extraction |\n\n## Why \"AmpCode-like\"?\n\nAmp Code has excellent session management built-in - you can branch conversations, reference parent context, and navigate session history. This package brings similar workflows to Pi:\n\n- **Context handoff** \u2192 Amp's conversation branching\n- **Session querying** \u2192 Amp's ability to reference parent context\n\n## Web Skills Origin\n\nThe web-search and visit-webpage skills were extracted from [pasky/muaddib](https://github.com/pasky/muaddib). The original implementations have additional features (rate limiting, multiple backends, async execution) that aren't needed for Pi's skill system.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-package",
+    "agent",
+    "skills",
+    "extensions",
+    "amp",
+    "ampcode",
+    "session",
+    "handoff",
+    "permissions",
+    "web-search"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/pasky/pi-amplike",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pasky/pi-amplike.git"
+  },
+  "pi": {
+    "skills": [
+      "./skills/visit-webpage",
+      "./skills/web-search",
+      "./skills/session-query"
+    ],
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-02-04T19:35:21.849Z",
+    "modified": "2026-04-24T00:39:37.450Z",
+    "0.1.0": "2026-02-04T19:35:22.090Z",
+    "0.1.1": "2026-02-04T19:36:45.047Z",
+    "0.1.2": "2026-02-05T00:40:28.914Z",
+    "0.1.3": "2026-02-05T22:58:04.806Z",
+    "0.2.0": "2026-02-05T23:08:14.499Z",
+    "0.2.1": "2026-02-10T02:58:48.192Z",
+    "0.2.3": "2026-02-10T17:23:51.807Z",
+    "1.0.0": "2026-02-12T02:21:24.290Z",
+    "1.1.0": "2026-02-19T01:38:17.810Z",
+    "1.2.0": "2026-02-24T23:02:55.666Z",
+    "1.3.0": "2026-03-11T16:26:53.872Z",
+    "1.3.1": "2026-03-11T19:37:15.702Z",
+    "1.3.2": "2026-03-19T14:26:47.053Z",
+    "1.3.3": "2026-03-29T01:28:21.989Z",
+    "1.3.4": "2026-04-03T23:28:23.715Z",
+    "1.3.6": "2026-04-24T00:39:37.342Z"
+  },
+  "versions_count": 16,
+  "downloads_last_week": null,
+  "download_trend": []
+}

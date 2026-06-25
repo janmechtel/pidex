@@ -1,0 +1,355 @@
+{
+  "name": "@ramarivera/pi-supermemory",
+  "latest_version": "0.4.4",
+  "description": "Pi coding-agent extension that recalls and captures session memory through Supermemory.",
+  "readme": "# pi-supermemory\n\nPi coding-agent extension that recalls and captures development memory through Supermemory.\n\nThe extension uses Supermemory's v4 API directly. Pi does not expose MCP servers natively, so this package complements the toolbox `mcporter` MCP bridge instead of replacing it.\n\n## Configuration\n\nSet an API key in the Pi runtime environment:\n\n```sh\nSUPERMEMORY_API_KEY=...\n```\n\nBy default, the extension uses a generic Supermemory container:\n\n```sh\nPI_SUPERMEMORY_CONTAINER_TAG=pi-supermemory\n```\n\nSet `PI_SUPERMEMORY_CONTAINER_TAG` to your own shared memory container if you want Pi to write into the same namespace as your other agents.\n\nSupported environment variables:\n\n- `SUPERMEMORY_API_KEY`, `SUPERMEMORY_CC_API_KEY`, or `SUPERMEMORY_OPENCLAW_API_KEY`\n- `PI_SUPERMEMORY_CONFIG`\n- `PI_SUPERMEMORY_CONTAINER_TAG` or `SUPERMEMORY_CONTAINER_TAG`\n- `PI_SUPERMEMORY_ENABLED`\n- `SUPERMEMORY_API_BASE_URL`\n- `PI_SUPERMEMORY_MAX_RECALL`\n- `PI_SUPERMEMORY_AUTO_RECALL`\n- `PI_SUPERMEMORY_AUTO_CAPTURE`\n- `PI_SUPERMEMORY_CAPTURE_MODE` (`signal` by default, or `all` for legacy every-turn capture)\n\nEnv vars always win over file-based configuration.\n\n## Policy files\n\nThe extension discovers and merges config files **from the current working directory all the way up to `~`**. At each directory level it checks (in order of specificity):\n\n```text\n.pi/supermemory.json\n.pi/pi-supermemory.json\n.pi/agent/pi-supermemory.json\n```\n\nChild directories override parent directories. Within the same directory, `agent/pi-supermemory.json` wins over `pi-supermemory.json`, which wins over `supermemory.json`.\n\nUse `PI_SUPERMEMORY_CONFIG` to point at a single explicit file instead of hierarchical discovery.\n\n### Example\n\n```json\n{\n  \"default\": {\n    \"enabled\": true,\n    \"containerTag\": \"pi-supermemory\",\n    \"captureMode\": \"signal\"\n  },\n  \"directories\": {\n    \"/workspace/app\": {\n      \"containerTag\": \"app-memory\"\n    }\n  },\n  \"models\": {\n    \"local/no-memory-model\": {\n      \"enabled\": false\n    },\n    \"openai-codex/gpt-5.5\": {\n      \"containerTag\": \"codex-memory\"\n    }\n  },\n  \"rules\": [\n    {\n      \"path\": \"/workspace/app\",\n      \"modelPattern\": \"openai-codex/.*\",\n      \"containerTag\": \"app-codex-memory\",\n      \"permissions\": \"read-only\"\n    }\n  ]\n}\n```\n\n### Override precedence\n\n```text\ndefault -> longest matching directory -> matching model -> matching rule\n```\n\nModel overrides win over directory overrides. **Rules win over everything** (they combine path + model pattern). Env vars win over all file-based config.\n\n### Rules\n\nRules are the most specific override. Each rule has:\n\n- `path` \u2014 directory scope (applies to this directory and all subdirectories unless overridden)\n- `modelPattern` \u2014 optional regex matched against `<provider>/<model>` identifiers\n- `containerTag`, `enabled`, `maxRecall`, etc. \u2014 same fields as other overrides\n- `permissions` \u2014 `\"read-only\"`, `\"write-only\"`, or `\"read-write\"` (default)\n\nWhen `permissions` is set, it controls whether the extension can search (read) and/or save (write) memories:\n\n- `read-only` \u2014 search works, save is blocked\n- `write-only` \u2014 save works, search is blocked\n- `read-write` \u2014 both work (default)\n\nIf a subfolder defines its own rule, it overrides the parent rule.\n\n## Behavior\n\n- Injects relevant Supermemory search results into Pi context before the model runs (if `autoRecall` is enabled and read is permitted).\n- Captures completed user/assistant turns back to the same Supermemory container (if `autoCapture` is enabled and write is permitted).\n- Uses `captureMode: \"signal\"` by default to reduce Supermemory UI clutter: explicit memory requests, durable preferences/decisions, and completed implementation summaries are captured, while low-signal command chatter is skipped.\n- Skips assistant thinking blocks and strips injected Supermemory context before saving, so recalled memories do not recursively re-enter storage.\n- Set `captureMode: \"all\"` to restore legacy every-turn capture for a project, model, or rule.\n- Splits oversized direct-memory writes into ordered chunks under Supermemory's per-memory content limit.\n- Reports auto-capture save failures as concise warnings instead of surfacing extension stack traces.\n- Registers tools:\n  - `supermemory_search`\n  - `supermemory_save`\n  - `supermemory_save_file`\n  - `supermemory_status`\n- Registers command:\n  - `/supermemory status`\n  - `/supermemory search <query>`\n  - `/supermemory save <content>`\n  - `/supermemory save-file <path> [containerTag]`\n\n## Local development\n\n```sh\nnpm install\nnpm test\nnpm run typecheck\n```\n\nThe repo includes `.pi/extensions/pi-supermemory/index.ts` so Pi's `DefaultResourceLoader` can discover the extension locally.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "supermemory",
+    "memory"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/ramarivera/pi-supermemory#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ramarivera/pi-supermemory.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-03T11:37:04.623Z",
+    "modified": "2026-05-30T02:17:21.584Z",
+    "0.1.0": "2026-05-03T11:37:04.830Z",
+    "0.1.1": "2026-05-03T11:42:10.064Z",
+    "0.2.0": "2026-05-03T12:14:30.368Z",
+    "0.3.0": "2026-05-07T02:20:48.192Z",
+    "0.3.1": "2026-05-07T03:04:15.292Z",
+    "0.4.0": "2026-05-07T04:20:30.510Z",
+    "0.4.1": "2026-05-07T05:51:31.259Z",
+    "0.4.2": "2026-05-09T14:17:53.400Z",
+    "0.4.3": "2026-05-14T04:22:54.457Z",
+    "0.4.4": "2026-05-30T02:17:21.318Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": 48,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 352
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 631
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 167
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 31
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 217
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 56
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 28
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 48
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

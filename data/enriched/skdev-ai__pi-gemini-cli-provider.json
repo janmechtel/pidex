@@ -1,0 +1,41 @@
+{
+  "name": "@skdev-ai/pi-gemini-cli-provider",
+  "latest_version": "0.1.2",
+  "description": "Gemini LLM provider for Pi/GSD via A2A protocol with MCP tool bridge",
+  "readme": "# pi-gemini-cli-provider\n\nA [GSD-2](https://github.com/gsd-build/gsd-2) extension that adds Google Gemini as an LLM provider, routing model calls through Google's Gemini CLI via the A2A (Agent-to-Agent) protocol.\n\nUse Gemini models (Flash, Pro) inside GSD with full tool support \u2014 the same tools available in GSD-2 work with Gemini, plus Gemini's native `google_web_search` and `web_fetch` capabilities.\n\n## Why This Approach\n\nGoogle's Gemini CLI includes an A2A server that exposes Gemini models over HTTP with tool calling support. This extension bridges that server into GSD's provider system, giving you:\n\n- **No API key needed** \u2014 uses your existing Google AI Pro subscription via Gemini CLI OAuth\n- **Full tool support** \u2014 GSD's tools (Read, Edit, Bash, Grep, etc.) are exposed to the model via MCP\n- **Native search and fetch** \u2014 Gemini's built-in `google_web_search` and `web_fetch` run server-side with no extra setup\n- **Multi-turn context** \u2014 conversation history maintained per A2A task; GSD session resets (`/clear`, `/new`, workflow steps) start fresh tasks\n- **Shared server** \u2014 one A2A server process shared across all GSD sessions, survives GSD exit\n\n**Approach to ToS:** The extension spawns official Google binaries (`@google/gemini-cli-a2a-server`) using the same OAuth credentials as regular Gemini CLI usage. All communication uses Google's own A2A protocol. See the [search extension's ToS discussion](https://github.com/skdev-ai/pi-gemini-cli-search#why-this-approach) for details.\n\n> **DISCLAIMER:** Google's [ToS](https://geminicli.com/docs/resources/tos-privacy/) regarding third-party access to Gemini CLI services is ambiguous. A Google maintainer has [indicated](https://github.com/google-gemini/gemini-cli/discussions/22970#discussioncomment-16198982) that ACP-based integration \"sounds like a legitimate use,\" but this is not a policy commitment. **Use at your own risk.**\n\n## Prerequisites\n\n- **Gemini CLI** installed globally: `npm install -g @google/gemini-cli`\n- **Google OAuth** authenticated: run `gemini` once to complete browser auth flow\n- **[GSD-2](https://github.com/gsd-build/gsd-2)** (v2.30.0+)\n\n## Installation\n\n```bash\ncurl -fsSL https://raw.githubusercontent.com/skdev-ai/pi-gemini-cli-provider/main/install.sh | bash\n```\n\nOr manually:\n\n```bash\ncd ~/.pi/agent/extensions\ngit clone https://github.com/skdev-ai/pi-gemini-cli-provider.git\ncd pi-gemini-cli-provider\nnpm install\n```\n\n### Setup\n\n1. Start GSD\n2. Run `/gemini-cli install-a2a` to install and patch the A2A server\n3. Select a Gemini model from the model picker (e.g., `gemini-2.5-flash`, `gemini-2.5-pro`)\n\n## How It Works\n\nThe extension registers Gemini models as GSD LLM providers. When you select a Gemini model:\n\n1. **Server startup** \u2014 The A2A server is spawned (or reused if already running from another session)\n2. **Prompt routing** \u2014 Your prompt is sent to the A2A server via HTTP SSE\n3. **Tool calling** \u2014 GSD's active tools are exported as MCP schemas to the A2A server. When Gemini calls a tool, the extension hands it back to GSD for execution, then reinjects the result\n4. **Native tools** \u2014 Gemini's `google_web_search` and `web_fetch` run server-side automatically. Results are displayed inline with resolved source URLs\n\n### Tool Flow\n\n```\nYou type a prompt\n  -> Extension sends to A2A server (HTTP SSE)\n  -> Gemini processes, may call tools:\n      MCP tools (Read, Edit, Bash, etc.)\n        -> Extension returns to GSD -> GSD executes -> result reinjected\n      Native tools (google_web_search, web_fetch)\n        -> Gemini executes server-side -> results displayed inline\n  -> Final response streamed back to GSD\n```\n\n### A2A Server\n\nThe A2A server runs as a detached process shared across all GSD sessions. First session spawns it, subsequent sessions detect and reuse it via health check. The server persists after GSD exits.\n\nThe `/gemini-cli install-a2a` command installs `@google/gemini-cli-a2a-server` globally and applies required patches for tool approval flow, result reinjection, and model override support.\n\n**Version pinning:** The extension requires `@google/gemini-cli-a2a-server@0.34.0` specifically. The `/gemini-cli install-a2a` command pins this version and applies required patches to the bundle. Do not update the A2A server package independently \u2014 newer versions will break patch compatibility and may change internal APIs. Wait for an extension update that supports the new version.\n\n### Commands\n\n| Command | Description |\n|---|---|\n| `/gemini-cli install-a2a` | Install and patch the A2A server |\n| `/gemini-cli server start` | Start the A2A server |\n| `/gemini-cli server stop` | Stop the A2A server |\n| `/gemini-cli server restart` | Restart the A2A server |\n| `/gemini-cli server status` | Show server status and uptime |\n\n## Models\n\nAny model available through the Gemini API can be selected from GSD's model picker.\n\n**Rate limiting:** Starting March 25, 2026, Google has implemented [aggressive rate limiting](https://github.com/google-gemini/gemini-cli/discussions/22970) for Pro models, even for paying accounts.\n\n## Known Limitations\n\n- **Context window overflow**: The A2A server accumulates conversation history per task with no compaction. Gemini models have 1M token context windows. Very long sessions may eventually hit this limit, resulting in an API error. Start a new session (`/clear`) to reset.\n- **No token usage reporting**: The A2A protocol does not expose token usage metadata. GSD's auto-compaction cannot trigger based on context fullness.\n- **Gemini rate limiting**: Google has implemented aggressive rate limiting for Pro models. Flash models are less affected. When rate-limited, the model response may take 60-120 seconds.\n\n## Architecture\n\nSee [ARCHITECTURE.md](ARCHITECTURE.md) for technical details on the A2A protocol integration, MCP tool bridge, native tool handling, and server patches.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "gsd",
+    "extension",
+    "gemini-cli",
+    "llm",
+    "provider",
+    "a2a",
+    "mcp"
+  ],
+  "author": {
+    "name": "skdev-ai"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/skdev-ai/pi-gemini-cli-provider#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/skdev-ai/pi-gemini-cli-provider.git"
+  },
+  "pi": {
+    "extensions": [
+      "src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-20T10:26:14.853Z",
+    "modified": "2026-03-31T06:43:25.664Z",
+    "0.0.1": "2026-03-20T10:26:15.186Z",
+    "0.1.0": "2026-03-30T15:55:39.031Z",
+    "0.1.2": "2026-03-31T06:43:25.555Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 64,
+  "download_trend": []
+}

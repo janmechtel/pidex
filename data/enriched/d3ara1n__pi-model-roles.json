@@ -1,0 +1,34 @@
+{
+  "name": "@d3ara1n/pi-model-roles",
+  "latest_version": "0.3.0",
+  "description": "Model role configuration library for pi extensions \u2014 defines named model roles and resolves them to Model instances",
+  "readme": "# @d3ara1n/pi-model-roles\n\nModel role configuration library for [pi](https://github.com/earendil-works/pi) extensions.\n\nDefines named model roles (e.g. \"heavy\", \"fast\", \"utility\") and resolves them to pi `Model` instances with API key and headers.\n\n## What it does\n\n- Reads role definitions from `~/.pi/agent/settings.json` \u2192 `modelRoles` field\n- Resolves role names to `Model<Api>` instances via pi's `ModelRegistry`\n- Exposes a `ModelRolesAPI` singleton for other extensions to consume via direct import\n- **Pure library**: no tools, no commands, no event hooks\n\n## Installation\n\n```bash\npi extension add @d3ara1n/pi-model-roles\n```\n\n## Default Roles\n\nWorks out of the box \u2014 no configuration required.\nBuilt-in defaults use `model: null` (use pi's current model, don't switch):\n\n| Role | model | thinking | Description |\n|------|-------|----------|-------------|\n| `default` | null | medium | Regular dev tasks: new features, code edits, code review, adding tests, general debugging, single-file changes |\n| `heavy` | null | high | Deep-thinking tasks: cross-file refactoring, architecture design, complex bug debugging, performance optimization, security analysis, DB schema changes, multi-module migrations |\n| `fast` | null | low | Simple deterministic tasks: one-line edits, formatting, simple Q&A, doc lookups, git operations, confirmations |\n| `utility` | null | off | Lightweight utility tasks: routing, commit gen, title summarization |\n\n`model: null` means \"keep using whatever model pi currently has\".\nOnly `thinking` level differs between roles by default.\n\nCustom roles can be added freely \u2014 any role name works:\n\n## Configuration\n\nOverride specific roles in `~/.pi/agent/settings.json`:\n\n```jsonc\n{\n  \"modelRoles\": {\n    \"roles\": {\n      \"heavy\": {\n        \"model\": \"anthropic/claude-opus-4\"\n      },\n      \"fast\": {\n        \"model\": \"google/gemini-2.5-flash\",\n        \"thinking\": \"off\"\n      },\n      // Lightweight utility tasks (routing, commit generation, etc.)\n      \"utility\": {\n        \"model\": \"deepseek/deepseek-v4-flash\",\n        \"thinking\": \"off\"\n      }\n    },\n    \"defaultRole\": \"default\"\n  }\n}\n```\n\nUser settings **merge** with built-in defaults: only override roles you want to change.\nYou can also add entirely new roles.\n\n### Hidden roles\n\nRoles with `hidden: true` (like `utility` by default) are excluded from scout's role\nselection list \u2014 the side agent won't suggest switching to them. They can still be\nused directly by name (e.g. as `sideAgentRole` in scout config) and resolved via\n`resolveRole()` / `resolveRoleAsync()`.\n\n### Role fields\n\n| Field | Type | Default | Description |\n|-------|------|---------|-------------|\n| `model` | `string \\| null` | `null` | `\"provider/model-id\"` or `null` = use current model |\n| `thinking` | `string` | | `\"off\"` `\"minimal\"` `\"low\"` `\"medium\"` `\"high\"` `\"xhigh\"` |\n| `description` | `string` | | Human-readable description |\n| `tools` | `string` | | Comma-separated default tool list |\n| `hidden` | `boolean` | `false` | Hide from user-facing listings |\n| `systemPromptAppend` | `string` | | Extra system prompt content |\n\n## API (for extension authors)\n\n```typescript\nimport { getModelRolesAPI } from \"@d3ara1n/pi-model-roles\";\nimport type { ModelRolesAPI } from \"@d3ara1n/pi-model-roles\";\n\nconst roles: ModelRolesAPI = getModelRolesAPI();\n\n// Resolve a role \u2014 always returns a real model or undefined\nconst resolved = await roles.resolveRoleAsync(\"heavy\");\nif (resolved.model) {\n  // Use resolved.model, resolved.apiKey, resolved.headers\n  // model=null in config is transparently resolved to pi's current model\n} else {\n  // Model not available\n}\n\n// Reverse lookup\nroles.findRoleByModel(\"anthropic/claude-opus-4\"); // \"heavy\"\n\n// \"Which role is the currently-active model?\" \u2014 recognizes the default role\n// even when all roles are model=null (the common case), so callers (e.g.\n// pi-scout's router) have a real baseline instead of \"unknown\".\nroles.getCurrentRole(\"anthropic/claude-sonnet-4\");\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/d3ara1n/pi-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/d3ara1n/pi-extensions.git",
+    "directory": "packages/pi-model-roles"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-05T08:09:39.813Z",
+    "modified": "2026-06-24T06:43:43.011Z",
+    "0.1.0": "2026-06-05T08:09:40.266Z",
+    "0.2.0": "2026-06-06T11:19:12.144Z",
+    "0.2.1": "2026-06-24T03:22:20.037Z",
+    "0.3.0": "2026-06-24T06:43:42.741Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 376,
+  "download_trend": []
+}

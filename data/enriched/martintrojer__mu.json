@@ -1,0 +1,354 @@
+{
+  "name": "@martintrojer/mu",
+  "latest_version": "0.4.5",
+  "description": "A persistent, observable crew of pi agents running in one tmux session per workstream, coordinated through a built-in task DAG.",
+  "readme": "# mu\n\n**A small, opinionated control plane for a crew of AI coding agents\nworking in parallel.** Tmux panes, a typed task DAG, isolated VCS\nworkspaces per agent, an audit log \u2014 and a dashboard for seeing what\nthe crew is doing right now.\n\n![mu dashboard](docs/img/tui-dashboard.png)\n\n*`mu` (no args) \u2014 read-only dashboard: agents, tracks, ready /\nin-progress / blocked tasks, log tail, workspaces, doctor.*\n\nThe core loop is: plan work as a DAG, spawn a small crew, and watch\nhandoffs happen in tmux:\n\n```bash\nmu workstream init auth-refactor\nmu task add --title \"Design auth\" --impact 80 --effort-days 2\nmu task add --title \"Build auth\"  --impact 80 --effort-days 5 --blocked-by design_auth\n\nmu agent spawn worker-1 --workspace\nmu agent send worker-1 'Pick up the next ready task and design the auth module.'\nmu                         # dashboard\n```\n\nNeed one quick helper without the DAG? `mu agent spawn scout-1 -w\nscratch` gives you a low-ceremony agent you can still send/read/wait\non.\n\nNothing here is a black box. Agents are tmux panes you can `tmux\nattach` to, tasks live in a SQLite DAG, and workspaces are real jj\nworkspaces / sl shares / git worktrees on disk. **mu persists state\nand coordinates handoffs; the model still decides what to do.**\n\nFor the full copy-paste flow, see [Quick start](#quick-start).\n\n---\n\n## What mu is\n\n- **Parallelism that doesn't trip over itself.** Per-agent VCS\n  workspaces plus a real task DAG with deterministic parallel-track\n  detection keep agents off each other's toes.\n- **A durable coordination layer.** One SQLite registry records\n  agents, tasks, ownership, notes, events, snapshots, and workspaces;\n  panes can die and humans can come back later.\n- **Stay out of the model's way.** Mu coordinates handoffs; it does\n  not choose models, providers, or thinking effort. `--cli <key>`\n  uppercases to `$MU_<KEY>_COMMAND`, so your shell rc owns the agent\n  command.\n- **Scriptable without scraping text.** Every read path that matters has\n  `--json`, and every state change goes through a typed CLI verb; the\n  dashboard is for humans, not the API.\n- **A low-ceremony escape hatch.** The reserved `scratch` workstream\n  is there when you want one driveable helper without committing to a\n  full task graph.\n\n## What mu is NOT\n\n- **Not a build tool.** mu doesn't compile, test, or deploy\n  anything.\n- **Not a chat protocol.** Agents communicate via the work graph\n  and the activity log, never agent-to-agent messaging.\n- **Not a verifier.** `task close --evidence \"tests pass\"` records\n  the claim; mu doesn't run the tests.\n- **Not a replacement for [pi-subagents](https://github.com/nicobailon/pi-subagents).**\n  Mu agents are driveable tmux panes; pi-subagents is for one-shot\n  focused delegation. See [vs `pi-subagents`](#vs-pi-subagents).\n- **Not a hosted service.** Local-first SQLite.\n- **DB-undoable, not tmux-undoable.** Every destructive verb\n  auto-captures a whole-DB snapshot first; `mu undo --yes` restores\n  the DB. Killed panes and freed workspace dirs are NOT replayed.\n\n---\n\n## When mu earns its overhead\n\n**Use mu for** \u2014 multi-phase investigations; tasks worth gating with\nreview; parallel audit or implementation/reviewer splits with isolated\nworkspaces; anything where \"what was decided and why\" needs to outlive\na single agent's scrollback. Use `scratch` for the lighter adjacent\ncase: one helper or background watcher you still want to drive and\nobserve.\n\n**Don't use mu for** \u2014 tiny direct edits; quick local inspection;\none-shot focused delegation where you only need a returned answer\n(use `pi-subagents`); single-context work where durable coordination\nadds ceremony.\n\n---\n\n## Install\n\n```bash\n# 1. The CLI.\nnpm install -g @martintrojer/mu\nmu --version\n\n# 2. The skill (teaches your coding agent how to drive mu).\nnpx skills add martintrojer/mu          # auto-detects pi / claude-code / codex / etc.\n# Add -g to install globally (~/.<agent>/skills/), -y to skip prompts.\n```\n\n**Requirements:**\n- Node 20, 22, or 23 (LTS recommended; see `.nvmrc`). Node 24+ is\n  currently blocked by a `better-sqlite3` native-build incompatibility.\n- tmux \u2265 3.0 (`mu doctor` checks)\n- pi (the agent CLI mu orchestrates)\n- For `--workspace`: jj, sl, or git on PATH (or `--backend none`)\n\n**Update:** `npm install -g @martintrojer/mu@latest` for the CLI;\n`npx skills update mu` for the skill.\n\n**Install from source** (hacking on mu itself):\n\n```bash\ngit clone https://github.com/martintrojer/mu\ncd mu\nnpm install -g .                        # `prepare` script auto-builds; `mu` lands on $PATH\nnpx skills add ./skills/mu              # local-path source format\n```\n\nMore install patterns (alias-to-dist for fastest dev iteration) in\n[docs/USAGE_GUIDE.md \u00a7 1 Setup](docs/USAGE_GUIDE.md#1-setup).\n\n---\n\n## TUI dashboard\n\nBare `mu` in a TTY launches the flagship read-only dashboard across\nall workstreams; `mu state --tui -w <workstream>` is the explicit\nsingle/multi-workstream form. Non-TTY callers and scripts keep the\nstatic/help path, and `mu state --json` is the API.\n\nThe dashboard has ten cards: Commits, Agents, Tracks, Ready, Activity\nlog, Workspaces, In-progress, Blocked, Recent, and Doctor. Drill into\nany numbered card fullscreen with `Shift+0`-`Shift+9`; `g` opens the\nfull DAG and `t` opens the all-tasks list. `?` shows the complete\nkeymap. Keyboard and mouse both work: navigate with keys, double-click\ncards or rows to drill, and scroll popup bodies with the mouse wheel.\n\nThe TUI is read-only by design. `y` yanks the canonical `mu` command\nfor the focused row to your clipboard; you run it in a shell, so every\nmutation still goes through a short-lived typed CLI invocation. The\none exception is user-driven: `t` inside a commit/show drill suspends\nmu's alt-screen and hands off to `tuicr -r <sha>`, then restores the\ndashboard when tuicr exits.\n\n---\n\n## Quick start\n\n```bash\n# Make sure you're inside tmux.\ntmux\n\n# Initialize the workstream (creates tmux session mu-auth-refactor)\nmu workstream init auth-refactor\n\n# Plan the work as a DAG. IDs auto-derive from titles.\nmu task add --title \"Design auth module\" --impact 80 --effort-days 2\nmu task add --title \"Build auth\"         --impact 80 --effort-days 5 --blocked-by design_auth_module\nmu task add --title \"Review auth\"        --impact 60 --effort-days 1 --blocked-by build_auth\n\n# Spawn a crew with isolated workspaces.\nmu agent spawn worker-1   --workspace\nmu agent spawn reviewer-1 --workspace --role read-only\n\n# Human home base: interactive read-only TUI across every workstream\n# (same dashboard is explicit with: mu state --tui -w auth-refactor).\nmu\n\n# Agent/script API: static state stays explicit and JSON-friendly.\nmu state -w auth-refactor --json\n\n# Inside an agent's pane, the agent claims and closes tasks\n# without ever knowing its own name (mu reads $TMUX_PANE).\nmu task claim design_auth_module\nmu task note  design_auth_module \"DECISION: JWT, 24h expiry, refresh via cookie\"\nmu task close design_auth_module --evidence \"design doc reviewed by reviewer-1\"\n\n# Subscribe to events instead of polling.\nmu log --tail\n\n# Cleanup (auto-snapshots + auto-exports the conversation first).\nmu workstream destroy --yes\n```\n\nFull tour: [docs/USAGE_GUIDE.md](docs/USAGE_GUIDE.md), including the\nexpanded [dashboard/state guide](docs/USAGE_GUIDE.md#5-see-the-graph-dashboard--state-api).\n\n---\n\n## Portability and handoff\n\nState lives in one SQLite DB, so it travels. `mu db export <file>`\nwrites a consistent whole-DB copy plus a manifest sidecar; `mu db\nimport <file>` ships it back, with per-workstream drift detection\n(dry-run by default; `--apply` commits) and a sharp `--force-source`\nthat parks the loser to a sidecar before clobbering. Hard rule: don't\nedit the same workstream on two machines concurrently.\n\nFor humans / git / docs, `mu workstream export` and `mu archive\nexport` render a workstream (or an archive bucket) as Markdown:\nper-task `.md` files plus an `INDEX.md`, suitable for committing,\nreviewing, or pasting. Bucket exports are read-only artifacts; the\nlossless un-archive path back into a live workstream is `mu archive\nrestore <label> --as <new-ws>`.\n\n---\n\n## vs `pi-subagents`\n\n|                          | [`pi-subagents`](https://github.com/nicobailon/pi-subagents) | `mu` |\n| ------------------------ | -------------------------------------------------------- | ---- |\n| Best for                 | \"Send this focused task to a specialist, return a result\" | \"Keep a driveable agent/persistent crew in tmux\" |\n| Lifetime                 | one-shot per task                                        | from off-the-cuff `scratch` helper to long-lived crew |\n| Substrate                | `pi` subprocess + result files                           | tmux panes running pi sessions |\n| Built-in task graph      | no                                                       | yes: parallel-tracks union-find with diamond-merge |\n| Drivable from outside pi | no (extension-only)                                      | yes (`mu` is a real CLI) |\n\nThe two play well together. Use `pi-subagents` when you want one\nfocused answer back. Use mu's reserved `scratch` workstream when you\nwant a low-ceremony helper you can keep talking to. For coordinated\nmulti-agent work, graduate from `scratch` to a named workstream + task\nDAG. See [docs/USAGE_GUIDE.md](docs/USAGE_GUIDE.md).\n\n---\n\n## Documentation\n\n- **[docs/USAGE_GUIDE.md](docs/USAGE_GUIDE.md)** \u2014 practical tour\n  of every verb. **Start here.**\n- **[skills/mu/SKILL.md](skills/mu/SKILL.md)** \u2014 what an LLM\n  running inside an agent pane sees: the in-pane working loop,\n  subscribe-vs-poll pattern.\n- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** \u2014 module map,\n  reconciliation algorithm, schema seam (surrogate INTEGER PKs +\n  the SDK boundary discipline).\n- **[docs/VOCABULARY.md](docs/VOCABULARY.md)** \u2014 canonical terms;\n  source of truth for every word in code, docs, error messages.\n- **[docs/VISION.md](docs/VISION.md)** \u2014 the load-bearing pillars\n  + the prior-runtime retrospective.\n- **[docs/ROADMAP.md](docs/ROADMAP.md)** \u2014 what's next + the\n  anti-feature pledges + explicitly-rejected ideas.\n- **[CHANGELOG.md](CHANGELOG.md)** \u2014 release notes.\n\n## License\n\nMIT.\n",
+  "keywords": [
+    "tmux",
+    "agents",
+    "ai",
+    "orchestration",
+    "task-graph",
+    "pi-coding-agent",
+    "pi-package"
+  ],
+  "author": {
+    "name": "Martin Trojer",
+    "email": "martin.trojer@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/martintrojer/mu",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/martintrojer/mu.git"
+  },
+  "pi": {},
+  "time": {
+    "created": "2026-05-11T06:58:43.855Z",
+    "modified": "2026-06-10T07:38:54.928Z",
+    "0.3.1": "2026-05-11T06:58:44.144Z",
+    "0.3.2": "2026-05-11T09:30:59.858Z",
+    "0.4.0": "2026-05-14T07:33:03.917Z",
+    "0.4.1": "2026-05-14T12:37:50.836Z",
+    "0.4.2": "2026-05-17T16:18:59.384Z",
+    "0.4.3": "2026-05-23T09:28:16.740Z",
+    "0.4.4": "2026-05-30T09:50:00.689Z",
+    "0.4.5": "2026-06-10T07:38:54.809Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 29,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 243
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 454
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 177
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 206
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 82
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 35
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 37
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 3
+    }
+  ]
+}

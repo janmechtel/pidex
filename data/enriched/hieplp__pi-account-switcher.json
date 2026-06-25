@@ -1,0 +1,351 @@
+{
+  "name": "@hieplp/pi-account-switcher",
+  "latest_version": "0.3.1",
+  "description": "Pi extension for quickly switching between multiple accounts/API keys per provider.",
+  "readme": "# Pi Account Switcher\n\n> Switch between multiple API keys and accounts \u2014 per provider \u2014 inside Pi. No more manual env-var juggling.\n\n```\nclaude/work  \u00b7  claude/personal  \u00b7  openai/team  \u00b7  gemini/testing\n```\n\n---\n\n## Install\n\n**From GitHub (recommended)**\n\n```bash\npi install git:github.com/hieplp/pi-account-switcher\n```\n\n**From npm**\n\n```bash\npi install npm:@hieplp/pi-account-switcher\n```\n\n**Test without installing**\n\n```bash\npi -e git:github.com/hieplp/pi-account-switcher\n```\n\n**Project-local install** (writes to `.pi/settings.json`)\n\n```bash\npi install -l git:github.com/hieplp/pi-account-switcher\n```\n\n**Run from a local checkout**\n\n```bash\nnpm install\npi -e ./src/extension.ts\n```\n\nAfter installing, reload Pi and add your first account:\n\n```\n/reload\n/accounts:add\n```\n\n### Local development command prefix\n\nIf you have the npm package installed and also run a local checkout, set `PI_ACCOUNT_SWITCHER_COMMAND_PREFIX` before launching Pi to avoid command-name collisions:\n\n```bash\nPI_ACCOUNT_SWITCHER_COMMAND_PREFIX=dev pi -e ./src/extension.ts\n```\n\nThe local commands will be registered as `/dev:accounts:list`, `/dev:accounts:add`, etc. The prefix may include the trailing colon (`dev:`) or omit it (`dev`).\n\n---\n\n## Commands\n\n### Accounts\n\n| Command              | Description                                                     |\n| -------------------- | --------------------------------------------------------------- |\n| `/accounts:add`      | Add a new account interactively                                 |\n| `/accounts:switch`   | Switch to any account (interactive picker or by ID)             |\n| `/accounts:peers`    | Switch to another account within the current provider           |\n| `/accounts:subagent` | Set account for the next spawned subagent                       |\n| `/accounts:edit`     | Edit label, provider, id, or credential source                  |\n| `/accounts:remove`   | Delete an account                                               |\n| `/accounts:oauth`    | Import the current Pi `/login` OAuth session as a named account |\n| `/accounts:dirs`     | Manage working directories for CWD-based auto-select            |\n\n### Providers\n\n| Command             | Description                      |\n| ------------------- | -------------------------------- |\n| `/providers:add`    | Add a reusable custom provider   |\n| `/providers:list`   | List custom providers            |\n| `/providers:edit`   | Edit a custom provider           |\n| `/providers:remove` | Remove an unused custom provider |\n\n### Models\n\n| Command          | Description                                              |\n| ---------------- | -------------------------------------------------------- |\n| `/models:list`   | List all available models and switch to the selected one |\n| `/models:add`    | Add a custom model config to the current provider        |\n| `/models:remove` | Remove a custom model config                             |\n\n### System\n\n| Command          | Description                                              |\n| ---------------- | -------------------------------------------------------- |\n| `/system:reset`  | Delete all accounts, providers, and state                |\n| `/system:export` | Export all accounts, providers, and state to a JSON file |\n| `/system:import` | Import accounts, providers, and state from a JSON file   |\n\n---\n\n## Adding Accounts\n\nRun `/accounts:add` and the wizard will ask for:\n\n1. **Provider** \u2014 pick a built-in or custom provider\n2. **Label** \u2014 a friendly display name (e.g. `Claude \u2014 Work`)\n3. **Account ID** \u2014 a unique slug (e.g. `claude-work`)\n4. **Credential env var** \u2014 e.g. `ANTHROPIC_API_KEY`\n5. **Secret source** \u2014 one of:\n   - Pasted API key (stored in plaintext \u2014 prefer the options below)\n   - Existing environment variable\n   - File path\n   - Shell command\n   - 1Password `op://` reference\n\nIf the account ID already exists, Pi will ask whether to replace it, enter a new ID, or cancel.\n\n---\n\n## OAuth Accounts (Claude, Codex, etc.)\n\nFor subscription providers, use Pi's built-in login first, then import it as a named account:\n\n```\n/login\n```\n\nComplete browser/device login, then:\n\n```\n/accounts:oauth\n```\n\nGive it a label like `Claude \u2014 Work`. Repeat for as many accounts as you need \u2014 each gets its own saved credentials. Switch between them any time with `/accounts:switch`.\n\nOAuth credentials are read from `~/.pi/agent/auth.json` and written back to Pi's live auth storage on switch.\n\n---\n\n## Directory-based Auto-Select\n\nThe extension can automatically activate the right account based on your current working directory. Each account can list directory paths (`dirs`) \u2014 the longest prefix match wins. A `defaultAccountId` at the config level serves as the fallback. Use `/accounts:dirs` to manage directories interactively.\n\nSee **USAGE.md** for full details on the activation cascade, configuration, and examples.\n\n---\n\n## Custom Providers\n\nDefine a provider once, reuse it across accounts:\n\n```\n/providers:add\n```\n\nCustom providers are stored at `~/.pi/account-switcher/providers.json` and support all Pi model-provider fields:\n\n```json\n{\n  \"providers\": {\n    \"acme\": {\n      \"name\": \"Acme AI\",\n      \"baseUrl\": \"https://api.acme.test/v1\",\n      \"api\": \"openai-completions\",\n      \"apiKey\": \"ACME_API_KEY\",\n      \"envKeys\": [\"ACME_API_KEY\"],\n      \"aliases\": [\"acme-ai\"],\n      \"models\": [{ \"id\": \"acme-coder\", \"name\": \"Acme Coder\" }]\n    }\n  }\n}\n```\n\n> Removing a provider is blocked while any account uses it \u2014 edit or remove those accounts first.\n\n---\n\n## Export / Import\n\nBack up or migrate your full configuration with two commands:\n\n```\n/system:export          # prompts for a path, defaults to ~/pi-account-switcher-export.json\n/system:export ~/backup.json  # export to a specific path\n```\n\nThe export file contains all accounts, providers, and active-selection state as a single JSON bundle. To restore on another machine (or after a reset):\n\n```\n/system:import          # prompts for a path, defaults to ~/pi-account-switcher-export.json\n/system:import ~/backup.json  # import from a specific path\n```\n\n> **Warning:** import replaces all existing data. A confirmation prompt is shown before anything is written.\n\n---\n\n## Config Reference\n\n### Accounts \u2014 `~/.pi/account-switcher/accounts.json`\n\n```json\n{\n  \"switchMode\": \"env\",\n  \"defaultAccountId\": \"claude-work\",\n  \"accounts\": [\n    {\n      \"id\": \"claude-work\",\n      \"label\": \"Claude \u2014 Work\",\n      \"provider\": \"anthropic\",\n      \"dirs\": [\"/home/user/Development/Work\"],\n      \"env\": {\n        \"ANTHROPIC_API_KEY\": { \"type\": \"env\", \"name\": \"ANTHROPIC_WORK_API_KEY\" }\n      }\n    },\n    {\n      \"id\": \"openai-personal\",\n      \"label\": \"OpenAI \u2014 Personal\",\n      \"provider\": \"openai\",\n      \"dirs\": [\"/home/user/Projects/Client-A\"],\n      \"env\": {\n        \"OPENAI_API_KEY\": { \"type\": \"file\", \"path\": \"~/.keys/openai-personal.txt\" }\n      }\n    }\n  ]\n}\n```\n\n### Secret Sources\n\n```json\n{ \"type\": \"literal\", \"value\": \"sk-...\" }\n{ \"type\": \"env\",     \"name\": \"MY_API_KEY\" }\n{ \"type\": \"file\",    \"path\": \"~/.keys/key.txt\" }\n{ \"type\": \"command\", \"command\": \"op read op://AI/Claude/api-key\" }\n{ \"type\": \"op\",      \"reference\": \"op://AI/Claude/api-key\" }\n```\n\nA plain string is treated as a literal; strings starting with `op://` are resolved via `op read`.\n\n### State \u2014 `~/.pi/account-switcher/state.json`\n\nTracks the selected account and model **per Pi session**. Each Pi session gets its own key \u2014 no global active-account state.\n\n```json\n{\n  \"sessions\": {\n    \"abc123\": { \"activeAccountId\": \"claude-work\" },\n    \"def456\": { \"activeAccountId\": \"openai-personal\", \"activeModelId\": \"gpt-4\", \"activeModelProvider\": \"openai\" }\n  }\n}\n```\n\nWhen Pi starts, the extension derives a session key from Pi's session file and restores that session's saved state. Sessions with no saved state fall back to CWD-based auto-select or `defaultAccountId`.\n\nLegacy flat-format state (`{ \"activeAccountId\": \"...\" }`) is automatically migrated to the session-keyed format on first load.\n\nSession entries are automatically cleaned up: entries inactive for `stateCleanupDays` (default 30, configurable in `accounts.json`) are pruned, with a hard cap of 500 entries.\n\n---\n\n## Credential Caching\n\nOn switch, the extension updates `process.env`, Pi's live API-key overrides, and Pi's OAuth auth storage. If a provider still uses old credentials, run `/reload` or restart Pi.\n\n---\n\n## License\n\nMIT \u2014 see [LICENSE](./LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "account-switcher"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/hieplp/pi-account-switcher#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hieplp/pi-account-switcher.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-10T09:00:52.929Z",
+    "modified": "2026-06-19T02:09:27.672Z",
+    "0.2.0": "2026-05-10T09:00:53.175Z",
+    "0.2.1": "2026-05-10T09:59:18.493Z",
+    "0.2.2": "2026-05-11T03:46:28.957Z",
+    "0.2.3": "2026-06-01T02:20:56.972Z",
+    "0.2.4": "2026-06-01T02:39:10.803Z",
+    "0.3.0": "2026-06-19T01:52:08.071Z",
+    "0.3.1": "2026-06-19T02:09:27.357Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": 302,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 396
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 26
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 24
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 309
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 58
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 27
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 302
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 3
+    }
+  ]
+}

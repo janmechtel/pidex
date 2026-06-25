@@ -1,0 +1,364 @@
+{
+  "name": "@ifi/pi-spec",
+  "latest_version": "0.5.1",
+  "description": "Native spec-kit workflow for pi with a /spec command, TypeScript scaffolding, and spec-driven prompts.",
+  "readme": "# @ifi/pi-spec\n\nNative spec-driven workflow for pi, inspired by [github/spec-kit](https://github.com/github/spec-kit).\n\n`@ifi/pi-spec` is a **pi extension package**, not a shell wrapper and not a general-purpose JavaScript\nlibrary. Its job is to bring the core spec-kit workflow into pi as a native TypeScript experience:\n\n- one `/spec` command instead of a pile of separate commands and shell entrypoints\n- deterministic local scaffolding under `.specify/`\n- deterministic feature artifacts under `specs/###-feature-name/`\n- native git/repo detection, branch naming, and feature numbering in TypeScript\n- prompt handoff back into pi via `pi.sendUserMessage(...)`\n- project-owned templates that can be customized locally after initialization\n\nThe package deliberately keeps the **mental model** of spec-kit, but replaces its shell orchestration with\nnormal pi tools and normal pi conversations.\n\n## Install\n\n```bash\npi install npm:@ifi/pi-spec\n```\n\nOr install the full oh-pi bundle:\n\n```bash\nnpx @ifi/oh-pi\n```\n\n---\n\n## Purpose\n\nThe purpose of this package is to make **spec-first development** feel native inside pi.\n\nIn practice that means:\n\n1. **Requirements come first**\n   - You write or refine a spec before planning and implementation.\n2. **The workflow is explicit**\n   - `/spec:specify`, `/spec:plan`, `/spec:tasks`, `/spec:implement` are separate steps with clear outputs.\n3. **The repository owns the workflow state**\n   - Important artifacts live in normal files in your repo, not in hidden runtime state.\n4. **Pi stays in control of the work**\n   - Instead of calling external shell scripts, pi reads templates, edits files, runs tests, and explains what it did.\n5. **Teams can customize locally**\n   - The package seeds `.specify/templates/`, then gets out of the way.\n\n## Goals\n\nThe design goals for `@ifi/pi-spec` are:\n\n- **Native pi UX** \u2014 use pi's existing tools, prompting, and slash-command system\n- **Spec-kit compatibility of concepts** \u2014 keep the same major phases and familiar artifact layout\n- **Type-safe implementation** \u2014 perform repo detection, path calculation, and branch generation in TypeScript\n- **Idempotent scaffolding** \u2014 create missing files without constantly overwriting local customizations\n- **Low surprise** \u2014 make state visible through files and `/spec:status`\n- **Good defaults, flexible templates** \u2014 ship usable templates while letting projects evolve them\n\n## Non-goals\n\nThis package intentionally does **not** try to be:\n\n- a 1:1 shell-script port of upstream spec-kit internals\n- a hidden autonomous pipeline that silently runs every step for you\n- a generic npm library with a stable programmatic JS API\n- a hook runner that auto-executes `.specify/extensions.yml` scripts behind your back\n\nThe stable API surface is the **slash command** and the **on-disk workflow structure**.\n\n---\n\n## The API I chose\n\n### Public API surface\n\nThe package has one primary public entrypoint:\n\n```text\n/spec [subcommand] [freeform input]\n```\n\nSupported subcommands:\n\n<!-- {=piSpecSubcommandsDocs} -->\n\nCanonical `/spec` subcommands exposed by the extension. Keep README command lists and exported type\nmetadata in sync with this source of truth: `status`, `help`, `init`, `constitution`, `specify`,\n`clarify`, `checklist`, `plan`, `tasks`, `analyze`, `implement`, `list`, and `next`.\n\n<!-- {/piSpecSubcommandsDocs} -->\n\nThat is the **intentional public API**.\n\nThere is **not** a separate public JS/TS library API right now. Internal modules like\n`workspace.ts`, `scaffold.ts`, or `prompts.ts` are implementation details for contributors, not a versioned\nintegration surface for consumers.\n\nCore workflow steps:\n\n<!-- {=piSpecWorkflowStepsDocs} -->\n\nWorkflow steps that hand work back into pi for feature execution. These ordered steps are\n`constitution`, `specify`, `clarify`, `checklist`, `plan`, `tasks`, `analyze`, and `implement`.\nKeep contributor-facing docs aligned with the same sequence.\n\n<!-- {/piSpecWorkflowStepsDocs} -->\n\n### Why one `/spec` command is the right API\n\nI chose **one command with subcommands** instead of many top-level commands like `/specify`, `/clarify`,\n`/plan`, `/tasks`, etc. for a few reasons:\n\n1. **It matches the workflow mental model**\n   - All of these actions are part of one lifecycle.\n   - Grouping them under `/spec` makes that lifecycle obvious.\n\n2. **It avoids namespace clutter in pi**\n   - A spec workflow can easily consume half a dozen top-level slash commands.\n   - `/spec ...` keeps the command surface organized.\n\n3. **It is easier to discover**\n   - `/spec:help`, `/spec:status`, and `/spec:next` make the system self-explanatory.\n   - Users only need to remember one root command.\n\n4. **It preserves upstream familiarity without copying the shell UX**\n   - The step names still map cleanly to spec-kit concepts.\n   - But the runtime behavior is pi-native instead of script-native.\n\n5. **It centralizes context resolution**\n   - Repo detection, active-feature resolution, scaffold creation, and prompt generation all happen in one place.\n   - That reduces edge cases and keeps behavior consistent.\n\n### Why the API is file-centric\n\nThe second part of the API is the **filesystem contract**:\n\n- `.specify/` for reusable workflow state and templates\n- `specs/###-feature-name/` for per-feature artifacts\n\nI think this is the correct design because it keeps the workflow:\n\n- reviewable in git\n- easy to inspect manually\n- easy to customize\n- resilient across agent restarts\n- tool-agnostic at the file layer\n\nIn other words, the source of truth is not some in-memory session object; it is the repo itself.\n\n---\n\n## Exact command behavior\n\nBelow is the practical contract for each subcommand.\n\n| Command                               | Purpose                                                    | Model handoff | Filesystem side effects                                                  |\n| ------------------------------------- | ---------------------------------------------------------- | ------------- | ------------------------------------------------------------------------ |\n| `/spec` or `/spec:status`             | Show current workflow state                                | No            | None                                                                     |\n| `/spec:help`                          | Show available commands and guidance                       | No            | None                                                                     |\n| `/spec:init`                          | Create the base workflow scaffold                          | No            | Creates missing `.specify/` files                                        |\n| `/spec:constitution [principles]`     | Create or revise the project constitution                  | Yes           | Ensures base scaffold exists                                             |\n| `/spec:specify <feature description>` | Create the next numbered feature workspace                 | Yes           | Ensures scaffold, creates `specs/###-.../`, may create/switch git branch |\n| `/spec:clarify [focus]`               | Ask and resolve high-impact ambiguities in the active spec | Yes           | Ensures scaffold exists                                                  |\n| `/spec:checklist [domain]`            | Generate or refine requirement-quality checklists          | Yes           | Ensures scaffold exists                                                  |\n| `/spec:plan [technical context]`      | Build the implementation plan and design artifacts         | Yes           | Ensures scaffold, creates `plan.md` if missing                           |\n| `/spec:tasks [context]`               | Generate an executable `tasks.md`                          | Yes           | Ensures scaffold exists                                                  |\n| `/spec:analyze [focus]`               | Run a read-only consistency review                         | Yes           | Ensures scaffold exists                                                  |\n| `/spec:implement [focus]`             | Execute tasks and update completion state                  | Yes           | Ensures scaffold exists; prompts if checklists are incomplete            |\n| `/spec:list`                          | List known feature directories                             | No            | None                                                                     |\n| `/spec:next`                          | Show the next recommended step                             | No            | None                                                                     |\n\n### Input rules\n\nThe command accepts **freeform text** after the subcommand.\n\nExamples:\n\n```bash\n/spec:constitution Security-first, testable, low-complexity defaults\n/spec:specify Add usage-based billing alerts for workspace admins\n/spec:plan Use TypeScript, Vitest, and direct pi tool access\n/spec:analyze Focus on contradictions between spec.md and tasks.md\n/spec:implement Start with the MVP story and update tasks as you go\n```\n\nNotes:\n\n- `/spec:specify` effectively requires a real feature description.\n- Other workflow steps accept freeform guidance and can also run with minimal or no extra guidance.\n- When pi has UI input capabilities available, the extension can prompt for missing input instead of failing immediately.\n\n### Active feature resolution\n\nFor steps that operate on a feature (`clarify`, `checklist`, `plan`, `tasks`, `analyze`, `implement`), the\nextension resolves the active feature using this order:\n\n1. current branch name if it matches a numbered feature directory\n2. a single known feature directory, if there is only one\n3. a UI selection prompt, if multiple features exist and the UI supports selection\n4. otherwise the latest numbered feature directory\n\nThis keeps the common path simple while still working in multi-feature repos.\n\n---\n\n## Files and directories created by the package\n\n### Base workflow scaffold\n\n`/spec:init` creates the base workflow scaffold if it is missing.\n\n```text\n.specify/\n\u251c\u2500\u2500 README.md\n\u251c\u2500\u2500 extensions.yml\n\u251c\u2500\u2500 memory/\n\u2502   \u251c\u2500\u2500 constitution.md\n\u2502   \u2514\u2500\u2500 pi-agent.md\n\u2514\u2500\u2500 templates/\n    \u251c\u2500\u2500 agent-file-template.md\n    \u251c\u2500\u2500 checklist-template.md\n    \u251c\u2500\u2500 constitution-template.md\n    \u251c\u2500\u2500 plan-template.md\n    \u251c\u2500\u2500 spec-template.md\n    \u251c\u2500\u2500 tasks-template.md\n    \u2514\u2500\u2500 commands/\n        \u251c\u2500\u2500 analyze.md\n        \u251c\u2500\u2500 checklist.md\n        \u251c\u2500\u2500 clarify.md\n        \u251c\u2500\u2500 constitution.md\n        \u251c\u2500\u2500 implement.md\n        \u251c\u2500\u2500 plan.md\n        \u251c\u2500\u2500 specify.md\n        \u2514\u2500\u2500 tasks.md\n```\n\nWhat these are for:\n\n- `.specify/README.md` \u2014 local explanation of the workflow as installed in this repo\n- `.specify/extensions.yml` \u2014 compatibility/config surface; pi inspects it manually when relevant rather than auto-running hooks\n- `.specify/memory/constitution.md` \u2014 canonical governance/principles file\n- `.specify/memory/pi-agent.md` \u2014 pi-native replacement for agent-context update scripts\n- `.specify/templates/` \u2014 local, editable workflow templates copied from the packaged defaults\n\n### Per-feature workspace\n\n`/spec:specify <description>` creates a numbered feature workspace:\n\n```text\nspecs/\n\u2514\u2500\u2500 001-my-feature/\n    \u251c\u2500\u2500 spec.md\n    \u251c\u2500\u2500 checklists/\n    \u251c\u2500\u2500 plan.md\n    \u251c\u2500\u2500 research.md\n    \u251c\u2500\u2500 data-model.md\n    \u251c\u2500\u2500 quickstart.md\n    \u251c\u2500\u2500 contracts/\n    \u2514\u2500\u2500 tasks.md\n```\n\nNot every file exists immediately.\n\nCurrent behavior:\n\n- `spec.md` is scaffolded during `/spec:specify`\n- `plan.md` is scaffolded during `/spec:plan` if it is missing\n- other files are referenced by the workflow and created as the step needs them\n\n### Idempotency rules\n\nScaffolding is intentionally conservative:\n\n- missing files are created\n- existing files are left alone\n- bundled templates are copied into the repo once, then become the repo's copies to edit\n\nThat is important because the package should seed a workflow, not keep fighting your local customization.\n\n---\n\n## How to use it in practice\n\n### 1) Initialize the workflow\n\n```bash\n/spec:init\n```\n\nUse this when introducing the workflow to a repo for the first time.\n\nWhat happens:\n\n- `.specify/` is created if missing\n- default templates are copied in\n- constitution and pi-agent memory files are created if missing\n- a report is rendered in pi explaining what was created\n\n### 2) Define the project's constitution\n\n```bash\n/spec:constitution Security-first, testable, backwards-compatible changes by default\n```\n\nUse this to establish the rules the workflow should follow.\n\nTypical outcomes:\n\n- the constitution file is created or updated in `.specify/memory/constitution.md`\n- related templates may be aligned with those rules\n- future workflow steps can refer back to the same governance file\n\n### 3) Create a feature spec\n\n```bash\n/spec:specify Add SSO login for enterprise tenants\n```\n\nWhat happens:\n\n- the next feature number is computed\n- a branch name is generated from the description\n- `specs/###-feature-name/` is created\n- `spec.md` is scaffolded\n- if git is available and you are not already on that feature branch, the extension creates and switches to it\n- pi receives a prompt instructing it to follow the local `specify` template using the prepared paths\n\nThis is the key step that turns a vague idea into a concrete feature workspace.\n\n### 4) Clarify open questions\n\n```bash\n/spec:clarify\n```\n\nor\n\n```bash\n/spec:clarify Focus on tenant boundaries, auth edge cases, and failure states\n```\n\nThis step is meant to remove the highest-impact ambiguities before planning.\n\n### 5) Generate a requirement-quality checklist\n\n```bash\n/spec:checklist Authentication quality gates\n```\n\nThis is not supposed to generate implementation TODOs. It is meant to verify that the spec is precise,\ncomplete, and testable.\n\n### 6) Build the implementation plan\n\n```bash\n/spec:plan Use TypeScript, Vitest, and existing auth services; avoid new infrastructure\n```\n\nWhat happens:\n\n- `plan.md` is created if missing\n- pi is instructed to use the local `plan` workflow template\n- `pi-agent.md` is treated as the pi-native context artifact instead of shell-generated agent files\n\n### 7) Generate tasks\n\n```bash\n/spec:tasks\n```\n\nor\n\n```bash\n/spec:tasks Prioritize the MVP path and keep tasks grouped by user story\n```\n\nThis step should produce a `tasks.md` with a strict checkbox-oriented execution plan.\n\n### 8) Analyze for contradictions\n\n```bash\n/spec:analyze\n```\n\nThis step is intentionally read-only. It is there to catch inconsistencies between the spec, plan,\nchecklists, and tasks before coding begins.\n\n### 9) Implement\n\n```bash\n/spec:implement\n```\n\nor\n\n```bash\n/spec:implement Start with story 1, update tasks.md as each item completes\n```\n\nBehavior worth knowing:\n\n- checklist files are summarized before implementation\n- if incomplete checklist items exist and the UI supports confirmation, pi asks whether you want to continue\n- the implementation prompt reminds pi to mark completed tasks as `[x]`\n\n### 10) Inspect progress any time\n\n```bash\n/spec:status\n/spec:next\n/spec:list\n```\n\nUse these when you want visibility rather than action:\n\n- `/spec:status` shows artifact presence, checklist summaries, current branch, and known features\n- `/spec:next` recommends the next workflow command\n- `/spec:list` lists all numbered feature directories in `specs/`\n\n---\n\n## Example end-to-end session\n\n```bash\n/spec:init\n/spec:constitution Security-first, testable, low-complexity defaults\n/spec:specify Build a native spec workflow package for pi\n/spec:clarify\n/spec:checklist Requirements quality for the initial MVP\n/spec:plan Use TypeScript, Vitest, and direct pi tool access\n/spec:tasks Group work by independently testable user stories\n/spec:analyze\n/spec:implement\n```\n\nThat sequence is the intended happy path.\n\n---\n\n## Native behavior vs upstream spec-kit\n\nThis package is **inspired by** upstream spec-kit, but the runtime model is different on purpose.\n\n### What is preserved\n\n- the phase names and overall lifecycle\n- the numbered feature directory convention\n- the use of templates to guide each phase\n- the idea of constitution/spec/plan/tasks/checklist artifacts\n\n### What changed\n\n- shell scripts are replaced with TypeScript helpers\n- repo/branch/path preparation happens inside the extension\n- workflow execution is handed back to pi as a normal prompt-driven task\n- `.specify/memory/pi-agent.md` replaces agent-update shell behavior\n- `.specify/extensions.yml` is preserved as a file, but not auto-executed as hooks\n\n### Why this is the correct adaptation for pi\n\nBecause pi already has:\n\n- tools for file IO\n- tools for running validation commands\n- a conversation model for asking clarifying questions\n- slash commands for entering workflows\n\nUsing shell wrappers would add indirection without adding capability. Native TypeScript makes the workflow:\n\n- easier to test\n- easier to reason about\n- more portable across environments\n- less dependent on shell behavior differences\n- more aligned with how pi already works\n\n---\n\n## Internal implementation overview\n\nThese modules are useful for contributors, but they are **not** the promised external API.\n\n- `extension/index.ts` \u2014 command registration, dispatch, prompting, and model handoff\n- `extension/workspace.ts` \u2014 repo detection, feature numbering, branch slugging, and path building\n- `extension/scaffold.ts` \u2014 idempotent scaffold/template creation\n- `extension/prompts.ts` \u2014 native workflow prompt builder and step-specific notes\n- `extension/status.ts` \u2014 status reporting and checklist summarization\n- `extension/git.ts` \u2014 minimal git adapter used by the workflow\n- `extension/assets/templates/` \u2014 vendored workflow and file templates adapted from spec-kit\n\nI split the implementation this way because the workflow naturally has four concerns:\n\n1. command API and UX\n2. filesystem/workspace logic\n3. prompt-generation logic\n4. status/reporting logic\n\nKeeping those concerns separate made the package easier to test thoroughly.\n\n---\n\n## Customization\n\nAfter initialization, you can customize the workflow by editing files in your repo:\n\n- `.specify/memory/constitution.md`\n- `.specify/memory/pi-agent.md`\n- `.specify/templates/*.md`\n- `.specify/templates/commands/*.md`\n\nThis is another core design choice: the workflow should become **your repo's workflow**, not remain locked\ninside the npm package.\n\n---\n\n## Summary\n\nIf I had to describe the package in one sentence:\n\n> `@ifi/pi-spec` is a native pi implementation of a spec-first workflow whose public API is one `/spec`\n> command plus a deterministic `.specify/` and `specs/###-feature-name/` file layout.\n\nI think that is the correct API because it is:\n\n- small enough to remember\n- explicit enough to inspect\n- compatible enough to feel familiar to spec-kit users\n- native enough to feel right inside pi\n- testable enough to maintain over time\n",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-package",
+    "requirements",
+    "spec",
+    "spec-driven-development",
+    "workflow"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/ifiokjr/oh-pi/tree/main/packages/spec",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ifiokjr/oh-pi.git",
+    "directory": "packages/spec"
+  },
+  "pi": {
+    "extensions": [
+      "./extension/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-03-13T18:56:02.608Z",
+    "modified": "2026-04-28T05:50:25.425Z",
+    "0.2.14": "2026-03-13T18:56:02.889Z",
+    "0.2.15": "2026-03-14T05:55:56.766Z",
+    "0.2.16": "2026-03-14T06:28:20.743Z",
+    "0.3.0": "2026-03-14T10:40:20.820Z",
+    "0.3.1": "2026-03-15T15:19:28.566Z",
+    "0.3.2": "2026-03-23T14:14:49.561Z",
+    "0.3.3": "2026-03-23T21:54:57.687Z",
+    "0.3.4": "2026-03-25T06:18:34.469Z",
+    "0.3.5": "2026-03-25T15:11:12.500Z",
+    "0.3.6": "2026-03-29T13:23:30.056Z",
+    "0.4.0": "2026-03-30T20:16:07.619Z",
+    "0.4.1": "2026-03-30T21:17:12.230Z",
+    "0.4.2": "2026-03-31T06:35:49.643Z",
+    "0.4.4": "2026-04-02T09:53:03.749Z",
+    "0.5.0": "2026-04-28T00:36:07.310Z",
+    "0.5.1": "2026-04-28T05:50:25.298Z"
+  },
+  "versions_count": 16,
+  "downloads_last_week": 63,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 522
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 351
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 888
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 370
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 363
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 554
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 583
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 294
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 167
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 105
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 131
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 95
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 114
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 87
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 74
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 4
+    }
+  ]
+}

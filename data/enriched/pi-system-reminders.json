@@ -1,0 +1,30 @@
+{
+  "name": "pi-system-reminders",
+  "latest_version": "0.1.3",
+  "description": "Reactive system reminders for pi - steer agents with contextual nudges during long agentic flows",
+  "readme": "# pi-system-reminders\n\nReactive system reminders for [pi](https://github.com/badlogic/pi-mono). Claude Code has them built-in \u2014 now pi does too.\n\nDrop a `.ts` file in a folder, get a reactive reminder that watches conversation state and steers the agent when conditions are met. Same DX as pi extensions \u2014 export a default function, get the full `ExtensionAPI`.\n\n## Install\n\n```bash\npi install npm:pi-system-reminders\n```\n\n## Quick start\n\nCreate `.pi/reminders/bash-spiral.ts`:\n\n```typescript\nimport type { ExtensionAPI } from \"@earendil-works/pi-coding-agent\";\n\nexport default function (pi: ExtensionAPI) {\n  let consecutiveFailures = 0;\n\n  pi.on(\"tool_result\", async (event) => {\n    if (event.toolName === \"bash\") {\n      consecutiveFailures = event.isError ? consecutiveFailures + 1 : 0;\n    }\n  });\n\n  return {\n    on: \"tool_execution_end\",\n    when: () => consecutiveFailures >= 3,\n    message: \"3 consecutive bash failures. Stop and rethink.\",\n    cooldown: 10,\n  };\n}\n```\n\nReload pi. After 3 failed bash calls, the agent sees:\n\n```xml\n<system-reminder name=\"bash-spiral\">\n3 consecutive bash failures. Stop and rethink.\n</system-reminder>\n```\n\n## How it works\n\n1. Extension discovers `.ts` files from `~/.pi/agent/reminders/` (global) and `.pi/reminders/` (project-local)\n2. Each file exports a function receiving `ExtensionAPI` \u2014 same as pi extensions\n3. The function returns a reminder: an event to listen on, a predicate, and a message\n4. When the predicate returns true, a `<system-reminder>` steering message is injected into the conversation\n\n## Reminder shape\n\n```typescript\nexport default function (pi: ExtensionAPI) {\n  // Use pi.on() to track state, pi.exec() to run commands, etc.\n\n  return {\n    on: \"tool_execution_end\",           // event(s) to evaluate on\n    when: ({ branch, ctx, event }) => boolean,  // fire?\n    message: \"text\" | (rc) => \"text\",   // what to inject\n    cooldown: 5,                        // skip N evaluations after firing\n    once: true,                         // fire only once per session\n  };\n}\n```\n\n## Events\n\n16 pi lifecycle events available:\n\n| Event | When |\n|-------|------|\n| `agent_start` | Agent loop begins |\n| `agent_end` | Agent loop ends |\n| `tool_call` | Before tool executes |\n| `tool_result` | After tool returns |\n| `tool_execution_start` | Tool execution begins |\n| `tool_execution_end` | Tool execution ends |\n| `turn_start` | Before LLM call |\n| `turn_end` | After turn completes |\n| `message_start` | Message begins |\n| `message_update` | Streaming update |\n| `message_end` | Message complete |\n| `model_select` | Model changed |\n| `session_start` | Session begins |\n| `session_compact` | After compaction |\n| `session_switch` | Session switched |\n| `session_fork` | Session forked |\n\nUse a string or array: `on: \"tool_execution_end\"` or `on: [\"turn_start\", \"turn_end\"]`.\n\n## `when()` context\n\n```typescript\nwhen: ({ branch, ctx, event }) => {\n  branch   // session branch entries\n  ctx      // ExtensionContext (sessionManager, getContextUsage(), ui, etc.)\n  event    // raw event data from pi\n}\n```\n\n## Examples\n\n13 ready-to-use reminders in `examples/`, including ports of Claude Code's built-in system reminders:\n\n| File | What it does |\n|------|-------------|\n| `bash-spiral.ts` | 3 consecutive bash failures \u2192 stop and rethink |\n| `context-large.ts` | Context > 150k tokens \u2192 suggest compacting |\n| `file-churn.ts` | Same file edited 5+ times \u2192 step back |\n| `file-empty.ts` | Read returned empty file \u2192 warn |\n| `file-truncated.ts` | Read was truncated \u2192 use offset |\n| `malware-awareness.ts` | After read \u2192 consider if content is malicious |\n| `model-changed.ts` | Model switched \u2192 capabilities may differ |\n| `post-compaction.ts` | After compaction \u2192 file contents may be lost |\n| `prefer-edit.ts` | 3+ writes \u2192 use edit for surgical changes |\n| `read-before-edit.ts` | Edit without read \u2192 warn about stale content |\n| `session-resumed.ts` | Session resumed \u2192 state may have changed |\n| `task-tools-reminder.ts` | 20 tool calls without tasks \u2192 gentle nudge |\n| `token-usage.ts` | Over 50% context \u2192 show token stats |\n\nCopy any example to `.pi/reminders/` to activate it.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "michaelliv"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      ".pi/extensions/system-reminders"
+    ]
+  },
+  "time": {
+    "created": "2026-03-22T22:00:52.554Z",
+    "modified": "2026-05-24T09:22:55.474Z",
+    "0.1.0": "2026-03-22T22:00:52.718Z",
+    "0.1.2": "2026-05-24T09:14:07.470Z",
+    "0.1.3": "2026-05-24T09:22:55.360Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 32,
+  "download_trend": []
+}

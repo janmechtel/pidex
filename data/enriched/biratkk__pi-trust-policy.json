@@ -1,0 +1,351 @@
+{
+  "name": "@biratkk/pi-trust-policy",
+  "latest_version": "0.1.6",
+  "description": "Bash command allowlist system for pi \u2014 grouped trust policies with glob matching, recursive parsing, and an interactive TUI manager",
+  "readme": "# pi-trust-policy\n\nBash command allowlist system for [pi](https://github.com/earendil-works/pi). Group trusted commands into policies, toggle them on/off, and get prompted for anything not covered.\n\n## Install\n\n```bash\npi install git:github.com/biratkk/pi-trust-policy\n```\n\nOr for a quick test:\n\n```bash\npi -e git:github.com/biratkk/pi-trust-policy\n```\n\n## Getting Started\n\nAfter installing, open pi and run:\n\n```\n/trust-policy\n```\n\nThat's it. Type to search, Enter to cycle activation states.\n\n## Usage\n\n### 1. Write a policy YAML file\n\nCreate `~/.pi/agent/trust-policy/my-dev-tools.yaml`:\n\n```yaml\nname: my-dev-tools\ndescription: Development commands for my project\n\nincludes:\n  - unix-read\n\ncommands:\n  - glob: \"npm run *\"\n    description: \"Run package scripts\"\n    pipe: true\n  - glob: \"docker build {*,*/**}\"\n    description: \"Build Docker images\"\n    redirect: append\n```\n\n### 2. Activate it\n\nRun `/trust-policy` in pi to open the TUI manager. Type to fuzzy-search, Enter/Space to cycle through activation states:\n\n| State | Meaning |\n|-------|--------|\n| `inactive` | Not active anywhere |\n| `local` | Active in project `.pi/trust-policy/` only |\n| `global` | Active in `~/.pi/agent/trust-policy/` (all projects) |\n| `global & local` | Active in both scopes |\n\nOr manually create `~/.pi/agent/trust-policy/policy.json`:\n\n```json\n{\n  \"active\": [\"unix-read\"]\n}\n```\n\n### 3. Work normally\n\nTrusted commands run without interruption. Untrusted commands prompt you with options to allow once, deny, or persist to a group.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/trust-policy` | Open TUI manager \u2014 toggle policies active/inactive |\n\n## Policy Format\n\n```yaml\nname: my-policy\ndescription: What this policy covers\n\nincludes:                    # optional: inherit from other groups\n  - grep-read\n  - cat-read\n\ncommands:\n  - glob: \"docker build *\"\n    description: \"Build images\"  # optional\n    pipe: false                  # allow in pipelines (default: false)\n    embedded: false              # allow in $() substitutions (default: false)\n    redirect: none               # none | append | overwrite | both (default: none)\n```\n\n### Redirect Modes\n\n| Value | Allows |\n|-------|--------|\n| `none` | No redirects \u2014 command must run without `>` or `>>` |\n| `append` | `>>` only |\n| `overwrite` | `>` only |\n| `both` | Both `>` and `>>` |\n\n## Starters\n\nBuilt-in starter policies are organized by risk level and can be activated from the TUI:\n\n| Policy | Category | Includes |\n|--------|----------|----------|\n| **unix-read** | Safe | grep, cat, ls, head, tail, wc, find, cut, sort |\n| **unix-write** | Modifying | sed, awk, tee, cp, curl -o, sort -o |\n| **unix-dangerous** | Destructive | rm, shred, truncate, mv |\n\nEach aggregate policy composes per-tool policies (e.g., `unix-read` includes `grep-read`, `cat-read`, etc.). Per-tool policies live in subdirectories under `~/.pi/agent/trust-policy/policies/` and can also be activated individually for granular control.\n\nOn first session start, starters are migrated to `~/.pi/agent/trust-policy/policies/`. You own the copies and can freely edit them.\n\n## How It Works\n\n1. At session start, migrates bundled starter policies to `~/.pi/agent/trust-policy/policies/` (only new files, preserves edits)\n2. Loads `policy.json` from global (`~/.pi/agent/trust-policy/`) and local (`.pi/trust-policy/`) directories\n3. Resolves all active groups and their `includes` recursively (with cycle detection)\n4. Intercepts every `bash` tool call and validates against the merged allowlist\n5. Recursively parses compound commands (pipelines, `&&`/`||`/`;`, `$()`, `bash -c`) using [unbash](https://github.com/webpro-nl/unbash)\n6. Validates redirect operators (`>`, `>>`) against each entry's `redirect` permission\n7. Commands with env vars, `eval`, or unparseable elements always prompt\n\n## Security Model\n\n- **Pure allowlist** \u2014 only explicitly permitted commands run without confirmation\n- **Fail-safe defaults** \u2014 `pipe: false`, `embedded: false`, `redirect: none`\n- **Redirect enforcement** \u2014 `>` and `>>` require explicit `redirect` permission on the matching entry\n- **Env vars always prompt** \u2014 `VAR=val cmd` and `export` trigger confirmation\n- **Recursive validation** \u2014 every segment of a compound command is checked independently\n\n## File Structure\n\n```\n~/.pi/agent/trust-policy/              # global\n\u251c\u2500\u2500 policy.json                        # {\"active\": [\"unix-read\", \"unix-write\"]}\n\u251c\u2500\u2500 policies/                          # migrated starters (source of truth)\n\u2502   \u251c\u2500\u2500 unix-read.yaml                 # aggregate: includes per-tool policies\n\u2502   \u251c\u2500\u2500 unix-write.yaml\n\u2502   \u251c\u2500\u2500 unix-dangerous.yaml\n\u2502   \u251c\u2500\u2500 grep/\n\u2502   \u2502   \u2514\u2500\u2500 grep-read.yaml             # per-tool policy\n\u2502   \u251c\u2500\u2500 sed/\n\u2502   \u2502   \u2514\u2500\u2500 sed-write.yaml\n\u2502   \u2514\u2500\u2500 rm/\n\u2502       \u2514\u2500\u2500 rm-destructive.yaml\n\u2514\u2500\u2500 my-custom-policy.yaml              # user-created policies\n\n<project>/.pi/trust-policy/            # local (project-scoped)\n\u251c\u2500\u2500 policy.json\n\u2514\u2500\u2500 project-scripts.yaml\n```\n\nBoth scopes merge additively. Local policies apply only within that project tree.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "trust-policy",
+    "permissions",
+    "bash",
+    "allowlist",
+    "security"
+  ],
+  "author": {
+    "name": "biratkk"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/biratkk/pi-trust-policy#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/biratkk/pi-trust-policy.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-22T10:07:28.536Z",
+    "modified": "2026-05-26T10:21:50.671Z",
+    "0.1.0": "2026-05-22T10:07:29.201Z",
+    "0.1.5": "2026-05-26T10:03:10.555Z",
+    "0.1.6": "2026-05-26T10:21:50.373Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 45,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 322
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 48
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 20
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 9
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 40
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 8
+    }
+  ]
+}

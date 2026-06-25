@@ -1,0 +1,34 @@
+{
+  "name": "pi-codex-account",
+  "latest_version": "0.1.1",
+  "description": "Pi extension to switch between multiple OpenAI Codex OAuth accounts and show usage for the active account.",
+  "readme": "# pi-codex-account\n\n[![npm version](https://img.shields.io/npm/v/pi-codex-account?color=cb3837&logo=npm)](https://www.npmjs.com/package/pi-codex-account)\n[![install with pi](https://img.shields.io/badge/pi-install%20npm%3Api--codex--account-5b5bd6)](https://pi.dev/packages)\n[![GitHub release](https://img.shields.io/github/v/release/fadilsflow/pi-codex-account?logo=github)](https://github.com/fadilsflow/pi-codex-account/releases)\n[![CI](https://github.com/fadilsflow/pi-codex-account/actions/workflows/ci.yml/badge.svg)](https://github.com/fadilsflow/pi-codex-account/actions/workflows/ci.yml)\n[![license](https://img.shields.io/github/license/fadilsflow/pi-codex-account)](LICENSE)\n\nPi extension for switching between multiple OpenAI Codex OAuth accounts and\nchecking usage for the active account.\n\nPi currently stores one `openai-codex` OAuth credential in\n`~/.pi/agent/auth.json`. This extension keeps named snapshots of those\ncredentials in `~/.pi/agent/codex-accounts.json` and swaps the active\ncredential on demand.\n\n## Features\n\n- Save the current Codex login under a label.\n- Switch between saved Codex accounts.\n- Show the active account.\n- Rename and remove saved accounts.\n- Query Codex usage for the active account directly from ChatGPT's usage endpoint.\n- No dependency on other usage extensions.\n- Does not write usage summaries to the footer/statusline.\n\n## Install\n\nInstall the public npm package with Pi:\n\n```bash\npi install npm:pi-codex-account\n```\n\nFor one-off testing without installing:\n\n```bash\npi -e npm:pi-codex-account\n```\n\nFor local development from a checkout:\n\n```bash\npi -e /path/to/pi-codex-account\n```\n\nAfter installing or changing the package, reload Pi:\n\n```text\n/reload\n```\n\n## Commands\n\n```text\n/codex\n```\n\nOpen an interactive account picker.\n\n`/codex-account` is also registered as a backward-compatible alias, but `/codex` is the primary command.\n\n```text\n/codex save <label>\n```\n\nSave the currently active `openai-codex` credential under a label.\n\n```text\n/codex switch <label>\n```\n\nSwitch the active Codex account to a saved label. The command reloads Pi after writing the credential.\n\n```text\n/codex list\n/codex current\n```\n\nList saved accounts and show the current active account.\n\n```text\n/codex usage\n```\n\nFetch usage for the active account and print it in the terminal/notification area. This command does not use another extension.\n\n```text\n/codex rename <old> <new>\n/codex remove <label>\n```\n\nRename or delete a saved account.\n\n## Typical setup for two accounts\n\n```text\n/login openai-codex\n/codex save work\n\n/login openai-codex\n/codex save personal\n\n/codex switch work\n```\n\n## Why `needs refresh` can appear\n\nPi keeps auth credentials in memory while it is running. When this extension swaps `auth.json`, Pi may still hold the previous credential in memory.\n\nTo make Pi pick up the swapped account reliably, the extension writes the selected credential to `auth.json` with `expires: 0`. The next Codex model request sees an expired token, refreshes it with the selected account's refresh token, and re-reads the credential from disk.\n\nFlow:\n\n```text\n/codex switch work\nsend one Codex model request\n/codex usage\n```\n\nIf `/codex usage` says the access token is expired, send one Codex model request first so Pi can refresh the token, then run usage again.\n\n## Security\n\nThis extension stores OAuth credential snapshots in:\n\n```text\n~/.pi/agent/codex-accounts.json\n```\n\nThe file is written with permission `0600`, matching Pi's `auth.json` style. It still contains sensitive OAuth tokens. Do not commit it, share it, or copy it to untrusted machines.\n\n## Development\n\n```bash\nbun install\nbun run typecheck\nbun test\n```\n\n## Package manifest\n\nThis package declares its Pi extension in `package.json`:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./src/index.ts\"]\n  }\n}\n```\n\n## Limitations\n\n- The extension relies on Pi's existing OAuth refresh path. A first Codex request after switching may be needed to refresh the selected account.\n- Usage queries use the active access token directly. If the access token is expired, refresh it via one Codex model request first.\n- Credentials are stored on disk, not in macOS Keychain or another encrypted secret store.\n\n## Future upstream improvement\n\nA first-class Pi API for reloading auth storage would remove the need for the `expires: 0` refresh trigger. For example, Pi could expose `ctx.auth.reload()` or `ctx.modelRegistry.reloadAuth()` to extensions.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "codex",
+    "openai",
+    "oauth"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/fadilsflow/pi-codex-account#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fadilsflow/pi-codex-account.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-04T19:55:27.232Z",
+    "modified": "2026-06-04T20:14:41.903Z",
+    "0.1.0": "2026-06-04T19:55:27.601Z",
+    "0.1.1": "2026-06-04T20:14:41.774Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 18,
+  "download_trend": []
+}

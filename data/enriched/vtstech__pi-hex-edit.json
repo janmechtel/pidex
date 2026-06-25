@@ -1,0 +1,353 @@
+{
+  "name": "@vtstech/pi-hex-edit",
+  "latest_version": "1.3.8",
+  "description": "Hex stream-based edit replacement for reliable file editing",
+  "readme": "# Pi Hex Edit Extension\n\n[![npm version](https://img.shields.io/npm/v/@vtstech/pi-hex-edit)](https://www.npmjs.com/package/@vtstech/pi-hex-edit)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)\n[![GitHub](https://img.shields.io/badge/GitHub-VTSTech-blue)](https://github.com/VTSTech/pi-coding-agent)\n\nA robust hex stream-based edit replacement for Pi Coding Agent that provides reliable, byte-level file editing with validation and transparency.\n\n## Features\n\n- **Hex Stream Validation**: Uses byte-level comparison instead of text matching for maximum reliability\n- **LLM-callable Tools**: Tools that Pi can directly call for file operations\n- **Hash Verification**: Shows SHA-256 hashes before and after edits for verification\n- **Multiple Occurrence Handling**: Warns when multiple matches found and uses the first occurrence\n- **Detailed Output**: Displays file sizes, byte changes, and exact positions\n- **Error Handling**: Clear error messages for missing files and text not found\n- **Binary File Support**: Perfect for both text and binary file editing\n- **Typebox Validation**: All tools now use Typebox for robust parameter validation\n- **Streaming Support**: Progress updates during long operations\n- **Enhanced Hash Verification**: Both SHA-256 and simple hash for performance\n- **Better Context Display**: \u00b120 byte context in validation results\n- **Optimized Diff Output**: Shows first 50 lines for readability\n- **Proper Tool Labels**: Clear descriptions for better LLM understanding\n- **Automatic Recovery**: When the builtin `edit` tool fails, hex-edit automatically intercepts and retries with byte-level validation (enabled by default)\n- **Fallback for Edit Failures**: Use when the built-in `edit` tool fails due to encoding, whitespace, or special character issues\n\n## Installation\n\n```bash\n# Install via npm\nnpm install @vtstech/pi-hex-edit\n\n# Or install directly from GitHub\npi install git:github.com/VTSTech/pi-coding-agent#main --filter pi-hex-edit\n```\n\n## Available Tools\n\n### 1. `hex_edit`\n\nEdit file using hex stream validation for reliable byte-level editing.\n\n```typescript\n{\n  \"name\": \"hex_edit\",\n  \"parameters\": {\n    \"file\": \"string\",           // Path to the file to edit\n    \"oldText\": \"string\",        // Exact text to replace  \n    \"newText\": \"string\"         // Replacement text\n  }\n}\n```\n\n**Example Usage:**\n```json\n{\n  \"tool\": \"hex_edit\",\n  \"parameters\": {\n    \"file\": \"src/app.js\",\n    \"oldText\": \"console.log('Hello World');\",\n    \"newText\": \"console.log('Hello Universe!');\"\n  }\n}\n```\n\n### 2. `hex_edit_show`\n\nShow file content with line numbers and hex preview.\n\n```typescript\n{\n  \"name\": \"hex_edit_show\", \n  \"parameters\": {\n    \"file\": \"string\"           // Path to the file to show\n  }\n}\n```\n\n**Output includes:**\n- File size and SHA-256 hash\n- Line-by-line view with text preview (60 chars)\n- Hex bytes preview for each line (16 bytes)\n- Line numbers for easy reference\n\n### 3. `hex_edit_validate`\n\nValidate that old text exists in file and show positions.\n\n```typescript\n{\n  \"name\": \"hex_edit_validate\",\n  \"parameters\": {\n    \"file\": \"string\",          // Path to the file to validate\n    \"searchText\": \"string\"     // Text to search for in the file\n  }\n}\n```\n\n**Output includes:**\n- Number of occurrences found\n- Byte positions for each occurrence\n- Context around each match (\u00b120 bytes)\n- Clear success/failure indication\n\n### 4. `hex_edit_diff`\n\nShow byte-level diff between two files.\n\n```typescript\n{\n  \"name\": \"hex_edit_diff\",\n  \"parameters\": {\n    \"file1\": \"string\",         // Path to the first file\n    \"file2\": \"string\"         // Path to the second file\n  }\n}\n```\n\n**Output includes:**\n- File sizes and hashes for both files\n- \"Files are identical\" or detailed differences\n- Line-by-line diff showing additions (+) and deletions (-)\n- Truncated to 50 lines for readability\n\n## Usage Examples\n\n### Basic File Edit\n```bash\n# Pi can call: hex_edit(file: \"config.txt\", oldText: \"debug=false\", newText: \"debug=true\")\n```\n\n### Validate Text Exists\n```bash\n# Pi can call: hex_edit_validate(file: \"app.js\", searchText: \"function main\")\n```\n\n### Show File Details\n```bash\n# Pi can call: hex_edit_show(file: \"README.md\")\n```\n\n### Compare Files\n```bash\n# Pi can call: hex_edit_diff(file1: \"old.txt\", file2: \"new.txt\")\n```\n\n## Why Hex Edit?\n\n### Problems with Regular Text Editing\n- **Text encoding issues** with different character sets\n- **Line ending differences** between platforms (CRLF vs LF)\n- **Partial matches** causing unintended replacements\n- **Binary file corruption** when using text-based editors\n\n### When to Use Hex Edit\nUse `/hex-edit` as a reliable fallback when the built-in `edit` tool fails:\n- **Encoding issues** - Special characters, Unicode, non-ASCII text\n- **Whitespace problems** - Invisible characters, different line endings\n- **Partial matches** - When text-based matching finds wrong content\n- **Binary files** - Images, executables, archives, and other non-text files\n\n### Automatic Recovery\nWhen the builtin `edit` tool fails (returns an error), the hex-edit extension **automatically intercepts** the failed operation and retries it using byte-level validation. This happens seamlessly without any action required from the user. The recovery is enabled by default and can be controlled via the `OVERWRITE_BUILTIN_EDIT` configuration flag.\n\n### Hex Edit Solutions\n- **Byte-level precision** - Works exactly on the bytes you specify\n- **Encoding agnostic** - Doesn't care about text encodings\n- **Exact matching** - Only replaces the exact byte sequence\n- **Binary safe** - Perfect for images, executables, and other binary files\n\n## Technical Details\n\n### Hash Algorithm\n- **SHA-256** for file content verification\n- **Simple hash** for quick comparison during editing\n\n### Search Algorithm\n- **Linear scan** through file content\n- **All occurrences** found and reported\n- **First occurrence** used for editing\n\n### Replacement Algorithm\n- **Buffer manipulation** for precise byte replacement\n- **No text parsing** involved\n- **Position-based** replacement guaranteed\n\n## Error Handling\n\n| Error Type | Description | Solution |\n|------------|-------------|----------|\n| File not found | Specified file doesn't exist | Check file path and permissions |\n| Text not found | Old text not found in file | Use hex_edit_validate to verify |\n| Multiple matches | Multiple occurrences found | Tool will use first occurrence |\n| Permission denied | Insufficient file permissions | Check file permissions |\n| Invalid encoding | Text encoding issues | Use exact byte sequences |\n\n## Integration\n\nThe extension automatically integrates with Pi Coding Agent:\n\n1. **Tool Registration**: All tools are available to Pi immediately\n2. **Slash Commands**: User-friendly slash commands also available\n3. **Error Handling**: Graceful error reporting and recovery\n4. **Validation**: Built-in validation for all parameters\n\n## Development\n\n### Building\n```bash\n# Build the extension\nnpm run build\n\n# Or build the entire project\nnpm run build:hex-edit\n```\n\n### Testing\n```bash\n# Run tests (when implemented)\nnpm test\n```\n\n## Contributing\n\n1. Fork the repository\n2. Create a feature branch\n3. Add tests for new functionality\n4. Submit a pull request\n\n## License\n\nMIT License - see [LICENSE](LICENSE) file for details.\n\n## Author\n\n**VTSTech**  \nWebsite: [www.vts-tech.org](https://www.vts-tech.org)  \nGitHub: [VTSTech](https://github.com/VTSTech)  \nRepository: [pi-coding-agent](https://github.com/VTSTech/pi-coding-agent)\n\n## Support\n\nFor issues and questions:\n- GitHub Issues: [pi-coding-agent/issues](https://github.com/VTSTech/pi-coding-agent/issues)\n- Email: support@vts-tech.org",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extensions",
+    "hex",
+    "edit",
+    "binary"
+  ],
+  "author": {
+    "name": "VTSTech"
+  },
+  "license": "MIT",
+  "homepage": "https://www.vts-tech.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VTSTech/pi-coding-agent.git"
+  },
+  "pi": {
+    "extensions": [
+      "./hex-edit.js"
+    ]
+  },
+  "time": {
+    "created": "2026-05-16T00:02:27.059Z",
+    "modified": "2026-05-24T18:28:38.717Z",
+    "1.3.5": "2026-05-16T00:02:27.300Z",
+    "1.3.6": "2026-05-16T00:50:20.811Z",
+    "1.3.7": "2026-05-21T19:31:57.749Z",
+    "1.3.8": "2026-05-24T18:28:38.612Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": 22,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 230
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 326
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 60
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 34
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 38
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 6
+    }
+  ]
+}

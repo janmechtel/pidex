@@ -1,0 +1,34 @@
+{
+  "name": "@amitkot/pi-safe-github",
+  "latest_version": "0.2.0",
+  "description": "Typed GitHub wrapper tools for Pi: PRs, CI runs, issues, releases, and workflows.",
+  "readme": "# safe-github extension\n\nA narrow, typed GitHub operation surface for Pi.\n\n## Purpose\n\nProvides safe, host-side GitHub operations via the `gh` CLI, bypassing macOS sandbox TLS issues in the sandboxed bash tool.\n\n## Threat Model\n\n- **Risk**: accidental mutation, operations on the wrong repo, shell injection, token exposure.\n- **Mitigations**:\n  - Uses `child_process.execFile` with argument arrays; no shell strings.\n  - Adds execution timeouts and output limits.\n  - Validates and normalizes parameters.\n  - Infers owner/repo from the active Pi session cwd unless `cwd` is provided.\n  - High-risk mutations preview unless `confirm: true`.\n  - Mutation previews redact long bodies/notes.\n  - Does not expose `gh auth token` or a generic `gh` / `gh api` tool.\n  - Does not pass the full process environment to subprocesses.\n\n## Installation\n\n```bash\npi install npm:@amitkot/pi-safe-github\n```\n\nFor local development from a checkout:\n\n```bash\npi -e ./packages/safe-github/src/index.ts\n```\n\nIf you are working inside this repository, Pi can also auto-load the project-local shim at `.pi/extensions/safe-github/index.ts` after the project is trusted.\n\n## Requirements\n\n- GitHub CLI (`gh`) installed on the host machine\n- Host `gh` authenticated (`gh auth status`)\n- Run Pi from inside a GitHub-backed git repository for repo/PR tools\n\n## Tools\n\n### Read-oriented\n\n- `github_auth_status` \u2014 verify gh CLI auth and logged-in user\n- `github_repo_info` \u2014 repo identity, branches, visibility, viewer permission\n- `github_branch_info` \u2014 branch existence, protection, ahead/behind\n- `github_pr_list` \u2014 list PRs with filters\n- `github_pr_view` \u2014 view a PR or current-branch PR\n- `github_pr_checks` \u2014 detailed PR checks with links\n- `github_pr_files` \u2014 changed files for a PR\n- `github_pr_diff` \u2014 truncated PR diff/patch\n- `github_run_list` \u2014 list workflow runs\n- `github_run_view` \u2014 view run jobs and failed steps\n- `github_commit_status` \u2014 commit status and check runs for SHA/HEAD\n- `github_issue_list` \u2014 list issues\n- `github_issue_view` \u2014 view issue\n- `github_workflow_list` \u2014 list workflows\n- `github_workflow_view` \u2014 view workflow summary/YAML\n- `github_release_list` \u2014 list releases\n- `github_release_view` \u2014 view release details/assets\n\n### Sensitive read\n\n- `github_run_logs` \u2014 fetch/tail workflow logs. Recommended permission: `ask`.\n\n### Mutating\n\n- `github_pr_create` \u2014 preview/create PR\n- `github_pr_edit` \u2014 edit PR title/body\n- `github_pr_comment` \u2014 comment on PR\n- `github_pr_review` \u2014 approve/comment/request changes\n- `github_pr_ready` \u2014 mark draft PR ready\n- `github_pr_close` / `github_pr_reopen`\n- `github_pr_merge` \u2014 preview/merge with safeguards\n- `github_issue_create`\n- `github_issue_comment`\n- `github_issue_edit`\n- `github_issue_close` / `github_issue_reopen`\n- `github_workflow_dispatch` \u2014 preview/dispatch workflow\n- `github_run_rerun` \u2014 preview/rerun workflow run/job\n- `github_run_cancel` \u2014 preview/cancel workflow run\n- `github_release_create` \u2014 preview/create release\n- `github_release_upload_asset` \u2014 preview/upload one release asset\n\n## Approval Model\n\nConfigure mutating tool names as `ask` in `@gotgenes/pi-permission-system`.\n\nHigh-risk tools also require `confirm: true` internally:\n\n- `github_pr_create`\n- `github_pr_merge`\n- `github_workflow_dispatch`\n- `github_run_rerun`\n- `github_run_cancel`\n- `github_release_create`\n- `github_release_upload_asset`\n\nCalling these without `confirm: true` returns a preview only.\n\nRecommended permission examples are in `docs/plans/safe-github-expanded-tools.md`.\n\n## Prompt Guidelines\n\n- Use these typed tools instead of raw `gh` commands.\n- Use `github_auth_status` before GitHub operations when auth is uncertain.\n- Use `github_repo_info` before mutating operations to confirm the repo/branch.\n- Never use raw `gh api`, `gh auth token`, or shell for GitHub operations when these tools are available.\n\n## Testing\n\n```bash\nnpm run check\nnpm test\n```\n\nManual smoke tests after `/reload`:\n\n1. Call `github_auth_status`.\n2. Call `github_repo_info`.\n3. Call `github_pr_list` / `github_pr_view`.\n4. Use `github_pr_checks`, `github_run_list`, and `github_run_view` on a repo with Actions.\n5. Call a high-risk mutation without `confirm`; expected: preview only.\n6. Call the same mutation with `confirm: true` only in a test repo/branch and approve the Pi permission prompt.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "github",
+    "gh"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/amitkot/pi-tools/tree/main/packages/safe-github#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amitkot/pi-tools.git",
+    "directory": "packages/safe-github"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-14T20:34:11.892Z",
+    "modified": "2026-06-17T12:20:41.230Z",
+    "0.1.0": "2026-06-14T20:34:12.221Z",
+    "0.2.0": "2026-06-17T12:20:41.127Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 19,
+  "download_trend": []
+}

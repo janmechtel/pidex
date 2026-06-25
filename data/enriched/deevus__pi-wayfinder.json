@@ -1,0 +1,47 @@
+{
+  "name": "@deevus/pi-wayfinder",
+  "latest_version": "0.3.2",
+  "description": "Structure-aware code navigation and anchor-stable editing tools for pi agents.",
+  "readme": "# pi-wayfinder\n\nStructure-aware code navigation and anchor-stable editing tools for pi agents.\n\nWayfinder helps agents keep code context focused with compact file skeletons, targeted function reads, stable anchored edits, whole-symbol replacement, and exact symbol search/rename.\n\n## Why context stays focused\n\nWayfinder gives agents precise source-code tools instead of forcing broad file reads and brittle line-number edits:\n\n- `get_file_skeleton` is the first-pass source exploration tool, returning a compact outline before broad reads.\n- `get_function` follows the skeleton and reads only the definitions needed for the task.\n- `read_file` supports stable anchors and narrow line ranges when skeleton/function output is insufficient.\n- `edit_file` batches precise edits across one or more files by anchor.\n- `replace_symbol` rewrites complete functions, methods, classes, interfaces, or exported const/arrow functions.\n- `find_symbol_references` and `rename_symbol` avoid manual grep-and-edit loops.\n\nAnchors add a small prefix to returned source lines, but they are intended to prevent repeated reads, failed edits, and correction turns.\n\n## Install\n\n```bash\npi install npm:@deevus/pi-wayfinder\n```\n\nFor local development:\n\n```bash\npi -e . --wayfinder-mode preferred\n```\n\n\n## Modes\n\n- `additive`: add Wayfinder tools without changing pi built-ins.\n- `preferred`: default; add Wayfinder tools and guide the model to prefer them for source-code reads and edits.\n- `replacement`: deactivate pi `edit` from the active toolset and use Wayfinder source-editing tools instead; keep built-in `read` for images, PDFs, and binary/non-source assets.\n\n## Built-in replacement\n\n`replacement` mode is a soft source-editing replacement: it removes pi `edit` from the active toolset and activates Wayfinder `read_file`, `edit_file`, and AST-aware tools. It intentionally keeps pi `read` active for images, PDFs, and binary/non-source assets. It does not override pi's built-in implementations. This is the safest idiomatic pi behavior.\n\nA future explicit `--wayfinder-override-builtins read_edit` mode can register tools named `read` and `edit`, but that is intentionally separate because overriding built-ins can surprise existing workflows.\n\nRun from a local checkout:\n\n```bash\npi -e . --wayfinder-mode preferred\npi -e . --wayfinder-mode replacement\n```\n\nInside pi:\n\n```txt\n/wayfinder additive\n/wayfinder preferred\n/wayfinder replacement\n```\n\nSlash-command mode changes are persisted in the current pi session and restored on reload/resume. An explicit `--wayfinder-mode ...` flag takes precedence over the persisted session mode.\n\n## Reading files\n\n`read_file` accepts global `start_line` / `end_line` for applying the same line range to every requested file. For mixed reads where only one file needs a range, put the range on that path instead:\n\n```json\n{ \"paths\": [\"PROJECTS/ROLLER/3d.h\", \"build.zig:150-230\"] }\n```\n\n\n## Agent acceptance tests\n\nWayfinder includes an opt-in Dokimasia acceptance test that runs pi and asserts the model uses `get_file_skeleton` before source reads, then `get_function` for targeted implementation context:\n\n```bash\nnpm run test:agent\n```\n\nThis test invokes a real agent/model, so it is intentionally separate from `npm test` and requires working pi credentials.\n\n## Smoke tests\n\n```bash\npi -e . --wayfinder-mode additive -p \"Use read_file on README.md and summarize the first 20 lines.\"\npi -e . --wayfinder-mode replacement -p \"Use read_file on README.md and report whether Wayfinder mentions anchor-stable editing.\"\n```\n\n## Tree-sitter AST tools\n\n\nFor source exploration, use `get_file_skeleton` first to understand the available symbols, then `get_function` for the relevant implementation. Use `read_file` for narrow line ranges, non-symbol context, small/config files, or when AST output is insufficient.\n\n`get_file_skeleton` and `get_function` use tree-sitter parsing for supported source files. Supported extensions include `bash`, `sh`, `zsh`, `ts`, `tsx`, `js`, `jsx`, `py`, `rs`, `go`, `c`, `h`, `cpp`, `cc`, `cxx`, `hpp`, `hh`, `hxx`, `cs`, `css`, `el`, `elisp`, `ex`, `exs`, `html`, `htm`, `rb`, `java`, `json`, `php`, `swift`, `kt`, `kts`, `lua`, `m`, `mm`, `ml`, `mli`, `res`, `resi`, `scala`, `sc`, `sol`, `rdl`, `tla`, `toml`, `vue`, and `zig`.\n\nFor unsupported languages or parser load failures, the tools fall back to the conservative regex MVP for common JavaScript, TypeScript, and Python top-level definitions.\n\nSome bundled tree-sitter WASMs are intentionally not enabled yet because they are incompatible with the current `web-tree-sitter` runtime or fail to parse reliably in Node: Dart, Elm, QL, and YAML.\n\n## Symbol replacement\n\n`replace_symbol` replaces complete AST symbols by name. Use it when replacing an entire function, method, class, interface, or exported const/arrow function.\n\n```json\n{\n  \"replacements\": [\n    {\n      \"path\": \"src/sample.ts\",\n      \"symbol\": \"Service.run\",\n      \"type\": \"method\",\n      \"text\": \"  run() {\\n    return 2;\\n  }\"\n    }\n  ]\n}\n```\n\nThe tool resolves symbols with tree-sitter, rejects overlapping replacements in the same file, applies accepted replacements from bottom to top, strips hash anchors from replacement text, and preserves the file's existing line-ending style where practical.\n\nThe `replacements` array is required. Unsupported languages, parser failures, and missing symbols are reported as errors; `replace_symbol` does not fall back to regex matching.\n\n## Finding symbol references\n\n`find_symbol_references` finds exact tree-sitter definitions and references for one or more symbols across files or directories.\n\n```json\n{\n  \"paths\": [\"src/\", \"test/\"],\n  \"symbols\": [\"calculateTotal\", \"UserAccount\"],\n  \"find_type\": \"both\"\n}\n```\n\n`find_type` can be `definition`, `reference`, or `both` (default). Results are grouped by file and include stable hash anchors for each matching line.\n\n## Renaming symbols\n\n`rename_symbol` renames all exact tree-sitter definitions and references of one symbol inside the requested files or directories.\n\n```json\n{\n  \"paths\": [\"src/\", \"test/\"],\n  \"existing_symbol\": \"calculateTotal\",\n  \"new_symbol\": \"calculateGrandTotal\"\n}\n```\n\nThe tool uses an in-memory session cache for scanned files, invalidated by file `mtime` and size. It does not create a persistent symbol index. Before writing, it prepares all affected files and verifies every indexed location still matches the existing symbol; if validation fails, no file is written.\n\n## Interactive rendering\n\nIn pi's interactive TUI, Wayfinder tools render with pi-native readable output:\n\n- read-like tools hide `WayX\u2502` anchor prefixes visually while preserving anchors in model-facing tool content;\n- `edit_file`, `replace_symbol`, and `rename_symbol` render unified diffs using pi's diff renderer;\n- print/JSON/API outputs keep the same anchored text contract used by the agent.\n\nThis means humans see clean code and diffs, while the agent still receives stable anchors for follow-up edits.\n",
+  "keywords": [
+    "pi-package",
+    "wayfinder",
+    "dirac",
+    "coding-agent",
+    "code-navigation",
+    "code-editing",
+    "anchor-stable-editing",
+    "hash-anchored",
+    "tree-sitter",
+    "ast",
+    "ast-tools",
+    "symbol-search",
+    "symbol-rename",
+    "refactoring"
+  ],
+  "author": null,
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/deevus/pi-wayfinder#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deevus/pi-wayfinder.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-10T08:58:41.646Z",
+    "modified": "2026-06-14T01:52:53.170Z",
+    "0.1.0": "2026-05-10T08:58:41.919Z",
+    "0.1.1": "2026-05-15T08:32:12.158Z",
+    "0.2.0": "2026-05-17T07:26:37.420Z",
+    "0.2.1": "2026-05-20T02:39:44.821Z",
+    "0.3.0": "2026-05-20T05:18:14.783Z",
+    "0.3.2": "2026-06-14T01:52:53.082Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": null,
+  "download_trend": []
+}

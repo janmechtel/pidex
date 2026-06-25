@@ -1,0 +1,40 @@
+{
+  "name": "@josephyoung/pi-file-reference",
+  "latest_version": "0.1.7",
+  "description": "Pi extension: resolve @filepath (files & directories) in AGENTS.md, inject into system prompt",
+  "readme": "# pi-file-reference\n\nA [pi](https://github.com/earendil-works/pi-coding-agent) extension that resolves `@filepath` references in `AGENTS.md` and injects the referenced file contents into the system prompt.\n\n## How it works\n\n1. On `session_start`, the extension resets its cache for the new session\n2. On the first `before_agent_start`, parses `@filepath` references from Pi's loaded context files (AGENTS.md, CLAUDE.md, custom context files), filters to `.md`/`.mdc` only, ignores dot-files and files over 100KB\n3. Reads the referenced files and caches their contents (survives reload)\n4. On every `before_agent_start`, injects the file contents into the system prompt as `<project_references>` blocks inside Pi's `<project_context>` section\n\n## @filepath syntax\n\n```\n@path/to/file.md\n@./path/to/file.md\n@~/path/to/file.md\n@\"path with spaces.md\"\n@/absolute/path/to/file.md\n```\n\nThe `@` must be at the start of a line or preceded by whitespace.\n\n**Only `.md` and `.mdc` file references are resolved.** References to other file types (e.g., `@notes.txt`) are silently ignored.\n\n### Directory references\n\nWhen `@path` resolves to a directory, **only `.md` and `.mdc` files** at depth 1 are injected. Dot-files (e.g., `.hidden.md`) are skipped. Files larger than 100KB are also skipped.\n\n```\n@./docs\n```\n\nInjects `@docs/style-guide.md`, `@docs/patterns.md`, etc. (sorted alphabetically). Subdirectories are skipped. Trailing `/` is stripped (`@./docs/` works the same).\n\n## Installation\n\n```bash\n# Install from npm (once published)\npi install npm:@josephyoung/pi-file-reference\n\n# Or clone and link locally\ngit clone https://github.com/your-org/pi-file-reference.git\ncd pi-file-reference\nnpm install\npi install .\n```\n\n## Usage\n\nIn your `AGENTS.md`:\n\n```markdown\n# Project guidelines\nAlways follow the patterns in @./docs/style-guide.md\n\n# Architecture\n@~/.project-arch/backend-overview.md\n```\n\nThe referenced files' content is automatically injected into the system prompt at the start of each agent turn.\n\n## Caching & LLM Prompt Cache\n\nFile contents are read once per session (first `before_agent_start`) and reused for every subsequent turn. This guarantees the injected system prompt bytes are identical within a session, making the extension LLM prompt-cache friendly.\n\n| Decision | Rationale |\n|----------|-----------|\n| Cache at session level | New session = fresh content. No stale data across sessions. |\n| Cache file contents, not full prompt | `lastIndexOf` + string concat is O(n) and memcpy-cheap. Caching the full prompt + hashing the raw prompt for hit/miss adds complexity with no observable gain. |\n| Inject before `</project_context>` | References are project context material. Fallback to appending if the tag is absent. |\n\nThe only cache-invalidation risk is other extensions producing non-deterministic system prompt output, which is rare and outside our control.\n\nSee [docs/lifecycle-diagram.md](docs/lifecycle-diagram.md) for a visual flow and [docs/system-prompt-injection.md](docs/system-prompt-injection.md) for full design analysis.\n\n## License\n\nMIT\n\nSee [CHANGELOG.md](CHANGELOG.md) for version history.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "context",
+    "file-reference"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/josephyoung/pi-file-reference#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/josephyoung/pi-file-reference.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-05-13T03:08:29.718Z",
+    "modified": "2026-05-26T07:39:55.892Z",
+    "0.1.0": "2026-05-13T03:08:30.329Z",
+    "0.1.1": "2026-05-13T04:29:14.594Z",
+    "0.1.2": "2026-05-13T06:48:30.291Z",
+    "0.1.3": "2026-05-13T08:32:45.513Z",
+    "0.1.4": "2026-05-13T08:35:45.237Z",
+    "0.1.5": "2026-05-13T08:40:33.797Z",
+    "0.1.6": "2026-05-25T07:00:10.101Z",
+    "0.1.7": "2026-05-26T07:39:55.603Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": 21,
+  "download_trend": []
+}

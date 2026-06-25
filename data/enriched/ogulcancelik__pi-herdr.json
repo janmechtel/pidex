@@ -1,0 +1,360 @@
+{
+  "name": "@ogulcancelik/pi-herdr",
+  "latest_version": "0.2.5",
+  "description": "Herdr-native workspace, tab, and pane orchestration for pi with output watches and agent status waits.",
+  "readme": "# pi-herdr\n\nHerdr-native pane, tab, and workspace orchestration for [pi](https://github.com/earendil-works/pi). Run commands in existing panes, read output, wait for readiness, coordinate with other agents, and organize work across tabs and workspaces without falling back to tmux choreography.\n\n## Install\n\n```bash\npi install npm:@ogulcancelik/pi-herdr\n```\n\nOr add manually to `~/.pi/agent/settings.json`:\n\n```json\n{\n  \"packages\": [\"npm:@ogulcancelik/pi-herdr\"]\n}\n```\n\n## What it does\n\nGives the agent a `herdr` tool with these actions:\n\n| Action | Description |\n|--------|-------------|\n| **list** | List panes in the current herdr workspace |\n| **workspace_list** | List workspaces |\n| **workspace_create** | Create a workspace |\n| **workspace_focus** | Focus a workspace |\n| **tab_list** | List tabs in a workspace |\n| **tab_create** | Create a tab |\n| **tab_focus** | Focus a tab |\n| **focus** | Focus a workspace, tab, or the tab containing a pane |\n| **pane_split** | Split an existing pane and optionally alias the new pane |\n| **run** | Submit a line atomically with Enter in an existing pane |\n| **read** | Read output from a pane |\n| **watch** | Wait until pane output matches text or regex |\n| **wait_agent** | Wait until one or more panes running recognized coding agents reach one or more target statuses |\n| **send** | Send raw text or keys to a pane without implicit Enter |\n| **stop** | Close a pane |\n\n## Why this exists\n\nThis replaces the most common `pi-tmux` workflow with herdr's native CLI wrappers:\n\n- `herdr workspace ...`\n- `herdr tab ...`\n- `herdr pane split`\n- `herdr pane run`\n- `herdr pane read`\n- `herdr wait output`\n- `herdr wait agent-status`\n- `herdr pane close`\n\nThat means the agent can do higher-level pane workflows with fewer brittle steps and better awareness of agent completion states like `done`.\n\n## Defaults and behavior\n\n- The extension returns early unless `HERDR_ENV` exists and `HERDR_PANE_ID` is present, so the `herdr` tool is not registered at all outside herdr\n- Pane actions target pane identity. Use friendly aliases like `server` or `tests`, or real herdr pane ids from create/list results\n- Alias state is stored in tool result details and reconstructed on session load and branch changes\n- The extension preserves current focus by default. Creation flows stay in the current UI context unless `focus: true` is passed explicitly.\n- `pane_split` creates a right sibling pane from the agent's own pane by default, or from an explicit pane alias/id in the current workspace, and can remember it under `newPane`\n- `workspace_create` and `tab_create` use herdr's returned `root_pane` when available, with a pane-list fallback for older herdr versions\n- `run` only targets an existing pane alias or real pane id\n- If an alias no longer points to a live pane, the extension removes it and returns an error\n- `watch` uses `herdr wait output` and is the right wait primitive for normal processes like tests, dev servers, and build logs\n- `wait_agent` uses herdr agent status information and can coordinate one pane or many panes that are running recognized coding agents\n- `watch` and `wait_agent` forward pi's abort signal, so Escape cancels the wait\n- `read` and `watch` support `visible`, `recent`, and `recent-unwrapped`\n\n## Agent status semantics\n\nUse `wait_agent` only for panes running a recognized coding agent. Do not use it to wait for normal shell commands, test runners, build processes, or dev servers. Use `watch` for output conditions and `read` for inspection.\n\nWhen using `wait_agent`, herdr statuses mean:\n\n- `working` \u2014 the agent is actively processing\n- `blocked` \u2014 the agent needs user input or approval\n- `done` \u2014 the agent finished in a background pane and you have not looked at it yet\n- `idle` \u2014 the agent finished and the pane has already been seen\n- `unknown` \u2014 no recognized agent is detected\n\nImportant workflow tips:\n\n- if you start another agent in a background pane and want to wait for completion, **usually wait for `done`**\n- if the pane is focused while the agent finishes, expect **`idle`** instead\n- do **not** treat `blocked` as generic startup readiness\n\n## Starting another pi cleanly\n\nA good pattern for a fresh agent in another pane is to create a tab or workspace root pane, or split an existing pane, alias it, then run in that existing pane:\n\n```json\n{ \"action\": \"tab_create\", \"label\": \"review\", \"pane\": \"reviewer\" }\n```\n\n```json\n{ \"action\": \"run\", \"pane\": \"reviewer\", \"command\": \"pi --no-session --model openai-codex/gpt-5.4-mini\" }\n```\n\nIf model choice matters and the user has not specified one, the agent should ask which model/provider to use.\n\n## Example workflows\n\nSplit the agent's own pane to the right by default and remember the new sibling pane as `reviewer`:\n\n```json\n{ \"action\": \"pane_split\", \"newPane\": \"reviewer\" }\n```\n\nSplit an explicit existing pane instead:\n\n```json\n{ \"action\": \"pane_split\", \"pane\": \"server\", \"direction\": \"right\", \"newPane\": \"reviewer\" }\n```\n\nCreate a tab and remember its root pane as `server`:\n\n```json\n{ \"action\": \"tab_create\", \"label\": \"server\", \"pane\": \"server\" }\n```\n\nRun a server in that existing pane:\n\n```json\n{ \"action\": \"run\", \"pane\": \"server\", \"command\": \"bun run dev\" }\n```\n\nWait for readiness with regex:\n\n```json\n{ \"action\": \"watch\", \"pane\": \"server\", \"match\": \"ready|listening on\", \"regex\": true, \"timeout\": 30000 }\n```\n\nRead recent unwrapped logs:\n\n```json\n{ \"action\": \"read\", \"pane\": \"server\", \"source\": \"recent-unwrapped\", \"lines\": 40 }\n```\n\nCreate a labeled tab and remember its returned root pane:\n\n```json\n{ \"action\": \"tab_create\", \"workspace\": \"1\", \"label\": \"review\", \"pane\": \"reviewer\" }\n```\n\nRun in that existing root pane:\n\n```json\n{ \"action\": \"run\", \"pane\": \"reviewer\", \"command\": \"pi --no-session\" }\n```\n\nWait for another agent to finish in the same sense the UI shows:\n\n```json\n{ \"action\": \"wait_agent\", \"pane\": \"reviewer\", \"status\": \"done\", \"timeout\": 300000 }\n```\n\nWait until a whole set of panes has settled into idle or done:\n\n```json\n{ \"action\": \"wait_agent\", \"panes\": [\"pi-00f\", \"pi-010\", \"pi-016\"], \"statuses\": [\"idle\", \"done\"], \"mode\": \"all\", \"timeout\": 300000 }\n```\n\nFocus the tab containing an existing pane id:\n\n```json\n{ \"action\": \"focus\", \"pane\": \"w64eca6cb07ad62-2\" }\n```\n\nList workspaces and tabs:\n\n```json\n{ \"action\": \"workspace_list\" }\n```\n\n```json\n{ \"action\": \"tab_list\", \"workspace\": \"1\" }\n```\n\n## Notes for agents\n\n- `pane_split`, `run`, `read`, `watch`, `wait_agent`, `send`, and `stop` target panes only. Do not pass tab ids to those actions.\n- `wait_agent` accepts either `pane`/`status` for single-pane waits or `panes`/`statuses` for multi-pane waits, but only for panes running recognized coding agents. Use `mode: \"all\"` or `mode: \"any\"` to control how multi-pane waits resolve.\n- `run` is the default way to submit a line or prompt to a pane because it sends text and Enter atomically.\n- `send` is low-level input only. It does not press Enter. If you want text plus Enter as one action, use `run` instead of `send` + `Enter`.\n- `run` only targets an existing pane. It never creates or restarts panes.\n- If an alias is stale, the extension removes it and returns an error.\n- `pane_split` accepts optional `pane`, `direction`, `newPane`, `cwd`, and `focus`, and returns the created pane. If `pane` is omitted, it splits the agent's own pane. If `direction` is omitted, it splits right.\n- `tab_create` and `workspace_create` accept `label` and preserve current focus unless `focus: true` is passed explicitly.\n- If you already know a real pane id from `list` or another herdr response, you can use it directly in `run`, `read`, `watch`, `wait_agent`, `send`, `stop`, or `focus`, even outside the alias map, as long as it belongs to the agent's current workspace.\n- Herdr does not currently expose direct pane focus. `focus` with a pane id focuses the pane's tab.\n\n## Requirements\n\n- [pi](https://github.com/earendil-works/pi) v0.40+\n- [herdr](https://github.com/ogulcancelik/herdr)\n- pi must be running inside a herdr pane\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "herdr",
+    "pane-management",
+    "agent-workflows",
+    "dev-server",
+    "watch",
+    "coding-agent"
+  ],
+  "author": {
+    "name": "Can Celik"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ogulcancelik/pi-extensions/tree/main/packages/pi-herdr#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ogulcancelik/pi-extensions.git",
+    "directory": "packages/pi-herdr"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-09T11:46:13.623Z",
+    "modified": "2026-05-17T00:52:57.414Z",
+    "0.1.0": "2026-04-09T11:46:13.863Z",
+    "0.1.1": "2026-04-09T19:18:56.912Z",
+    "0.1.2": "2026-04-11T15:53:26.337Z",
+    "0.2.0": "2026-04-12T00:10:19.087Z",
+    "0.2.1": "2026-04-20T20:17:50.351Z",
+    "0.2.2": "2026-04-27T19:15:34.811Z",
+    "0.2.3": "2026-05-07T15:57:49.373Z",
+    "0.2.4": "2026-05-08T19:51:27.483Z",
+    "0.2.5": "2026-05-17T00:52:57.311Z"
+  },
+  "versions_count": 9,
+  "downloads_last_week": 146,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 476
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 138
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 151
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 71
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 320
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 276
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 111
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 77
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 74
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 79
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 146
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 22
+    }
+  ]
+}

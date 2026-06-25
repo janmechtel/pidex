@@ -1,0 +1,56 @@
+{
+  "name": "pi-twincat-ads",
+  "latest_version": "0.5.2",
+  "description": "Pi extension for reading and writing TwinCAT runtime values over ADS.",
+  "readme": "![Pi TwinCAT ADS Extension](./logo.png)\n\n# pi-twincat-ads\n\nPi extension for reading, watching, and safely writing TwinCAT PLC values over\nADS.\n\nThis package is the Pi adapter for the monorepo. ADS logic is provided by\n`twincat-mcp-core`; this package owns Pi extension registration, tool wrappers,\nlifecycle hooks, context injection, and the bundled skill.\n\n## Install\n\n```bash\npi install npm:pi-twincat-ads\n```\n\nThe package manifest registers:\n\n- extension entry: `./dist/pi-extension.js`\n- skill directory: `./skills`\n\n## Bundled Skills\n\nThe package ships two Pi skills:\n\n- `twincat-ads`: Pi-specific Runtime/ADS tool guidance for PLC, NC, IO, watches,\n  write gates, and TwinCAT runtime diagnostics.\n- `twincat-xae-project-guidelines`: agent-neutral guidance for offline TwinCAT\n  XAE/Visual Studio project-file work, including PLC project XML, POUs, GVLs,\n  DUTs, tasks, I/O devices, boxes, and terminals.\n\nThe XAE skill source lives centrally under\n`packages/skills/twincat-xae-project-guidelines`. It is copied into this\npackage by the Pi `prepack` lifecycle and removed again by `postpack`, so npm\nartifacts contain the skill without maintaining a second manual copy.\n\n## Configuration\n\nThe Pi adapter accepts configuration through:\n\n- `--plc-config ./plc.config.json`\n- `PI_TWINCAT_ADS_CONFIG=./plc.config.json`\n- `PI_TWINCAT_ADS_CONFIG_JSON='{\"connectionMode\":\"router\",...}'`\n\nDefault local config:\n\n```json\n{\n  \"connectionMode\": \"router\",\n  \"targetAmsNetId\": \"localhost\",\n  \"targetAdsPort\": 851,\n  \"readOnly\": true,\n  \"writeAllowlist\": [],\n  \"contextSnapshotSymbols\": [],\n  \"notificationCycleTimeMs\": 250,\n  \"maxNotifications\": 128,\n  \"maxWaitUntilMs\": 600000,\n  \"services\": {\n    \"plc\": {\n      \"targetAdsPort\": 851,\n      \"symbolGroups\": {}\n    },\n    \"nc\": {\n      \"targetAdsPort\": 500,\n      \"axes\": []\n    },\n    \"io\": {\n      \"targetAdsPort\": 300,\n      \"dataPoints\": [],\n      \"groups\": {}\n    }\n  },\n  \"diagnostics\": {\n    \"maxEvents\": 50,\n    \"maxLogBytes\": 65536,\n    \"eventSources\": [\n      {\n        \"id\": \"local-windows-application\",\n        \"kind\": \"windowsEventLog\",\n        \"logName\": \"Application\",\n        \"providerNames\": [\"TwinCAT\", \"Beckhoff\", \"TcSysSrv\", \"TcSysUi\", \"TcIoSrv\", \"TcNc\", \"TcEvent\"],\n        \"commandTimeoutMs\": 8000\n      }\n    ],\n    \"logSources\": [\n      {\n        \"id\": \"local-windows-application-log\",\n        \"kind\": \"windowsEventLog\",\n        \"logName\": \"Application\",\n        \"providerNames\": [\"TwinCAT\", \"Beckhoff\", \"TcSysSrv\", \"TcSysUi\", \"TcIoSrv\", \"TcNc\", \"TcEvent\"],\n        \"commandTimeoutMs\": 8000\n      }\n    ]\n  }\n}\n```\n\nFor direct mode, include `routerAddress`, `routerTcpPort`, `localAmsNetId`, and\n`localAdsPort`.\n\n## Tools\n\nRead and discovery:\n\n- `plc_list_symbols`\n- `plc_describe_symbol`\n- `plc_read`\n- `plc_read_many`\n- `plc_list_groups`\n- `plc_read_group`\n- `plc_state`\n\n`plc_state` includes ADS connection state, write gates, watch count, and a\nreadable PLC runtime status summary such as `Run` or `Stop`.\n\nConfigured groups are created in config under `services.plc.symbolGroups`.\n`plc_list_groups` lists those group names and `plc_read_group` reads all\nsymbols in one group.\n\nNC read-only:\n\n- `nc_state`\n- `nc_list_axes`\n- `nc_read_axis_position`\n- `nc_read_axis_status`\n- `nc_read_axis`\n- `nc_read_axis_many`\n- `nc_read_error`\n\nConfigure NC axes under `services.nc.axes` with `name` and `id`.\n\nIO read-only:\n\n- `io_list_groups`\n- `io_read`\n- `io_read_many`\n- `io_read_group`\n\nConfigure IO data points under `services.io.dataPoints` and group them under\n`services.io.groups`.\n\nTwinCAT runtime diagnostics:\n\n- `tc_state`\n- `tc_event_list`\n- `tc_runtime_error_list`\n- `tc_log_read`\n- `tc_diagnose_errors`\n- `tc_diagnose_runtime`\n\nConfigure diagnostic sources under `diagnostics`. The default local source reads\nthe Windows `Application` Event Log for TwinCAT/Beckhoff entries when available;\notherwise tools return unavailable capability details.\n\nPrefer individual commands when the target is already clear. Use\n`tc_diagnose_errors` for a small bundle of runtime errors, recent events, and log\ntail; use `tc_diagnose_runtime` for TC/PLC/NC/IO runtime health plus active\nruntime errors. These are triage helpers, not global dump tools.\n\nWrite control:\n\n- `plc_set_write_mode`\n- `plc_write`\n\nWatches:\n\n- `plc_watch`\n- `plc_wait_until`\n- `plc_unwatch`\n- `plc_list_watches`\n\nAll tool operations delegate to `twincat-mcp-core`.\n\n## Hooks\n\n- `session_start`: connects and reads configured snapshot symbols\n- `before_agent_start`: returns startup state, snapshots, failed snapshots, and watches\n- `context`: injects live snapshots, failed snapshot names, watch count, and write mode\n- `tool_call`: pre-evaluates write access for write-related tools\n- `session_end`: disconnects and releases ADS resources\n\nIn packaged Pi usage, `session_shutdown` maps to the internal `session_end`\ncleanup.\n\n## Safety Model\n\nWrites require all gates to pass:\n\n1. `readOnly=false` in config.\n2. `plc_set_write_mode` has switched runtime write mode to `enabled`.\n3. The exact symbol name is present in `writeAllowlist`.\n\nThe default behavior is read-only.\n\n## Local Smoke Test\n\nBuild the workspace and run the root smoke script against a reachable PLC:\n\n```bash\nnpm run build\nnpm run smoke:local -- --config ./local.config.json --symbol MAIN.someValue --watch-symbol MAIN.someValue\n```\n\nOptional write smoke:\n\n```bash\nnpm run smoke:local -- --config ./local.config.json --symbol MAIN.someValue --watch-symbol MAIN.someValue --enable-write --write-symbol MAIN.safeWriteValue --write-value 1\n```\n\nOnly run the write path against a safe symbol with `readOnly=false` and a matching\n`writeAllowlist` entry.\n\n## Migration Notes\n\nExisting `pi-twincat-ads` users keep installing the same package name. The main\nbehavioral change is package structure: ADS service and config logic now live in\n`twincat-mcp-core`, while Pi-specific hooks and tools remain here.\n\nThe old single-package `src/ads` and `src/config` imports are preserved as\ncompatibility re-exports for now, but new code should import core primitives\nfrom `twincat-mcp-core`.\n\n## Development\n\n```bash\nnpm run sync:skills -w pi-twincat-ads\nnpm run test:pi\nnpm run build\nnpm run pack:pi\n```\n\n`npm run pack:pi` runs the Pi package `prepack`/`postpack` hooks and verifies\nthat shared skills are present in the package tarball while keeping the\nrepository source of truth under `packages/skills`.\n\nLive PLC smoke-test details are documented in the repository under\n`docs/local-dev-test.md` and `docs/manual-smoke-test.md`.\n",
+  "keywords": [
+    "pi-package",
+    "twincat",
+    "ads",
+    "beckhoff",
+    "plc"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/Auda29/twincat-mcp-mono#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Auda29/twincat-mcp-mono.git",
+    "directory": "packages/pi"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/pi-extension.js"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-04-17T06:32:18.790Z",
+    "modified": "2026-06-22T13:22:42.590Z",
+    "0.1.0": "2026-04-17T06:32:18.921Z",
+    "0.2.0": "2026-04-17T11:49:47.231Z",
+    "0.2.1": "2026-04-17T12:14:53.636Z",
+    "0.2.2": "2026-04-20T06:26:29.368Z",
+    "0.2.3": "2026-04-27T12:04:45.327Z",
+    "0.3.0": "2026-04-30T11:27:09.457Z",
+    "0.3.1": "2026-04-30T11:47:12.279Z",
+    "0.3.2": "2026-04-30T12:36:39.042Z",
+    "0.4.0": "2026-05-08T10:48:52.519Z",
+    "0.4.1": "2026-05-08T11:33:14.822Z",
+    "0.4.2": "2026-05-11T09:57:58.578Z",
+    "0.4.3": "2026-05-11T10:34:09.898Z",
+    "0.4.4": "2026-05-11T11:18:53.515Z",
+    "0.4.5": "2026-05-11T11:50:26.386Z",
+    "0.4.6": "2026-05-11T12:15:09.820Z",
+    "0.4.7": "2026-05-11T13:15:06.978Z",
+    "0.4.8": "2026-06-09T11:45:53.948Z",
+    "0.5.0": "2026-06-22T12:29:44.019Z",
+    "0.5.1": "2026-06-22T12:50:52.198Z",
+    "0.5.2": "2026-06-22T13:22:42.297Z"
+  },
+  "versions_count": 20,
+  "downloads_last_week": 472,
+  "download_trend": []
+}

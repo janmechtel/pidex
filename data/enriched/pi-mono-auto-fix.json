@@ -1,0 +1,35 @@
+{
+  "name": "pi-mono-auto-fix",
+  "latest_version": "0.3.2",
+  "description": "Pi extension that runs language-appropriate fixers (eslint, black, prettier, ...) on files touched during a turn",
+  "readme": "# pi-mono-auto-fix\n\nEnd-of-turn formatter/linter dispatcher for pi. Collects every file written during a turn and applies language-appropriate fixers (eslint, black, prettier, \u2026) in one batch once the agent stops talking.\n\n## What it does\n\n- Subscribes to `tool_result` for the built-in `edit` and `write` tools, plus the `context-guard:file-modified` event that `multi-edit` and other writers emit.\n- Buffers absolute paths of touched files in a per-turn `Set`.\n- On `agent_end`, groups paths by matching fixer, runs each fixer once per group (parallel up to `concurrency`).\n- After each run, re-emits `context-guard:file-modified` for any file whose mtime actually changed, so downstream read caches evict.\n- Emits a single notification at the end (`auto-fix: N/M files updated`).\n\nFixers are invoked silently \u2014 stdout/stderr are swallowed. Failures are reported in the summary notification but never surfaced into the LLM context.\n\n## Built-in fixer rules\n\n| Extensions                                        | Command                                                        |\n| ------------------------------------------------- | -------------------------------------------------------------- |\n| `.ts .tsx .js .jsx .mjs .cjs`                     | `npx --no-install eslint --fix --no-error-on-unmatched-pattern {files}` |\n| `.py`                                             | `black -q {files}`                                             |\n| `.json .md .yml .yaml .css .scss .html`           | `npx --no-install prettier --write --log-level=warn {files}`   |\n\n`{files}` is replaced with shell-quoted, space-separated absolute paths. If the token is missing, files are appended to the end of the command.\n\nCommands run with `shell: true`, `cwd = ctx.cwd`, and a per-invocation timeout (default 60s).\n\n## Configuration\n\nResolution order (first hit wins):\n\n1. `PI_AUTO_FIX=0` \u2192 extension is fully disabled (no listeners registered)\n2. `~/.pi/agent/auto-fix.json`\n3. built-in defaults\n\nExample `~/.pi/agent/auto-fix.json`:\n\n```json\n{\n  \"enabled\": true,\n  \"timeoutMs\": 90000,\n  \"concurrency\": 2,\n  \"ignore\": [\"node_modules/\", \"dist/\", \".git/\", \"vendor/\"],\n  \"fixers\": [\n    {\n      \"label\": \"biome\",\n      \"extensions\": [\".ts\", \".tsx\", \".js\", \".jsx\"],\n      \"command\": \"npx --no-install biome check --write --no-errors-on-unmatched {files}\"\n    },\n    {\n      \"label\": \"ruff\",\n      \"extensions\": [\".py\"],\n      \"command\": \"ruff check --fix {files} && ruff format {files}\"\n    }\n  ]\n}\n```\n\nAll fields are optional; anything omitted falls back to the built-in default.\n\n## Install\n\n```bash\npi install npm:pi-mono-auto-fix\n```\n\nOr load directly for testing:\n\n```bash\npi -e /path/to/pi-extensions/extensions/auto-fix/index.ts\n```\n\n## Notes\n\n- Paths outside `ctx.cwd` are skipped for safety.\n- Paths matching any substring in `ignore` are skipped.\n- Files deleted during the turn are skipped (existence is re-checked at flush time).\n- The mtime diff catches fixers that are no-ops on already-clean files, so the summary reflects real changes rather than just invocations.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/emanuelcasco/pi-mono-extensions#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emanuelcasco/pi-mono-extensions.git",
+    "directory": "extensions/auto-fix"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-25T20:23:51.908Z",
+    "modified": "2026-05-29T11:32:05.626Z",
+    "0.1.0": "2026-04-25T20:23:52.134Z",
+    "0.2.2": "2026-04-27T12:07:04.080Z",
+    "0.3.0": "2026-04-29T23:27:10.377Z",
+    "0.3.1": "2026-05-08T22:43:16.483Z",
+    "0.3.2": "2026-05-29T11:32:05.512Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 15,
+  "download_trend": []
+}

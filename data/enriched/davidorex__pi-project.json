@@ -1,0 +1,60 @@
+{
+  "name": "@davidorex/pi-project",
+  "latest_version": "0.14.6",
+  "description": "Schema-driven project state management for Pi",
+  "readme": "# pi-project\n\nSchema-driven project state management for [Pi](https://github.com/badlogic/pi-mono).\n\nSchemas are the design language. You define what your project tracks by writing JSON Schemas, and the entire system \u2014 tools, validation, derived state, workflow integration \u2014 adapts automatically. Drop a new `.schema.json` file into `.project/schemas/` and it instantly becomes an addressable block type with write-time validation, discovery, and generic CRUD tooling. No code changes.\n\n## Install\n\n```bash\npi install npm:@davidorex/pi-project\n```\n\n## Getting Started\n\n```\n/project init\n```\n\nCreates `.project/` with 13 default schemas and 4 starter blocks (gaps, decisions, rationale, project). Idempotent \u2014 safe to run again.\n\n## How It Works\n\nProject data lives in `.project/` as typed JSON block files. Each block has a corresponding JSON Schema that defines its shape. All writes \u2014 whether from tools, workflows, or agents \u2014 are validated against the schema before data hits disk. Invalid data is never persisted.\n\n```\n.project/\n  schemas/          \u2014 JSON Schema files define block types\n    gaps.schema.json\n    decisions.schema.json\n    features.schema.json     \u2190 user-defined, works immediately\n  phases/           \u2014 phase specification files\n  gaps.json         \u2014 block data, validated against gaps.schema.json\n  decisions.json    \u2014 block data, validated against decisions.schema.json\n```\n\nThe schema is the contract. When pi-workflows agents produce output that writes to project blocks, the schema enforces the shape. When `/project add-work` extracts items from conversation, the schema constrains what gets written. When `projectState()` derives block summaries, it reads the typed data the schemas guarantee.\n\n**Tools registered:**\n- `append-block-item` \u2014 append an item to any block array (schema validation automatic)\n- `update-block-item` \u2014 update fields on a block item by predicate match\n\n**Commands registered:**\n- `/project init` \u2014 scaffold `.project/` with default schemas and empty blocks\n- `/project status` \u2014 derived project state (source metrics, test counts, block summaries, git state)\n- `/project add-work` \u2014 extract structured items from conversation into typed blocks\n\n## Source Files\n\n| File | Purpose |\n|------|---------|\n| `src/index.ts` | Extension entry point \u2014 tool and command registration |\n| `src/block-api.ts` | Block CRUD: `readBlock`, `writeBlock`, `appendToBlock`, `updateItemInBlock` |\n| `src/schema-validator.ts` | AJV wrapper: `validate`, `validateFromFile`, `ValidationError` |\n| `src/block-validation.ts` | Post-step validation: `snapshotBlockFiles`, `validateChangedBlocks`, `rollbackBlockFiles` |\n| `src/project-sdk.ts` | Derived state: `projectState`, `availableBlocks`, `availableSchemas`, `findAppendableBlocks` |\n| `src/project-dir.ts` | Constants: `PROJECT_DIR` (`.project`), `SCHEMAS_DIR` (`schemas`) |\n| `src/update-check.ts` | Checks for updates to `@davidorex/pi-project-workflows` on session start |\n\n## API\n\n### Block I/O (`src/block-api.ts`)\n\n```typescript\nreadBlock(cwd: string, blockName: string): unknown\nwriteBlock(cwd: string, blockName: string, data: unknown): void\nappendToBlock(cwd: string, blockName: string, arrayKey: string, item: unknown): void\nupdateItemInBlock(cwd: string, blockName: string, arrayKey: string, predicate: (item) => boolean, updates: Record<string, unknown>): void\n```\n\nAll writes are atomic (tmp file + rename). If a schema exists for the block, validation runs before the write \u2014 invalid data is never persisted.\n\n### Schema Validation (`src/schema-validator.ts`)\n\n```typescript\nvalidate(schema: Record<string, unknown>, data: unknown, label: string): unknown\nvalidateFromFile(schemaPath: string, data: unknown, label: string): unknown\n```\n\nThrows `ValidationError` with structured AJV error details on failure.\n\n### Derived State (`src/project-sdk.ts`)\n\n```typescript\nprojectState(cwd: string): ProjectState\navailableBlocks(cwd: string): BlockInfo[]\navailableSchemas(cwd: string): string[]\nfindAppendableBlocks(cwd: string): Array<{ block, arrayKey, schemaPath }>\n```\n\n`projectState()` computes everything fresh on each call \u2014 no cache, no stale data. Returns: `testCount`, `sourceFiles`, `sourceLines`, `lastCommit`, `recentCommits`, `blockSummaries` (with per-array item counts and status distribution), `phases`, `blocks`, `schemas`.\n\n### Block Validation (`src/block-validation.ts`)\n\nUsed by workflow executors for post-step integrity checks:\n\n```typescript\nsnapshotBlockFiles(cwd: string): BlockSnapshot   // Map<string, BlockFileSnapshot>\nvalidateChangedBlocks(cwd: string, snapshot: BlockSnapshot): void\nrollbackBlockFiles(cwd: string, snapshot: BlockSnapshot): string[]\n```\n\n## For LLMs\n\nWhen working with this extension:\n\n- **Read `src/project-sdk.ts`** to understand what project state is available and how it's computed\n- **Read `src/block-api.ts`** to understand the CRUD operations and validation behavior\n- **Read `src/index.ts`** to see tool parameter schemas and command handler logic\n- Use the `append-block-item` tool to add items \u2014 it handles schema validation, duplicate checking, and atomic writes\n- Use the `update-block-item` tool with a `match` predicate (e.g., `{ id: \"gap-123\" }`) and `updates` object\n- Block schemas define the contract \u2014 consult `.project/schemas/*.schema.json` to understand what fields are required\n- `projectState(cwd)` is the single source of truth for project metrics \u2014 prefer it over manual filesystem inspection\n\n## Tests\n\n```bash\nnpm test\n```\n\nRuns `tsx --test src/*.test.ts`. Test files: `block-api.test.ts`, `block-tools.test.ts`, `schema-validator.test.ts`, `project-sdk.test.ts`.\n\n## Development\n\nPart of the [`pi-project-workflows`](../../README.md) monorepo. All three packages (pi-project, pi-workflows, pi-behavior-monitors) are versioned in lockstep at 0.9.1.\n\n`npm run build` compiles TypeScript to `dist/` via `tsc`. The package ships `dist/`, not `src/` \u2014 the `pi.extensions` entry point is `./dist/index.js`.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": {
+    "name": "David Ryan"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/davidorex/pi-project-workflows/tree/main/packages/pi-project",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/davidorex/pi-project-workflows.git",
+    "directory": "packages/pi-project"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-03-16T10:31:56.765Z",
+    "modified": "2026-04-27T22:39:36.338Z",
+    "0.1.0": "2026-03-16T10:31:57.047Z",
+    "0.2.0": "2026-03-16T22:59:31.032Z",
+    "0.3.0": "2026-03-18T22:29:15.324Z",
+    "0.3.1": "2026-03-24T22:44:50.077Z",
+    "0.3.2": "2026-03-26T14:28:39.231Z",
+    "0.3.4": "2026-03-27T00:17:41.635Z",
+    "0.4.0": "2026-03-27T10:52:04.217Z",
+    "0.4.1": "2026-03-27T12:25:08.600Z",
+    "0.5.0": "2026-03-28T00:36:49.968Z",
+    "0.6.1": "2026-03-28T06:32:42.229Z",
+    "0.9.0": "2026-03-29T12:48:02.289Z",
+    "0.9.1": "2026-03-30T22:52:26.013Z",
+    "0.9.2": "2026-03-30T23:54:30.327Z",
+    "0.10.0": "2026-04-01T22:36:35.133Z",
+    "0.10.1": "2026-04-01T22:52:56.084Z",
+    "0.10.2": "2026-04-01T23:20:38.527Z",
+    "0.10.3": "2026-04-01T23:32:17.040Z",
+    "0.10.5": "2026-04-03T20:37:20.409Z",
+    "0.11.0": "2026-04-04T00:44:23.360Z",
+    "0.11.3": "2026-04-04T07:26:32.425Z",
+    "0.12.0": "2026-04-06T02:14:42.654Z",
+    "0.13.0": "2026-04-06T03:55:34.524Z",
+    "0.14.1": "2026-04-06T10:59:16.399Z",
+    "0.14.2": "2026-04-06T11:32:30.322Z",
+    "0.14.4": "2026-04-06T23:58:25.367Z",
+    "0.14.6": "2026-04-27T22:39:36.237Z"
+  },
+  "versions_count": 26,
+  "downloads_last_week": 44,
+  "download_trend": []
+}

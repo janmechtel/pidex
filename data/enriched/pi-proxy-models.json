@@ -1,0 +1,36 @@
+{
+  "name": "pi-proxy-models",
+  "latest_version": "0.0.4",
+  "description": "Pi coding-agent extension that exposes CLIProxyAPIPlus models (Claude, Gemini, OpenAI/Codex, Copilot, Kiro, GLM, Qwen, ...) to pi's model picker, routing each family through its native streaming API (anthropic-messages, openai-completions, google-generati",
+  "readme": "# pi-proxy-models\n\nA [pi-coding-agent](https://github.com/badlogic/pi-mono) extension that exposes\n[CLIProxyAPIPlus](https://github.com/router-for-me/CLIProxyAPIPlus) models to\n`pi`'s model picker and routes each model family through its native streaming\nAPI (Anthropic Messages, OpenAI Chat Completions, or Google Generative AI).\n\nThat means you can `/login` to Claude Code, Gemini CLI, OpenAI Codex, GitHub\nCopilot, Kiro, GLM, etc. inside CLIProxyAPIPlus once, and then consume all of\nthose subscriptions from `pi` with their native features intact \u2014 prompt\ncaching for Claude, thinking for Gemini, and so on.\n\n## Why three providers?\n\n`pi.registerProvider()` forces a single `baseUrl` per provider, but the\nAnthropic, OpenAI, and Google SDKs expect different base paths (`/`, `/v1`,\n`/v1beta`). The extension therefore partitions the discovered models across up\nto three providers:\n\n| Provider          | Family             | pi API              | base path          |\n| ----------------- | ------------------ | ------------------- | ------------------ |\n| `cliproxy`        | Claude / Anthropic | `anthropic-messages`  | `<url>`            |\n| `cliproxy-openai` | OpenAI / Codex / Copilot / Kiro / GLM / Qwen \u2026 | `openai-completions`  | `<url>/v1`         |\n| `cliproxy-gemini` | Google / Gemini    | `google-generative-ai`| `<url>/v1beta`     |\n\nProviders with no matching models are **not** registered. If you only run\nClaude accounts through CLIProxy, you only get `cliproxy/\u2026` models.\n\n## Install\n\n> Requires a running CLIProxyAPIPlus instance. See\n> [the upstream README](https://github.com/router-for-me/CLIProxyAPIPlus) for\n> Docker/`docker-compose` setup.\n\nDrop the single file into pi's global extension directory:\n\n```bash\n# from this repo\nmkdir -p ~/.pi/agent/extensions/cliproxy\nln -sf \"$(pwd)/index.ts\" ~/.pi/agent/extensions/cliproxy/index.ts\n```\n\nor copy instead of symlinking if you prefer:\n\n```bash\nmkdir -p ~/.pi/agent/extensions/cliproxy\ncp index.ts ~/.pi/agent/extensions/cliproxy/index.ts\n```\n\nFor quick one-shot testing without installing:\n\n```bash\npi -e ./index.ts\n```\n\n## Configure\n\nThe extension reads its config in this order (first match wins):\n\n1. Environment variables `CLIPROXY_URL` and `CLIPROXY_API_KEY`\n2. `~/.pi/agent/cliproxy.json`:\n   ```json\n   {\n     \"baseUrl\": \"http://localhost:8317\",\n     \"apiKey\": \"your-api-key\"\n   }\n   ```\n3. Default: `baseUrl = http://localhost:8317`, no API key\n\nA missing/empty API key is **tolerated** \u2014 the extension passes a placeholder\ndownstream. CLIProxyAPIPlus accepts any value when its own `api-keys:` list is\nempty. When `api-keys:` is populated, set `CLIPROXY_API_KEY` to one of those\nvalues.\n\nExamples:\n\n```bash\n# Env-based (remote proxy with auth)\nexport CLIPROXY_URL=https://my-proxy.example.com\nexport CLIPROXY_API_KEY=abc123\npi\n\n# File-based (persistent local config)\ncat > ~/.pi/agent/cliproxy.json <<EOF\n{ \"baseUrl\": \"http://localhost:8317\", \"apiKey\": \"dev-key\" }\nEOF\npi\n```\n\n## Usage\n\nStart `pi` and pick a model with `Ctrl+P` or `/model`:\n\n```\ncliproxy/claude-sonnet-4-5\ncliproxy/claude-opus-4-5\ncliproxy-gemini/gemini-2.5-pro\ncliproxy-openai/gpt-5-codex\n...\n```\n\nOr via flag:\n\n```bash\npi --provider cliproxy --model claude-sonnet-4-5\npi --provider cliproxy-gemini --model gemini-2.5-pro\npi --provider cliproxy-openai --model gpt-4o\n```\n\n### Slash commands\n\n| Command             | Description                                              |\n| ------------------- | -------------------------------------------------------- |\n| `/cliproxy-status`  | Ping the proxy, show model count + auth info             |\n| `/cliproxy-models`  | List all discovered models grouped by `owned_by`         |\n| `/cliproxy-refresh` | Re-fetch the model list and re-register all providers    |\n\n### Listing models from the CLI\n\n```bash\npi --list-models cliproxy         # Claude-family models\npi --list-models cliproxy-gemini  # Gemini-family models\npi --list-models cliproxy-openai  # everything else\n```\n\n## Behaviour notes\n\n- **Model metadata** (`contextWindow`, `maxTokens`, `reasoning`, image input)\n  is inferred from the model ID; costs are set to `0` because upstream accounts\n  are paid via subscription, not tokens.\n- **Startup resilience** \u2014 if the proxy is unreachable at launch, the\n  extension still loads with a small static fallback list and warns the user.\n  Run `/cliproxy-refresh` once the proxy is back online.\n- **No Bearer header is added by pi** \u2014 each native SDK sends its own auth\n  (Anthropic `x-api-key`, OpenAI `Authorization: Bearer`, Google\n  `x-goog-api-key`) using the configured key.\n\n## Troubleshooting\n\n**`CLIProxy unreachable`** \u2014 verify the proxy is listening:\n```bash\ncurl -s http://localhost:8317/v1/models | jq '.data | length'\n```\n\n**`302 Found` / `unauthorized` from Gemini or OpenAI** \u2014 CLIProxyAPIPlus is\nforwarding to the upstream API with an unauthenticated token. Check that you\nhave an account linked for that provider in your proxy's `auths/` directory,\nor set a valid key that matches the proxy's `api-keys:` list.\n\n**Models don't appear after starting CLIProxy** \u2014 run `/cliproxy-refresh` in a\nrunning pi session, or restart pi.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent"
+  ],
+  "author": {
+    "name": "Victor Leite Costa"
+  },
+  "license": "ISC",
+  "homepage": "https://github.com/victormilk/pi-proxy-models#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/victormilk/pi-proxy-models.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-19T02:05:06.820Z",
+    "modified": "2026-04-26T19:43:24.961Z",
+    "0.0.1": "2026-04-19T02:05:06.956Z",
+    "0.0.2": "2026-04-19T02:12:42.522Z",
+    "0.0.3": "2026-04-25T04:40:27.148Z",
+    "0.0.4": "2026-04-26T19:43:24.850Z"
+  },
+  "versions_count": 4,
+  "downloads_last_week": null,
+  "download_trend": []
+}

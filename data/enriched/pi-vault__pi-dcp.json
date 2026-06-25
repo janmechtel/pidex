@@ -1,0 +1,353 @@
+{
+  "name": "@pi-vault/pi-dcp",
+  "latest_version": "0.3.0",
+  "description": "Pi extension for dynamic context pruning \u2014 incremental tool output pruning and conversation compression",
+  "readme": "# @pi-vault/pi-dcp\n\n[![npm version](https://img.shields.io/npm/v/%40pi-vault%2Fpi-dcp)](https://www.npmjs.com/package/@pi-vault/pi-dcp)\n[![Quality](https://github.com/pi-vault/pi-dcp/actions/workflows/quality.yml/badge.svg?branch=master)](https://github.com/pi-vault/pi-dcp/actions/workflows/quality.yml)\n[![Node >=22.19.0](https://img.shields.io/badge/node-%3E%3D22.19.0-339933)](https://nodejs.org/)\n[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](https://github.com/pi-vault/pi-dcp/blob/master/README.md#license)\n\nKeep long Pi sessions usable by pruning stale tool output and nudging the model to compress old context before the window fills up.\n\n## Install\n\n```sh\npi install npm:@pi-vault/pi-dcp\n```\n\nRestart Pi after install.\n\nTo try a local checkout before publishing:\n\n```sh\npi -e /absolute/path/to/pi-dcp\n```\n\n## Quick Start\n\npi-dcp works out of the box \u2014 no configuration needed.\n\nCheck that it's loaded and see what it knows about your session:\n\n```text\ndcp:context\n```\n\nList all available commands:\n\n```text\ndcp:help\n```\n\nAfter a long session, see how many tokens the extension has saved:\n\n```text\ndcp:stats\n```\n\nBefore an intensive design or debugging session, force-prune dead output:\n\n```text\ndcp:sweep\n```\n\n## What it does\n\n- **Prunes automatically** \u2014 deduplicates repeated tool outputs (e.g. two identical file reads) without losing the first occurrence; clears old failed tool results after `strategies.purgeErrors.turns`.\n- **Compresses with the model** \u2014 exposes a `compress` tool in `range` or `message` mode. Tool-call / tool-result pairs are never split across a compression boundary; protected tool outputs, user messages (when enabled), and `<protect>` tag content survive summaries verbatim.\n- **Nudges the model** \u2014 anchored, frequency-throttled nudges fire when context crosses configured limits. They persist across turns and don't drift as new messages arrive.\n- **Notifies you** \u2014 toast or status-bar updates with per-pass pruning stats.\n- **Respects sub-agents** \u2014 skips child sessions by default; with `experimental.allowSubAgents` enabled, caches child results so they can be merged into parent-side compression summaries.\n- **Reports savings** \u2014 `dcp:stats` for the session, `dcp:lifetime` across all sessions.\n- **Survives the long session** \u2014 persisted anchor sets, stable message IDs, and rehydrated state on resume.\n\n## Commands\n\nAll commands are also discoverable in-session via `dcp:help`.\n\n| Command                    | Purpose                                                                |\n| -------------------------- | ---------------------------------------------------------------------- |\n| `dcp:help`                 | List all available commands                                            |\n| `dcp:context`              | Current token usage, pruned outputs, active blocks, manual mode status |\n| `dcp:stats`                | Session token savings and compression counts                           |\n| `dcp:sweep`                | Force-prune all eligible tool outputs immediately                      |\n| `dcp:manual on`            | Pause automatic compression (take manual control)                      |\n| `dcp:manual off`           | Resume automatic compression                                           |\n| `dcp:decompress <blockId>` | Restore a previously compressed block                                  |\n| `dcp:recompress <blockId>` | Re-activate a decompressed block                                       |\n| `dcp:lifetime`             | Aggregate statistics across all saved sessions                         |\n\n## Typical workflows\n\n**Default \u2014 just install it.** DCP prunes duplicates and stale errors on its own and nudges the model when context fills up. Watch `dcp:context` to see what's happening.\n\n**Long design or debug session.** Run `dcp:sweep` first to clear dead weight, then check `dcp:context` periodically.\n\n**Take manual control of compression.** Turn automatic compression off:\n\n```text\ndcp:manual on\n```\n\nThen use the `compress` tool directly on whatever you decide is safe to summarize. Resume automatic mode with:\n\n```text\ndcp:manual off\n```\n\n**Undo a bad compression.** Get the block ID from `dcp:context` or `dcp:stats`, then:\n\n```text\ndcp:decompress b3\n```\n\nRe-activate it with:\n\n```text\ndcp:recompress b3\n```\n\n**Check the savings.** Session totals:\n\n```text\ndcp:stats\n```\n\nAcross all saved sessions:\n\n```text\ndcp:lifetime\n```\n\n**Customize prompts (experimental).** Enable the prompt store in your config:\n\n```json\n{ \"experimental\": { \"customPrompts\": true } }\n```\n\nOn first run, defaults are written to `~/.pi/agent/extensions/dcp-prompts/defaults/` for reference. Edit overrides at either of these paths (project wins):\n\n- Project: `.pi/dcp-prompts/overrides/<file>.md`\n- Global: `~/.pi/agent/extensions/dcp-prompts/overrides/<file>.md`\n\nFiles: `system.md`, `context-limit-nudge.md`, `turn-nudge.md`, `iteration-nudge.md`. Reloaded on every context pass.\n\n## Configuration\n\nCreate `~/.pi/agent/extensions/dcp.json` to override defaults. Every field is optional; missing keys fall back to built-in defaults:\n\n```json\n{\n  \"enabled\": true,\n  \"debug\": false,\n  \"nudgeNotification\": \"minimal\",\n  \"nudgeNotificationType\": \"status\",\n  \"protectedFilePatterns\": [],\n  \"compress\": {\n    \"mode\": \"range\",\n    \"permission\": \"allow\",\n    \"maxContextPercent\": 80,\n    \"minContextPercent\": 50,\n    \"maxContextLimit\": 200000,\n    \"minContextLimit\": 100000,\n    \"modelMaxLimits\": {},\n    \"modelMinLimits\": {},\n    \"nudgeFrequency\": 5,\n    \"iterationNudgeThreshold\": 15,\n    \"nudgeForce\": \"soft\",\n    \"protectedTools\": [\"compress\"],\n    \"protectUserMessages\": false,\n    \"protectTags\": false,\n    \"summaryBuffer\": true\n  },\n  \"manualMode\": {\n    \"default\": false,\n    \"automaticStrategies\": true\n  },\n  \"strategies\": {\n    \"deduplication\": { \"enabled\": true, \"protectedTools\": [] },\n    \"purgeErrors\": { \"enabled\": true, \"turns\": 4, \"protectedTools\": [] }\n  },\n  \"experimental\": {\n    \"allowSubAgents\": false,\n    \"customPrompts\": false\n  }\n}\n```\n\n### Top-level\n\n- `enabled` \u2014 set to `false` to disable the extension entirely without uninstalling.\n- `debug` \u2014 when `true`, writes per-session logs to `{sessionDir}/dcp/logs/YYYY-MM-DD.log`.\n- `nudgeNotification` \u2014 how verbosely the model is warned about context pressure: `\"off\"`, `\"minimal\"`, or `\"detailed\"`.\n- `nudgeNotificationType` \u2014 where notifications appear: `\"toast\"` (transient popups) or `\"status\"` (persistent status line, default).\n- `protectedFilePatterns` \u2014 array of glob patterns. Tool outputs that reference matching file paths are never pruned.\n\n### `compress`\n\n- `mode` \u2014 compression style: `\"range\"` (compress a span) or `\"message\"` (compress individual messages).\n- `permission` \u2014 whether the model is allowed to compress: `\"allow\"` or `\"deny\"`.\n- `maxContextPercent` / `minContextPercent` \u2014 percentage-based thresholds. Used as a fallback when `maxContextLimit` / `minContextLimit` are not set.\n- `maxContextLimit` / `minContextLimit` \u2014 absolute token thresholds (default `200000` / `100000`). Use these for predictable behavior across large and small context windows.\n- `modelMaxLimits` / `modelMinLimits` \u2014 per-model overrides keyed by `provider/modelId`, accepting either a token count or a percentage string.\n- `nudgeFrequency` \u2014 minimum messages between successive compression nudges.\n- `iterationNudgeThreshold` \u2014 iterations (tool-use turns) without a user message before an iteration-specific nudge fires.\n- `nudgeForce` \u2014 strength of the nudge message: `\"soft\"` (suggestive) or `\"strong\"` (insistent).\n- `protectedTools` \u2014 tool names whose outputs are never compressed.\n- `protectUserMessages` \u2014 when `true`, user messages in a compressed range are appended verbatim to the summary.\n- `protectTags` \u2014 when `true`, content inside `<protect>...</protect>` tags is extracted from user messages and appended to the summary.\n- `summaryBuffer` \u2014 when `true` (default), active compression summaries are excluded from the max-threshold comparison, preventing feedback loops.\n\n### `manualMode`\n\n- `default` \u2014 start the session in manual compression mode: `false` (automatic) or `\"active\"`.\n- `automaticStrategies` \u2014 when manual mode is active, keep running deduplication and error pruning automatically.\n\n### `strategies`\n\n- `deduplication.enabled` / `deduplication.protectedTools` \u2014 turn off dedup or exclude specific tools.\n- `purgeErrors.enabled` / `purgeErrors.turns` / `purgeErrors.protectedTools` \u2014 error-result purging, age threshold, and exclusions.\n\n### `experimental`\n\n- `allowSubAgents` \u2014 when `true`, DCP runs inside sub-agent child sessions. Default `false` (DCP skips child sessions to avoid interfering with their context).\n- `customPrompts` \u2014 when `true`, prompts are loaded from the filesystem override paths described in [Typical workflows](#typical-workflows). Default `false` (bundled prompts used directly, zero filesystem access).\n\n## What's new in 0.3.0\n\n- **Absolute token limits** \u2014 `compress.maxContextLimit` / `minContextLimit` with per-model overrides via `modelMaxLimits` / `modelMinLimits`.\n- **Anchored, persistent nudges** \u2014 context-limit, turn, and iteration nudges are anchored to message keys with `nudgeFrequency` spacing, so they persist across turns and don't drift.\n- **Protected content survives compression** \u2014 protected tool outputs, user messages, and `<protect>` tag content are appended to summaries verbatim.\n- **UI notifications** \u2014 toast or status-bar mode via `nudgeNotificationType`, on top of the existing verbosity setting.\n- **Experimental opt-ins** \u2014 sub-agent support (`experimental.allowSubAgents`) and custom prompts via `PromptStore` (`experimental.customPrompts`).\n- **Stable message IDs and compression timing** \u2014 refs persist across sessions and compactions; each compression block records its duration.\n\n## Compatibility\n\n- Node `>=22.19.0`\n- Peer dependencies: `@earendil-works/pi-coding-agent`, `@earendil-works/pi-agent-core`, `typebox`\n- Intended for Pi sessions with package and extension support\n\n## Development\n\n```sh\npnpm install\npnpm run check\npnpm run pack --dry-run\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-package",
+    "pi-extension",
+    "pi-dcp",
+    "context-pruning",
+    "compression"
+  ],
+  "author": {
+    "name": "Lanh Hoang",
+    "email": "lanhhoang@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/pi-vault/pi-dcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pi-vault/pi-dcp.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-16T04:14:30.895Z",
+    "modified": "2026-06-23T23:07:07.453Z",
+    "0.1.0": "2026-06-16T04:14:31.219Z",
+    "0.2.0": "2026-06-16T21:59:40.152Z",
+    "0.3.0": "2026-06-23T23:07:07.122Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": 174,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 272
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 166
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 26
+    }
+  ]
+}

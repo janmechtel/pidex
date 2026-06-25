@@ -1,0 +1,343 @@
+{
+  "name": "@nqbao/pi-inbox",
+  "latest_version": "0.1.1",
+  "description": "Inter-session communication extension for Pi \u2014 file-based, channel-oriented, threaded messaging between independently-running Pi sessions",
+  "readme": "# pi-inbox\n\nAllow multiple Pi sessions to talk to each other while still staying coherent, with a small agent-facing surface and policy-driven behavior inside the extension.\n\n## Install\n\nInstall from npm through Pi:\n\n```bash\npi install npm:@nqbao/pi-inbox\n```\n\nOr load it locally during development:\n\n```bash\npi -e ./index.ts\n```\n\n## Package\n\nThis is a Pi package and exposes its extension through `package.json`:\n\n```json\n{\n  \"pi\": {\n    \"extensions\": [\"./index.ts\"]\n  }\n}\n```\n\n`pi-inbox` is designed around a simple rule: keep protocol complexity inside Pi, and keep the agent interface as small as possible. The extension focuses on policy between Pi sessions so they can talk to each other without creating too much confusion for the agent, while the agent itself ideally only needs to understand:\n\n- a message was delivered\n- reply with `inbox_post(channel, message)` if a reply is needed\n\n## Current Shape\n\n- Pure file-system transport\n- Channel-oriented messaging\n- Auto-polling and notification injection\n- One agent-facing tool: `inbox_post`\n- User-facing commands for subscribe, unsubscribe, post, clear, and status\n\nCurrent implementation files:\n\n- [index.ts](./index.ts)\n- [tools.ts](./tools.ts)\n- [transport.ts](./transport.ts)\n- [channels.ts](./channels.ts)\n- [config.ts](./config.ts)\n\n## Product Position\n\n`pi-inbox` is a messaging primitive, not an orchestration runtime.\n\nIt is meant to let independent Pi sessions talk to each other while keeping the model loop simple. Coordination complexity such as delivery behavior, claiming, retries, batching, or response shaping should live inside the extension rather than in additional agent tools.\n\nThis means `pi-inbox` focuses on policy among agents:\n\n- who should receive a message\n- whether a reply is expected\n- whether a message is informational or claimable\n- how broadly a message should be delivered\n- whether responses should be constrained\n- whether urgent items should be broken out from normal batches\n\nThe goal is operational sophistication with cognitive simplicity.\n\n## Design Principles\n\n- Hide protocol, expose intent\n- Keep the agent-facing communication API minimal\n- Push messages to the agent instead of making the agent poll\n- Keep discovery primarily user-facing\n- Use one transport model for both broadcast and peer-to-peer messaging\n- Prefer delivery policy over extra coordination tools\n\n## Communication Model\n\nChannels are the core primitive.\n\nExamples:\n\n- shared channel: `code-review`\n- shared channel: `orchestrator`\n- peer-specific channel: `_dm.worker-abc`\n\nBoth broadcast-style and peer-to-peer communication should fit within the same channel model.\n\nCurrent channel names may only contain lowercase letters, `.`, `_`, and `-`.\n\n## Policy Direction\n\nThe longer-term direction is to let Pi manage communication policy internally while preserving the same small external interface.\n\nExamples of policy dimensions:\n\n- audience: broadcast, selective, direct\n- reply expectation: read-only, reply-allowed, single-claimer\n- constraints: free-form, yes/no, fixed choices, short structured reply\n- priority: high, normal, low\n\nThese policies are intended to shape delivery and notification behavior without growing the tool surface.\n\n## Current Tool\n\n### `inbox_post(channel, message)`\n\nPosts a message to a subscribed channel.\n\nCurrent behavior:\n\n- rejects unsubscribed channels\n- writes to the channel log\n- advances cursor to avoid self-notification\n\nSee [tools.ts](./tools.ts).\n\n## Commands\n\nCurrent user-facing commands:\n\n- `/inbox-subscribe <channel>`\n- `/inbox-unsubscribe <channel>`\n- `/inbox-status`\n- `/inbox-post <channel> <message>`\n- `/inbox-clear <channel>`\n\nCommands are for user control and inspection. Discovery and richer session awareness should be added here before becoming agent-visible capabilities.\n\n## Transport\n\n`pi-inbox` uses append-only `messages.jsonl` files under a local inbox directory.\n\nDefault shape:\n\n```text\n~/.pi/inbox/\n  default/\n    channels/\n      code-review/\n        messages.jsonl\n```\n\nThis keeps the system:\n\n- local\n- durable\n- inspectable\n- offline-tolerant\n- free of broker/daemon requirements\n\n## Roadmap\n\nPlanned work is documented in [PLAN.md](./PLAN.md).\n\nThe main roadmap direction is not \u201cmore tools.\u201d It is richer internal policy with a stable, simple agent-facing model.\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/nqbao/pi-inbox#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nqbao/pi-inbox.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-30T03:28:30.223Z",
+    "modified": "2026-05-30T22:30:31.068Z",
+    "0.1.0": "2026-05-30T03:28:30.546Z",
+    "0.1.1": "2026-05-30T22:30:30.945Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 13,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 253
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 30
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 16
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 12
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

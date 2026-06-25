@@ -1,0 +1,38 @@
+{
+  "name": "@mjfuertesf/pi-difit",
+  "latest_version": "0.3.0",
+  "description": "Thin Pi wrapper that opens difit to review branch changes against a base ref",
+  "readme": "# pi-difit\n\nPi extension for local code review with [difit](https://github.com/yoshiko-pg/difit): open a diff viewer, read the human's inline comments, and post replies \u2014 all without leaving Pi.\n\nRepository: https://gitlab.com/mjfuertesf/pi-difit\n\n![pi-difit screenshot](./assets/pi-difit-screenshot.png)\n\n## Install\n\n```bash\npi install npm:@mjfuertesf/pi-difit\n```\n\nRequires **Node.js >= 21** and **difit >= 5.x**.\n\n## Round-trip review flow\n\n1. **Open diff** \u2014 `/show-diff` or `show_review_diff` launches difit and remembers the port.\n2. **Human reviews** \u2014 opens the browser URL difit prints, adds inline comment threads.\n3. **Agent reads comments** \u2014 `get_review_comments` or `/review-comments` fetches all threads.\n4. **Agent replies or fixes** \u2014 `post_review_comments` adds inline replies; agent also makes code changes.\n5. **Human re-reviews** \u2014 reloads difit; agent replies appear in the existing threads.\n\n## Commands and tools\n\n### `/show-diff [base]` \u00b7 `show_review_diff({ base?: string })`\n\nValidates the git repo, resolves the base ref, computes `git merge-base <base> HEAD` \u2014 the commit where your branch diverged \u2014 and launches `difit HEAD <merge-base>` as a detached process. This matches the GitHub/GitLab three-dot PR diff: only your changes, not everything the base branch accumulated since you branched off.\n\ndifit opens the browser itself; its server self-terminates when the tab closes. Pi shows a notification with the base label, short merge-base SHA, and server URL. The port is remembered for the tools below.\n\n**Base resolution** (auto-detected when no argument given):\n\n1. Explicit ref passed as argument (error if it does not exist)\n2. `<remote>/main` \u2192 local `main` (first match wins)\n3. `<remote>/master` \u2192 local `master` (first match wins)\n\nThe remote is the upstream of the current branch, or the first `git remote` when no upstream is configured.\n\nIf the merge-base cannot be computed (no common history, shallow clone), the extension falls back to the base ref directly and emits a warning. Note: merge-base is computed from **local** refs \u2014 run `git fetch` if your local `origin/main` is stale.\n\n---\n\n### `/review-comments` \u00b7 `get_review_comments({ port?: number })`\n\nFetches all comment threads from the running difit server. Returns file path, line or range, diff side, and messages with author and body.\n\n`/review-comments` posts the result into the conversation as a user message to trigger an agent turn. The optional `port` overrides the port remembered from the last launch.\n\nError cases:\n- **No server launched and no `port` given** \u2014 prompts you to run `show_review_diff` first.\n- **Connection refused** \u2014 server is gone; prompts you to relaunch.\n- **Empty review** \u2014 explicit \"No review comments yet.\" message.\n\n---\n\n### `post_review_comments({ entries: CommentEntry[], port?: number })`\n\nPosts inline threads or replies to the running difit server. Use this to reply directly to human review comments or add agent observations.\n\n- `author` is always forced to `\"pi\"` \u2014 not caller-controlled.\n- Each entry: `type` (`\"thread\"` | `\"reply\"`), `filePath`, `position` (`{ side: \"old\" | \"new\", line: number | { start, end } }`), `body`.\n- A `\"reply\"` anchors by `filePath` + `position`; if no thread exists there difit creates one.\n- Returns posted count and any warnings from difit.\n\nError cases mirror `get_review_comments`, plus difit validation errors (invalid position, empty body) from the API response.\n\n## difit binary\n\ndifit ships as an optional dependency and is used as a fallback. Resolution order:\n\n1. `PI_DIFIT_COMMAND` env var (explicit override, always wins)\n2. `difit` on PATH (preferred \u2014 typically newer)\n3. The `difit` bundled with this package\n\nIf difit is not on the default PATH \u2014 for example because a per-repo `.mise.toml` shadows the global node version \u2014 set the override:\n\n```bash\nexport PI_DIFIT_COMMAND=\"mise x node@26.2.0 -- difit\"\n```\n\nThe value is split on whitespace into command + prefix args; `HEAD <merge-base>` is appended. difit is always spawned with `NODE_ENV` removed \u2014 it serves a blank dev-mode shell when it inherits `NODE_ENV=development`.\n\n## Development\n\n```bash\nnpm test\nnpm pack --dry-run\n```\n\n## Credits\n\nBuilt on [difit](https://github.com/yoshiko-pg/difit) by [yoshiko-pg](https://github.com/yoshiko-pg) and contributors.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "diff",
+    "difit",
+    "git",
+    "code-review"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://gitlab.com/mjfuertesf/pi-difit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitlab.com/mjfuertesf/pi-difit.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "image": "https://gitlab.com/mjfuertesf/pi-difit/-/raw/main/assets/pi-difit-screenshot.png"
+  },
+  "time": {
+    "created": "2026-06-11T12:38:55.093Z",
+    "modified": "2026-06-11T12:47:20.412Z",
+    "0.2.2": "2026-06-11T12:38:56.448Z",
+    "0.3.0": "2026-06-11T12:47:20.309Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 7,
+  "download_trend": []
+}

@@ -1,0 +1,26 @@
+{
+  "name": "pi-headroom",
+  "latest_version": "0.1.0",
+  "description": "Transparent LLM context compression for Pi using Headroom",
+  "readme": "# pi-headroom\n\nTransparent LLM context compression for [Pi](https://github.com/mariozechner/pi-coding-agent) using [Headroom](https://github.com/chopratejas/headroom). Automatically compresses conversation context before every LLM call, saving 70\u201395% of tokens without changing your workflow.\n\n**Zero-config:** The extension automatically installs the Headroom proxy (`pip install headroom-ai[proxy]`), starts it on session start, and stops it on exit. You don't need to touch the proxy manually.\n\n## How It Works\n\n```\nSession start \u2192 auto-install headroom-ai[proxy] \u2192 spawn proxy on :8787\n                                                          \u2193\nUser prompt \u2192 Pi builds context \u2192 pi-headroom compresses \u2192 LLM receives compressed context\n                                                          \u2193\nSession exit \u2192 proxy stopped automatically\n```\n\n1. **`session_start`**: Checks if proxy is running. If not, installs `headroom-ai[proxy]` via pip (if needed), spawns it as a background process, and polls until healthy.\n2. **`context` event**: Before every LLM call, converts Pi messages to OpenAI format, sends them to the proxy for compression, converts back, and returns compressed messages.\n3. **`session_shutdown`**: Gracefully stops the proxy (only if the extension started it).\n\n## Prerequisites\n\n- **Python \u2265 3.10** \u2014 needed to run the Headroom proxy (the extension auto-installs it via pip)\n\nThat's it. The extension handles everything else.\n\n## Installation\n\n```bash\n# From local path (development)\npi install ./pi-headroom\n\n# From npm (once published)\npi install npm:pi-headroom\n\n# Quick test without installing\npi -e ./pi-headroom\n```\n\n## Configuration\n\n| Env Variable     | Default                 | Description                                                |\n|------------------|-------------------------|------------------------------------------------------------|\n| `HEADROOM_URL`   | _(none)_                | Set to use your own proxy. **Disables auto-management.**   |\n| `HEADROOM_PORT`  | `8787`                  | Port for the auto-managed proxy                            |\n\n### Auto-management vs. manual mode\n\n- **No env vars set** (default): The extension auto-installs, auto-starts, and auto-stops the proxy. Zero-config.\n- **`HEADROOM_URL` set**: The extension skips auto-management and health-checks the URL you provide. You manage the proxy yourself.\n- **`HEADROOM_PORT` set**: The auto-managed proxy starts on your chosen port instead of 8787.\n\n## Commands\n\n### `/headroom [on|off|status]`\n\nToggle compression or show status.\n\n- `/headroom` or `/headroom status` \u2014 Show current state, proxy mode, and session compression stats\n- `/headroom on` \u2014 Enable compression (auto-starts proxy if needed)\n- `/headroom off` \u2014 Disable compression (passthrough mode)\n\n### `/headroom-health`\n\nCheck proxy health and show diagnostics. Shows whether the proxy is managed by the extension or external.\n\n## Status Bar\n\nThe extension shows progress and compression status in Pi's footer:\n\n- `\u23f3 Installing headroom-ai...` \u2014 Auto-installing the proxy\n- `\u23f3 Starting Headroom proxy...` \u2014 Spawning the proxy\n- `\u2713 Headroom` \u2014 Proxy online, ready to compress\n- `\u2713 Headroom -42% (1,234 saved)` \u2014 Last compression result\n- `\u26a0 Headroom offline` \u2014 Proxy unavailable, using uncompressed context\n- `\u25cb Headroom off` \u2014 Compression disabled by user\n\n## Behavior\n\n- **Zero-config**: Installs and starts the proxy automatically on first use\n- **Smart detection**: Won't reinstall or restart if already running (e.g., you started it manually)\n- **Graceful fallback**: If anything fails, Pi continues with uncompressed context\n- **Crash recovery**: If the proxy crashes mid-session, one automatic restart is attempted\n- **Clean shutdown**: The proxy is stopped on session exit (only if the extension started it)\n- **Cross-platform**: Works on macOS, Linux, and Windows\n\n## Architecture\n\n```\npi-headroom/\n\u251c\u2500\u2500 package.json          # Pi package manifest\n\u251c\u2500\u2500 tsconfig.json\n\u251c\u2500\u2500 src/\n\u2502   \u251c\u2500\u2500 index.ts          # Extension: context hook, lifecycle, commands\n\u2502   \u251c\u2500\u2500 format-bridge.ts  # Pi-AI \u2194 OpenAI message format conversion\n\u2502   \u2514\u2500\u2500 proxy-manager.ts  # Auto-install, start, stop, health check\n\u2514\u2500\u2500 README.md\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-16T03:59:00.629Z",
+    "0.1.0": "2026-04-16T03:59:00.784Z",
+    "modified": "2026-04-16T03:59:00.942Z"
+  },
+  "versions_count": 1,
+  "downloads_last_week": null,
+  "download_trend": []
+}

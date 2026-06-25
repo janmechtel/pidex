@@ -1,0 +1,46 @@
+{
+  "name": "pi-tinyfish-tools",
+  "latest_version": "0.2.1",
+  "description": "TinyFish Web Agent tools for pi \u2014 search, fetch, and goal-driven browser automation",
+  "readme": "# pi-tinyfish\n\nTinyFish Web Agent tools for **pi** \u2014 search, fetch, and goal-driven browser automation.\n\n## Tools\n\n| Tool | API | Description |\n|------|-----|-------------|\n| `tinyfish_search` | Search API | Web search with ranked results, snippets, and URLs |\n| `tinyfish_fetch` | Fetch API | Render URLs and extract clean content (markdown/html/json) |\n| `tinyfish_agent_run` | Agent API (SSE) | Goal-driven browser automation with real-time progress |\n| `tinyfish_run_get` | Runs API | Query a specific automation run's status and result |\n| `tinyfish_run_list` | Runs API | List/search historical automation runs |\n| `tinyfish_run_cancel` | Runs API | Cancel an in-progress run |\n\n## Setup\n\n1. Install:\n\n```bash\npi install npm:pi-tinyfish\n# or local:\npi install ./pi-tinyfish\n```\n\n2. Configure your TinyFish API key (get one from [agent.tinyfish.ai/api-keys](https://agent.tinyfish.ai/api-keys)):\n\n```\n/tinyfish-login\n```\n\n3. Check status:\n\n```\n/tinyfish-status\n```\n\n## Configuration\n\nAPI key and defaults are stored in `~/.pi/agent/pi-tinyfish.json` (permissions `0600`). No global environment variable required.\n\n```json\n{\n  \"apiKey\": \"tf_xxx\",\n  \"defaultLocation\": \"US\",\n  \"defaultLanguage\": \"en\",\n  \"defaultFetchFormat\": \"markdown\",\n  \"defaultBrowserProfile\": \"lite\"\n}\n```\n\nFallback: `TINYFISH_API_KEY` env var for CI / debugging.\n\n## Commands\n\n| Command | Description |\n|---------|-------------|\n| `/tinyfish-login` | Enter your TinyFish API key interactively |\n| `/tinyfish-status` | Show configuration status (key never exposed) |\n| `/tinyfish-logout` | Remove stored API key |\n\n## Development\n\n```bash\nnpm install          # peer deps\nnpm test             # vitest\npi -e .             # load extension for testing\n```\n\n## Tool Result UI\n\nTool results follow a three-layer information model so the LLM gets the full picture while the user only sees what they need on screen:\n\n| Layer | Field | Audience | Purpose |\n|-------|-------|----------|---------|\n| Full data | `content` | LLM | Complete output enters the next conversation turn \u2014 never truncated for the LLM |\n| Structured | `details` | Renderer & state | Compact summary (status, count, urls) used by `renderResult` and persisted in session state |\n| Visual | `renderResult` | Human | Default view is a one-line summary; press `Ctrl+O` (`app.tools.expand`) to expand the full markdown |\n\nThis applies to all six tools. See [src/tools/README.md](./src/tools/README.md) for the per-tool contract.\n\n## Directory layout\n\n```\nindex.ts               # Standard package entry \u2014 re-exports src/index.ts\nsrc/\n  index.ts          # Extension implementation \u2014 registers tools and /commands\n  api.ts            # TinyFish REST/SSE client\n  config.ts         # ~/.pi/agent/pi-tinyfish.json read/write\n  format.ts         # Output text formatters\n  render.ts         # Shared renderResult helpers (collapsible markdown)\n  tools/\n    search.ts       # tinyfish_search\n    fetch.ts        # tinyfish_fetch\n    agent-run.ts    # tinyfish_agent_run\n    run-get.ts      # tinyfish_run_get\n    run-list.ts     # tinyfish_run_list\n    run-cancel.ts   # tinyfish_run_cancel\nskills/\n  tinyfish/\n    SKILL.md        # Agent-facing usage guide\n```\n\n## Design notes\n\n- All six tools are **synchronous** \u2014 `execute()` awaits the full response. No background runs, no `pi.sendMessage` injection. The LLM sees results in the natural tool-call return.\n- `details` is the source of truth for collapsible summaries; `content` is the source of truth for LLM context. They are intentionally not derived from each other.\n- `truncateOutput` (format.ts) only trims `content` when the caller passes `maxBytes`; it never silently strips data the LLM needs.\n",
+  "keywords": [
+    "pi-package",
+    "tinyfish",
+    "web-automation",
+    "search",
+    "fetch",
+    "browser-agent",
+    "extension",
+    "skill"
+  ],
+  "author": {
+    "name": "ssdiwu"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ssdiwu/pi-tinyfish#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ssdiwu/pi-tinyfish.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-24T07:00:02.176Z",
+    "modified": "2026-06-10T16:36:19.542Z",
+    "0.1.0": "2026-05-24T07:00:02.353Z",
+    "0.1.1": "2026-05-24T07:03:06.376Z",
+    "0.1.2": "2026-05-24T07:12:16.060Z",
+    "0.1.3": "2026-05-24T07:21:44.652Z",
+    "0.2.0": "2026-06-05T16:20:25.967Z",
+    "0.2.1": "2026-06-10T16:36:19.412Z"
+  },
+  "versions_count": 6,
+  "downloads_last_week": null,
+  "download_trend": []
+}

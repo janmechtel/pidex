@@ -1,0 +1,45 @@
+{
+  "name": "pi-notifi",
+  "latest_version": "1.0.0",
+  "description": "Pi extension that sends focus-aware desktop notifications when pi finishes a task.",
+  "readme": "# pi-notifi\n\nA focus-aware desktop notification package for [pi](https://pi.dev/). It sends a\nnotification when an interactive pi task finishes, but skips the notification if\nthe tmux window containing that pi agent is already visible in Hyprland.\n\nNotifications include a `Focus` action that jumps back to the originating pi\nagent by restoring the saved Hyprland/Ghostty/tmux target.\n\nThis package is intentionally developed for an Arch + Hyprland + Ghostty +\ntmux + dunst workflow. If your setup differs, copy/fork it and adapt the small\nfocus script.\n\n## Requirements\n\n- Linux with Hyprland\n- Ghostty\n- tmux\n- dunst or another notification daemon compatible with `notify-send` actions\n- `notify-send` from `libnotify`\n- `dunstctl` if using the example keybinds\n- `jq`\n\nOn Arch:\n\n```bash\nsudo pacman -S libnotify dunst jq\n```\n\nYour pi shell should be running inside tmux, and that tmux client should be\ninside a Hyprland-managed Ghostty window.\n\n## Install\n\nFrom npm, once published:\n\n```bash\npi install npm:pi-notifi\n```\n\nFrom git:\n\n```bash\npi install git:github.com/<you>/pi-notifi\n```\n\nFor a one-off test without installing:\n\n```bash\npi -e git:github.com/<you>/pi-notifi\n```\n\nFor local development from this checkout:\n\n```bash\npi -e /absolute/path/to/pi-notifi\n```\n\nThe package manifest loads:\n\n```text\nindex.ts\n```\n\nNo manual symlink is required. The extension invokes the packaged focus helper\nat:\n\n```text\nscripts/notifi-focus\n```\n\n## My dunst / Hyprland setup\n\nHyprland binds:\n\n```ini\nbind = SUPER, X, exec, dunstctl close\nbind = SUPER, N, exec, dunstctl action\n```\n\nDunst mouse behavior:\n\n```ini\nmouse_left_click = do_action, close_current\nmouse_right_click = close_current\n```\n\nBehavior:\n\n- `SUPER X` / right click: close the current notification without action.\n- `SUPER N` / left click: invoke the notification action. Dunst closes actioned notifications automatically.\n- For notifi notifications, the action jumps to the Ghostty/tmux location that\n  produced that specific notification.\n\n## Commands\n\nInside pi:\n\n```text\n/notifi status\n/notifi test\n/notifi on|enable\n/notifi off|disable\n```\n\n`on` / `off` are persisted into the current pi session.\n\n## Configuration\n\nConfiguration is read from the first valid JSON file that exists:\n\n1. `<project>/.pi/notifi.json`\n2. `~/.pi/agent/notifi.json`\n3. `~/.pi/agent/extensions/notifi.json`\n\nExample:\n\n```json\n{\n  \"disabled\": false,\n  \"defaults\": {\n    \"urgency\": \"normal\",\n    \"expireTime\": 0\n  },\n  \"events\": {\n    \"finished\": {\n      \"body\": \"Task Finished\"\n    },\n    \"error\": {\n      \"body\": \"Task Failed\",\n      \"urgency\": \"critical\"\n    },\n    \"aborted\": {\n      \"disabled\": true,\n      \"body\": \"Task Aborted\"\n    }\n  }\n}\n```\n\nTop-level fields:\n\n| Field      | Default | Description                    |\n| ---------- | ------- | ------------------------------ |\n| `disabled` | `false` | Disable all notifi events      |\n| `defaults` | `{}`    | Shared defaults for all events |\n| `events`   | `{}`    | Per-event notification config  |\n\nSupported events:\n\n| Event      | Default disabled | Default focus-aware | Default body    | Default urgency |\n| ---------- | ---------------- | ------------------- | --------------- | --------------- |\n| `finished` | `false`          | `true`              | `Task Finished` | `normal`        |\n| `error`    | `false`          | `false`             | `Task Failed`   | `critical`      |\n| `aborted`  | `true`           | `false`             | `Task Aborted`  | `normal`        |\n\nEach event, and `defaults`, supports:\n\n| Field        | Default                                 | Description                                                         |\n| ------------ | --------------------------------------- | ------------------------------------------------------------------- |\n| `disabled`   | event-specific                          | Disable notifications for this event                                |\n| `focusAware` | event-specific                          | If true, suppress this event when the pi tmux window is visible     |\n| `title`      | `<tmux-session>:<window-index>` or `pi` | Notification title                                                  |\n| `body`       | event-specific                          | Notification body                                                   |\n| `urgency`    | event-specific                          | notify-send urgency: `low`, `normal`, or `critical`                 |\n| `expireTime` | `0`                                     | notify-send expire time in ms; `0` requests persist until dismissed |\n\nEnvironment variables with the old `PI_NOTIFI_*` names override JSON for quick\none-off changes. Invalid JSON config files are ignored so a bad config does not\nbreak notification delivery.\n\n## Behavior\n\nFor focus-aware events, notification is suppressed only when all of these are true:\n\n1. pi is running inside tmux.\n2. notifi identifies the tmux session/window containing the pi pane.\n3. an attached tmux client is currently viewing that same tmux window.\n4. that tmux client maps through its process tree to a Hyprland window.\n5. that Hyprland window is on a workspace visible on a monitor.\n\nPane focus does not matter for notification suppression. If the pi pane is\nanywhere in the visible tmux window, no notification is sent. Notification\nactions still try to focus the original pi pane after switching to the saved\ntmux session/window.\n\nIf the tmux window is not visible, notifi sends a persistent notification with a\n`Focus` action:\n\n```text\n<title: tmux-session:window-index>\n<body: Task Finished | Task Failed | Task Aborted>\n<action: Focus>\n```\n\nOnly `finished` is focus-aware by default. `error` and `aborted` are not\nfocus-aware by default, so enabled error/abort notifications fire even when the\npi tmux window is visible. Aborted tasks still do not notify by default because\nthe `aborted` event is disabled by default. Headless/print-mode pi runs do not\nnotify.\n\n## Action target cache\n\nEach notification gets a unique UUID target id. The extension writes that\nnotification's jump target to:\n\n```text\n${XDG_CACHE_HOME:-~/.cache}/notifi/targets/<target-id>.json\n```\n\nEach notification action captures its own target id, so multiple concurrent pi\nagents and long-lived notifications do not overwrite each other.\n\n`scripts/notifi-focus <target-id>`:\n\n1. validates the target id\n2. reads the target file\n3. deletes the consumed target file\n4. prunes target files older than 24 hours\n5. switches Hyprland to the saved Ghostty workspace/window when possible\n6. switches tmux to the saved session/window\n7. focuses the original pi pane if it still exists\n\nIf no existing Ghostty/tmux client can be mapped back to Hyprland but the tmux\nsession/window still exists, the action opens Ghostty attached to that tmux\nsession/window. If the tmux session/window no longer exists, it exits\nsuccessfully and does nothing.\n\nTarget files for notifications dismissed without action are cleaned up the next\ntime a notifi action is consumed.\n\n## Edge cases\n\n- If multiple Ghostty windows are attached to tmux, notifi prefers one already\n  viewing the target window, then one in the target session, then any usable tmux\n  client it can map back to Hyprland.\n- If no saved/reusable Ghostty/Hyprland window exists, notifi falls back to\n  opening Ghostty attached to the saved tmux session/window.\n- If the saved tmux session or window no longer exists, the action exits\n  successfully and does nothing.\n- If the saved tmux pane no longer exists, the action still switches to the\n  saved tmux window and skips pane focus.\n- If the target file is missing, malformed, or older than 24 hours when pruning\n  runs, the action exits successfully and/or removes stale metadata.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "notifications",
+    "notification",
+    "notify",
+    "notice",
+    "warning",
+    "ping",
+    "notify-send",
+    "hyprland",
+    "tmux",
+    "ghostty",
+    "dunst"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-20T07:39:51.472Z",
+    "modified": "2026-05-24T00:27:34.690Z",
+    "0.1.0": "2026-05-20T07:39:51.653Z",
+    "0.1.1": "2026-05-20T08:03:05.569Z",
+    "0.1.2": "2026-05-20T08:19:56.033Z",
+    "0.1.3": "2026-05-20T08:28:54.972Z",
+    "0.1.4": "2026-05-20T09:00:53.159Z",
+    "0.1.5": "2026-05-20T09:13:31.282Z",
+    "1.0.0": "2026-05-24T00:27:34.262Z"
+  },
+  "versions_count": 7,
+  "downloads_last_week": null,
+  "download_trend": []
+}

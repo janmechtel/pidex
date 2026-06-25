@@ -1,0 +1,348 @@
+{
+  "name": "pi-stop",
+  "latest_version": "1.3.0",
+  "description": "ALWAYS stops the current pi.dev agent \u2014 keyboard shortcut, /stop command, and standalone kill script",
+  "readme": "# pi-stop\n\n**ALWAYS** stops the current [pi.dev](https://pi.dev) coding agent \u2014 aborts streaming, kills\nrunning tool calls, stops subagents, and reloads your last message for resending.\n\nThree independent stop mechanisms, each covering failure modes of the others:\n\n| # | Mechanism | Scope | When it works |\n|---|-----------|-------|--------------|\n| 1 | `/stop` command | Inside pi | Agent is responsive to keyboard input |\n| 2 | `Ctrl+Shift+X` | Inside pi | Agent is streaming, even if thinking/tool-calling |\n| 3 | `pi-stop.sh` | Any terminal | Agent is stuck, hung, or in a broken state |\n\n## Install\n\n```bash\npi install npm:pi-stop\n```\n\nOr from a local checkout:\n\n```bash\npi install /path/to/pi-stop\n```\n\n## Usage\n\n### Inside pi \u2014 `/stop` command\n\nType `/stop` and press Enter anytime \u2014 even while the agent is mid-response:\n\n```\n/stop\n```\n\nWhat happens:\n1. `ctx.abort()` fires immediately \u2014 stops streaming, tool calls, subagents\n2. Waits up to **15 seconds** for the agent to fully settle\n3. If the agent doesn't stop in time, escalates to SIGINT \u2192 SIGTERM \u2192 SIGKILL\n4. Your last user message is loaded into the editor for editing and resending\n\n### Inside pi \u2014 `Ctrl+Shift+X` shortcut\n\nPress `Ctrl+Shift+X` at any time \u2014 same as `/stop` but faster, works even while\nthe agent is streaming mid-thought.\n\nCan be customised in `~/.pi/agent/keybindings.json`:\n\n```json\n{\n  \"Ctrl+Shift+Z\": \"stop\"\n}\n```\n\n### Outside pi \u2014 `pi-stop.sh`\n\nWhen pi itself is frozen, hung, or unresponsive:\n\n```bash\n./pi-stop.sh           # graceful stop\n./pi-stop.sh -f        # force kill (skip SIGINT)\n./pi-stop.sh -d        # verbose debug output\n```\n\nThis script:\n1. Finds all `pi-coding-agent` processes via `pgrep`\n2. Sends SIGINT (graceful abort, skip with `-f`)\n3. Waits 3 seconds, then SIGTERM if alive\n4. Waits 2 seconds, then SIGKILL if still alive\n5. Also kills orphan child shell processes (bash/sh/zsh)\n\n## How it ALWAYS stops\n\nThe escalation chain guarantees termination:\n\n```\nctx.abort()  \u2192  ctx.waitForIdle()  \u2192  SIGINT  \u2192  SIGTERM  \u2192  SIGKILL\n   (API)           (15s timeout)      (3s)       (2s)      (nuclear)\n```\n\nEach layer covers the failure modes of the layer above it:\n\n- **`abort()`** fails if the abort signal is already consumed or the agent is in a bad state\n- **`waitForIdle()`** hangs if the agent never emits `agent_end` (e.g., subagent stuck in a loop)\n- **SIGINT** is ignored if the process is in an uninterruptible sleep\n- **SIGTERM** is caught but ignored by some misbehaving processes\n- **SIGKILL** cannot be caught or ignored \u2014 always terminates\n\n## File layout\n\n```\npi-stop/\n\u251c\u2500\u2500 extensions/\n\u2502   \u2514\u2500\u2500 stop.ts        # Pi extension: /stop command + Ctrl+Shift+X shortcut\n\u251c\u2500\u2500 test/\n\u2502   \u2514\u2500\u2500 stop.test.ts   # Tests for the extension\n\u251c\u2500\u2500 pi-stop.sh          # Standalone kill script (works outside pi)\n\u251c\u2500\u2500 package.json\n\u2514\u2500\u2500 README.md\n```\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent"
+  ],
+  "author": {
+    "name": "greedy",
+    "email": "j.locker@whonix.net"
+  },
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./extensions/stop.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-18T09:17:57.619Z",
+    "modified": "2026-06-08T12:51:29.055Z",
+    "1.0.1": "2026-05-18T09:17:57.831Z",
+    "1.1.0": "2026-05-18T09:43:35.643Z",
+    "1.1.1": "2026-05-18T10:26:39.258Z",
+    "1.2.0": "2026-05-24T15:09:53.047Z",
+    "1.3.0": "2026-06-08T12:51:28.914Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 26,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 415
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 166
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 10
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 151
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 48
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 25
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 2
+    }
+  ]
+}

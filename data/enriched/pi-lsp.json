@@ -1,0 +1,38 @@
+{
+  "name": "pi-lsp",
+  "latest_version": "0.1.7",
+  "description": "Declarative Pi extension for LSP diagnostics and language-server navigation tools.",
+  "readme": "# pi-lsp\n\nDeclarative Pi extension for LSP diagnostics and language-server navigation tools.\n\n## Why\n\n`pi-lsp` lets users configure language servers with JSON instead of installing a separate Pi plugin for every language.\n\nIt is intentionally separate from [`pi-code-quality`](https://www.npmjs.com/package/pi-code-quality): LSP servers are long-lived JSON-RPC processes, while formatters/linters are short-lived command-line tools.\n\n## Install\n\n```bash\npi install npm:pi-lsp\n```\n\nFor local development:\n\n```bash\npi install /absolute/path/to/pi-lsp\n```\n\n## Configuration\n\nGlobal config, trusted automatically:\n\n```text\n~/.pi/agent/lsp.json\n```\n\nProject-local config, requires trust:\n\n```text\n.pi/lsp.json\n```\n\nProject entries override global entries with the same `id`. A project entry with `\"enabled\": false` disables the global entry with that `id`.\n\n## Trust and security\n\nProject-local config can auto-run binaries on your machine. For that reason:\n\n- project-local config content is hashed;\n- unknown hashes prompt for `Trust once`, `Trust always`, or `Reject`;\n- the prompt shows every configured LSP binary;\n- `Trust always` stores the hash in `~/.pi/agent/trust/lsp.json`;\n- changing the config changes the hash and asks again;\n- non-interactive mode rejects project-local config by default;\n- servers are spawned as `bin` + `args[]`, never as shell strings.\n\nGlobal config is considered trusted because it is user-owned agent configuration.\n\n## Example config\n\n```json\n{\n  \"version\": 1,\n  \"servers\": [\n    {\n      \"id\": \"gopls\",\n      \"enabled\": true,\n      \"include\": [\"**/*.go\"],\n      \"rootMarkers\": [\"go.mod\"],\n      \"bin\": \"gopls\",\n      \"args\": [],\n      \"cwd\": \"{root}\",\n      \"languageIdByExtension\": { \".go\": \"go\" },\n      \"startupTimeoutMs\": 45000,\n      \"diagnosticsWaitMs\": 1500,\n      \"initializationOptions\": {},\n      \"settings\": {}\n    },\n    {\n      \"id\": \"pyright\",\n      \"enabled\": true,\n      \"include\": [\"**/*.py\", \"**/*.pyi\"],\n      \"rootMarkers\": [\"pyproject.toml\", \"setup.py\", \"requirements.txt\"],\n      \"bin\": \"pyright-langserver\",\n      \"args\": [\"--stdio\"],\n      \"cwd\": \"{root}\",\n      \"languageIdByExtension\": { \".py\": \"python\", \".pyi\": \"python\" },\n      \"startupTimeoutMs\": 45000,\n      \"diagnosticsWaitMs\": 2000,\n      \"initializationOptions\": {},\n      \"settings\": {}\n    },\n    {\n      \"id\": \"clangd\",\n      \"enabled\": true,\n      \"include\": [\"**/*.c\", \"**/*.h\", \"**/*.cpp\", \"**/*.hpp\", \"**/*.cc\", \"**/*.cxx\"],\n      \"rootMarkers\": [\"compile_commands.json\", \".clangd\"],\n      \"bin\": \"clangd\",\n      \"args\": [\"--background-index\"],\n      \"cwd\": \"{root}\",\n      \"languageIdByExtension\": {\n        \".c\": \"c\",\n        \".h\": \"c\",\n        \".cpp\": \"cpp\",\n        \".hpp\": \"cpp\",\n        \".cc\": \"cpp\",\n        \".cxx\": \"cpp\"\n      },\n      \"startupTimeoutMs\": 45000,\n      \"diagnosticsWaitMs\": 2000,\n      \"initializationOptions\": {},\n      \"settings\": {}\n    }\n  ]\n}\n```\n\n## Behavior\n\nAfter a successful `write` or `edit`:\n\n1. finds servers matching `include` / `exclude`;\n2. finds `{root}` using `rootMarkers`;\n3. starts or reuses one LSP process per `(server id, root)`;\n4. reads the current file content;\n5. sends `textDocument/didOpen` or `textDocument/didChange`;\n6. sends `textDocument/didSave` when the server supports save;\n7. waits `diagnosticsWaitMs`;\n8. appends the latest diagnostics to the original tool result.\n\nDiagnostics do **not** make `write` / `edit` fail. They are extra context for the model. Summaries that contain issues are also sent as a user-visible, tool-styled diagnostic notice.\n\nOn `session_shutdown`, the extension sends `shutdown`, then `exit`, then kills the process as fallback.\n\n## LLM tools\n\n`pi-lsp` registers tools for the model, not slash commands:\n\n- `lsp_diagnostics({ path })`\n- `lsp_hover({ path, line, character })`\n- `lsp_definition({ path, line, character })`\n- `lsp_references({ path, line, character, includeDeclaration })`\n- `lsp_symbols({ path })`\n\n## Relative paths and placeholders\n\nPath resolution:\n\n1. absolute paths are used as-is;\n2. relative `bin`, `config`, and `cwd` values with `/` are resolved relative to `{root}`;\n3. bare binary names are resolved through `PATH`.\n\nPlaceholders:\n\n- `{workspace}` \u2014 Pi working directory or directory containing project `.pi` config\n- `{root}` \u2014 nearest directory containing one of `rootMarkers`\n- `{file}` \u2014 absolute file path\n- `{relFile}` \u2014 file path relative to `{root}`\n- `{dir}` \u2014 absolute file directory\n- `{relDir}` \u2014 file directory relative to `{root}`\n- `{config}` \u2014 resolved server config path\n- `{configDir}` \u2014 directory containing `{config}`\n\n## Output example\n\n```text\nLSP diagnostics:\n\n\u2705 gopls: no diagnostics\n```\n\n```text\nLSP diagnostics:\n\n\u26a0\ufe0f pyright:\nsrc/app.py:12:8 - error: Argument of type \"str\" cannot be assigned to parameter \"int\"\n```\n\n## Disable a server\n\n```json\n{\n  \"version\": 1,\n  \"servers\": [{ \"id\": \"gopls\", \"enabled\": false }]\n}\n```\n\n## Development\n\n```bash\nnpm install\nnpm run verify\nnpm pack --dry-run\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "lsp",
+    "language-server",
+    "diagnostics"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "extensions/pi-lsp/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-11T18:28:26.836Z",
+    "modified": "2026-05-11T19:59:20.460Z",
+    "0.2.0": "2026-04-17T10:42:57.743Z",
+    "0.1.0": "2026-05-11T18:28:26.989Z",
+    "0.1.1": "2026-05-11T18:43:17.868Z",
+    "0.1.2": "2026-05-11T19:00:18.227Z",
+    "0.1.3": "2026-05-11T19:10:06.562Z",
+    "0.1.4": "2026-05-11T19:31:13.358Z",
+    "0.1.5": "2026-05-11T19:44:11.683Z",
+    "0.1.6": "2026-05-11T19:51:29.062Z",
+    "0.1.7": "2026-05-11T19:59:20.369Z"
+  },
+  "versions_count": 8,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,38 @@
+{
+  "name": "pi-dax",
+  "latest_version": "0.1.2",
+  "description": "Dual Active eXtension \u2014 a symbiont for the Pi coding agent that provides peer code review and loop prevention",
+  "readme": "# \u03c0-DAX \u2014 Dual Active eXtension\n\n**DAX** is a *symbiont* for the [Pi coding agent](https://pi.dev).\n\nIn *Star Trek: Deep Space Nine*, the Dax symbiont joins with a host, carrying the memories and wisdom of past lifetimes. **\u03c0-DAX** brings that same spirit to LLM-assisted development: a lightweight secondary model joins with the primary worker model, offering real-time peer review, loop detection, and oversight \u2014 not as a command-and-control watchdog, but as an **active partner** that helps the host produce better code.\n\n---\n\n## How It Works\n\nExample: Two local models communicate via `llama.cpp` (or any OpenAI-compatible server):\n\n| Role | Model | Port | Responsibility |\n|------|-------|------|---------------|\n| **Host** (Worker) | Gemma 4 12B | `:8080` | Drives the conversation, writes code, executes tools |\n| **DAX** (Symbiont) | Qwen 3.5 4B | `:8081` | Reviews every edit, detects loops, prunes repeating context |\n\nDAX hooks into three Pi lifecycle events:\n\n- **`tool_call`** \u2014 Tracks tool repetition for loop detection; intercepts `write`/`edit` and sends the proposed change to DAX for peer review. If DAX finds bugs, the edit is blocked and feedback is returned to the host.\n- **`message_end`** \u2014 Heuristic loop detection via Jaccard similarity of consecutive assistant messages.\n- **`context`** \u2014 Queries the DAX LLM for semantic loop verification; prunes looping turns and injects a steering warning when a loop is confirmed.\n\n---\n\n## Project Structure\n\n```\npi-dax/\n\u251c\u2500\u2500 src/\n\u2502   \u251c\u2500\u2500 index.ts          # Extension entry point (default export, event handlers)\n\u2502   \u251c\u2500\u2500 config.ts         # DAX provider configuration (models.json, API keys)\n\u2502   \u251c\u2500\u2500 peer-review.ts    # Code review logic (reviewCodeChange)\n\u2502   \u2514\u2500\u2500 loops.ts          # Loop detection & pruning utilities\n\u251c\u2500\u2500 tests/                # Test files\n\u251c\u2500\u2500 package.json          # Package manifest with pi.extensions registration\n\u251c\u2500\u2500 tsconfig.json         # TypeScript configuration\n\u251c\u2500\u2500 README.md             # You are here\n\u2514\u2500\u2500 LICENSE               # MIT\n```\n\n---\n\n## Setup\n\n### Prerequisites\n\n- [Pi coding agent](https://github.com/anomalyco/pi-coding-agent) installed\n- Two `llama.cpp` server instances (or any OpenAI-compatible API)\n\n### Step 1: Start the llama.cpp Servers\n\n**Host (Worker, port 8080):**\n```bash\n./llama-server -m models/gemma-4-12b.gguf --port 8080\n```\n\n**DAX (Symbiont / Reviewer, port 8081):**\n```bash\n./llama-server -m models/qwen-4b.gguf --port 8081\n```\n\n### Step 2: Configure Pi Models (`models.json`)\n\nEdit `~/.pi/agent/models.json` to register the models. You can either run both models locally (Option A), or route the DAX symbiont to a remote API provider like OpenRouter or OpenAI (Option B). \n\n> [!IMPORTANT]\n> The provider key in the `providers` object **must** be exactly named `\"local-dax\"`, as the extension explicitly looks up this identifier under the hood\u2014even when it resolves to a remote endpoint.\n\n#### Option A: Fully Local Setup (Gemma + Qwen)\nFor a fully offline setup using two local `llama.cpp` servers:\n\n```json\n{\n  \"providers\": {\n    \"local-worker\": {\n      \"baseUrl\": \"http://localhost:8080/v1\",\n      \"api\": \"openai-completions\",\n      \"apiKey\": \"local\",\n      \"compat\": {\n        \"supportsDeveloperRole\": false,\n        \"supportsReasoningEffort\": false\n      },\n      \"models\": [\n        {\n          \"id\": \"gemma-4-12b\",\n          \"name\": \"Gemma 4 12B (Host)\",\n          \"contextWindow\": 262144\n        }\n      ]\n    },\n    \"local-dax\": {\n      \"baseUrl\": \"http://localhost:8081/v1\",\n      \"api\": \"openai-completions\",\n      \"apiKey\": \"local\",\n      \"compat\": {\n        \"supportsDeveloperRole\": false,\n        \"supportsReasoningEffort\": false\n      },\n      \"models\": [\n        {\n          \"id\": \"qwen-4b\",\n          \"name\": \"Qwen 3.5 4B (DAX)\",\n          \"contextWindow\": 262144\n        }\n      ]\n    }\n  }\n}\n```\n\n*Note: For local llama-servers, the `apiKey` can be any placeholder string.*\n\n#### Option B: Remote Setup (e.g., OpenRouter / any OpenAI-compatible API)\nIf you prefer not to run a local server for the symbiont, configure the `\"local-dax\"` provider to point to a remote endpoint by supplying their base URL, model ID, and API key environment variable (which the extension will resolve in real time):\n\n```json\n{\n  \"providers\": {\n    \"local-dax\": {\n      \"baseUrl\": \"https://openrouter.ai/api/v1\",\n      \"api\": \"openai-completions\",\n      \"apiKey\": \"$OPENROUTER_API_KEY\",\n      \"models\": [\n        {\n          \"id\": \"qwen/qwen-2.5-7b-instruct\",\n          \"name\": \"Qwen 2.5 7B (DAX)\",\n          \"contextWindow\": 32768\n        }\n      ]\n    }\n  }\n}\n```\n\n### Step 3: Configure Default Session Model\n\nCreate a project-local `.pi/settings.json`:\n\n```json\n{\n  \"defaultModel\": \"local-worker/gemma-4-12b\",\n  \"defaultProjectTrust\": \"trust\"\n}\n```\n\n### Step 4: Load DAX\n\n**Option A \u2014 Install from npm (once):**\n```bash\npi install npm:pi-dax\n```\n\n**Option B \u2014 Load from path (for local development):**\n```bash\npi -e /path/to/pi-dax/src/index.ts\n```\n\nLook for the startup notification:\n\n> `DAX symbiont active \u2014 peer review & loop prevention on port 8081`\n\n### Commands\n\n- `/dax` \u2014 Show current DAX status\n- `/dax review on` / `/dax review off` \u2014 Toggle peer code review\n\n---\n\n## Development\n\n```bash\nnpm install\nnpm run typecheck   # TypeScript type checking\nnpm test            # Run tests\n```\n\n---\n\n## The Symbiont Philosophy\n\nDAX is not a supervisor. It is a **symbiont** \u2014 a partner that enhances the host without replacing it. The host makes the decisions and drives the work; DAX offers its accumulated wisdom in two critical moments:\n\n- **Before a file is written** \u2014 reviewing code with fresh eyes\n- **When the host stalls** \u2014 recognizing the loop and clearing the path forward\n\nThis symbiotic relationship gives the host the benefit of a second model's perspective without the overhead of explicit hand-offs, context switching, or multi-agent orchestration.\n\n---\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pair-programming",
+    "code-review",
+    "loop-detection",
+    "llm"
+  ],
+  "author": {
+    "name": "cwt114"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/cwt/pi-dax",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cwt/pi-dax.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-06-13T06:59:23.983Z",
+    "modified": "2026-06-17T09:45:00.065Z",
+    "0.1.0": "2026-06-13T06:59:24.190Z",
+    "0.1.1": "2026-06-15T08:33:19.334Z",
+    "0.1.2": "2026-06-17T09:44:59.932Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}

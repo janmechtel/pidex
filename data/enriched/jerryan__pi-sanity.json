@@ -1,0 +1,52 @@
+{
+  "name": "@jerryan/pi-sanity",
+  "latest_version": "0.4.2",
+  "description": "Pi extension for sanity checks on agent operations",
+  "readme": "# Pi-Sanity\r\n\r\nA [Pi](https://pi.dev/) extension that adds sanity checks to agent operations. It acts as a configurable safety net to prevent accidental file modifications and catch potentially dangerous commands before they execute.\r\n\r\n> \u26a0\ufe0f **IMPORTANT SAFETY DISCLAIMER**\r\n>\r\n> **Pi-Sanity provides NO GUARANTEED SAFETY.** This is not a security extension and does not prevent carefully-crafted or obfuscated malicious commands from executing.\r\n>\r\n> - The intention is only to prevent **careless mistakes** while adding as little friction as possible to general development workflows\r\n> - This is **NOT a replacement** for Docker-like containers or OS-level sandboxes\u2014those still provide the utmost safety\r\n> - Determined users can bypass these checks through command obfuscation, encoding, or other techniques\r\n> - For true isolation, use proper sandboxing technologies like containers, VMs, or restricted user accounts\r\n\r\n## What It Does\r\n\r\nPi-Sanity intercepts agent operations and validates them against configurable rules:\r\n\r\n- **File Operations**: Checks reads, writes, and deletes against permission rules to prevent accidental changes\r\n- **Command Validation**: Analyzes bash commands to detect potentially dangerous operations that might be typos or mistakes\r\n- **Smart Defaults**: Protects system directories, home folder, and git repositories while allowing normal development workflows\r\n\r\nThink of it as a \"seatbelt\" for your agent\u2014not a guarantee against all accidents, but helpful protection against common mistakes.\r\n\r\n## Installation\r\n\r\n```bash\r\npi install npm:@jerryan/pi-sanity\r\n```\r\n\r\nOr add to your project's `.pi/config.toml`:\r\n\r\n```toml\r\n[extensions]\r\n\"@jerryan/pi-sanity\" = \"latest\"\r\n```\r\n\r\n## Default Protection\r\n\r\nOut of the box, Pi-Sanity provides sensible defaults:\r\n\r\n### File Operations\r\n\r\n| Operation | Default | Home Directory | Current Project | Temp Files |\r\n|-----------|---------|----------------|-----------------|------------|\r\n| **Read** | Allow | Ask for credential files | Allow | Allow |\r\n| **Write** | Deny | Ask | Allow | Allow |\r\n\r\nDeletion is checked against **write** permissions (deleting a file modifies its parent directory). There is no separate `permissions.delete` section. |\r\n\r\n### Command Rules\r\n\r\n- **Safe commands** (`cat`, `grep`, `cp`, `mv`, `rm`): Allowed with path checking\r\n- **Dangerous commands** (`dd`): Denied\r\n- **Package managers**: Local installs allowed, global installs denied\r\n- **Invalid syntax**: Parse errors are denied\r\n\r\n## When Pi-Sanity Intervenes\r\n\r\nPi-Sanity may ask for confirmation when:\r\n\r\n- Reading known credential locations (`~/.ssh/*`, `~/.aws/**`, `~/.kube/config`, etc.)\r\n- Writing outside the current project directory\r\n- Deleting files outside the current project directory\r\n- Modifying git internals (`.git/` directory)\r\n- Using force flags (`rm -f`, `cp -f`, etc.)\r\n\r\nExample interaction:\r\n\r\n```\r\nAgent wants to: echo \"secret\" > ~/.env\r\n\r\n\u26a0\ufe0f  Pi-Sanity (30s)\r\n    Writing to home directory requires confirmation\r\n\r\n    Write file: /home/user/.env\r\n\r\n    Allow this operation?\r\n    [Yes] [No]\r\n```\r\n\r\nIf you select \"Yes\", the operation proceeds. If you select \"No\", press Escape, or let the 30-second timeout expire, the operation is blocked.\r\n\r\n## Configuration\r\n\r\nPi-Sanity loads configuration from multiple sources:\r\n\r\n1. **Built-in defaults** - Sensible base protection (requires rebuild to modify)\r\n2. **User config** - `~/.pi/agent/sanity.toml` - Your personal preferences (hot-reloadable)\r\n3. **Project config** - `.pi/sanity.toml` - Project-specific rules (hot-reloadable)\r\n\r\nLater configs override earlier ones. Changes to user or project config are picked up automatically on the next tool call (lazy mtime check).\r\n\r\n### Common Customizations\r\n\r\nCreate `.pi/sanity.toml` in your project:\r\n\r\n```toml\r\n# Allow writing to a shared output directory\r\n[[permissions.write.overrides]]\r\npath = [\"$SHARED_OUTPUT_DIR/**\"]\r\naction = \"allow\"\r\nreason = \"Shared build output directory\"\r\n\r\n# Protect sensitive project files\r\n[[permissions.read.overrides]]\r\npath = [\".env\", \".env.*\"]\r\naction = \"ask\"\r\nreason = \"Environment files may contain secrets\"\r\n```\r\n\r\n### Paranoid Mode\r\n\r\nFor high-security environments, create `~/.pi/agent/sanity.toml`:\r\n\r\n```toml\r\n[permissions.write]\r\ndefault = \"deny\"\r\nreason = \"All writes require explicit approval\"\r\n\r\n[[permissions.write.overrides]]\r\npath = [\"{{CWD}}/**\"]\r\naction = \"ask\"\r\nreason = \"Even project writes require confirmation\"\r\n```\r\n\r\n### CI/CD Mode\r\n\r\nFor automated environments, be more permissive:\r\n\r\n```toml\r\n[permissions.write]\r\ndefault = \"allow\"\r\n\r\n[[permissions.write.overrides]]\r\npath = [\"{{HOME}}/.ssh/**\", \"{{HOME}}/.aws/**\"]\r\naction = \"deny\"\r\nreason = \"Never delete credential files\"\r\n```\r\n\r\n## Configuration Reference\r\n\r\nSee [skills/sanity-config/references/CONFIG.md](skills/sanity-config/references/CONFIG.md) for complete documentation of:\r\n\r\n- Permission sections (read, write)\r\n- Path patterns and variable expansion\r\n- Command rules and flag restrictions\r\n- Environment pre-checks\r\n\r\n## Limitations\r\n\r\nPi-Sanity uses static analysis and intentionally avoids:\r\n\r\n- Executing commands to evaluate substitutions\r\n- Resolving symlinks at check time\r\n- Parsing dynamic execution (`eval`, `xargs`, etc.)\r\n\r\nThis follows a \"low friction over comprehensive protection\" philosophy. See [LIMITATIONS.md](LIMITATIONS.md) for details.\r\n\r\n## Why \"Low-Friction First\"?\r\n\r\n### Approval Fatigue Is a Safety Issue\r\n\r\nFrequent approval prompts can be counterproductive:\r\n\r\n- **Habituation**: Users may start automatically clicking \"yes\" without reading\r\n- **Workarounds**: Users might configure `dangerously-skip-permissions` to avoid interruptions\r\n- **Missed real risks**: When every operation requires approval, genuine dangers blend into the noise\r\n\r\nPi-Sanity intentionally allows most normal development operations and only intervenes on clearly suspicious actions. This keeps the signal-to-noise ratio high.\r\n\r\n### Alternative: pi-unbash\r\n\r\nThis project is heavily inspired by [pi-unbash](https://github.com/jdiamond/pi-unbash), which takes a whitelist-based, ask-if-unsure approach. In theory, pi-unbash is **safer** than Pi-Sanity because it:\r\n\r\n- Whitelists known-safe commands rather than allowing unrecognized ones\r\n- Asks for confirmation more frequently\r\n- Takes a more conservative stance by default\r\n\r\n**Consider pi-unbash if:**\r\n- You don't mind frequent approval prompts\r\n- You want maximum safety and are willing to trade friction for it\r\n- You prefer a whitelist approach over blacklist\r\n\r\nPi-Sanity exists for users who find that approach too interruptive for daily development workflows.\r\n\r\n## License\r\n\r\nApache License 2.0\r\n\r\n## Contributing\r\n\r\nSee [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute to this project.\r\n\r\nBy contributing, you agree that your contributions will be licensed under the Apache License 2.0.\r\n",
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "pi-package",
+    "agent",
+    "ai",
+    "safety",
+    "sanity-checks",
+    "bash",
+    "security"
+  ],
+  "author": {
+    "name": "Jerry An",
+    "email": "jerryan@gmx.com"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/JerryAZR/pi-sanity#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JerryAZR/pi-sanity.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/extension.js"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-04-12T15:11:29.562Z",
+    "modified": "2026-06-19T04:40:42.595Z",
+    "0.1.0": "2026-04-12T15:11:29.802Z",
+    "0.1.1": "2026-04-12T15:54:33.171Z",
+    "0.1.2": "2026-04-12T17:08:19.884Z",
+    "0.2.0": "2026-04-17T15:51:45.650Z",
+    "0.2.1": "2026-04-17T16:13:16.868Z",
+    "0.2.2": "2026-04-17T17:22:47.031Z",
+    "0.3.0": "2026-04-28T06:23:25.380Z",
+    "0.4.0": "2026-05-21T03:50:25.588Z",
+    "0.4.1": "2026-05-22T02:09:29.588Z",
+    "0.4.2": "2026-06-19T04:40:42.482Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": null,
+  "download_trend": []
+}

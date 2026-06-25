@@ -1,0 +1,62 @@
+{
+  "name": "pi-fast-subagent",
+  "latest_version": "0.9.4",
+  "description": "In-process subagent delegation for pi with single, parallel, and background modes",
+  "readme": "# pi-fast-subagent\n\nIn-process subagent delegation for [pi](https://github.com/badlogic/pi-mono) with max visibility.\n\nRuns subagents with `createAgentSession()` in same process instead of spawning `pi` subprocesses. This removes subprocess cold-start and reuses pi auth/model registry.\n\n## Features\n\n- Single mode: `{ agent, task }`\n- Parallel mode: `{ tasks: [...] }`\n- Background mode: `{ agent, task, background: true }` \u2014 fire-and-forget with poll/cancel\n- Slash commands for background job status + cancellation via selector UI\n- Per-call model override\n- User + project agent discovery\n- Project agents override user agents\n- Max nesting depth guard\n- Streamed prompt preview while the parent LLM is writing the subagent task\n- Chronological expanded view (Ctrl+O): subagent tool calls and response text interleaved in execution order\n- Collapsed view shows response + trailing tool calls as an indented tree\n\n## Settings\n\nConfigure preview sizes in `~/.pi/agent/settings.json` or `.pi/settings.json`:\n\n```json\n{\n  \"fastSubagent\": {\n    \"previewLines\": 12,\n    \"promptPreviewLines\": 12\n  }\n}\n```\n\n- `previewLines` \u2014 response text preview lines in collapsed view (default 12)\n- `promptPreviewLines` \u2014 task/prompt preview lines in collapsed view (default 12)\n\n## Install\n\n```bash\npi install /absolute/path/to/pi-fast-subagent\n```\n\nOr from npm after publish:\n\n```bash\npi install npm:pi-fast-subagent\n```\n\n## Package contents\n\nThis package exposes one pi extension:\n\n- `./index.ts` \u2014 registers `subagent` tool\n\n## Included agents\n\nThis package bundles default agents:\n\n- `scout` \u2014 code exploration specialist\n- `general` \u2014 general-purpose helper\n\nDiscovery priority:\n\n1. bundled package agents\n2. `~/.pi/agent/agents/`\n3. nearest `.pi/agents/`\n4. nearest legacy `.agents/`\n\nUser and project agents override bundled agents with same name.\n\nExample override agent file:\n\n```md\n---\nname: scout\ndescription: Explore codebases and summarize findings\nmodel: anthropic/claude-haiku-4-5\n---\n\nYou are code exploration specialist. Read relevant files, trace data flow, summarize findings clearly.\n```\n\n### Agent frontmatter\n\n| Field | Required | Description |\n|-------|----------|-------------|\n| `name` | yes | Unique agent identifier used in `subagent({ agent: \"...\" })` |\n| `description` | yes | One-line description shown in `/fast-subagent:agent` |\n| `model` | no | Model override, format `provider/model-id` (e.g. `anthropic/claude-haiku-4-5`) |\n| `tools` | no | Tool allowlist (see below) |\n| `maxDepth` | no | Nested subagent depth this agent may spawn. Default `0` means this agent cannot call `subagent`. |\n\n### `tools:` field\n\nControls which tools the subagent has access to. The default is **all tools** \u2014 builtins plus parent extensions (web_search, fetch_content, mcp, playwright, \u2026). Agents opt into lean mode with `tools: builtins` or an explicit built-in allowlist.\n\n| Value | Behavior |\n|-------|----------|\n| *(omitted)* | Builtins + every parent extension (**default**) |\n| `all` | Same as omitted \u2014 explicit \"everything\" |\n| `builtins` | Builtins only \u2014 `read, bash, edit, write, grep, find, ls` |\n| `none` | No tools at all \u2014 pure reasoning agent |\n| comma list | Allowlist; extensions auto-load only if any listed tool is non-builtin |\n\nBuilt-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`.\n\nExamples:\n\n```md\n---\nname: writer\ndescription: Pure-reasoning writing assistant\ntools: none\n---\n```\n\n```md\n---\nname: scout\ndescription: Read-only code explorer\n# drop `edit` and `write` so the agent cannot mutate the codebase\ntools: read, bash, grep, find, ls\n---\n```\n\n```md\n---\nname: researcher\ndescription: Web research agent\n# listing `web_search` triggers extension loading; `read` + `write` keep the rest local\ntools: read, write, web_search, fetch_content\n---\n```\n\n```md\n---\nname: general\ndescription: Do-anything helper\n# `tools` omitted means all tools; `tools: all` is equivalent\ntools: all\n---\n```\n\n> **Performance note:** omitted `tools` / `tools: all` loads every installed pi extension into the subagent session. That adds startup cost (extension init, possibly MCP server spawn, playwright runtime, \u2026) and token cost (bigger system prompt). Use `tools: builtins` or list specific tools for tight, focused agents.\n\n**YAML comments** (`# \u2026`) are allowed inside the frontmatter \u2014 handy for documenting *why* a particular tool set was chosen. See `agents/general.md` and `agents/scout.md` for examples.\n\n### `maxDepth:` field\n\nSubagents cannot spawn other subagents by default, even when `tools` exposes the `subagent` tool.\n\n```md\n---\nname: planner\ndescription: Can delegate one level deeper\nmaxDepth: 1\n---\n```\n\nDepth counts nested generations from that agent:\n\n| Value | Behavior |\n|-------|----------|\n| *(omitted)* / `0` | This agent cannot spawn subagents |\n| `1` | This agent may spawn subagents, but those children cannot spawn again unless their own `maxDepth` allows it |\n| `2` | Allows two nested generations, subject to each child agent's own `maxDepth` |\n\nAliases accepted: `max_depth`, `depth`, `subagentDepth`.\n\n## Background Agents\n\nEvery foreground subagent can be moved to background at any time. Background jobs run concurrently while you continue chatting. When a job finishes, pi automatically posts the result as a follow-up message.\n\n### Status bar\n\nWhile a foreground subagent is running, the pi status bar shows:\n```\n{agent-name} running \u00b7 Ctrl+Shift+B to move to background\n```\n\nWhile background jobs are running:\n```\n\u29d7 N bg agents\n```\n\n### Moving to background\n\n**Keyboard shortcut (while subagent is running):**\n```\nCtrl+Shift+B\n```\n\n**Slash command:**\n```\n/fast-subagent:bg fg_ab12cd34\n```\n\n**Via tool call:**\n```js\nsubagent({ action: \"detach\", jobId: \"fg_ab12cd34\" })\n```\n\n### Auto-completion announcement\n\nWhen a background job finishes, pi injects a follow-up message automatically:\n```\nBackground subagent \u2713: sa_ab12cd34 (scout, 4.2s)\n> Explore src and summarize architecture\n\n<result output>\n```\n\nFailed jobs are announced the same way with \u2717 and the error message.\n\n## Slash Commands\n\n### `/fast-subagent:agent`\n\nList all available agents:\n\n```\n/fast-subagent:agent\n```\n\nShow details for a specific agent (description, file path, model, tools, system prompt):\n\n```\n/fast-subagent:agent scout\n```\n\nTab-completion is supported for agent names.\n\n### `/fast-subagent:bg`\n\nDetach a running foreground subagent to background. Each foreground job has a `fg_` prefixed ID shown in the status bar.\n\n```\n/fast-subagent:bg fg_ab12cd34\n```\n\nOmit ID to list all active foreground jobs:\n\n```\n/fast-subagent:bg\n```\n\n### `/fast-subagent:bg-status`\n\nOpen selector UI showing all active background jobs. Arrow keys to navigate, Enter to view full details.\n\n```\n/fast-subagent:bg-status\n```\n\nSkip the selector \u2014 show details for a specific job directly:\n\n```\n/fast-subagent:bg-status sa_ab12cd34\n```\n\n### `/fast-subagent:bg-cancel`\n\nOpen selector UI to choose a running job to cancel:\n\n```\n/fast-subagent:bg-cancel\n```\n\nCancel a specific job directly:\n\n```\n/fast-subagent:bg-cancel sa_ab12cd34\n```\n\n## Keyboard Shortcuts\n\n| Shortcut | Action |\n|---|---|\n| `Ctrl+Shift+B` | Move active foreground subagent to background |\n\n## Roadmap\n\nGoal: keep this extension **small and focused** \u2014 aligned with pi's philosophy of minimal, composable tooling. No feature creep. Every addition must earn its place.\n\n- **UI/UX polish** \u2014 improve visibility of running subagents: clearer status lines, better progress feedback, agent name + task always visible during execution\n- ~~**Background subagents**~~ \u2714 shipped in v0.4.0 \u2014 fire-and-forget with `background: true`, poll/cancel/detach support\n\n## Notes\n\n- Async/background isolation not supported in-process\n- Git worktree isolation not supported\n- Nested subagent spawning disabled by default (`maxDepth: 0`); opt in per agent via frontmatter\n\n## Tool Reference\n\n> These are `subagent` tool call examples used by the LLM internally. Not typically invoked directly by users.\n\n### List / discover agents\n\n```js\n// List all agents\nsubagent({ action: \"list\" })\n\n// Get details for a specific agent\nsubagent({ action: \"get\", agent: \"scout\" })\n\n// Scope filter: \"user\" | \"project\" | \"both\" (default)\nsubagent({ action: \"list\", agentScope: \"project\" })\n```\n\n### Single\n\n```js\nsubagent({ agent: \"scout\", task: \"Explore src and summarize architecture\" })\n```\n\n### Parallel\n\n```js\nsubagent({\n  tasks: [\n    { agent: \"scout\", task: \"Map auth flow\" },\n    { agent: \"scout\", task: \"Map navigation\" }\n  ],\n  concurrency: 2  // default: 4\n})\n\n// Repeat one task N times\nsubagent({ tasks: [{ agent: \"scout\", task: \"Explore src\", count: 3 }] })\n```\n\n### Background\n\n```js\n// Fire-and-forget \u2014 returns job ID immediately\nsubagent({ agent: \"scout\", task: \"Explore src\", background: true })\n// \u2192 { jobId: \"sa_ab12cd34\", status: \"running\" }\n\nsubagent({ action: \"poll\",   jobId: \"sa_ab12cd34\" })  // check progress\nsubagent({ action: \"cancel\", jobId: \"sa_ab12cd34\" })  // abort\nsubagent({ action: \"status\" })                        // list all bg jobs\nsubagent({ action: \"detach\", jobId: \"fg_ab12cd34\" })  // move fg \u2192 bg\n```\n\n### Options\n\n```js\nsubagent({ agent: \"scout\", task: \"...\", model: \"anthropic/claude-haiku-4-5\" })\nsubagent({ agent: \"scout\", task: \"...\", cwd: \"/path/to/project\" })\n```\n\n## Publish\n\n```bash\ncd ~/.pi/agent/extensions/fast-subagent\nnpm publish\n```\n\nIf package name is taken, rename `name` in `package.json` first, usually with your npm scope:\n\n```json\n{\n  \"name\": \"@your-scope/pi-fast-subagent\"\n}\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "subagent",
+    "agents",
+    "extension",
+    "delegation",
+    "parallel",
+    "concurrent",
+    "in-process",
+    "fast",
+    "coding-agent",
+    "ai-agent",
+    "llm",
+    "task-runner",
+    "scout",
+    "workflow",
+    "automation"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/tuansondinh/pi-fast-subagent#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tuansondinh/pi-fast-subagent.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-21T18:07:08.416Z",
+    "modified": "2026-06-11T15:48:37.650Z",
+    "0.1.0": "2026-04-21T18:07:08.553Z",
+    "0.1.1": "2026-04-21T18:16:19.599Z",
+    "0.1.2": "2026-04-22T07:18:46.492Z",
+    "0.2.0": "2026-04-22T09:08:38.768Z",
+    "0.3.0": "2026-04-22T09:28:43.182Z",
+    "0.4.0": "2026-04-23T11:56:37.897Z",
+    "0.5.0": "2026-04-23T19:47:47.017Z",
+    "0.5.1": "2026-04-23T19:52:29.432Z",
+    "0.6.0": "2026-04-24T14:14:58.698Z",
+    "0.6.1": "2026-04-24T14:16:46.773Z",
+    "0.7.0": "2026-04-24T14:58:02.048Z",
+    "0.8.0": "2026-04-24T15:10:09.925Z",
+    "0.9.0": "2026-04-24T16:01:35.836Z",
+    "0.9.1": "2026-04-24T21:04:43.996Z",
+    "0.9.2": "2026-04-28T13:06:31.741Z",
+    "0.9.3": "2026-04-28T13:26:32.193Z",
+    "0.9.4": "2026-06-11T15:48:37.545Z"
+  },
+  "versions_count": 17,
+  "downloads_last_week": null,
+  "download_trend": []
+}

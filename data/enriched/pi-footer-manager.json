@@ -1,0 +1,37 @@
+{
+  "name": "pi-footer-manager",
+  "latest_version": "1.0.2",
+  "description": "One footer, many extensions: build flexible Pi footers from reusable fragments with configurable layout and built-in fragments instead of competing `setFooter()` calls. `pi-footer-manager` lets one extension own footer rendering while built-in and custom ",
+  "readme": "# pi-footer-manager\n\nOne footer, many extensions: build flexible Pi footers from reusable fragments with configurable layout and built-in fragments instead of competing `setFooter()` calls.\n\n`pi-footer-manager` lets one extension own `ctx.ui.setFooter(...)` while built-in and custom fragments are arranged through a shared API, with flexible rows, regions, widths, alignment, and redraw/invalidation flow.\n\n## Install or test\n\nInstall permanently:\n\n```bash\npi install npm:pi-footer-manager\n```\n\nTest without installing permanently:\n\n```bash\npi --no-extensions -e npm:pi-footer-manager\n```\n\nTo load it alongside your normal setup:\n\n```bash\npi -e npm:pi-footer-manager\n```\n\n![pi-footer-manager screenshot](./assets/pi-footer-manager.png)\n\n## Included extensions\n\n- `footer-manager/index.ts` \u2014 cooperative footer owner\n- `fragments/footer-timer-fragment.ts` \u2014 example fragment showing elapsed work time\n- `fragments/quota-footer-fragment.ts` \u2014 richer quota usage display for supported providers\n- `fragments/quota-footer-fragment-text.ts` \u2014 text-focused quota usage display\n- `fragments/context-gauge-text-fragment.ts` \u2014 text version of context usage\n\n## Public API for custom fragment extensions\n\nExternal extensions can integrate with the footer manager through:\n\n```ts\nimport {\n  FOOTER_MANAGER_REGISTER_FRAGMENT,\n  FOOTER_MANAGER_UNREGISTER_FRAGMENT,\n  type FooterFragmentRegistration,\n} from \"pi-footer-manager/api\";\n```\n\nThis is the supported public integration surface for custom fragment extensions. It avoids fragile cross-extension relative imports and lets third-party fragment extensions live in their own repos or packages.\n\n## How configuration works\n\nLayout is configured under `footerManager.layout` in Pi settings.\n\n- `separator` controls how fragments are joined inside a region\n- `rows` is an array of footer rows\n- each row has `regions`\n- each region can set:\n  - `width`: fraction like `0.35` or `\"auto\"`\n  - `align`: `\"left\"`, `\"center\"`, or `\"right\"`\n  - `fragments`: fragment ids to render in that region\n\nProject settings override global settings.\n\n## Example: simple two-region footer\n\n```json\n{\n  \"footerManager\": {\n    \"layout\": {\n      \"separator\": \" > \",\n      \"rows\": [\n        {\n          \"regions\": [\n            { \"width\": 0.65, \"align\": \"left\", \"fragments\": [\"cwd.full\", \"git.branch\", \"context.gauge\"] },\n            { \"width\": 0.35, \"align\": \"right\", \"fragments\": [\"model.name\", \"thinking.level\", \"statuses\"] }\n          ]\n        }\n      ]\n    }\n  }\n}\n```\n\n## Example: mostly automatic sizing\n\n```json\n{\n  \"footerManager\": {\n    \"layout\": {\n      \"rows\": [\n        {\n          \"regions\": [\n            { \"align\": \"left\", \"fragments\": [\"cwd.full\", \"git.branch\"] },\n            { \"width\": 0.35, \"align\": \"right\", \"fragments\": [\"model.name\", \"statuses\"] }\n          ]\n        }\n      ]\n    }\n  }\n}\n```\n\nIn mixed layouts, fixed fractional regions are allocated first and the remaining width goes to `\"auto\"` regions.\n\n## Example: multi-row footer\n\n```json\n{\n  \"footerManager\": {\n    \"layout\": {\n      \"rows\": [\n        {\n          \"regions\": [\n            { \"align\": \"left\", \"fragments\": [\"cwd.full\", \"git.branch\"] },\n            { \"align\": \"right\", \"fragments\": [\"model.name\", \"thinking.level\"] }\n          ]\n        },\n        {\n          \"regions\": [\n            { \"align\": \"left\", \"fragments\": [\"context.gauge.text\", \"quota.current.text\", \"timer.work\"] }\n          ]\n        }\n      ]\n    }\n  }\n}\n```\n\n## Widths and overflow\n\nThink of each row as a fixed-width bar split into regions:\n\n```text\n[ left region                              ][       right region ]\n```\n\nFor this layout:\n\n```json\n{\n  \"regions\": [\n    { \"align\": \"left\", \"fragments\": [\"cwd.full\", \"git.branch\"] },\n    { \"width\": 0.35, \"align\": \"right\", \"fragments\": [\"model.name\", \"statuses\"] }\n  ]\n}\n```\n\nThe row behaves roughly like this:\n\n```text\n[ cwd.full > git.branch                    ][ model.name > statuses ]\n```\n\nRules of thumb:\n\n- fixed fractional regions get their width first\n- `\"auto\"` regions get the remaining space\n- if content does not fit, fragments are dropped before the final visible fragment is truncated\n- left- and center-aligned regions drop fragments from the right\n- right-aligned regions drop fragments from the left\n\nMulti-row layouts behave like stacked bars:\n\n```text\nrow 1: [ cwd.full > git.branch           ][ model.name > statuses ]\nrow 2: [ context.gauge.text > timer.work                         ]\n```\n\n## Built-in fragments\n\nMain built-ins provided by `footer-manager` include:\n\n- `cwd.full` \u2014 full path of the current working directory\n- `git.branch` \u2014 current Git branch for the active working tree\n- `model.name` \u2014 active model name\n- `model.cost` \u2014 input/output token pricing for the active model\n- `model.cacheCost` \u2014 cached token read/write pricing for the active model\n- `cache.hit` \u2014 cache hit rate summary\n- `cache.hit_counts` \u2014 cache hit rate with read/write token counts\n- `thinking.level` \u2014 current reasoning/thinking level\n- `context.gauge` \u2014 graphical context usage indicator\n- `cost.total` \u2014 total accumulated session cost\n- `statuses` \u2014 status items contributed through Pi status APIs\n\nThe included fragment extensions add examples like:\n\n- `timer.work` \u2014 elapsed time for the current agent run\n- `context.gauge.text` \u2014 text version of context usage\n- `quota.current` \u2014 quota usage summary for supported providers\n- `quota.current.text` \u2014 text-focused quota usage summary\n\n## Custom fragments\n\nOther extensions should register fragments instead of calling `ctx.ui.setFooter(...)` directly.\n\nSee detailed fragment API docs and examples in:\n\n- [`footer-manager/README.md`](./footer-manager/README.md)\n\nThe public integration module for external fragment extensions is `pi-footer-manager/api`.\n\n## Check\n\n```bash\nnpm run check\n```\n\n## Publish dry run\n\n```bash\nnpm run release:check\n```\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "footer-manager"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": "https://github.com/sergiobonfiglio/pi-footer-manager#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sergiobonfiglio/pi-footer-manager.git"
+  },
+  "pi": {
+    "extensions": [
+      "./footer-manager/index.ts",
+      "./fragments/footer-timer-fragment.ts",
+      "./fragments/quota-footer-fragment.ts",
+      "./fragments/quota-footer-fragment-text.ts",
+      "./fragments/context-gauge-text-fragment.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-24T16:50:22.370Z",
+    "modified": "2026-05-24T18:11:28.443Z",
+    "1.0.0": "2026-05-24T16:50:22.682Z",
+    "1.0.2": "2026-05-24T18:11:28.187Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 17,
+  "download_trend": []
+}

@@ -1,0 +1,51 @@
+{
+  "name": "pi-delegate",
+  "latest_version": "0.4.5",
+  "description": "Minimal delegate tool for Pi",
+  "readme": "# pi-delegate\n\n[![npm version](https://img.shields.io/npm/v/pi-delegate.svg)](https://www.npmjs.com/package/pi-delegate)\n\nOne Pi tool: `delegate`.\n\nGive Pi a clean side thread. `delegate` starts a fresh child agent, gives it a task, then brings back only the useful result. No child transcript. No scratchpad spill. No context mud.\n\nSmall by design: no workflow engine, background job manager, dashboard, or artifact system. One tool. One job. Keep the main context clean.\n\n## Install\n\n```bash\npi install npm:pi-delegate\n```\n\n## What it adds\n\n`pi-delegate` adds the `delegate` tool.\n\nThe tool runs a fresh in-memory child Pi agent in the current project, waits for the task to finish, and returns:\n\n- the child\u2019s concise final report\n- model/effort metadata\n- duration\n- child tool/error counts\n- child turn/token/cost usage when the provider reports usage\n- output truncation metadata when the final report is large\n- native tool errors with concise failure metadata when delegation fails\n\nThe main agent never sees the child\u2019s intermediate exploration.\n\n## Tool API\n\n### `delegate`\n\nParameters:\n\n- `task`: the task for the child agent\n- `effort`: optional `fast | balanced | smart` \u2014 default `balanced`, but callers should choose explicitly\n\nThe child uses the active parent model by default. `effort` only selects the requested thinking level:\n\n| effort | thinking |\n| --- | --- |\n| `fast` | `low` |\n| `balanced` | `medium` |\n| `smart` | `high` |\n\nChoose `fast` for scouting, repo mapping, docs/API lookup, and quick read-only recon. Choose `smart` for review, critique, debugging, ambiguous design, and high-risk reasoning. Use `balanced` for moderate investigation or exceptional, explicitly write-capable child implementation.\n\nModel availability, authentication, and thinking-level compatibility follow the parent Pi session and Pi's normal model handling.\n\n## Behavior\n\n- fresh in-memory child session\n- parent cwd\n- project context files loaded through Pi's normal resource discovery\n- extensions and package resources discovered from the child session's cwd/agent directory are loaded; ad-hoc extension paths listed in `PI_CHILD_EXTENSION_PATHS` are also loaded in the child\n- recursive delegation tools are disabled inside the child\n- parallel execution, so multiple delegate calls in one agent turn can run concurrently\n- 15-minute internal timeout\n- running calls render as neutral progress, not failure; the tool header stays compact, while the result area shows the assigned task in a boxed card\n- collapsed task cards show the first four non-empty task lines with a hidden-line hint; expanded tool output shows the full assigned task\n- completed calls include a bounded child-report preview when collapsed and the full child report when expanded; if the parent-facing tool content was truncated, expanded TUI reads the saved full-output file when available\n- parent-facing delegation policy is tool-owned through the active `delegate` tool description, snippet, guidelines, and parameter descriptions; the package does not append a separate parent system prompt\n- child final reports are prompted as handoff-ready summaries with task, result, evidence, files, verification, and only-important handoff notes\n- failures throw native Pi tool errors with a concise reason plus model/duration/tool-count metadata\n- final child output is truncated at Pi's standard 2000-line/50KB tool-output limits, with the full report saved to a temp file when truncation occurs\n- normal Pi tools are available to the child, including write-capable tools; parent agents should keep implementation/final validation in the parent by default and delegate write-capable child tasks only when explicit or exceptional; callers are responsible for avoiding conflicting concurrent delegated writes\n\n## Package shape\n\nThe npm package is both a Pi package and a small TypeScript module. Pi loads `./extensions/delegate.ts` from the package manifest, while `./index.ts` re-exports the extension and helper types for tests or advanced consumers.\n\n## When to use it\n\nUse `delegate` for work that benefits from isolation:\n\n- scan a code area without filling the main context\n- research a library/API and report the answer\n- get an explicitly requested independent/fresh review\n- investigate noisy failures and report evidence\n\nDo not use it as a workflow engine or a default implementation worker. The parent agent owns implementation, final validation, and the final answer unless the user explicitly asks for child implementation or the task has a clear exceptional isolation benefit. Explicit independent/fresh review requests should use delegation because isolation is the product. If you need chains, background jobs, worktrees, or agent management, use a purpose-built workflow package.\n\n## Development\n\n```bash\nbun install\nbun test\nbun run typecheck\nbun run check\nbun pm pack --dry-run\nPI_OFFLINE=1 bunx --bun pi --no-extensions -e . --list-models >/tmp/pi-delegate-pi-load.out\n```\n\n## Live delegate evals\n\n`live-eval.test.ts` runs Pi in JSON mode against disposable fixture repos and compares delegate-enabled runs with a delegate-disabled control. It is opt-in locally because it uses live model calls:\n\n```bash\nPI_DELEGATE_LIVE=1 \\\nPI_DELEGATE_EVAL_JUDGE_MODEL=openai/gpt-5.5:low \\\nPI_DELEGATE_EVAL_TIMEOUT_MS=1800000 \\\nPI_DELEGATE_EVAL_MAX_TOKENS=1500000 \\\nPI_DELEGATE_EVAL_MAX_COST_USD=30 \\\nPI_DELEGATE_EVAL_ARTIFACT_DIR=artifacts/live-eval \\\nbun run test:live\n```\n\n`PI_DELEGATE_EVAL_MODEL` and `PI_DELEGATE_EVAL_JUDGE_MODEL` default to `openai/gpt-5.5:low`. Use `PI_DELEGATE_EVAL_TASKS=id1,id2` to run a subset while tuning the policy.\n\nThe suite records sanitized JSONL traces plus `summary.json`, including delegate decision and effort-selection KPIs. It hard-fails crashes, budget overruns, read-only writes, required/forbidden delegate decision misses, and effort mismatches when delegate is called with an expected effort; implementation fixtures are generally allowed-not-required delegation. Judge quality scores remain calibration data.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "delegate",
+    "minimal",
+    "isolated-context",
+    "extension"
+  ],
+  "author": {
+    "name": "drsh4dow",
+    "email": "daniel.morettiv@gmail.com",
+    "url": "https://codeberg.org/drsh4dow"
+  },
+  "license": null,
+  "homepage": "https://codeberg.org/drsh4dow/pi-delegate#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://codeberg.org/drsh4dow/pi-delegate.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/delegate.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-04-27T03:40:25.678Z",
+    "modified": "2026-05-23T21:44:59.800Z",
+    "0.1.0": "2026-04-27T03:40:25.826Z",
+    "0.1.1": "2026-04-27T04:06:20.572Z",
+    "0.2.0": "2026-04-27T12:32:17.098Z",
+    "0.3.0": "2026-04-27T23:46:17.351Z",
+    "0.3.1": "2026-04-28T01:35:54.847Z",
+    "0.3.2": "2026-04-28T02:09:52.493Z",
+    "0.3.3": "2026-04-28T02:26:47.312Z",
+    "0.3.4": "2026-04-28T02:59:52.901Z",
+    "0.4.0": "2026-04-28T14:39:25.820Z",
+    "0.4.1": "2026-04-29T12:19:51.770Z",
+    "0.4.2": "2026-05-13T15:39:40.883Z",
+    "0.4.3": "2026-05-19T00:49:54.863Z",
+    "0.4.4": "2026-05-19T18:49:50.798Z",
+    "0.4.5": "2026-05-23T21:44:59.707Z"
+  },
+  "versions_count": 14,
+  "downloads_last_week": 12,
+  "download_trend": []
+}

@@ -1,0 +1,343 @@
+{
+  "name": "pi-dstui",
+  "latest_version": "0.1.1",
+  "description": "Lisp DSL runtime for composable, on-demand TUI components",
+  "readme": "# tui\n\nhttps://github.com/user-attachments/assets/4e62e1ad-fd89-4266-b615-a0d0a344da12\n\nRich, interactive terminal UI components for pi agent\n\n \u2014 defined in a small Lisp DSL, persisted to disk, and rendered as full-screen overlays on demand.\n\nMost agent interactions collapse to text: the agent asks a question, you type an answer, and both sides guess at structure. `tui` replaces that back-and-forth with purpose-built input widgets. Instead of typing `\"option 2\"` in response to a numbered list, you navigate a radio picker. Instead of describing a number with a note about the valid range, you turn a rotary dial. The agent gets a typed value; you get a clear, keyboard-driven UI.\n\nThis makes `tui` a single replacement for question-prompt plugins, checklist plugins, checkbox plugins, and any other extension whose job is structured input \u2014 while keeping the entire widget definition inside the conversation context as a tiny Lisp source file.\n\n---\n\n## Install\n\n```sh\npi install npm:tui\n```\n\nOr for a project-local install:\n\n```sh\npi install -l npm:tui\n```\n\nAfter install, pi loads the extension automatically. No configuration needed.\n\n---\n\n## Use cases\n\n### Confirmation dialogs\n\nReplace yes/no text prompts with a keyboard-navigable confirm widget. The agent defines it once and reuses it anywhere a destructive action needs approval.\n\n### Radio and checklist pickers\n\nReplace numbered-list answers with a real picker. The agent passes a list of options; you select with arrow keys and confirm with Enter. The return value is the chosen item, not a string to parse.\n\n### Multi-step forms\n\nChain multiple overlays to collect structured input across several fields \u2014 filenames, environment names, feature flags \u2014 without a free-text round-trip for each one.\n\n### Progress and status displays\n\nRender progress bars, gauges, and live-updating dashboards during long-running tasks. Timers drive re-renders without waiting for a new tool call.\n\n### Domain-specific controls\n\nWhen a project has a recurring input pattern \u2014 selecting from a config enum, adjusting a numeric threshold, picking a deployment target \u2014 the agent can define a custom component for it once and save it to `.pi/ui-components/`. Every subsequent conversation in that project gets the control for free.\n\n---\n\n## pi tools\n\nInstalling `tui` registers two tools in the pi agent.\n\n### `tui_define_component`\n\nSaves a Lisp DSL module to `.pi/ui-components/<name>.lisp` and registers it in the runtime. The agent calls this to create or update a component definition.\n\n```json\n{\n  \"source\": \"(defcomponent confirm (message) ...)\",\n  \"scope\": \"local\",\n  \"module\": \"confirm\"\n}\n```\n\n| Parameter | Description |\n|-----------|-------------|\n| `source` | Full Lisp module source \u2014 one or more `defcomponent` / `defview` forms |\n| `scope` | `\"local\"` (project, `.pi/ui-components/`) or `\"global\"` (`~/.pi/agent/ui-components/`). Default: `\"local\"` |\n| `module` | File/module name. Inferred from the first `defcomponent` or `defview` name if omitted |\n\nGlobal components are available in every project. Local components are scoped to the current working directory.\n\n### `tui_create_dynamic_ui`\n\nLaunches a saved component by name as a full-screen overlay and returns the emitted value to the agent.\n\n```json\n{\n  \"componentId\": \"confirm-delete-123\",\n  \"type\": \"confirm\",\n  \"title\": \"Confirm deletion\",\n  \"config\": { \"message\": \"Delete production database?\" }\n}\n```\n\n| Parameter | Description |\n|-----------|-------------|\n| `type` | Component name as registered by `tui_define_component` |\n| `config` | Props object \u2014 keys map to the component's param list |\n| `title` | Displayed in the overlay header |\n| `componentId` | Unique identifier for this invocation |\n\nReturns the value passed to `(emit ...)` in the DSL, or `null` if the user dismisses with Escape / Ctrl+C.\n\n**Hotload:** the component's source file is re-read from disk on every `tui_create_dynamic_ui` call. Edit a `.lisp` file and the next invocation picks up the change without restarting the agent.\n\n---\n\n## Skill\n\nInstalling `tui` also registers the `tui-runtime-components` skill, which gives the agent:\n\n- Full DSL syntax reference and layout primitives\n- A component catalog with ready-to-use patterns (radio list, rotary encoder, progress gauge)\n- Guidance on when to define a new component vs. reuse a saved one\n\nThe agent uses the skill automatically when writing DSL source \u2014 you do not need to instruct it.\n\n---\n\n## Hotload\n\nEvery `tui_create_dynamic_ui` call re-reads the component's source file from disk before instantiation:\n\n```\n.pi/ui-components/\n  confirm.lisp          \u2190 edit here, runs immediately on next call\n  my-picker.lisp\n  rotary-encoder.lisp\n```\n\nThe load order:\n\n1. Look up the component name in the in-memory index\n2. Re-read its `.lisp` file from disk and re-compile\n3. If not yet registered, scan `local` then `global` directories for `<name>.lisp`\n4. Instantiate the freshly compiled `ComponentDef`\n\nThis means the agent can call `tui_define_component` to write a new version of a component, then immediately call `tui_create_dynamic_ui` to run it \u2014 all within the same message.\n\n---\n\n## Bundled components\n\nThe package ships three ready-to-use components in `.pi/ui-components/`:\n\n| Component | Description |\n|-----------|-------------|\n| `radio-list` | Single-select list with keyboard navigation and optional pre-selection |\n| `rotary-encoder` | Numeric dial with configurable min, max, step, and initial value |\n| `progress-gauge` | Animated progress display driven by a timer |\n\nThe agent can use these directly or use them as templates when defining new ones.\n\n---\n\n## Writing your own components\n\nSee **[docs/dsl.md](docs/dsl.md)** for the full DSL reference \u2014 layout primitives, state, bindings, timers, control flow, and built-in functions.\n\n---\n\n## Programmatic API\n\nThe runtime is also importable as a library for use in other pi extensions or tools:\n\n```ts\nimport { compileModule, instantiate, ModuleLoader } from \"tui\";\n```\n\nSee **[docs/api.md](docs/api.md)** for the full API reference.\n\n---\n\n## Package structure\n\n```\nindex.ts               pi extension entry \u2014 registers tui_define_component and tui_create_dynamic_ui\nsrc/\n  parser.ts            Lisp S-expression parser\n  runtime.ts           DSL evaluator, layout engine, component instantiation\n  loader.ts            ModuleLoader \u2014 persistence and hotload\n  runner.ts            makeUiRunner \u2014 pi-tui overlay adapter\n  index.ts             Public API exports\n.pi/\n  skills/\n    tui-runtime-components/   Skill loaded by pi agent\n  ui-components/              Saved component files (created at runtime)\ndocs/\n  dsl.md               DSL language reference\n  api.md               Programmatic API reference\n```\n",
+  "keywords": [
+    "pi-package"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./.pi/skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-28T18:59:31.630Z",
+    "modified": "2026-05-29T05:22:27.529Z",
+    "0.1.0": "2026-05-28T18:59:31.836Z",
+    "0.1.1": "2026-05-29T05:22:27.439Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": 20,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 297
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 23
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 15
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 22
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 0
+    }
+  ]
+}

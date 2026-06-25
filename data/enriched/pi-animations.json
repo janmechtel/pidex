@@ -1,0 +1,46 @@
+{
+  "name": "pi-animations",
+  "latest_version": "0.1.4",
+  "description": "Animated thinking/working/tool indicators for the Pi coding agent \u2014 26 terminal animations with ANSI true color and Nerd Font glyphs",
+  "readme": "# pi-animations\n\nAnimated thinking, working, and tool-execution indicators for [pi coding agent](https://github.com/badlogic/pi-mono).\n\nReplace pi's default spinner with 26 terminal animations \u2014 from demoscene fire to Matrix rain to Unicode block loaders \u2014 all rendered inline with ANSI true color and Nerd Font glyphs.\n\n## Demo\n\n![pi-animations demo](assets/demo.gif)\n\n## Install\n\n### From npm (recommended)\n\n```bash\npi install npm:pi-animations\n```\n\n### From GitHub\n\n```bash\npi install git:github.com/arpagon/pi-animations\n```\n\n### Try without installing\n\n```bash\npi -e npm:pi-animations\n```\n\n### Manual\n\n```bash\ngit clone https://github.com/arpagon/pi-animations.git\npi -e ./pi-animations/animations.ts\n```\n\nOr add to `~/.pi/agent/agent.json`:\n\n```json\n{\n  \"extensions\": [\n    \"npm:pi-animations\"\n  ]\n}\n```\n\nOr via git:\n\n```json\n{\n  \"extensions\": [\n    \"git:github.com/arpagon/pi-animations\"\n  ]\n}\n```\n\n## Usage\n\nEverything is under the `/animation` command:\n\n```\n/animation                          Show status, list all animations, and help\n/animation showcase                 Interactive browser (\u2190/\u2192 to navigate, Enter to select)\n/animation <name>                   Set animation for all states\n/animation working:<name>           Set working animation only\n/animation thinking:<name>          Set thinking animation only\n/animation tool:<name>              Set tool execution animation only\n/animation width full               Full terminal width (default)\n/animation width default            50 columns\n/animation width <number>           Custom column count\n/animation random                   Random animation each time\n/animation on                       Enable animations\n/animation off                      Disable animations\n```\n\n### Example config\n\n```\n/animation thinking:aurora\n/animation working:matrix3\n/animation tool:fire3\n/animation width full\n```\n\n## Animations\n\n### 1-line\n\n| Name | Category | Description |\n|------|----------|-------------|\n| `neural-pulse` | thinking | Energy pulses along neural pathway |\n| `glitch-text` | both | Cyberpunk glitch effect |\n| `plasma-wave` | thinking | Colorful plasma band |\n| `pacman` | working | Pac-Man eating dots |\n| `matrix` | both | Matrix rain |\n| `pipeline` | working | CI/CD pipeline with nerd font icons |\n| `starfield` | thinking | Horizontal parallax stars |\n| `fire` | working | Demoscene fire |\n| `icon-morph` | both | Morphing nerd font icons |\n| `brainstorm` | thinking | Weather icon brainstorm |\n| `dev-constellation` | thinking | Dev language icons with pulses |\n| `crush` | both | Crush-style character scrambler |\n| `pi-pulse` | both | Pi logo with gradient pulse |\n| `shimmer` | thinking | Rainbow shimmer text |\n| `typewriter` | both | Themed typewriter messages |\n| `orbit-dots` | thinking | Pulsing orbit dots |\n| `neon-bounce` | working | Neon ball bouncing between walls |\n| `block-wave` | thinking | Symmetric Unicode block wave |\n| `conveyor` | working | Unicode block conveyor loop |\n| `accordion` | working | Eased Unicode block accordion |\n\n### Multi-line\n\n| Name | Lines | Category | Description |\n|------|-------|----------|-------------|\n| `square-snake` | 5 | both | Unicode square snake |\n| `infinity-track` | 5 | thinking | Unicode figure-8 track |\n| `fire3` | 3 | working | \ud83d\udd25 Demoscene fire |\n| `matrix3` | 3 | both | \ud83d\udfe2 Matrix rain |\n| `starfield3` | 3 | thinking | \u2726 Deep starfield |\n| `aurora` | 3 | thinking | \ud83c\udf0c Aurora borealis |\n\n### Categories\n\n- **thinking** \u2014 shown while the model is reasoning (extended thinking phase)\n- **working** \u2014 shown while the model generates a response\n- **tool** \u2014 shown while tools execute (file reads, bash commands, etc.)\n- **both** \u2014 suitable for any state\n\n## How it works\n\n### Three animation states\n\npi has three distinct phases during a request:\n\n1. **Thinking** \u2014 The model reasons internally (e.g., Claude's extended thinking, OpenAI's chain-of-thought). The extension detects `thinking_start`/`thinking_end` stream events.\n\n2. **Working** \u2014 The model generates visible text output. Detected via `agent_start`/`agent_end` events.\n\n3. **Tool** \u2014 A tool is executing (bash, file read/write, etc.). Detected via `tool_execution_start`/`tool_execution_end` events.\n\nPriority: **thinking > tool > working**. If the model is thinking while a tool runs, the thinking animation takes precedence.\n\n### Rendering\n\n- **1-line animations** use `ctx.ui.setWorkingMessage()` to replace the Loader's text inline alongside pi's braille spinner.\n- **Multi-line animations** use `ctx.ui.setWidget()` to render a widget above the editor.\n- **Thinking label** patches `AssistantMessageComponent.updateContent()` to animate the collapsed \"Thinking...\" text in the message body.\n\n### Phase-aware text\n\nAnimations that display text (glitch-text, crush, shimmer, orbit-dots) automatically adapt their label:\n\n- Thinking state \u2192 \"Thinking...\"\n- Working state \u2192 \"Working...\"\n- Tool state \u2192 \"Running...\"\n\n### Full-width rendering\n\nVisual animations (fire, plasma, matrix, starfield, aurora, neon-bounce) scale to fill the terminal width. Structural/path animations (pacman, pipeline, neural-pulse, block-wave, conveyor, accordion, square-snake, infinity-track) keep a fixed or capped size.\n\nConfigurable via `/animation width`.\n\n### Persistence\n\nAll settings are saved to `~/.pi/agent/extensions/pi-tui-animations.json` and restored on startup:\n\n```json\n{\n  \"workingAnim\": \"matrix3\",\n  \"thinkingAnim\": \"aurora\",\n  \"toolAnim\": \"fire3\",\n  \"width\": \"full\",\n  \"randomMode\": false,\n  \"enabled\": true\n}\n```\n\n## Requirements\n\n- [pi coding agent](https://github.com/badlogic/pi-mono) v0.60+\n- Terminal with true color (24-bit ANSI) support\n- [Nerd Font](https://www.nerdfonts.com/) (for icon-based animations: pipeline, dev-constellation, icon-morph, pi-pulse, brainstorm)\n\n## Development\n\n### Standalone animation demos\n\nEach animation has a standalone demo in `explorations/`:\n\n```bash\nbun run explorations/12-fire.ts\nbun run explorations/20-crush-scramble.ts\n```\n\nRun all demos in tmux:\n\n```bash\nbash tmux-demo.sh\ntmux attach -t pi-anims\n# Ctrl-b n/p to navigate between windows\n```\n\n### Project structure\n\n```\npi-animations/\n\u251c\u2500\u2500 animations.ts         Extension: 26 animations + /animation command\n\u251c\u2500\u2500 package.json\n\u251c\u2500\u2500 explorations/         Standalone animation demos (bun run)\n\u251c\u2500\u2500 tmux-demo.sh          Launch all demos in tmux\n\u251c\u2500\u2500 AGENTS.md             Agent context\n\u2514\u2500\u2500 README.md\n```\n\n### Adding a new animation\n\n1. Add a renderer function in `animations.ts`:\n\n```typescript\nexport const myAnimation: AnimationFn = (frame, width, phase?) => {\n    const label = PHASE_LABELS[phase || \"thinking\"];\n    // ... render logic using frame counter and width\n    return \"single line result\";    // or [\"line1\", \"line2\", \"line3\"] for multi-line\n};\n```\n\n2. Register it in the `ANIMATIONS` array:\n\n```typescript\n{ name: \"my-anim\", fn: myAnimation, category: \"both\", description: \"My animation\", lines: 1 },\n```\n\n3. Done \u2014 it appears in `/animation showcase` and `/animation my-anim`.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "pi-package",
+    "animation",
+    "tui",
+    "terminal",
+    "spinner",
+    "thinking",
+    "nerd-font",
+    "ansi"
+  ],
+  "author": {
+    "name": "arpagon"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/arpagon/pi-animations",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arpagon/pi-animations.git"
+  },
+  "pi": {
+    "extensions": [
+      "./animations.ts"
+    ],
+    "video": "https://github.com/arpagon/pi-animations/releases/download/v0.1.0/demo.mp4"
+  },
+  "time": {
+    "created": "2026-03-20T21:03:37.773Z",
+    "modified": "2026-06-08T02:12:57.884Z",
+    "0.1.0": "2026-03-20T21:03:38.042Z",
+    "0.1.1": "2026-03-20T21:16:53.022Z",
+    "0.1.2": "2026-03-20T21:19:47.765Z",
+    "0.1.3": "2026-03-20T22:04:55.395Z",
+    "0.1.4": "2026-06-08T02:12:57.634Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": null,
+  "download_trend": []
+}

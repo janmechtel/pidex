@@ -1,0 +1,48 @@
+{
+  "name": "pi-memorix",
+  "latest_version": "0.1.9",
+  "description": "Pi extension that bridges Memorix memory hooks into Pi's session lifecycle",
+  "readme": "# pi-memorix\n\nPi extension that bridges [Memorix](https://github.com/AVIDS2/memorix) memory hooks into Pi's session lifecycle.\n\nWires Memorix into Pi's session lifecycle for automatic memory capture and recall. File writes, commands, and session summaries are captured as observations automatically. With the MCP server configured, the LLM also loads previous session context and searches memories at the start of each conversation.\n\n## What it does\n\n| Pi event | Memorix hook | Behavior |\n|---|---|---|\n| `session_start` | `SessionStart` | Loads previous session context, injects it on the first turn |\n| `before_agent_start` | `UserPromptSubmit` | Fetches memories relevant to the current prompt |\n| `tool_result` | `PostToolUse` | Auto-captures write/edit/bash results as Memorix observations |\n| `session_before_compact` | `PreCompact` | Saves context before `/compact` wipes the thread |\n| `session_shutdown` | `Stop` | Stores a session summary when Pi exits |\n\nAlso adds a `/mem <query>` command for quick memory search from within Pi.\n\n## Installation\n\n**1. Install Memorix:**\n\n```bash\nnpm install -g memorix\n```\n\n**2. Install this extension:**\n\n```bash\npi install npm:pi-memorix\n```\n\nTo try it without making it permanent: `pi -e npm:pi-memorix`\n\n**3. Wire the MCP server** \u2014 required for memory recall (context injection at session start):\n\nAdd this entry to `~/.pi/agent/mcp.json` under `mcpServers`:\n\n```json\n\"memorix\": {\n  \"command\": \"memorix\",\n  \"args\": [\"serve\"],\n  \"directTools\": true\n}\n```\n\nWithout this, auto-capture still works (PostToolUse, Stop) but the LLM has no tools to recall past memories. Skip this only if you want silent capture with no recall.\n\n**4. (Optional) Enable auto-install of the git hook** so commit-time capture is set up automatically for every repo you open:\n\nCreate `~/.pi/agent/memorix.json`:\n\n```json\n{ \"autoGitHook\": true }\n```\n\nWith this enabled, the extension installs the hook the first time you open a repo that doesn't have it yet. To install manually instead:\n\n```bash\nmemorix git-hook   # run once per repo\n```\n\n## Bootstrapping an existing repo\n\nFor repos with existing history, seed Memorix from past commits before the git hook takes over:\n\n```bash\nmemorix ingest log             # last 10 commits\nmemorix ingest log --count 50  # go further back\n```\n\nRun once per repo. The git hook handles new commits from that point on.\n\n## Usage\n\nOnce installed, the extension runs automatically with every Pi session. Steps 3 and 4 are optional \u2014 the extension's lifecycle hooks work without them. The MCP server (step 3) adds the ability for the LLM to call `memorix_search` and `memorix_store` directly on top of the automatic capture.\n\nThe `/mem` command lets you search project memory without leaving Pi:\n\n```\n/mem how does auth work\n/mem recent session context\n/mem what changed in the API layer\n```\n\n## Debug mode\n\n```bash\nMEMORIX_PI_DEBUG=1 pi\n```\n\nLogs all hook activity to stderr. To verify hooks are firing:\n\n```\n[memorix-pi] SessionStart: loaded 1234 chars\n[memorix-pi] PostToolUse \u2014 memorix stored observation\n[memorix-pi] Auto-installed git hook in /your/repo\n[memorix-pi] Stop: session saved to memorix\n```\n\nTo see what was stored after a session:\n\n```bash\ncd your-repo && memorix recent\n```\n\n## Maintenance\n\n```bash\n# Health check \u2014 project identity, data, conflicts\nmemorix doctor\n\n# Preview and remove low-quality auto-captured noise\nmemorix cleanup --dry\nmemorix cleanup --force\n\n# Inspect what's expiring; archive old memories\nmemorix retention\n\n# Project info and rules sync status\nmemorix status\n```\n\n## Notes\n\n- Memorix requires a `.git` directory in the project root to identify the project. Outside git repos, hooks are silently skipped.\n- All Memorix failures are silent by default \u2014 Pi never crashes because of this extension.\n- If `memorix` is not found on PATH, the extension disables itself after the first failed spawn.\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "memorix",
+    "memory",
+    "ai-memory",
+    "session",
+    "context",
+    "hooks",
+    "lifecycle"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/anh-chu/pi-memorix#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anh-chu/pi-memorix.git"
+  },
+  "pi": {
+    "extensions": [
+      "./memorix.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-18T08:04:30.855Z",
+    "modified": "2026-05-29T15:01:18.039Z",
+    "0.1.0": "2026-05-18T08:04:30.983Z",
+    "0.1.1": "2026-05-18T08:31:28.047Z",
+    "0.1.2": "2026-05-18T08:45:34.610Z",
+    "0.1.3": "2026-05-18T09:16:25.640Z",
+    "0.1.4": "2026-05-18T10:39:44.628Z",
+    "0.1.5": "2026-05-18T11:09:57.657Z",
+    "0.1.6": "2026-05-18T11:24:03.606Z",
+    "0.1.7": "2026-05-18T13:38:14.361Z",
+    "0.1.8": "2026-05-18T13:47:42.496Z",
+    "0.1.9": "2026-05-29T15:01:17.921Z"
+  },
+  "versions_count": 10,
+  "downloads_last_week": null,
+  "download_trend": []
+}

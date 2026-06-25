@@ -1,0 +1,33 @@
+{
+  "name": "pi-mixlayer",
+  "latest_version": "0.4.0",
+  "description": "Mixlayer provider extension for pi.",
+  "readme": "# pi Mixlayer Extension\n\nRegisters Mixlayer as a pi provider using Mixlayer's OpenAI-compatible APIs.\n\n## Usage\n\n```bash\npi install npm:pi-mixlayer\npi\n```\n\nInside pi, run:\n\n```text\n/login\n```\n\nSelect **Use an API key**, then choose **Mixlayer** from the provider list. Enter your Mixlayer API key when prompted. Pi stores the credential in `~/.pi/agent/auth.json`.\n\nThe extension fetches the current model list from:\n\n```text\nhttps://models.mixlayer.ai/_openrouter/models\n```\n\nIt registers the models under the `mixlayer` provider with `baseUrl: \"https://models.mixlayer.ai/v1\"`. By default, models use Pi's OpenAI-compatible Chat Completions transport.\n\nThe model list is cached in `~/.pi/agent/mixlayer-models-cache.json` for one hour to avoid repeated API requests. If the cache has expired and the network request fails, the extension falls back to the stale cache so pi still starts with available models.\n\nRun `pi --list-models` to verify the registered models after installation.\n\nWhen Mixlayer auth is configured and no model is selected yet, the extension selects `qwen/qwen3.5-397b-a17b` as the preferred default if that model is present in the remote model list.\n\n## Transport Selection\n\nThe extension supports configurable transport selection for the `mixlayer` provider:\n\n| Transport | Status | Behavior |\n| --- | --- | --- |\n| `chat-completions` | Default | Uses Pi's `openai-completions` transport. |\n| `responses-sse` | Supported | Uses Mixlayer's Responses API over HTTP/SSE through a Mixlayer-specific wrapper around Pi's Responses transport. |\n| `responses-websocket` | Supported | Uses Mixlayer's Responses API over WebSocket with full context sent on every turn. |\n| `responses-websocket-delta` | Supported | Uses Mixlayer's Responses API over WebSocket with session-cached `previous_response_id` deltas when safe, falling back to full context otherwise. |\n\nTransport resolution order is:\n\n1. `MIXLAYER_TRANSPORT` environment variable\n2. `~/.pi/agent/mixlayer-settings.json`, written by `/mixlayer-transport`\n3. `chat-completions`\n\nFor a one-off run:\n\n```bash\nMIXLAYER_TRANSPORT=responses-sse pi\n```\n\nFor a persistent setting inside Pi:\n\n```text\n/mixlayer-transport responses-sse\n```\n\nThen reload extensions or restart Pi for the new transport to take effect. Run `/mixlayer-transport` with no argument to show the current configured transport.\n\nThe Responses transports strip Mixlayer-incompatible request fields before sending and disable Pi's `session_id` request header, which Mixlayer rejects. They still send `x-client-request-id` for request affinity. The `responses-websocket` transport sends the full conversation context each turn. The `responses-websocket-delta` transport first builds the full request, then sends a delta only when the current request is an exact append-only continuation of the cached previous request and response.\n\n## Stats Counters\n\nRun this inside Pi to print in-memory Mixlayer counters for the current extension process:\n\n```text\n/mixlayer-stats\n```\n\nThe output includes Mixlayer turn counts, logical provider request counts, HTTP response status counts, and WebSocket full/delta request attempts. `delta_requests` and `delta_hit_rate` show whether the WebSocket delta path is being used.\n\nReset counters with:\n\n```text\n/mixlayer-stats reset\n```\n\n## Debug Logging\n\nSet `MIXLAYER_DEBUG_LOGS=1` to write provider request/response debug logs to:\n\n- `/tmp/mixlayer-debug.log`\n- `/tmp/mixlayer-response.log`\n\nLogging is disabled by default.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-provider",
+    "mixlayer"
+  ],
+  "author": null,
+  "license": null,
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "time": {
+    "created": "2026-06-07T01:49:51.603Z",
+    "modified": "2026-06-22T22:39:00.173Z",
+    "0.1.0": "2026-06-07T01:49:51.801Z",
+    "0.1.1": "2026-06-16T21:36:46.451Z",
+    "0.2.0": "2026-06-16T21:45:51.203Z",
+    "0.3.0": "2026-06-20T20:20:39.032Z",
+    "0.4.0": "2026-06-22T22:39:00.048Z"
+  },
+  "versions_count": 5,
+  "downloads_last_week": 343,
+  "download_trend": []
+}

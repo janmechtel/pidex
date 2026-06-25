@@ -1,0 +1,433 @@
+{
+  "name": "pi-dj",
+  "latest_version": "3.2.4",
+  "description": "AI music suite for pi \u2014 YouTube, global radio (30k+ stations), Suno, Lyria AI, SoundCloud/Bandcamp, mix, trim, BPM. Windows + macOS + Linux + Termux.",
+  "readme": "# pi-dj \ud83c\udfa7\n\n[![npm](https://img.shields.io/npm/v/pi-dj?style=flat-square)](https://www.npmjs.com/package/pi-dj)\n[![pi-package](https://img.shields.io/badge/pi.dev-package-8B5CF6?style=flat-square)](https://pi.dev/packages)\n[![license](https://img.shields.io/badge/license-MIT-4B5563?style=flat-square)](LICENSE)\n\nYouTube streaming, Suno AI generation, Lyria RealTime radio, SoundCloud / Bandcamp / BandLab downloads, mixing, trimming, BPM detection, and ffmpeg music video rendering \u2014 all from the terminal.\n\nWorks with [pi coding agent](https://github.com/badlogic/pi-mono/).\n\n![pi-dj banner](assets/banner.png)\n\n## Install\n\n```bash\npi install npm:pi-dj\n```\n\nDependencies are optional. The extension detects what's installed and degrades gracefully.\n\n| Platform | Install |\n|----------|---------|\n| Windows | `winget install mpv ffmpeg` \u00b7 `pip install yt-dlp` |\n| macOS | `brew install mpv yt-dlp ffmpeg` |\n| Linux / Raspberry Pi | `sudo apt install mpv ffmpeg -y` \u00b7 `pip install yt-dlp` |\n| Termux | `pkg install mpv ffmpeg python` \u00b7 `pip install yt-dlp` |\n\n## Commands\n\n### Playback\n\n| Command | Description |\n|---------|-------------|\n| `/dj-play <query\\|url>` | YouTube search, URL, or playlist \u2192 stream via mpv. Auto-resumes last track if empty. |\n| `/dj-resume` | Resume last played track from previous session (with seek position) |\n| `/pause` | Toggle pause / resume |\n| `/stop` | Stop + clear queue |\n| `/np` | Now playing \u2014 title, timestamp, progress bar |\n| `/vol <0-100>` | Set volume |\n| `/skip` | Skip to next queued track |\n| `/repeat` | Toggle repeat current track |\n| `/queue <query\\|url>` | Add to queue |\n| `/history` | Recently played |\n\n### Downloads\n\n| Command | Description |\n|---------|-------------|\n| `/sc <url>` | SoundCloud \u2192 MP3 |\n| `/bandcamp <url>` | Bandcamp track or album \u2192 MP3 |\n| `/bandlab <url>` | BandLab track, album, or collection \u2192 MP3 |\n\n### Radio\n\n| Command | Description |\n|---------|-------------|\n| `/radio <genre\\|name>` | Search Radio Browser \u2014 30k+ global stations, no API key |\n| `/radio jazz japan` | Genre + country filter |\n| `/radio <http url>` | Play any stream URL directly |\n| `/radio lyria` | Lyria RealTime AI generative radio (preset 1) |\n| `/radio lyria chill` | Lyria with preset name or custom prompt |\n| `/radio lyria <1-9>` | Lyria by preset number |\n\nRadio Browser has 30k+ stations across every genre and country. 21 genre presets with aliases (`lofi`, `dnb`, `hiphop`, `edm`, etc.). Top station by votes plays automatically; alternatives listed.\n\nLyria requires [lyria-cli](https://github.com/arosstale/lyria-cli).\n\n### Production\n\n| Command | Description |\n|---------|-------------|\n| `/mix <a> <b> [secs]` | Crossfade two audio files |\n| `/trim <file> <start> [end]` | Trim a clip |\n| `/bpm <file>` | Detect BPM |\n| `/render <file\\|url> [style]` | Render a music video with ffmpeg |\n| `/dj-help` | Show all commands + dependency status |\n\n## Render Styles\n\n`/render` outputs a 1080\u00d71080 MP4 with animated visualizer and title overlay. Pure ffmpeg \u2014 no extra dependencies.\n\n![Visualizer styles](assets/visualizers.png)\n\n| Style | ffmpeg filter | Notes |\n|-------|--------------|-------|\n| `bars` *(default)* | `showspectrum` | Frequency spectrum |\n| `wave` | `showwaves` | Waveform |\n| `circle` | `avectorscope` | Lissajous / stereo field |\n| `cqt` | `showcqt` | Constant-Q transform |\n\n```\n/render ~/Music/track.mp3\n/render ~/Music/track.mp3 wave\n/render https://youtu.be/xxx cqt\n```\n\nOutput: `~/Music/Videos/<title>_<style>.mp4`\n\nIf a URL is passed, yt-dlp downloads first.\n\n## Terminal Visualizer (`/viz`)\n\nAudio-reactive terminal visualizer bundled as `pi-djvj`. Reacts to mpv IPC or mic.\n\n```\n/viz         \u2014 embedded in pi TUI (side panel)\n/viz full    \u2014 fullscreen alt-screen mode\n```\n\n**78 half-block shaders** + **27 braille modes** + **ASCII** = **106 visualizer modes**.\n\nIncludes: Spectrum, Plasma, Tunnel, Starfield, Kaleidoscope, Black Hole, Nebula, Cymatics, Aurora, Voronoi, 3D Sphere, Liquid Metal, Jellyfish, Stained Glass, Neon City, Wormhole, Mandelbrot, and more. Plus 6 CAVA-inspired shaders: Polar Spectrum, Scrolling Spectrogram, Feedback Trail, AA Rings, Gradient Bars, Polar Waveform.\n\n**9 color palettes** (press `T` to cycle): default, catppuccin, tokyo-night, nord, gruvbox, dracula, rose-pine, hackerman, vantablack.\n\n**Autosensitivity**: auto-adjusts gain so the visualizer looks good at any volume \u2014 no manual tweaking needed.\n\n| Key | Action |\n|-----|--------|\n| `N` / `P` | Next / previous shader |\n| `v` | Cycle mode (halfblock \u2192 braille \u2192 ascii) |\n| `T` | Cycle color palette |\n| `+` / `-` | Sensitivity |\n| `F` | Toggle fullscreen |\n| `Q` | Quit |\n\n## LLM Tools\n\nTwo tools the AI can call directly mid-conversation:\n\n| Tool | Description |\n|------|-------------|\n| `dj_play_music` | Stream a YouTube search or URL |\n| `dj_queue_music` | Add a track to the queue |\n| `dj_radio` | Search and play global radio \u2014 genre, country, Lyria AI, or stream URL |\n\n## Division of Labour\n\n| Extension | Commands |\n|-----------|----------|\n| `cliamp` | Local files, HTTP streams, Lyria radio \u2014 `/play` `/music` `/lyria` |\n| `pi-dj` | YouTube, AI, production, radio \u2014 `/dj-play` `/radio` `/subs` `/render` + tools |\n| `pi-djvj` | Terminal visualizer \u2014 `/viz` `/viz full` \u2014 **bundled with pi-dj** |\n\n`pi install npm:pi-dj` installs both `pi-dj` and `pi-djvj` in one shot.\n\n## Platforms\n\nWindows \u00b7 macOS \u00b7 Linux \u00b7 Raspberry Pi \u00b7 Termux\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "music",
+    "player",
+    "youtube",
+    "streaming",
+    "lyria",
+    "suno",
+    "soundcloud",
+    "bandcamp",
+    "ai",
+    "dj",
+    "crossplatform",
+    "termux",
+    "raspberry-pi",
+    "radio",
+    "internet-radio",
+    "mpv",
+    "whisper",
+    "subtitles",
+    "karaoke",
+    "speech-to-text",
+    "transcription"
+  ],
+  "author": {
+    "name": "artale"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/artale93/pi-dj#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/artale93/pi-dj.git"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/pi-dj.ts",
+      "extensions/pi-djvj.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/arosstale/pi-dj/master/assets/banner.png",
+    "commands": [
+      "dj-play",
+      "dj-resume",
+      "pause",
+      "stop",
+      "np",
+      "vol",
+      "queue",
+      "skip",
+      "repeat",
+      "history",
+      "dj-lib",
+      "dj-viz",
+      "djvj",
+      "viz",
+      "sc",
+      "bandcamp",
+      "bandlab",
+      "mix",
+      "bpm",
+      "render",
+      "subs",
+      "radio",
+      "strudel",
+      "strudel-stop",
+      "dj-help"
+    ],
+    "tools": [
+      "dj_play_music",
+      "dj_queue_music",
+      "dj_radio",
+      "dj_strudel",
+      "dj_strudel_stop"
+    ]
+  },
+  "time": {
+    "created": "2026-03-03T16:38:41.469Z",
+    "modified": "2026-05-06T21:01:16.218Z",
+    "1.3.1": "2026-03-03T16:38:41.934Z",
+    "1.5.0": "2026-03-04T08:38:54.830Z",
+    "1.5.1": "2026-03-04T23:08:43.932Z",
+    "1.5.2": "2026-03-05T13:46:46.390Z",
+    "1.5.3": "2026-03-05T14:00:29.515Z",
+    "1.5.4": "2026-03-05T14:54:23.289Z",
+    "1.6.0": "2026-03-05T16:27:32.723Z",
+    "1.7.0": "2026-03-05T16:50:26.097Z",
+    "1.8.0": "2026-03-05T17:23:21.404Z",
+    "1.9.0": "2026-03-05T17:32:03.002Z",
+    "2.0.0": "2026-03-05T17:37:25.367Z",
+    "2.1.0": "2026-03-05T19:18:08.617Z",
+    "2.2.0": "2026-03-05T19:20:27.275Z",
+    "2.2.1": "2026-03-05T20:48:03.384Z",
+    "2.3.0": "2026-03-05T20:55:18.734Z",
+    "3.0.0": "2026-03-05T20:57:41.966Z",
+    "3.0.1": "2026-03-06T08:49:08.071Z",
+    "3.0.2": "2026-03-06T13:29:10.301Z",
+    "3.0.3": "2026-03-06T13:36:30.645Z",
+    "3.0.4": "2026-03-07T12:28:31.602Z",
+    "3.0.5": "2026-03-09T16:15:06.428Z",
+    "3.0.6": "2026-03-09T16:28:29.353Z",
+    "3.0.7": "2026-03-14T22:16:29.683Z",
+    "3.1.0": "2026-03-17T01:10:05.604Z",
+    "3.1.1": "2026-03-17T01:18:33.614Z",
+    "3.1.2": "2026-03-17T01:37:06.156Z",
+    "3.2.0": "2026-03-17T01:58:15.410Z",
+    "3.2.1": "2026-03-17T02:28:47.552Z",
+    "3.2.2": "2026-05-06T13:16:40.636Z",
+    "3.2.3": "2026-05-06T13:20:04.949Z",
+    "3.2.4": "2026-05-06T21:01:16.097Z"
+  },
+  "versions_count": 31,
+  "downloads_last_week": 56,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 74
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 2071
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 709
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 86
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 65
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 171
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 59
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 28
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 18
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 63
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 395
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 76
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 82
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 111
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 75
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 50
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 97
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 7
+    }
+  ]
+}

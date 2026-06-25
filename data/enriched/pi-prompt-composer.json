@@ -1,0 +1,384 @@
+{
+  "name": "pi-prompt-composer",
+  "latest_version": "1.9.1",
+  "description": "Build multi-option slash commands from plain prompts \u2014 variable expansion, arg collection & interactive selectors for Pi",
+  "readme": "# pi-prompt-composer\n\nBuild composer-owned slash commands from plain Markdown prompts \u2014 flat files, grouped menus, typed args, Liquid templating, and visible dispatch for [Pi](https://github.com/badlogic/pi-mono).\n\n<p align=\"center\">\n  <img src=\"assets/preview.png\" alt=\"Grouped prompt selector preview\" width=\"700\">\n</p>\n\nTurn `.md` files under `composed/` into single slash commands, or turn directories into grouped commands with Tab-completable subcommands, a rich interactive selector, automatic missing-argument collection, and optional Liquid-powered rendering.\n\n## Quick start\n\n```bash\n# Install\npi install pi-prompt-composer\n\n# Copy the bundled examples into your project composer root\nmkdir -p .pi/composed/review\ncp -r $(pi resolve pi-prompt-composer)/examples/prompts/review/* .pi/composed/review/\n\n# Reload Pi, then try:\n#   /review           \u2192 interactive selector\n#   /review summary   \u2192 asks for missing \"change\" arg, then sends\n#   /review fix \"bug\" \u2192 dispatches immediately\n\n# Or create a single Liquid-powered command\ncat > .pi/composed/ship.md <<'EOF'\n---\ndescription: Prepare a ship checklist\nengine: liquid\nargs:\n  - name: change\n    required: true\n    hint: What changed?\n---\nPrepare release checklist for {{ args.change | quote }}.\n{% xml \"checks\" %}\n- typecheck\n- lint\n- tests\n- docs\n{% endxml %}\nEOF\n#   /ship --change \"composed prompt discovery\"\n```\n\n## How it works\n\nComposer-owned prompts live under `composed/` roots so Pi does not also load them as native flat prompts.\n\n```text\n.pi/composed/\n\u251c\u2500\u2500 review.md                 \u2190 /review\n\u2514\u2500\u2500 review/\n    \u251c\u2500\u2500 _index.md             \u2190 /review\n    \u251c\u2500\u2500 summary.md            \u2190 /review summary\n    \u2514\u2500\u2500 fix.md                \u2190 /review fix\n```\n\nComposer roots:\n- **User**: `~/.pi/agent/composed/`\n- **Project**: `<project>/.pi/composed/`\n\nNative Pi prompt roots (`~/.pi/agent/prompts/*.md`, `.pi/prompts/*.md`) stay native. Existing grouped prompts under `prompts/<group>/` are migrated once into `composed/<group>/` with a warning.\n\n## Features\n\n| Feature | Behavior |\n|---------|----------|\n| **Flat composer commands** | `.pi/composed/review.md` \u2192 `/review` without creating a fake group |\n| **Grouped commands** | `.pi/composed/review/summary.md` \u2192 `/review summary` |\n| **Liquid templating** | `engine: liquid` unlocks `if`, `for`, `where`, `map`, `join`, structured XML blocks, JSON snippets, and command-batch rendering |\n| **Direct dispatch** | `/review fix \"the bug\"` \u2192 substitutes args, sends immediately |\n| **Bare-command selector** | `/review` \u2192 rich TUI selector with aligned descriptions and dynamic usage hints |\n| **Missing-arg collection** | Prompts with required `args` metadata pause and ask before sending |\n| **Autocomplete** | Tab after `/review ` shows subcommand names with descriptions |\n| **Safe helpers** | `present`, `quote`, `tokens`, `json`, `shell_quote`, and `{% xml \"tag\" %}` help build Claude Code skill-style prompts |\n| **Escape syntax** | `\\$ARGUMENTS` renders as literal `$ARGUMENTS` in `engine: pi` prompts |\n| **Discovery warnings** | Malformed metadata and misplaced composer prompts surface as Pi notifications on session start |\n| **Bundled `/compose`** | Built-in helpers for creating, extending, and simplifying grouped prompts |\n| **Authoring skill** | Comprehensive `compose-grouped-prompts` skill loaded on demand for deep guidance |\n\n## Bundled `/compose` command\n\nThe package ships a built-in `/compose` grouped command for authoring grouped prompts:\n\n| Command | Purpose |\n|---------|---------|\n| `/compose` | Interactive selector for compose operations |\n| `/compose new <group-name>` | Create a new grouped prompt set |\n| `/compose add <group-name>` | Add subcommands to an existing group |\n| `/compose remove <group-name>` | Remove or simplify a subcommand |\n\nThe bundled `/compose` is loaded with lowest precedence. If you create your own `compose/` group in user or project prompts, it overrides the built-in version.\n\n### Required tools\n\nThe `/compose` prompts work best with [`pi-ask-user`](https://www.npmjs.com/package/pi-ask-user) installed \u2014 it provides the `ask_user` tool for interactive decision handshakes during prompt authoring. If required tools are missing, a persistent warning banner appears at session start:\n\n```\n Missing tools: ask_user \u2014 run pi install pi-ask-user\n```\n\n### Authoring skill\n\nThe package also ships a `compose-grouped-prompts` skill with:\n\n- Workflow guidance for creating, adding, and removing prompts\n- Layout conventions and naming rules\n- Frontmatter and args reference\n- Realistic examples and anti-patterns\n\nThe skill is loaded on demand when the model needs deeper guidance beyond what the `/compose` prompts provide.\n\n## Writing prompts\n\n### `_index.md` (required for groups)\n\n```yaml\n---\ndescription: Review workflows\norder: [summary, fix]\n---\n```\n\nNo `type: group` marker is required. A subfolder under `composed/` with `_index.md` is a group.\n\n`order` is optional \u2014 controls subcommand display order in autocomplete and the selector. Listed names appear first in the given order; unlisted subcommands are appended alphabetically. Omit for default alphabetical ordering.\n\n### Flat composer prompt files\n\n```yaml\n---\ndescription: Review a change\nengine: liquid\nargs:\n  - name: change\n    required: true\n    hint: Change, diff, file, or PR to review\n  - name: focus\n    required: false\n    hint: Optional focus\n---\nReview {{ args.change | quote }}.\n\n{% if args.focus | present %}\nFocus on: {{ args.focus }}\n{% endif %}\n```\n\nSave as `.pi/composed/review.md`, then run `/review --change \"auth fix\" --focus security`.\n\n### Nested prompt files\n\n```yaml\n---\ndescription: Summarize a change\nargs:\n  - name: change\n    required: true\n    hint: What changed?\n  - name: context\n    required: false\n    hint: Additional context\n---\nSummarize the following change:\n$ARGUMENTS\n```\n\n**Argument syntax** defaults to Pi-native: `$1`, `$2`, `$@`, `$ARGUMENTS`, `${@:N}`, `${@:N:L}`. Add `engine: liquid` to use named args (`{{ args.change }}`), conditionals, loops, and filters.\n\nUse `\\$` to escape a literal dollar sign (e.g., `\\$ARGUMENTS` renders as `$ARGUMENTS`).\n\n### `args` metadata\n\nEach item needs:\n\n| Field | Required | Default | Notes |\n|-------|----------|---------|-------|\n| `name` | **yes** | \u2014 | Items without `name` are skipped with a warning |\n| `required` | no | `false` | Whether the extension asks for this arg when missing |\n| `hint` | no | `\"\"` | Shown in the input prompt and selector usage hint |\n\nParsing is lenient \u2014 a missing `hint` or `required` won't break the prompt. Only a missing `name` drops that individual arg item.\n\n## Liquid helpers\n\nLiquid prompts get `{ args, argv, arguments, variables, prompt, now }` as their render context:\n\n```liquid\n{{ args.change | quote }}\n{{ args.items | where: \"kind\", \"risk\" | map: \"name\" | join: \", \" }}\n{{ args.metadata | json: 2 }}\n{{ args.workdir | shell_quote }}\n{% xml \"task\" %}{{ args.goal }}{% endxml %}\n```\n\nStatic constants belong in frontmatter `variables`, not repeated body literals or body-level `assign` statements:\n\n```yaml\nvariables:\n  repo_path: acme/app\n  review_channel: dev-review\n```\n\n```liquid\nRepo: {{ variables.repo_path }}\nChannel: {{ variables.review_channel }}\n```\n\nUse body-level `assign` for dynamic derived values only, such as `args.key | upcase`.\n\nPrompt-local partials live beside the prompt in `_partials/` and can be included with `{% include \"name.md\" %}`. Use them for repeated prompt prose or JSON/tool snippets.\n\nLiquid also gets raw positional context for Pi-like rest behavior: `argv` is the positional array and `arguments` is every positional joined by spaces. For nicer frontmatter, mark the final arg `rest: true` with `type: string[]` to capture remaining positionals.\n\n```yaml\nargs:\n  - name: group_name\n    required: true\n    hint: Group name\n  - name: description\n    required: false\n    type: string[]\n    rest: true\n    hint: Freeform description\n```\n\n```liquid\nDescription: {{ args.description | join: \" \" }}\nRaw argv: {{ argv | join: \", \" }}\n```\n\nUseful helpers:\n\n| Helper | Purpose |\n|--------|---------|\n| `present` | True for non-empty strings/arrays |\n| `quote` | Trim and double-quote text |\n| `tokens` | Rough chars/4 estimate |\n| `json` | JSON stringify values, optionally pretty-printed |\n| `shell_quote` | Single-quote shell arguments for command text |\n| `{% xml \"tag\" %}` | Emit XML-style blocks only when rendered body is non-empty |\n| `{% shell %}...{% endshell %}` | Render a command and optionally execute it when `shell` frontmatter opts in |\n\nShell execution is deny-by-default:\n\n| Frontmatter | Behavior |\n|-------------|----------|\n| omitted / `shell: deny` | Show command text; do not execute |\n| `shell: ask` | Confirm before execution; stdout replaces the block |\n| `shell: allow` | Execute without asking; trusted prompts only |\n\nConfigure the default in `~/.pi/agent/prompt-composer.json` or project-local `.pi/prompt-composer.json`:\n\n```json\n{\n  \"shell\": { \"mode\": \"ask\", \"timeoutMs\": 30000 }\n}\n```\n\nPrompt frontmatter wins over config.\n\nShell blocks run with `bash -lc` from the prompt file directory, so relative scripts work:\n\n```liquid\n{% shell %}\npython3 scripts/summarize.py --topic {{ args.topic | shell_quote }}\n{% endshell %}\n```\n\nThis is opt-in because shell can read files, call networks, mutate repos, or expose secrets. Quote user-controlled args with `shell_quote`. Validate prompt roots before live smoke:\n\n```bash\npnpm run prompts:validate\nmise run prompts:validate -- prompts ~/.pi/agent/composed/review\n```\n\nSee [docs/TEMPLATING.md](docs/TEMPLATING.md) and [examples/templating/README.md](examples/templating/README.md).\n\nComposer does not pretend to sandbox commands. Portable sandboxing is platform-specific; shell-enabled prompts are trusted code, matching Pi's normal shell trust model.\n\n## What this package owns vs Pi-native\n\n| Concern | Owned by |\n|---------|----------|\n| Frontmatter parsing, arg syntax, substitution | **Pi** (reused) |\n| Folder \u2192 command grouping, selector, arg collection | **pi-prompt-composer** |\n| Native flat `.md` prompt behavior under `prompts/` | **Pi** (unchanged) |\n| Composer flat `.md` prompt behavior under `composed/` | **pi-prompt-composer** |\n| Command precedence (grouped wins over flat) | **Pi** (extension commands take precedence) |\n\n## Known limitations\n\nSee [`docs/ISSUES.md`](docs/ISSUES.md) for tracked defects and status.\n\n## Non-goals (this version)\n\n- No default shell execution from templates; shell remains explicit opt-in\n- No nesting deeper than `/group subcommand`\n- No aliases or dynamic subcommands\n\n## Development\n\n```bash\npnpm install\npnpm run typecheck && pnpm run lint && pnpm run test\n```\n\nAutofix: `pnpm run fix` \u00b7 Watch: `pnpm run test:watch`\n\n## Related packages\n\n| Package | Description |\n|---------|-------------|\n| [`@victor-software-house/pi-openai-proxy`](https://www.npmjs.com/package/@victor-software-house/pi-openai-proxy) | OpenAI-compatible HTTP proxy for Pi's multi-provider model registry |\n\n## License\n\n[MIT](LICENSE)\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "prompt-templates",
+    "slash-commands",
+    "coding-agent",
+    "developer-tools",
+    "llm",
+    "openai",
+    "prompt-engineering"
+  ],
+  "author": {
+    "name": "Victor Software House"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/victor-software-house/pi-prompt-composer#readme",
+  "repository": {
+    "url": "git+https://github.com/victor-software-house/pi-prompt-composer.git",
+    "type": "git"
+  },
+  "pi": {
+    "image": "https://raw.githubusercontent.com/victor-software-house/pi-prompt-composer/main/assets/preview.png",
+    "skills": [
+      "./skills"
+    ],
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "time": {
+    "created": "2026-04-01T18:54:58.196Z",
+    "modified": "2026-06-09T16:43:57.718Z",
+    "0.1.0": "2026-04-01T18:54:58.437Z",
+    "0.1.1": "2026-04-01T19:31:23.066Z",
+    "1.0.0": "2026-04-02T22:33:01.890Z",
+    "1.0.1": "2026-04-02T22:43:30.820Z",
+    "1.0.2": "2026-04-02T22:47:26.647Z",
+    "1.0.3": "2026-04-02T22:51:01.712Z",
+    "1.0.4": "2026-04-03T00:09:02.178Z",
+    "1.0.5": "2026-04-03T00:10:53.766Z",
+    "1.1.0": "2026-04-03T01:17:10.866Z",
+    "1.1.1": "2026-04-03T01:25:13.578Z",
+    "1.1.2": "2026-04-03T01:56:42.604Z",
+    "1.2.0": "2026-04-03T02:05:36.610Z",
+    "1.2.1": "2026-04-03T02:18:31.788Z",
+    "1.2.2": "2026-04-03T02:22:33.065Z",
+    "1.2.3": "2026-04-03T02:25:07.296Z",
+    "1.3.0": "2026-04-03T03:19:57.568Z",
+    "1.3.1": "2026-04-03T06:52:42.793Z",
+    "1.4.0": "2026-05-08T14:00:50.668Z",
+    "1.5.0": "2026-05-08T15:04:43.940Z",
+    "1.5.1": "2026-05-09T04:49:42.577Z",
+    "1.6.0": "2026-05-10T16:18:59.712Z",
+    "1.6.1": "2026-05-10T17:22:24.950Z",
+    "1.7.0": "2026-05-11T00:15:37.430Z",
+    "1.7.1": "2026-05-11T02:13:46.613Z",
+    "1.7.2": "2026-05-11T12:32:17.053Z",
+    "1.8.0": "2026-05-11T13:28:43.351Z",
+    "1.9.0": "2026-05-11T13:43:07.679Z",
+    "1.9.1": "2026-05-12T03:41:56.424Z"
+  },
+  "versions_count": 28,
+  "downloads_last_week": 18,
+  "download_trend": [
+    {
+      "week_end": "2025-01-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-01-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-02-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-03-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-04-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-05-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-06-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-01",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-08",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-15",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-22",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-07-29",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-05",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-12",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-19",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-08-26",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-09-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-07",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-14",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-21",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-10-28",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-04",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-11",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-18",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-11-25",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-02",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-09",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-16",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-23",
+      "downloads": 0
+    },
+    {
+      "week_end": "2025-12-30",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-06",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-13",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-20",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-01-27",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-02-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-03",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-10",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-17",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-24",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-03-31",
+      "downloads": 0
+    },
+    {
+      "week_end": "2026-04-07",
+      "downloads": 1916
+    },
+    {
+      "week_end": "2026-04-14",
+      "downloads": 96
+    },
+    {
+      "week_end": "2026-04-21",
+      "downloads": 57
+    },
+    {
+      "week_end": "2026-04-28",
+      "downloads": 79
+    },
+    {
+      "week_end": "2026-05-05",
+      "downloads": 51
+    },
+    {
+      "week_end": "2026-05-12",
+      "downloads": 1490
+    },
+    {
+      "week_end": "2026-05-19",
+      "downloads": 168
+    },
+    {
+      "week_end": "2026-05-26",
+      "downloads": 91
+    },
+    {
+      "week_end": "2026-06-02",
+      "downloads": 118
+    },
+    {
+      "week_end": "2026-06-09",
+      "downloads": 156
+    },
+    {
+      "week_end": "2026-06-16",
+      "downloads": 59
+    },
+    {
+      "week_end": "2026-06-23",
+      "downloads": 20
+    },
+    {
+      "week_end": "2026-06-25",
+      "downloads": 1
+    }
+  ]
+}

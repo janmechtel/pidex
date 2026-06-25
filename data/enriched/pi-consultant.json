@@ -1,0 +1,36 @@
+{
+  "name": "pi-consultant",
+  "latest_version": "1.0.0",
+  "description": "Pi package for small-model worker workflows with a larger consultant model and durable lessons.",
+  "readme": "# Pi-consultant extension\n\nA Pi package for workflows where a small/local worker model does most coding work and can consult a larger model for advice.\n\n## Features\n\n- `consult_expert` tool calls a configured larger model.\n- `consult_session` sends the current Pi conversation branch and failure signals to the consultant for recovery guidance.\n- Default consultant: `openai-codex/gpt-5.5`.\n- `record_lesson` stores durable project-local lessons.\n- Relevant lessons are injected into future turns.\n- Conservative nudges warn about repeated tool errors and high context usage.\n- `consultant-policy` skill documents extension-specific consultation policy when explicitly requested.\n\n## Install from npm\n\n```bash\npi install npm:pi-consultant\n```\n\n## Install locally\n\n```bash\npi install ./\n```\n\nFor temporary testing without changing your normal Pi settings:\n\n```bash\nPI_CODING_AGENT_DIR=\"$(mktemp -d)\" pi install ./\n```\n\n## Consultant model configuration\n\nDefaults:\n\n```text\nopenai-codex/gpt-5.5\n```\n\nConfiguration uses hardcoded defaults plus optional JSON config files.\n\n| File | Scope |\n| --- | --- |\n| `~/.pi/agent/consultant.json` | Global |\n| `.pi/consultant/config.json` | Project-local, overrides global |\n\nExample config:\n\n```json\n{\n  \"provider\": \"openai-codex\",\n  \"model\": \"gpt-5.5\",\n  \"maxTokens\": 4096,\n  \"lessonInjectionLimit\": 3,\n  \"contextWarningThreshold\": 0.75,\n  \"autoSessionConsult\": false,\n  \"failureNudgeThreshold\": 2\n}\n```\n\nProject config overrides global config. Invalid config files are ignored with console errors.\n\nAuthenticate with Pi before using subscription models:\n\n```text\n/login\n```\n\nSelect OpenAI/Codex if needed.\n\n## Current behavior reference\n\nSee [`docs/current-state.md`](docs/current-state.md) for the canonical description of current extension behavior, configuration, nudges, privacy boundaries, and verification commands.\n\n## Usage\n\nAsk the worker model explicitly when you want it to load the policy skill:\n\n```text\nUse the consultant-policy skill while working on this task.\n```\n\nYou can also invoke it directly if Pi skill commands are enabled:\n\n```text\n/skill:consultant-policy\n```\n\nManual consultation example:\n\n```text\nUse consult_expert. Question: Why might this TypeScript test fail with module not found? Context: I added extensions/foo.ts and imported it from test/foo.test.ts. Attempted: checked the path once. Desired output: likely causes and next diagnostics.\n```\n\nSession consultation example:\n\n```text\nUse consult_session with reason \"repeated edit validation failures\" and focus \"recover safely and give next exact steps\".\n```\n\n`consult_session` sends the current Pi conversation branch, tool calls/results already present in the session, compaction summaries, and detected failure signals to the configured consultant model. It does not automatically read additional project files from disk. Use the optional `maxEntries` tool argument only when you explicitly want to cap session context for privacy or cost.\n\nRecord a lesson after verified success:\n\n```text\nUse record_lesson with title \"Run targeted tests first\", problem \"Full suite output hid the useful failure\", successfulApproach \"Run the smallest failing test first\", confidence \"high\", tags [\"testing\"].\n```\n\n## Development\n\nRun local checks before opening a PR or publishing a release:\n\n```bash\nnpm run lint\nnpm run check\nnpm run pack:check\n```\n\n## Publishing\n\nPublishing is handled by GitHub Actions when a GitHub Release is published.\n\nRelease checklist:\n\n1. Bump the package version, for example with `npm version patch`, `npm version minor`, or `npm version major`.\n2. Publish a GitHub Release for that version.\n3. Ensure the repository has an `NPM_TOKEN` secret with publish access.\n4. The workflow publishes to npm with provenance.\n\nAfter the workflow succeeds, install with:\n\n```bash\npi install npm:pi-consultant\n```\n\n## Memory\n\nProject lessons are stored at:\n\n```text\n.pi/consultant/lessons.jsonl\n```\n\nReview this file before committing. Add `.pi/consultant/` to `.gitignore` if lessons may contain project-private details.\n\n## Safety\n\nThe consultant has no tool access. It only sees context explicitly supplied to `consult_expert`, current conversation-branch context gathered by `consult_session`, or compact lesson snippets injected by this extension.\n\nDo not send secrets, credentials, private keys, `.env` contents, or unrelated full files to the consultant.\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "consultant",
+    "agent-skills"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/deorz/pi-consultant#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deorz/pi-consultant.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/consultant.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "time": {
+    "created": "2026-05-27T19:26:59.607Z",
+    "modified": "2026-05-27T19:34:44.206Z",
+    "0.1.0": "2026-05-27T19:27:00.030Z",
+    "1.0.0": "2026-05-27T19:34:43.930Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

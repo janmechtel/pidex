@@ -1,0 +1,60 @@
+{
+  "name": "@0xkobold/pi-codebase-wiki",
+  "latest_version": "0.8.7",
+  "description": "Keeps a wiki for your code that updates itself \u2014 reads your git history and docs so you can ask questions about your codebase",
+  "readme": "# \ud83d\udcd6 pi-codebase-wiki\n\n> **Keeps a wiki for your code that updates itself** \u2014 reads your git history and docs so you can ask questions about your codebase.\n\n[![npm version](https://img.shields.io/npm/v/@0xkobold/pi-codebase-wiki)](https://www.npmjs.com/package/@0xkobold/pi-codebase-wiki)\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)\n\n## The Idea\n\nInstead of RAG retrieval that starts fresh on every query, you build a **persistent, compounding wiki** from your git history and code. Knowledge compiled once and kept current beats knowledge re-derived on every question.\n\n**pi-codebase-wiki** reads your commits and docs, incrementally builds a structured wiki, and keeps it current as code changes. Works as a [pi](https://github.com/mariozechner/pi-coding-agent) extension, a standalone CLI, or a programmatic library.\n\n## Three Ways to Use\n\n### 1. As a pi Extension\n\nFor agents running inside pi \u2014 automatic context injection, tool calls, and commands.\n\n```bash\npi install @0xkobold/pi-codebase-wiki\n```\n\nThen use tools like `wiki_ingest`, `wiki_query`, `wiki_lint` and commands like `/wiki`, `/wiki-init`, `/wiki-ingest all`.\n\n### 2. As a CLI \ud83d\udc39\n\nPowered by [kapy](https://moikapy.dev/kapy) \u2014 agent-first, works in any terminal. No pi required.\n\n> **Note:** For string flags, use `--flag=value` syntax (e.g. `--summary=\"My summary\"`) to avoid parsing ambiguity with kapy's global arg scanner.\n\n```bash\n# Install globally\nbun install -g @0xkobold/pi-codebase-wiki\n\n# Initialize wiki in current project\nwiki wiki-init\n\n# Ingest sources\nwiki ingest all\n\n# Search the wiki\nwiki query \"Why did we switch from LevelDB to SQLite?\"\n\n# Health check\nwiki lint\n\n# Show stats\nwiki status\n\n# Create an entity page\nwiki entity auth-module --summary=\"Handles user authentication\" --type=module\n\n# Create an ADR\nwiki decision \"Use SQLite over LevelDB\" --context=\"Need reliable persistence\" --choice=\"SQLite for durability\"\n\n# Generate changelog\nwiki changelog --since=\"2 weeks ago\"\n\n# Trace feature evolution\nwiki evolve auth\n\n# Launch local web UI with graph visualization\nwiki serve --port=3000 --open\n\n# All commands support --json for machine-readable output\nwiki status --json\nwiki query \"how does hot-reload work?\" --json\n```\n\nEvery command supports `--json` (structured output) and `--no-input` (non-interactive) \u2014 designed for agents and automation.\n\n### 3. As a Library\n\nImport the pure operations directly \u2014 no pi, no CLI, just functions.\n\n```typescript\nimport {\n  initWiki,\n  ingestCommits,\n  ingestFileTree,\n  searchWiki,\n  lintWiki,\n  WikiStore,\n  getRecentCommits,\n} from \"@0xkobold/pi-codebase-wiki/core\";\n\n// Initialize\nconst store = new WikiStore(\".codebase-wiki/meta/wiki.db\");\nawait store.init();\n\n// Ingest\nconst result = await ingestCommits(process.cwd(), config, store, \"1 week ago\");\n\n// Query\nconst matches = searchWiki(\"how does auth work\", wikiPath, store, 10);\n\n// Lint\nconst issues = lintWiki(wikiPath, store);\n```\n\n## Three-Layer Architecture\n\n```\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502  Layer 1: Raw Sources (IMMUTABLE)  \u2502  git log, source files, configs\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502  Layer 2: The Wiki (LLM-OWNED)      \u2502  .codebase-wiki/ \u2014 markdown pages\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502  Layer 3: Schema (CO-EVOLVING)      \u2502  .codebase-wiki/SCHEMA.md\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n```\n\n## Quick Start\n\n```bash\n# As a pi extension\npi install @0xkobold/pi-codebase-wiki\n/wiki-init\n/wiki-ingest all\n\n# As a standalone CLI\nbun install -g @0xkobold/pi-codebase-wiki\nwiki wiki-init\nwiki ingest all\n```\n\n## CLI Commands\n\n| Command | Description |\n|---------|-------------|\n| `wiki wiki-init` | Initialize `.codebase-wiki/` for current project |\n| `wiki ingest [source]` | Ingest commits, tree, smart, llm, or all |\n| `wiki query <question>` | Search the wiki |\n| `wiki lint` | Health check: orphans, stale pages, broken links |\n| `wiki status` | Show page counts, staleness, last ingest |\n| `wiki entity <name>` | Create or update an entity page |\n| `wiki decision <title>` | Create an Architecture Decision Record |\n| `wiki concept <name>` | Create or update a concept page |\n| `wiki changelog` | Generate changelog from recent commits |\n| `wiki evolve <feature>` | Trace feature evolution over time |\n| `wiki reindex` | Rebuild the wiki index |\n| `wiki serve` | Start local web UI with graph visualization |\n\n## pi Tools\n\n| Tool | What It Does |\n|------|-------------|\n| `wiki_ingest` | Ingest commits, files, or docs into the wiki |\n| `wiki_query` | Search the wiki and synthesize answers |\n| `wiki_lint` | Health check: orphans, stale pages, broken links |\n| `wiki_status` | Show wiki stats, staleness, coverage |\n| `wiki_entity` | Create or update an entity page |\n| `wiki_decision` | Create an Architecture Decision Record (ADR) |\n| `wiki_concept` | Create or update a concept page |\n| `wiki_changelog` | Generate changelog from recent commits |\n| `wiki_evolve` | Trace how a feature changed over time |\n\n## pi Commands\n\n| Command | Description |\n|---------|-------------|\n| `/wiki` | Show wiki status and INDEX.md |\n| `/wiki-init` | Initialize the wiki for the current project |\n| `/wiki-ingest [source]` | Ingest commits, tree, docs, or all |\n| `/wiki-query <question>` | Ask a question against the wiki |\n| `/wiki-lint` | Run health checks |\n| `/wiki-reindex` | Rebuild the wiki index |\n\n## Wiki Structure\n\n```\n.codebase-wiki/\n\u251c\u2500\u2500 SCHEMA.md            # The constitution (how the LLM maintains the wiki)\n\u251c\u2500\u2500 INDEX.md             # Master index with links to all pages\n\u251c\u2500\u2500 CHANGELOG.md         # Auto-generated from commits\n\u251c\u2500\u2500 entities/            # Code entity pages\n\u2502   \u251c\u2500\u2500 auth-module.md\n\u2502   \u2514\u2500\u2500 event-bus.md\n\u251c\u2500\u2500 concepts/            # Cross-cutting concept pages\n\u2502   \u2514\u2500\u2500 hot-reload-pattern.md\n\u251c\u2500\u2500 decisions/           # Architecture Decision Records\n\u2502   \u2514\u2500\u2500 001-sqlite-over-leveldb.md\n\u251c\u2500\u2500 evolution/           # How things changed over time\n\u2502   \u2514\u2500\u2500 auth-evolution.md\n\u251c\u2500\u2500 comparisons/         # Side-by-side analysis\n\u2502   \u2514\u2500\u2500 pi-learn-vs-generative-agents.md\n\u251c\u2500\u2500 templates/           # Page templates\n\u2502   \u251c\u2500\u2500 entity.md\n\u2502   \u251c\u2500\u2500 concept.md\n\u2502   \u251c\u2500\u2500 decision.md\n\u2502   \u2514\u2500\u2500 evolution.md\n\u2514\u2500\u2500 meta/\n    \u251c\u2500\u2500 LOG.md           # Ingest log\n    \u251c\u2500\u2500 STATS.md         # Wiki health stats\n    \u2514\u2500\u2500 wiki.db          # SQLite metadata (sql.js)\n```\n\n## How It Works\n\n1. **Ingest**: You add a source (commits, file tree, docs). The LLM reads it, extracts key information, and integrates it into the wiki \u2014 creating pages, updating cross-references, appending to the log. A single commit might touch 5-10 wiki pages.\n\n2. **Query**: You ask a question. The LLM searches the wiki (not the raw source), reads relevant pages, and synthesizes an answer. Good answers get filed back as new pages. Knowledge compounds.\n\n3. **Lint**: Periodic health checks find contradictions, orphans, stale pages, broken links, and missing concepts. Think of it as `eslint` for knowledge.\n\n## Key Principle\n\n> **The LLM writes. You read.** You curate sources and ask questions. The LLM does the bookkeeping.\n\n## Web UI\n\n`wiki serve` launches a local web interface with:\n\n- **Page browser** \u2014 sidebar with all pages, type-coded dots (entity, concept, decision, etc.)\n- **Content viewer** \u2014 rendered markdown with clickable `[[wikilinks]]` and metadata\n- **Full-text search** \u2014 search across all pages with relevance scoring\n- **Interactive graph** \u2014 force-directed node graph showing how pages connect, drag nodes, zoom, double-click to navigate\n- **Dark mode** \u2014 because we live in terminals\n\n```bash\nwiki serve              # Start on port 3000\nwiki serve --port=8080 # Custom port\nwiki serve --open      # Auto-open browser\n```\n\nAll data comes from the API (`/api/pages`, `/api/graph`, `/api/search`). The UI is a single HTML page \u2014 no build tools, no external deps.\n\n## License\n\nMIT",
+  "keywords": [
+    "pi-package",
+    "wiki",
+    "codebase",
+    "cli",
+    "agent",
+    "kapy"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": null,
+  "repository": null,
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills/codebase-wiki/SKILL.md"
+    ]
+  },
+  "time": {
+    "created": "2026-04-12T23:22:35.900Z",
+    "modified": "2026-05-17T23:53:46.502Z",
+    "0.1.0": "2026-04-12T23:22:36.183Z",
+    "0.1.1": "2026-04-12T23:52:25.358Z",
+    "0.2.0": "2026-04-13T00:21:07.791Z",
+    "0.2.1": "2026-04-13T00:55:56.074Z",
+    "0.2.2": "2026-04-13T01:29:22.250Z",
+    "0.3.0": "2026-04-13T01:54:29.933Z",
+    "0.4.0": "2026-04-13T03:01:37.376Z",
+    "0.4.1": "2026-04-13T03:05:46.175Z",
+    "0.5.0": "2026-04-13T04:10:59.518Z",
+    "0.5.1": "2026-04-13T04:31:04.351Z",
+    "0.5.2": "2026-04-13T04:50:52.884Z",
+    "0.6.0": "2026-04-13T05:20:09.835Z",
+    "0.6.1": "2026-04-13T18:15:16.128Z",
+    "0.6.2": "2026-04-26T03:27:57.140Z",
+    "0.7.0": "2026-05-01T20:27:55.286Z",
+    "0.7.1": "2026-05-01T21:45:40.555Z",
+    "0.7.2": "2026-05-03T17:26:39.414Z",
+    "0.7.3": "2026-05-04T03:24:42.821Z",
+    "0.7.4": "2026-05-08T23:52:59.510Z",
+    "0.8.0": "2026-05-17T22:11:11.267Z",
+    "0.8.1": "2026-05-17T22:44:48.871Z",
+    "0.8.2": "2026-05-17T22:54:59.225Z",
+    "0.8.3": "2026-05-17T23:09:33.127Z",
+    "0.8.4": "2026-05-17T23:17:39.014Z",
+    "0.8.5": "2026-05-17T23:27:53.863Z",
+    "0.8.6": "2026-05-17T23:45:16.237Z",
+    "0.8.7": "2026-05-17T23:53:46.385Z"
+  },
+  "versions_count": 27,
+  "downloads_last_week": null,
+  "download_trend": []
+}

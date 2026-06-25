@@ -1,0 +1,47 @@
+{
+  "name": "pi-meter",
+  "latest_version": "0.1.1",
+  "description": "LLM spend tracking, budget alerts, auto-downshift, and hard cutoff for AI coding agents \u2014 as a CLI, an MCP server, a Claude/Cursor skill, or a pi extension.",
+  "readme": "# pi-meter\n\n> Know what your coding agents cost \u2014 and stay on budget.\n\n**pi-meter** tracks every LLM call your AI coding agent makes, aggregates spend across sessions,\ndays, and models, and keeps you on budget with three escalating responses: it **warns** as you\napproach a limit, **auto-downshifts** to a cheaper model when you go over, and can **hard cut\noff** \u2014 refusing prompts and blocking tools \u2014 when you blow a hard cap.\n\nOne core engine, four ways to run it: a **CLI**, an **MCP server**, a **Claude/Cursor skill**,\nand a **[pi](https://pi.dev) extension**.\n\n[![npm](https://img.shields.io/npm/v/pi-meter?color=cb3837&logo=npm)](https://www.npmjs.com/package/pi-meter)\n[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)\n![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)\n\n---\n\n## Why\n\nLLM coding agents burn money quietly \u2014 a long session on a frontier model can run into real\ndollars before you notice. pi-meter gives you:\n\n- a portable **ledger** of every call (model, tokens, cost) you can grep,\n- **budgets** with three responses \u2014 warn \u2192 downshift \u2192 cut off,\n- and zero lock-in: plain JSONL + a JSON config file. No account, no daemon, no telemetry.\n\n## Features\n\n- **Spend tracking** \u2014 per call, per day, per month, all-time, per model, and per session.\n- **Cost estimates** \u2014 a built-in price table for Claude / GPT / Gemini, fully overridable; uses\n  the harness's own reported cost when it's available.\n- **Soft budgets \u2192 auto-downshift** \u2014 over budget, pi-meter switches the agent to a cheaper model\n  you choose.\n- **Hard limits \u2192 cutoff** \u2014 past a hard cap, pi-meter refuses new prompts and blocks tool calls,\n  with a one-command override.\n- **Four surfaces** \u2014 CLI, MCP server, Claude/Cursor skill, and pi extension, all on one core.\n- **Just files** \u2014 the ledger is JSONL at `~/.pi-meter/usage.jsonl`; config is a `pi-meter.json`.\n\n## Install\n\n```bash\n# CLI (global) \u2014 installs the `pimeter` command\nnpm install -g pi-meter\n\n# or run without installing\nnpx pi-meter report\n```\n\nFor the **pi** harness (installs the extension + skill):\n\n```bash\npi install npm:pi-meter\n# or from the repo:\npi install git:github.com/vaibhav-patel/pi-meter\n```\n\n## Quick start\n\n```bash\n# record a call (the pi extension / MCP server usually does this for you)\npimeter record --model claude-opus-4-8 --input 12000 --output 3000 --label \"refactor\"\n\n# where's the money going?\npimeter report\n\n# am I within budget?\npimeter status\n\n# set a soft budget (warn + downshift) and a hard cap (cutoff)\npimeter budget    --daily 5  --monthly 100\npimeter hardlimit --daily 10 --total 500\n```\n\n## How it works\n\npi-meter has one dependency-free core behind every surface:\n\n1. **Record** \u2014 each model call is priced and appended to the ledger.\n2. **Aggregate** \u2014 spend is summed by day / month / total / model / session.\n3. **Enforce** \u2014 spend is compared to your `budget` (soft) and `hardLimit` (hard):\n   - **soft budget exceeded** \u2192 warn and **auto-downshift** to a cheaper model;\n   - **hard limit exceeded** \u2192 **cut off**: refuse new prompts and block tool calls.\n\n### The ledger\n\nOne JSONL line per call at `~/.pi-meter/usage.jsonl` (override with `storePath`):\n\n```json\n{\"ts\":\"2026-06-18T09:30:00Z\",\"model\":\"claude-opus-4-8\",\"provider\":\"anthropic\",\"inputTokens\":12000,\"outputTokens\":3000,\"costUsd\":0.225,\"sessionId\":\"a1b2\",\"label\":\"refactor\"}\n```\n\nGreppable, portable, and yours \u2014 delete lines to forget, copy it elsewhere to analyze.\n\n## Configuration \u2014 `pi-meter.json`\n\nDrop a `pi-meter.json` in your project root (the folder you run the agent from):\n\n```jsonc\n{\n  \"budget\":    { \"daily\": 5, \"monthly\": 100, \"session\": 2 },   // soft  -> auto-downshift\n  \"hardLimit\": { \"monthly\": 150, \"total\": 500 },               // hard  -> cut off\n  \"downshift\": { \"claude-opus-4-8\": \"claude-sonnet-4-6\" },     // expensive -> cheaper\n  \"prices\":    [ { \"id\": \"my-model\", \"inputPerMTok\": 1.0, \"outputPerMTok\": 4.0 } ],\n  \"storePath\": \"~/.pi-meter/usage.jsonl\"\n}\n```\n\n| Field | What it does |\n|-------|--------------|\n| `budget` | Soft limits (USD). pi-meter warns at 80%, and at 100% **auto-downshifts** via `downshift`. |\n| `hardLimit` | Hard caps (USD). Once over, the pi extension **refuses prompts and blocks tools**. |\n| `downshift` | Expensive-model \u2192 cheaper-model map, used when over the soft budget. |\n| `prices` | Add or override model prices (USD per 1M tokens). Wins over the built-in defaults. |\n| `storePath` | Ledger location (supports a leading `~`). Defaults to `~/.pi-meter/usage.jsonl`. |\n\n**Scopes** for both `budget` and `hardLimit`: `daily`, `monthly`, `session`, and `total` (all-time).\n\n## CLI reference\n\n| Command | Description |\n|---------|-------------|\n| `pimeter record --model <id> --input <n> --output <n>` | Record a call. Optional: `--cache-read`, `--cache-write`, `--label`, `--session`. |\n| `pimeter report [--json]` | Spend: today / month / total / by model. |\n| `pimeter status [--session <id>]` | Budget + hard-limit usage per scope (exits 1 if over). |\n| `pimeter budget [--daily N --monthly N --session N --total N]` | Show or set the soft budget. |\n| `pimeter hardlimit [--daily N --monthly N --session N --total N]` | Show or set the hard limit. |\n| `pimeter models` | List known model prices. |\n| `pimeter mcp` | Start the MCP server (stdio). |\n\n## pi extension\n\nOnce installed in pi, pi-meter runs on its own:\n\n- **Meters every turn** \u2014 reads the harness's own token usage + cost and records it.\n- **Footer gauge** \u2014 shows `daily $1.20/$5.00 \u00b7 monthly \u2026` live as you work.\n- **Auto-downshift** \u2014 over the soft budget, switches to your `downshift` model (once per turn).\n- **Cutoff** \u2014 over the `hardLimit`, refuses new prompts and blocks tool calls.\n- **Commands** \u2014 `/pimeter` shows spend + budget; `/pimeter override` lifts a hard-limit block for\n  the current session.\n\n## MCP server\n\n`npx pi-meter mcp` starts a stdio MCP server with three tools, usable from Claude Desktop, Cursor,\nor any MCP client:\n\n| Tool | Description |\n|------|-------------|\n| `record_usage` | Record a model call; returns its computed cost. |\n| `get_spend` | Today / month / total / by-model spend. |\n| `check_budget` | Budget status per scope, whether to downshift, and a suggested cheaper model. |\n\nExample client config:\n\n```json\n{ \"mcpServers\": { \"pi-meter\": { \"command\": \"npx\", \"args\": [\"-y\", \"pi-meter\", \"mcp\"] } } }\n```\n\n## Claude / Cursor skill\n\nThe package ships a skill at [`skills/pimeter/SKILL.md`](skills/pimeter/SKILL.md). Drop it into your\nagent's skills directory (or it loads automatically when pi-meter is installed as a pi package) to\nteach the agent to record usage, report cost, and decide when to switch models for cost reasons.\n\n## Pricing note\n\nThe built-in price table is **approximate public list pricing** and **will drift** \u2014 verify and\noverride anything you depend on via `prices` in `pi-meter.json` (`pimeter models` prints the\ndefaults). When the harness reports its own cost (as pi does), pi-meter uses that instead of the\ntable.\n\n## Development\n\n```bash\nnpm install\nnpm run build      # tsc -> dist/\nnpm test           # node --test suite\nnpm run typecheck\n```\n\n## License\n\nMIT \u2014 see [LICENSE](LICENSE).\n",
+  "keywords": [
+    "pi-package",
+    "pi-meter",
+    "pimeter",
+    "llm",
+    "cost",
+    "budget",
+    "tokens",
+    "spend",
+    "token-usage",
+    "mcp",
+    "claude",
+    "cursor",
+    "pi",
+    "coding-agent",
+    "ai-agents"
+  ],
+  "author": null,
+  "license": "MIT",
+  "homepage": "https://github.com/vaibhav-patel/pi-meter#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vaibhav-patel/pi-meter.git"
+  },
+  "pi": {
+    "extensions": [
+      "dist/pi/extension.js"
+    ],
+    "skills": [
+      "skills"
+    ]
+  },
+  "time": {
+    "created": "2026-06-18T17:07:59.861Z",
+    "modified": "2026-06-18T18:12:47.542Z",
+    "0.1.0": "2026-06-18T17:08:00.072Z",
+    "0.1.1": "2026-06-18T18:12:47.431Z"
+  },
+  "versions_count": 2,
+  "downloads_last_week": null,
+  "download_trend": []
+}

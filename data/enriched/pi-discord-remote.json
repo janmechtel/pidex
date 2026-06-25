@@ -1,0 +1,48 @@
+{
+  "name": "pi-discord-remote",
+  "latest_version": "0.2.4",
+  "description": "Control your Pi coding-agent session from Discord \u2014 each session gets its own auto-created channel",
+  "readme": "# pi-discord-remote\n\n> Control your [Pi](https://pi.dev) coding-agent session from Discord.\n\n![pi-discord-remote demo](demo.gif)\n\nEach time you run `/pi-discord-remote start`, the extension automatically creates a **new Discord text channel** named after your current project + date (e.g. `kaleidoscope-may09`). Messages sent in that channel are injected into Pi as user prompts; Pi's responses are posted back. When you stop, the channel is deleted \u2014 keeping your server clean within Discord's channel limit.\n\n## Install\n\n```bash\npi install npm:pi-discord-remote\n```\n\n## Bot setup\n\n1. Create a bot at [discord.com/developers/applications](https://discord.com/developers/applications)\n2. Under **Bot \u2192 Privileged Gateway Intents**, enable **Message Content**\n3. Invite the bot to your server with these permissions:\n   - Read Messages / View Channels\n   - Send Messages\n   - Add Reactions\n   - **Manage Channels** \u2190 required for auto-create/delete\n\n## Usage\n\n```\n/pi-discord-remote setup        \u2014 configure token, server ID, optional category\n/pi-discord-remote start        \u2014 create channel + connect\n/pi-discord-remote stop         \u2014 delete channel + disconnect\n/pi-discord-remote status       \u2014 show connection state\n/pi-discord-remote open-config  \u2014 edit config JSON in Pi's editor\n```\n\n### Setup prompts\n\n| Field | Where to find it |\n|-------|-----------------|\n| Bot token | Discord Developer Portal \u2192 Bot \u2192 Token |\n| Guild (Server) ID | Right-click server \u2192 Copy Server ID (needs Developer Mode) |\n| Category ID | Right-click a category \u2192 Copy Category ID (optional \u2014 channels go to server root otherwise) |\n| Allowed user IDs | Right-click a user \u2192 Copy User ID (leave empty to allow everyone) |\n| Tool responses | Send tool outputs (results/errors) to Discord alongside tool-call labels? (y/n, default: no) |\n\nConfig is stored at `~/.pi/agent/pi-discord-remote/config.json`.\n\n### Environment variables (alternative to config file)\n\nFor CI or headless setups, you can skip `setup` entirely and set these env vars:\n\n| Variable | Description |\n|----------|-------------|\n| `DISCORD_TOKEN` | Bot token (overrides config file) |\n| `DISCORD_GUILD_ID` | Guild (server) ID |\n| `DISCORD_CATEGORY_ID` | Optional category ID |\n\n## Config reference\n\n| Key | Type | Default | Description |\n|-----|------|---------|-------------|\n| `token` | string | \u2014 | Discord bot token |\n| `guildId` | string | \u2014 | Discord guild (server) ID |\n| `categoryId` | string | \u2014 | Optional category for auto-created channels |\n| `allowedUserIds` | string[] | `[]` | Allow-list of Discord user IDs (empty = everyone) |\n| `reactions` | boolean | `true` | React with \u23f3 while processing |\n| `toolResponses` | boolean | `false` | Also post tool outputs/results alongside tool-call labels (truncated to \u2264400 chars) |\n\nEdit config with `/pi-discord-remote open-config`.\n\n## How it works\n\nThe extension loads silently on Pi startup \u2014 no channel is created until you explicitly run the command.\n\n- **`/pi-discord-remote start`** \u2014 bot logs in, creates a text channel named `<project>-<mon><dd>-<HHMM>`, and starts listening there only\n- **Incoming message** \u2014 injected as a user prompt into the active Pi session; bot reacts \u23f3 while Pi works, then posts the full response back\n- **Tool calls** \u2014 each tool invocation is labeled (\ud83d\udd27 bash, \ud83d\udcc4 read, \u270f\ufe0f edit, etc.) with a detail line; if `toolResponses` is on, results follow as \u21a9\ufe0f/\u274c code blocks\n- **`/pi-discord-remote stop`** (or Pi exit) \u2014 channel is deleted, bot disconnects\n\n### Optional image skill tool\n\nImage forwarding is **not automatic** in `pi-discord-remote`.\n\nIf you want to send an image, use the explicit `discord_send_image` tool (opt-in):\n- optional `channelId` (recommended for deterministic targeting)\n- source by local `path`\n- or source by `url`\n- or source by `base64` (+ optional `mediaType`)\n\nExactly one source should be provided per call. If omitted, the tool falls back to the latest `agent_browser` image artifact path.\n\n`/pi-discord-remote status` now shows the active **Channel ID** so you can pass it directly to `discord_send_image`.\n\nThe tool returns explicit send errors (for example `unknown_channel:<id>` or timeout/HTTP errors) instead of silently forwarding images.\n\n### `ask_user_question` \u2192 Discord\n\nPi's TUI-only `ask_user_question` dialog (from `@juicesharp/rpiv-ask-user-question`) is invisible over Discord remote. When Discord is connected, pi-discord-remote:\n\n1. **Blocks** the original `ask_user_question` via `tool_call` event interception \u2014 the TUI dialog never appears\n2. **Registers** `discord_ask_user_question` \u2014 a drop-in replacement that formats questions as Discord messages and collects answers from the channel\n3. **Hints** the LLM via `before_agent_start` to prefer `discord_ask_user_question` when Discord is connected\n\nWhen Discord **is not** connected, the original `ask_user_question` (TUI dialog) works normally as a fallback. No need to uninstall `@juicesharp/rpiv-ask-user-question` \u2014 the two extensions coexist gracefully.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "discord",
+    "remote-control"
+  ],
+  "author": {
+    "name": "Chuan Bai"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/t2o2/pi-discord-remote#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/t2o2/pi-discord-remote.git"
+  },
+  "pi": {
+    "extensions": [
+      "./dist"
+    ],
+    "image": "https://raw.githubusercontent.com/t2o2/pi-discord-remote/main/assets/banner.jpeg"
+  },
+  "time": {
+    "created": "2026-05-09T09:54:43.952Z",
+    "modified": "2026-05-20T08:46:27.294Z",
+    "0.1.0": "2026-05-09T09:54:44.090Z",
+    "0.1.1": "2026-05-09T10:05:45.387Z",
+    "0.1.2": "2026-05-09T10:09:57.610Z",
+    "0.1.3": "2026-05-09T11:11:31.230Z",
+    "0.1.4": "2026-05-09T16:29:13.269Z",
+    "0.1.5": "2026-05-09T22:30:27.759Z",
+    "0.1.6": "2026-05-09T23:24:12.964Z",
+    "0.1.9": "2026-05-10T09:31:05.618Z",
+    "0.1.10": "2026-05-10T23:46:57.691Z",
+    "0.2.0": "2026-05-14T10:10:20.564Z",
+    "0.2.1": "2026-05-18T21:35:22.113Z",
+    "0.2.2": "2026-05-18T21:41:19.469Z",
+    "0.2.3": "2026-05-20T07:59:30.763Z",
+    "0.2.4": "2026-05-20T08:46:27.201Z"
+  },
+  "versions_count": 14,
+  "downloads_last_week": null,
+  "download_trend": []
+}

@@ -1,0 +1,43 @@
+{
+  "name": "pi-worktree-tui-status",
+  "latest_version": "0.2.0",
+  "description": "TUI-only worktree and experiment status indicator for Pi; detects agent tool paths without managing them",
+  "readme": "# pi-worktree-tui-status\n\nA **TUI-only** worktree and experiment status indicator for [Pi](https://pi.dev/).\n\nIt shows which git worktree or disposable experiment the agent is touching when the agent edits or runs commands against long paths like:\n\n```text\nruns/agents/worktrees/<slug>/...\nruns/experiments/<product-or-app>/<slug>/...\n```\n\nIt **does not** create, switch, remove, prune, checkout, merge, promote, or otherwise manage worktrees or experiments.\n\n```text\n\ud83c\udf33 issue-1234-fix-camera | \ud83c\udf3f 1234-fix-camera | dirty +3\n\ud83e\uddea bistro-beacon/camera-spike | experiment\n```\n\n## Why this exists\n\nSome workflows keep Pi's current working directory on the main repository, while the agent works in an isolated git worktree by using explicit long paths:\n\n```bash\ngit worktree add runs/agents/worktrees/my-task my-branch\ngit -C runs/agents/worktrees/my-task status --short\n```\n\nStatusline extensions that inspect only `ctx.cwd` will still show the original checkout. This extension watches Pi tool calls and user shell commands, detects worktree or experiment paths, and updates a small TUI status item.\n\n## Install\n\n```bash\npi install npm:pi-worktree-tui-status\n```\n\nTry without installing:\n\n```bash\npi -e npm:pi-worktree-tui-status\n```\n\nLocal development:\n\n```bash\ngit clone https://github.com/arpagon/pi-worktree-tui-status.git\ncd pi-worktree-tui-status\npi -e ./index.ts\n```\n\nIf Pi is already running, use `/reload` after installing.\n\n## What it detects\n\n### Tool paths\n\nIt watches path-like arguments from Pi tool calls, including:\n\n- `read`\n- `write`\n- `edit`\n- `grep`\n- `find`\n- `ls`\n- any tool with `path`, `cwd`, `file`, `directory`, or `target` string fields\n\nExamples:\n\n```json\n{\n  \"path\": \"runs/agents/worktrees/my-task/src/index.ts\"\n}\n```\n\n```json\n{\n  \"path\": \"runs/experiments/bistro-beacon/camera-spike/report.md\"\n}\n```\n\n### Bash commands\n\nIt also watches bash commands and user `!` shell commands for:\n\n```bash\ngit -C runs/agents/worktrees/my-task status --short\nnpm --prefix runs/agents/worktrees/my-task/app test\npython runs/experiments/bistro-beacon/camera-spike/run.py\n```\n\n## Display\n\nThe extension writes one Pi status segment:\n\n```text\n\ud83c\udf33 <slug> | \ud83c\udf3f <branch> | <clean | dirty +N | dirty ?>\n\ud83e\uddea <product-or-app>/<slug> | experiment\n```\n\nExamples:\n\n```text\n\ud83c\udf33 issue-workflow-fix | \ud83c\udf3f 1943-improve-issue-workflow | clean\n\ud83c\udf33 roi-camera-plan | \ud83c\udf3f 2110-roi-camera-plan | dirty +4\n\ud83e\uddea bistro-beacon/camera-spike | experiment\n```\n\n## Non-goals\n\nThis package is intentionally narrow:\n\n- No `/worktree` command\n- No git worktree creation\n- No checkout/switch behavior\n- No path redirection\n- No shell sandboxing\n- No cleanup or deletion\n- No PR or merge automation\n- No experiment creation, promotion, cleanup, or archival\n\nUse a worktree management extension if you want those behaviors. Use this package only when you want a visual TUI indicator.\n\n## Project workflow compatibility\n\nThis is designed for workflows like:\n\n```bash\ngh issue develop <issue> --base main --name <branch>\ngit fetch origin <branch>\ngit worktree add -b <branch> runs/agents/worktrees/<slug> origin/<branch>\ngit -C runs/agents/worktrees/<slug> status --short\n```\n\nThe agent can keep Pi's `cwd` in the original repo and still get a visible indication of which worktree is being touched. Disposable exploration under `runs/experiments/<product-or-app>/<slug>` is shown as experiment mode.\n\n## Development\n\n```bash\nnpm test\nnpm run typecheck\nnpm run pack:dry\nnpm run validate\n```\n\n## Package contents\n\nThe npm package includes only:\n\n```text\nindex.ts\nREADME.md\nCHANGELOG.md\nLICENSE\nAGENTS.md\n```\n\n## Security\n\nPi extensions run with your user permissions. This extension does not execute arbitrary user-provided shell commands. Experiment detection only parses paths. For worktrees, it runs read-only git commands against detected worktree roots:\n\n```bash\ngit -C <worktree> branch --show-current\ngit -C <worktree> status --porcelain --untracked-files=normal\n```\n\nIt never writes files and never mutates git state.\n\n## License\n\nMIT\n",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "worktree",
+    "experiment",
+    "experiments",
+    "tui",
+    "status",
+    "indicator",
+    "git"
+  ],
+  "author": {
+    "name": "Arpagon"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/arpagon/pi-worktree-tui-status#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arpagon/pi-worktree-tui-status.git"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "time": {
+    "created": "2026-05-21T21:16:43.210Z",
+    "modified": "2026-05-22T21:56:29.347Z",
+    "0.1.0": "2026-05-21T21:16:43.951Z",
+    "0.1.1": "2026-05-21T21:36:16.476Z",
+    "0.2.0": "2026-05-22T21:56:29.074Z"
+  },
+  "versions_count": 3,
+  "downloads_last_week": null,
+  "download_trend": []
+}
