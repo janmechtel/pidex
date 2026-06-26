@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pidex — Pi Package Index</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e2e4ed;
+    --muted: #6b7280;
+    --accent: #6c8eff;
+    --green: #34d399;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --purple: #a78bfa;
+    --orange: #fb923c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; }
+
+  /* Nav */
+  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 0; position: sticky; top: 0; z-index: 100; }
+  .nav-brand { font-weight: 700; font-size: 16px; color: var(--accent); padding: 14px 24px 14px 0; border-right: 1px solid var(--border); margin-right: 8px; letter-spacing: -0.3px; }
+  .nav-brand span { color: var(--muted); font-weight: 400; }
+  .nav-tab { padding: 14px 16px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; transition: all .15s; font-size: 13px; }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .nav-meta { color: var(--muted); font-size: 12px; }
+  .btn-download { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; text-decoration: none; transition: border-color .15s; }
+  .btn-download:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Tabs */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Stats bar */
+  .stats-bar { display: flex; gap: 32px; padding: 16px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-value { font-size: 20px; font-weight: 700; color: var(--text); }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+
+  /* Filters */
+  .filters { display: flex; gap: 10px; padding: 14px 24px; background: var(--bg); border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; }
+  .search-input { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: 6px; font-size: 13px; width: 260px; outline: none; }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--muted); }
+  select { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 7px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; outline: none; }
+  select:focus { border-color: var(--accent); }
+  .filter-label { color: var(--muted); font-size: 12px; }
+  .count-badge { margin-left: auto; color: var(--muted); font-size: 12px; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { padding: 10px 16px; text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
+  th:hover { color: var(--text); }
+  th .sort-arrow { opacity: .4; margin-left: 4px; }
+  th.sorted .sort-arrow { opacity: 1; color: var(--accent); }
+  td { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:hover td { background: var(--surface); cursor: pointer; }
+
+  /* Cells */
+  .pkg-name { font-weight: 500; color: var(--text); font-size: 13px; }
+  .pkg-scope { color: var(--muted); font-weight: 400; }
+  .pkg-desc { color: var(--muted); font-size: 12px; max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+  .badge-extension { background: rgba(108,142,255,.15); color: var(--accent); }
+  .badge-skill     { background: rgba(167,139,250,.15); color: var(--purple); }
+  .badge-theme     { background: rgba(251,191,36,.15);  color: var(--yellow); }
+  .badge-prompt    { background: rgba(251,146,60,.15);  color: var(--orange); }
+  .badge-unknown   { background: rgba(107,114,128,.15); color: var(--muted); }
+  .trend-badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+  .trend-growing  { background: rgba(52,211,153,.15); color: var(--green); }
+  .trend-declining{ background: rgba(248,113,113,.15); color: var(--red); }
+  .trend-stable   { background: rgba(107,114,128,.15); color: var(--muted); }
+  .trend-new      { background: rgba(251,191,36,.12);  color: var(--yellow); }
+  .num { font-variant-numeric: tabular-nums; text-align: right; }
+  .num-hi { color: var(--text); }
+  .num-lo { color: var(--muted); }
+  .fork-icon { color: var(--muted); font-size: 11px; }
+
+  /* Sparkline */
+  canvas.spark { display: block; }
+
+  /* Drawer */
+  .drawer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200; }
+  .drawer-overlay.open { display: block; }
+  .drawer { position: fixed; right: 0; top: 0; bottom: 0; width: 480px; background: var(--surface); border-left: 1px solid var(--border); z-index: 201; overflow-y: auto; padding: 24px; transform: translateX(100%); transition: transform .2s ease; }
+  .drawer.open { transform: translateX(0); }
+  .drawer-close { float: right; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 0; }
+  .drawer-close:hover { color: var(--text); }
+  .drawer h2 { font-size: 16px; font-weight: 600; margin-bottom: 4px; padding-right: 24px; word-break: break-all; }
+  .drawer-desc { color: var(--muted); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+  .drawer-section { margin-bottom: 20px; }
+  .drawer-section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 10px; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .meta-item { background: var(--bg); border-radius: 6px; padding: 10px 12px; }
+  .meta-item .label { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin-bottom: 4px; }
+  .meta-item .value { font-size: 15px; font-weight: 600; }
+  .similar-list { display: flex; flex-direction: column; gap: 6px; }
+  .similar-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg); border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+  .similar-item:hover { background: var(--border); }
+  .similar-name { font-size: 12px; font-weight: 500; }
+  .similar-score { font-size: 11px; color: var(--muted); }
+  .links { display: flex; gap: 8px; flex-wrap: wrap; }
+  .link-btn { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: 5px; font-size: 12px; text-decoration: none; }
+  .link-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .kw-list { display: flex; gap: 6px; flex-wrap: wrap; }
+  .kw { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; font-size: 11px; color: var(--muted); }
+  .trend-chart { width: 100%; height: 60px; }
+
+  /* Report tab */
+  #report-frame { width: 100%; height: calc(100vh - 48px); border: none; background: white; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .drawer { width: 100%; }
+    .pkg-desc { display: none; }
+    td:nth-child(5), th:nth-child(5) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">Pidex <span>/ Pi Package Index</span></div>
+  <div class="nav-tab active" onclick="switchTab('browse', this)">Browse</div>
+  <div class="nav-tab" onclick="switchTab('report', this)">Analysis Report</div>
+  <div class="nav-right">
+    <span class="nav-meta" id="nav-meta">Loading…</span>
+    <a class="btn-download" href="data/pidex-full.json.gz" download>⬇ Download dataset</a>
+  </div>
+</nav>
+
+<!-- Browse tab -->
+<div id="tab-browse" class="tab-panel active">
+  <div class="stats-bar" id="stats-bar">
+    <div class="stat"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Packages</div></div>
+    <div class="stat"><div class="stat-value" id="stat-ext">—</div><div class="stat-label">Extensions</div></div>
+    <div class="stat"><div class="stat-value" id="stat-growing">—</div><div class="stat-label">Growing</div></div>
+    <div class="stat"><div class="stat-value" id="stat-declining">—</div><div class="stat-label">Declining</div></div>
+    <div class="stat"><div class="stat-value" id="stat-dupes">—</div><div class="stat-label">Near-duplicates</div></div>
+  </div>
+
+  <div class="filters">
+    <input class="search-input" id="search" placeholder="Search packages…" oninput="render()">
+    <span class="filter-label">Type:</span>
+    <select id="f-type" onchange="render()">
+      <option value="">All</option>
+      <option value="extension">Extension</option>
+      <option value="skill">Skill</option>
+      <option value="theme">Theme</option>
+      <option value="prompt">Prompt</option>
+      <option value="unknown">Unknown</option>
+    </select>
+    <span class="filter-label">Trend:</span>
+    <select id="f-trend" onchange="render()">
+      <option value="">All</option>
+      <option value="growing">Growing</option>
+      <option value="stable">Stable</option>
+      <option value="declining">Declining</option>
+      <option value="new">New</option>
+    </select>
+    <span class="filter-label">Sort:</span>
+    <select id="f-sort" onchange="render()">
+      <option value="dl">Downloads</option>
+      <option value="st">Stars</option>
+      <option value="tt-g">Trending up</option>
+      <option value="dt">Recently updated</option>
+      <option value="n">Name</option>
+    </select>
+    <span class="count-badge" id="count-badge"></span>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:280px">Package</th>
+          <th style="width:320px">Description</th>
+          <th style="width:70px">Type</th>
+          <th style="width:100px" class="num">Downloads/wk</th>
+          <th style="width:80px" class="num">Stars</th>
+          <th style="width:80px">Trend</th>
+          <th style="width:90px">Sparkline</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div id="load-more" style="display:none; text-align:center; padding:16px;">
+      <button onclick="loadMore()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 20px;border-radius:6px;cursor:pointer;">Load more</button>
+    </div>
+  </div>
+</div>
+
+<!-- Report tab -->
+<div id="tab-report" class="tab-panel">
+  <iframe id="report-frame" src="report.html"></iframe>
+</div>
+
+<!-- Drawer -->
+<div class="drawer-overlay" id="overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  <h2 id="d-name"></h2>
+  <p class="drawer-desc" id="d-desc"></p>
+
+  <div class="drawer-section">
+    <h3>Stats</h3>
+    <div class="meta-grid" id="d-meta"></div>
+  </div>
+
+  <div class="drawer-section" id="d-trend-section" style="display:none">
+    <h3>Download trend (last 26 weeks)</h3>
+    <canvas class="trend-chart" id="d-trend-canvas"></canvas>
+  </div>
+
+  <div class="drawer-section" id="d-similar-section" style="display:none">
+    <h3>Similar packages</h3>
+    <div class="similar-list" id="d-similar"></div>
+  </div>
+
+  <div class="drawer-section" id="d-kw-section" style="display:none">
+    <h3>Keywords</h3>
+    <div class="kw-list" id="d-kw"></div>
+  </div>
+
+  <div class="drawer-section">
+    <h3>Links</h3>
+    <div class="links" id="d-links"></div>
+  </div>
+</div>
+
+<script>
+let ALL = [], filtered = [], pkgMap = {};
+let PAGE = 50, shown = 0;
+
+async function init() {
+  const res = await fetch('data/packages.json');
+  ALL = await res.json();
+  ALL.forEach(p => pkgMap[p.n] = p);
+
+  // Stats
+  document.getElementById('stat-total').textContent = ALL.length.toLocaleString();
+  document.getElementById('stat-ext').textContent = ALL.filter(p=>p.t==='extension').length.toLocaleString();
+  document.getElementById('stat-growing').textContent = ALL.filter(p=>p.tt==='growing').length;
+  document.getElementById('stat-declining').textContent = ALL.filter(p=>p.tt==='declining').length;
+
+  // Near-dupes: count pairs with top similar score > 0.5
+  const dupes = ALL.filter(p => p.si && p.si.length && p.si[0].score > 0.5).length;
+  document.getElementById('stat-dupes').textContent = dupes.toLocaleString();
+
+  // Nav meta
+  const withDl = ALL.filter(p=>p.dl).length;
+  document.getElementById('nav-meta').textContent = `${ALL.length.toLocaleString()} packages · ${withDl.toLocaleString()} with download data`;
+
+  render();
+}
+
+function render() {
+  const q     = document.getElementById('search').value.toLowerCase();
+  const fType = document.getElementById('f-type').value;
+  const fTrend= document.getElementById('f-trend').value;
+  const fSort = document.getElementById('f-sort').value;
+
+  filtered = ALL.filter(p => {
+    if (fType  && p.t !== fType)  return false;
+    if (fTrend && p.tt !== fTrend) return false;
+    if (q) {
+      const hay = (p.n + ' ' + (p.d||'')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  filtered.sort((a,b) => {
+    if (fSort === 'dl') return (b.dl||0) - (a.dl||0);
+    if (fSort === 'st') return (b.st||0) - (a.st||0);
+    if (fSort === 'tt-g') {
+      const order = {growing:0,stable:1,new:2,declining:3};
+      return (order[a.tt]??9) - (order[b.tt]??9);
+    }
+    if (fSort === 'dt') return (b.dt||'') > (a.dt||'') ? 1 : -1;
+    if (fSort === 'n') return a.n.localeCompare(b.n);
+    return 0;
+  });
+
+  document.getElementById('count-badge').textContent = `${filtered.length.toLocaleString()} packages`;
+  shown = 0;
+  document.getElementById('tbody').innerHTML = '';
+  loadMore();
+}
+
+function loadMore() {
+  const tbody = document.getElementById('tbody');
+  const chunk = filtered.slice(shown, shown + PAGE);
+  chunk.forEach(p => tbody.appendChild(makeRow(p)));
+  shown += chunk.length;
+  document.getElementById('load-more').style.display = shown < filtered.length ? 'block' : 'none';
+}
+
+function makeRow(p) {
+  const tr = document.createElement('tr');
+  tr.onclick = () => openDrawer(p.n);
+
+  // Name
+  const nameParts = p.n.startsWith('@') ? p.n.split('/') : [null, p.n];
+  const nameHtml = nameParts[0]
+    ? `<span class="pkg-scope">${nameParts[0]}/</span>${nameParts[1]}`
+    : nameParts[1];
+  const forkIcon = p.fk ? ' <span class="fork-icon">⑂</span>' : '';
+
+  // Downloads
+  const dlStr = p.dl ? fmtNum(p.dl) : '—';
+  const dlClass = p.dl > 5000 ? 'num-hi' : 'num-lo';
+
+  // Stars
+  const stStr = p.st != null ? fmtNum(p.st) : '—';
+  const stClass = p.st > 500 ? 'num-hi' : 'num-lo';
+
+  // Sparkline
+  const sparkId = 'sp-' + Math.random().toString(36).slice(2);
+
+  tr.innerHTML = `
+    <td><div class="pkg-name">${nameHtml}${forkIcon}</div></td>
+    <td><div class="pkg-desc">${escHtml(p.d||'')}</div></td>
+    <td><span class="badge badge-${p.t}">${p.t}</span></td>
+    <td class="num"><span class="${dlClass}">${dlStr}</span></td>
+    <td class="num"><span class="${stClass}">${stStr}</span></td>
+    <td><span class="trend-badge trend-${p.tt}">${p.tt}</span></td>
+    <td><canvas id="${sparkId}" class="spark" width="80" height="28"></canvas></td>
+  `;
+
+  // Draw sparkline after insert
+  requestAnimationFrame(() => {
+    const c = document.getElementById(sparkId);
+    if (c && p.tr && p.tr.length > 1) drawSparkline(c, p.tr);
+  });
+
+  return tr;
+}
+
+function drawSparkline(canvas, data) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  const max = Math.max(...data, 1);
+  ctx.clearRect(0,0,w,h);
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = (i / (data.length-1)) * w;
+    const y = h - (v/max) * (h-2) - 1;
+    i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle = '#6c8eff';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+function fmtNum(n) {
+  if (n >= 1000) return (n/1000).toFixed(1) + 'k';
+  return n.toLocaleString();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function openDrawer(name) {
+  const p = pkgMap[name];
+  if (!p) return;
+
+  document.getElementById('d-name').textContent = p.n;
+  document.getElementById('d-desc').textContent = p.d || 'No description';
+
+  // Meta grid
+  document.getElementById('d-meta').innerHTML = [
+    { label: 'Downloads/wk', value: p.dl != null ? p.dl.toLocaleString() : '—' },
+    { label: 'GitHub Stars', value: p.st != null ? p.st.toLocaleString() : '—' },
+    { label: 'Trend',        value: p.tt || '—' },
+    { label: 'Type',         value: p.t  || '—' },
+    { label: 'Version',      value: p.v  || '—' },
+    { label: 'Fork',         value: p.fk ? 'Yes ⑂' : 'No' },
+  ].map(m => `<div class="meta-item"><div class="label">${m.label}</div><div class="value">${m.value}</div></div>`).join('');
+
+  // Trend chart
+  const trendSection = document.getElementById('d-trend-section');
+  if (p.tr && p.tr.length > 1) {
+    trendSection.style.display = 'block';
+    requestAnimationFrame(() => {
+      const c = document.getElementById('d-trend-canvas');
+      c.width = c.offsetWidth;
+      drawSparkline(c, p.tr);
+    });
+  } else { trendSection.style.display = 'none'; }
+
+  // Similar
+  const simSection = document.getElementById('d-similar-section');
+  if (p.si && p.si.length) {
+    simSection.style.display = 'block';
+    document.getElementById('d-similar').innerHTML = p.si.map(s => {
+      const sp = pkgMap[s.name];
+      const dl = sp && sp.dl ? `${fmtNum(sp.dl)}/wk` : '';
+      return `<div class="similar-item" onclick="openDrawer('${escHtml(s.name)}')">
+        <span class="similar-name">${escHtml(s.name)}</span>
+        <span class="similar-score">${dl} · ${Math.round(s.score*100)}% similar</span>
+      </div>`;
+    }).join('');
+  } else { simSection.style.display = 'none'; }
+
+  // Keywords
+  const kwSection = document.getElementById('d-kw-section');
+  if (p.kw && p.kw.length) {
+    kwSection.style.display = 'block';
+    document.getElementById('d-kw').innerHTML = p.kw.map(k => `<span class="kw">${escHtml(k)}</span>`).join('');
+  } else { kwSection.style.display = 'none'; }
+
+  // Links
+  const links = [];
+  if (p.n) links.push(`<a class="link-btn" href="https://www.npmjs.com/package/${encodeURIComponent(p.n)}" target="_blank">npm ↗</a>`);
+  if (p.gh) {
+    const m = p.gh.match(/github\.com[:/]([^/]+\/[^/.]+)/);
+    if (m) links.push(`<a class="link-btn" href="https://github.com/${m[1].replace(/\.git$/,'')}" target="_blank">GitHub ↗</a>`);
+  }
+  links.push(`<a class="link-btn" href="https://pi.dev/packages?q=${encodeURIComponent(p.n)}" target="_blank">pi.dev ↗</a>`);
+  document.getElementById('d-links').innerHTML = links.join('');
+
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('drawer').classList.remove('open');
+}
+
+function switchTab(name, el) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+init();
+</script>
+</body>
+</html>
