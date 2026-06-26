@@ -1,451 +1,336 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme-storage-key="pi:theme" data-theme="dark">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pidex — Pi Package Index</title>
-<style>
-  :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --border: #2a2d3a;
-    --text: #e2e4ed;
-    --muted: #6b7280;
-    --accent: #6c8eff;
-    --green: #34d399;
-    --red: #f87171;
-    --yellow: #fbbf24;
-    --purple: #a78bfa;
-    --orange: #fb923c;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; }
-
-  /* Nav */
-  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 0; position: sticky; top: 0; z-index: 100; }
-  .nav-brand { font-weight: 700; font-size: 16px; color: var(--accent); padding: 14px 24px 14px 0; border-right: 1px solid var(--border); margin-right: 8px; letter-spacing: -0.3px; }
-  .nav-brand span { color: var(--muted); font-weight: 400; }
-  .nav-tab { padding: 14px 16px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; transition: all .15s; font-size: 13px; }
-  .nav-tab:hover { color: var(--text); }
-  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-  .nav-meta { color: var(--muted); font-size: 12px; }
-  .btn-download { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; text-decoration: none; transition: border-color .15s; }
-  .btn-download:hover { border-color: var(--accent); color: var(--accent); }
-
-  /* Tabs */
-  .tab-panel { display: none; }
-  .tab-panel.active { display: block; }
-
-  /* Stats bar */
-  .stats-bar { display: flex; gap: 32px; padding: 16px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
-  .stat { display: flex; flex-direction: column; gap: 2px; }
-  .stat-value { font-size: 20px; font-weight: 700; color: var(--text); }
-  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
-
-  /* Filters */
-  .filters { display: flex; gap: 10px; padding: 14px 24px; background: var(--bg); border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; }
-  .search-input { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: 6px; font-size: 13px; width: 260px; outline: none; }
-  .search-input:focus { border-color: var(--accent); }
-  .search-input::placeholder { color: var(--muted); }
-  select { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 7px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; outline: none; }
-  select:focus { border-color: var(--accent); }
-  .filter-label { color: var(--muted); font-size: 12px; }
-  .count-badge { margin-left: auto; color: var(--muted); font-size: 12px; }
-
-  /* Table */
-  .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; }
-  th { padding: 10px 16px; text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
-  th:hover { color: var(--text); }
-  th .sort-arrow { opacity: .4; margin-left: 4px; }
-  th.sorted .sort-arrow { opacity: 1; color: var(--accent); }
-  td { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-  tr:hover td { background: var(--surface); cursor: pointer; }
-
-  /* Cells */
-  .pkg-name { font-weight: 500; color: var(--text); font-size: 13px; }
-  .pkg-scope { color: var(--muted); font-weight: 400; }
-  .pkg-desc { color: var(--muted); font-size: 12px; max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
-  .badge-extension { background: rgba(108,142,255,.15); color: var(--accent); }
-  .badge-skill     { background: rgba(167,139,250,.15); color: var(--purple); }
-  .badge-theme     { background: rgba(251,191,36,.15);  color: var(--yellow); }
-  .badge-prompt    { background: rgba(251,146,60,.15);  color: var(--orange); }
-  .badge-unknown   { background: rgba(107,114,128,.15); color: var(--muted); }
-  .trend-badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; }
-  .trend-growing  { background: rgba(52,211,153,.15); color: var(--green); }
-  .trend-declining{ background: rgba(248,113,113,.15); color: var(--red); }
-  .trend-stable   { background: rgba(107,114,128,.15); color: var(--muted); }
-  .trend-new      { background: rgba(251,191,36,.12);  color: var(--yellow); }
-  .num { font-variant-numeric: tabular-nums; text-align: right; }
-  .num-hi { color: var(--text); }
-  .num-lo { color: var(--muted); }
-  .fork-icon { color: var(--muted); font-size: 11px; }
-
-  /* Sparkline */
-  canvas.spark { display: block; }
-
-  /* Drawer */
-  .drawer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200; }
-  .drawer-overlay.open { display: block; }
-  .drawer { position: fixed; right: 0; top: 0; bottom: 0; width: 480px; background: var(--surface); border-left: 1px solid var(--border); z-index: 201; overflow-y: auto; padding: 24px; transform: translateX(100%); transition: transform .2s ease; }
-  .drawer.open { transform: translateX(0); }
-  .drawer-close { float: right; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 0; }
-  .drawer-close:hover { color: var(--text); }
-  .drawer h2 { font-size: 16px; font-weight: 600; margin-bottom: 4px; padding-right: 24px; word-break: break-all; }
-  .drawer-desc { color: var(--muted); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
-  .drawer-section { margin-bottom: 20px; }
-  .drawer-section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 10px; }
-  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .meta-item { background: var(--bg); border-radius: 6px; padding: 10px 12px; }
-  .meta-item .label { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin-bottom: 4px; }
-  .meta-item .value { font-size: 15px; font-weight: 600; }
-  .similar-list { display: flex; flex-direction: column; gap: 6px; }
-  .similar-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg); border-radius: 6px; padding: 8px 12px; cursor: pointer; }
-  .similar-item:hover { background: var(--border); }
-  .similar-name { font-size: 12px; font-weight: 500; }
-  .similar-score { font-size: 11px; color: var(--muted); }
-  .links { display: flex; gap: 8px; flex-wrap: wrap; }
-  .link-btn { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: 5px; font-size: 12px; text-decoration: none; }
-  .link-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .kw-list { display: flex; gap: 6px; flex-wrap: wrap; }
-  .kw { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; font-size: 11px; color: var(--muted); }
-  .trend-chart { width: 100%; height: 60px; }
-
-  /* Report tab */
-  #report-frame { width: 100%; height: calc(100vh - 48px); border: none; background: white; }
-
-  /* Responsive */
-  @media (max-width: 768px) {
-    .drawer { width: 100%; }
-    .pkg-desc { display: none; }
-    td:nth-child(5), th:nth-child(5) { display: none; }
-  }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Packages · Pi</title>
+  <link rel="stylesheet" href="pi-style.css">
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const stored = localStorage.getItem('pi:theme');
+      const mode = stored === 'light' || stored === 'dark' ? stored : 'system';
+      const theme = mode === 'system'
+        ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : mode;
+      root.dataset.theme = theme;
+      root.dataset.themeMode = mode;
+      root.style.colorScheme = theme;
+    })();
+  </script>
 </head>
 <body>
+  <!-- Minimal nav -->
+  <nav style="position:sticky;top:0;z-index:100;display:flex;align-items:center;padding:0 2rem;border-bottom:1px solid var(--line);background:var(--bg);gap:1rem;">
+    <a href="/" style="font-family:var(--mono);font-weight:700;font-size:1rem;color:var(--text);text-decoration:none;padding:0.85rem 0;display:flex;align-items:center;gap:0.4rem;">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <rect x="2" y="2" width="7" height="7" rx="1.5" fill="currentColor"/>
+        <rect x="11" y="2" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.4"/>
+        <rect x="2" y="11" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.4"/>
+        <rect x="11" y="11" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.4"/>
+      </svg>
+      Pi
+    </a>
+    <span style="color:var(--muted);font-size:0.85rem;">Packages</span>
+    <button type="button" id="theme-toggle" style="margin-left:auto;background:none;border:1px solid var(--line);color:var(--muted);padding:0.3rem 0.7rem;border-radius:4px;cursor:pointer;font-size:0.75rem;" onclick="toggleTheme()">Toggle theme</button>
+  </nav>
 
-<nav>
-  <div class="nav-brand">Pidex <span>/ Pi Package Index</span></div>
-  <div class="nav-tab active" onclick="switchTab('browse', this)">Browse</div>
-  <div class="nav-tab" onclick="switchTab('report', this)">Analysis Report</div>
-  <div class="nav-right">
-    <span class="nav-meta" id="nav-meta">Loading…</span>
-    <a class="btn-download" href="data/pidex-full.json.gz" download>⬇ Download dataset</a>
+  <div class="site-tilt-layer">
+    <main class="page-shell page-shell--home" style="--page-shell-columns:1fr;display:block;max-width:72rem;margin:0 auto;">
+
+      <!-- Recently published strip -->
+      <section class="surface-panel content-card packages-recent-card" style="margin-bottom:1.5rem;">
+        <header class="content-card-header">
+          <h2 class="content-card-title">Recently published</h2>
+        </header>
+        <div class="content-card-body">
+          <div class="content-grid content-grid--four packages-recent-list" id="recent-list">
+            <!-- filled by JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- All packages -->
+      <section class="surface-panel content-card packages-index-card">
+        <header class="content-card-header">
+          <h2 class="content-card-title">All packages</h2>
+          <div class="content-card-actions">
+            <span class="packages-count" id="packages-count">0 / 0</span>
+          </div>
+        </header>
+        <div class="content-card-body">
+          <!-- Filter bar -->
+          <form class="action-bar packages-action-bar" id="filter-form" onsubmit="return false;">
+            <label class="action-bar-field">
+              <span class="visually-hidden">Filter packages</span>
+              <input class="text-control" type="search" id="search" placeholder="Filter packages…" autocomplete="off">
+            </label>
+            <label class="action-bar-field">
+              <span class="visually-hidden">Filter by type</span>
+              <span class="select-control-shell">
+                <select class="select-control" id="f-type">
+                  <option value="">All types</option>
+                  <option value="extension">extension</option>
+                  <option value="skill">skill</option>
+                  <option value="theme">theme</option>
+                  <option value="prompt">prompt</option>
+                </select>
+                <svg class="select-control-caret" viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M5.5 7.5 10 12l4.5-4.5H5.5Z"/></svg>
+              </span>
+            </label>
+            <label class="action-bar-field">
+              <span class="visually-hidden">Sort</span>
+              <span class="select-control-shell">
+                <select class="select-control" id="f-sort">
+                  <option value="dl">Most downloads</option>
+                  <option value="dt">Recently published</option>
+                  <option value="n">A-Z</option>
+                </select>
+                <svg class="select-control-caret" viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M5.5 7.5 10 12l4.5-4.5H5.5Z"/></svg>
+              </span>
+            </label>
+          </form>
+
+          <!-- Card grid -->
+          <div class="content-grid content-grid--two packages-grid" id="pkg-grid"></div>
+
+          <!-- Load more -->
+          <div style="text-align:center;padding:1.5rem 0" id="load-more-wrap">
+            <button type="button" class="action-button" id="load-more">Load more</button>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
-</nav>
 
-<!-- Browse tab -->
-<div id="tab-browse" class="tab-panel active">
-  <div class="stats-bar" id="stats-bar">
-    <div class="stat"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Packages</div></div>
-    <div class="stat"><div class="stat-value" id="stat-ext">—</div><div class="stat-label">Extensions</div></div>
-    <div class="stat"><div class="stat-value" id="stat-growing">—</div><div class="stat-label">Growing</div></div>
-    <div class="stat"><div class="stat-value" id="stat-declining">—</div><div class="stat-label">Declining</div></div>
-    <div class="stat"><div class="stat-value" id="stat-dupes">—</div><div class="stat-label">Near-duplicates</div></div>
-  </div>
+  <script>
+  // ── SVG icons ─────────────────────────────────────────────────────────────
+  const NPM_SVG = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M0 7.334v8h6.666v1.332H12v-1.332h12v-8H0zm6.666 6.664H5.334v-4H3.999v4H1.335V8.667h5.331v5.331zm4 0v1.336H8.001V8.667h5.334v5.332h-2.669v-.001zm12.001 0h-1.33v-4h-1.336v4h-1.335v-4h-1.33v4h-2.671V8.667h8.002v5.331zM10.665 10H12v2.667h-1.335V10z"/></svg>`;
+  const GH_SVG = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/></svg>`;
+  const REPORT_SVG = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`;
 
-  <div class="filters">
-    <input class="search-input" id="search" placeholder="Search packages…" oninput="render()">
-    <span class="filter-label">Type:</span>
-    <select id="f-type" onchange="render()">
-      <option value="">All</option>
-      <option value="extension">Extension</option>
-      <option value="skill">Skill</option>
-      <option value="theme">Theme</option>
-      <option value="prompt">Prompt</option>
-      <option value="unknown">Unknown</option>
-    </select>
-    <span class="filter-label">Trend:</span>
-    <select id="f-trend" onchange="render()">
-      <option value="">All</option>
-      <option value="growing">Growing</option>
-      <option value="stable">Stable</option>
-      <option value="declining">Declining</option>
-      <option value="new">New</option>
-    </select>
-    <span class="filter-label">Sort:</span>
-    <select id="f-sort" onchange="render()">
-      <option value="dl">Downloads</option>
-      <option value="st">Stars</option>
-      <option value="tt-g">Trending up</option>
-      <option value="dt">Recently updated</option>
-      <option value="n">Name</option>
-    </select>
-    <span class="count-badge" id="count-badge"></span>
-  </div>
+  // ── Time ago ───────────────────────────────────────────────────────────────
+  function timeAgo(ms) {
+    const diff = Date.now() - ms;
+    const s = diff / 1000;
+    if (s < 60) return 'just now';
+    const m = s / 60;
+    if (m < 60) return Math.round(m) + 'm ago';
+    const h = m / 60;
+    if (h < 24) return Math.round(h) + 'h ago';
+    const d = h / 24;
+    if (d < 30) return Math.round(d) + 'd ago';
+    const mo = d / 30.44;
+    if (mo < 12) return Math.round(mo) + 'mo ago';
+    return Math.round(mo / 12) + 'y ago';
+  }
 
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th style="width:280px">Package</th>
-          <th style="width:320px">Description</th>
-          <th style="width:70px">Type</th>
-          <th style="width:100px" class="num">Downloads/wk</th>
-          <th style="width:80px" class="num">Stars</th>
-          <th style="width:80px">Trend</th>
-          <th style="width:90px">Sparkline</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
-    <div id="load-more" style="display:none; text-align:center; padding:16px;">
-      <button onclick="loadMore()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 20px;border-radius:6px;cursor:pointer;">Load more</button>
+  // ── Format downloads ───────────────────────────────────────────────────────
+  function fmtDl(weekly) {
+    if (weekly == null) return null;
+    const mo = Math.round(weekly * 4.33);
+    if (mo >= 1000000) return (mo / 1000000).toFixed(1).replace(/\.0$/, '') + 'M/mo';
+    if (mo >= 1000) return (mo / 1000).toFixed(1).replace(/\.0$/, '') + 'k/mo';
+    return mo + '/mo';
+  }
+
+  // ── Build a package card ───────────────────────────────────────────────────
+  function buildCard(pkg) {
+    const name = pkg.n;
+    const npmUrl = `https://www.npmjs.com/package/${encodeURIComponent(name)}`;
+    const dl = fmtDl(pkg.dl);
+    const ago = pkg.dt ? timeAgo(pkg.dt) : null;
+    const copyText = `pi install npm:${name}`;
+
+    const metaSpans = [
+      pkg.p ? `<span>${pkg.p}</span>` : '',
+      dl ? `<span>${dl}</span>` : '',
+      ago ? `<span>${ago}</span>` : '',
+    ].filter(Boolean).join('\n      ');
+
+    const repoLink = pkg.gh
+      ? `<a href="${pkg.gh}" target="_blank" rel="noopener">${GH_SVG} repo</a>`
+      : '';
+
+    return `<article class="surface-panel content-card" data-package-card="true" data-package-name="${name}">
+  <div class="packages-card-body">
+    <h3 class="packages-name">
+      <a href="${npmUrl}" target="_blank" rel="noopener">${name}</a>
+    </h3>
+    <p class="packages-desc">${pkg.d ? pkg.d.replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''}</p>
+    <div class="packages-meta">
+      ${metaSpans}
+    </div>
+    <div class="packages-badges">
+      <span class="meta-chip packages-badge" data-type="${pkg.t}">${pkg.t}</span>
+    </div>
+    <div class="packages-links" aria-label="Links for ${name}">
+      <a href="${npmUrl}" target="_blank" rel="noopener">${NPM_SVG} npm</a>
+      ${repoLink}
+      <a href="https://pi.dev/report?pkg=${encodeURIComponent(name)}" target="_blank" rel="noopener">${REPORT_SVG} report</a>
+    </div>
+    <div class="packages-install">
+      <code><span class="prefix">$</span> ${copyText}</code>
+      <button type="button" data-copy="${copyText}" class="action-button">Copy</button>
     </div>
   </div>
-</div>
-
-<!-- Report tab -->
-<div id="tab-report" class="tab-panel">
-  <iframe id="report-frame" src="report.html"></iframe>
-</div>
-
-<!-- Drawer -->
-<div class="drawer-overlay" id="overlay" onclick="closeDrawer()"></div>
-<div class="drawer" id="drawer">
-  <button class="drawer-close" onclick="closeDrawer()">✕</button>
-  <h2 id="d-name"></h2>
-  <p class="drawer-desc" id="d-desc"></p>
-
-  <div class="drawer-section">
-    <h3>Stats</h3>
-    <div class="meta-grid" id="d-meta"></div>
-  </div>
-
-  <div class="drawer-section" id="d-trend-section" style="display:none">
-    <h3>Download trend (last 26 weeks)</h3>
-    <canvas class="trend-chart" id="d-trend-canvas"></canvas>
-  </div>
-
-  <div class="drawer-section" id="d-similar-section" style="display:none">
-    <h3>Similar packages</h3>
-    <div class="similar-list" id="d-similar"></div>
-  </div>
-
-  <div class="drawer-section" id="d-kw-section" style="display:none">
-    <h3>Keywords</h3>
-    <div class="kw-list" id="d-kw"></div>
-  </div>
-
-  <div class="drawer-section">
-    <h3>Links</h3>
-    <div class="links" id="d-links"></div>
-  </div>
-</div>
-
-<script>
-let ALL = [], filtered = [], pkgMap = {};
-let PAGE = 50, shown = 0;
-
-async function init() {
-  const res = await fetch('data/packages.json');
-  ALL = await res.json();
-  ALL.forEach(p => pkgMap[p.n] = p);
-
-  // Stats
-  document.getElementById('stat-total').textContent = ALL.length.toLocaleString();
-  document.getElementById('stat-ext').textContent = ALL.filter(p=>p.t==='extension').length.toLocaleString();
-  document.getElementById('stat-growing').textContent = ALL.filter(p=>p.tt==='growing').length;
-  document.getElementById('stat-declining').textContent = ALL.filter(p=>p.tt==='declining').length;
-
-  // Near-dupes: count pairs with top similar score > 0.5
-  const dupes = ALL.filter(p => p.si && p.si.length && p.si[0].score > 0.5).length;
-  document.getElementById('stat-dupes').textContent = dupes.toLocaleString();
-
-  // Nav meta
-  const withDl = ALL.filter(p=>p.dl).length;
-  document.getElementById('nav-meta').textContent = `${ALL.length.toLocaleString()} packages · ${withDl.toLocaleString()} with download data`;
-
-  render();
-}
-
-function render() {
-  const q     = document.getElementById('search').value.toLowerCase();
-  const fType = document.getElementById('f-type').value;
-  const fTrend= document.getElementById('f-trend').value;
-  const fSort = document.getElementById('f-sort').value;
-
-  filtered = ALL.filter(p => {
-    if (fType  && p.t !== fType)  return false;
-    if (fTrend && p.tt !== fTrend) return false;
-    if (q) {
-      const hay = (p.n + ' ' + (p.d||'')).toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
-
-  filtered.sort((a,b) => {
-    if (fSort === 'dl') return (b.dl||0) - (a.dl||0);
-    if (fSort === 'st') return (b.st||0) - (a.st||0);
-    if (fSort === 'tt-g') {
-      const order = {growing:0,stable:1,new:2,declining:3};
-      return (order[a.tt]??9) - (order[b.tt]??9);
-    }
-    if (fSort === 'dt') return (b.dt||'') > (a.dt||'') ? 1 : -1;
-    if (fSort === 'n') return a.n.localeCompare(b.n);
-    return 0;
-  });
-
-  document.getElementById('count-badge').textContent = `${filtered.length.toLocaleString()} packages`;
-  shown = 0;
-  document.getElementById('tbody').innerHTML = '';
-  loadMore();
-}
-
-function loadMore() {
-  const tbody = document.getElementById('tbody');
-  const chunk = filtered.slice(shown, shown + PAGE);
-  chunk.forEach(p => tbody.appendChild(makeRow(p)));
-  shown += chunk.length;
-  document.getElementById('load-more').style.display = shown < filtered.length ? 'block' : 'none';
-}
-
-function makeRow(p) {
-  const tr = document.createElement('tr');
-  tr.onclick = () => openDrawer(p.n);
-
-  // Name
-  const nameParts = p.n.startsWith('@') ? p.n.split('/') : [null, p.n];
-  const nameHtml = nameParts[0]
-    ? `<span class="pkg-scope">${nameParts[0]}/</span>${nameParts[1]}`
-    : nameParts[1];
-  const forkIcon = p.fk ? ' <span class="fork-icon">⑂</span>' : '';
-
-  // Downloads
-  const dlStr = p.dl ? fmtNum(p.dl) : '—';
-  const dlClass = p.dl > 5000 ? 'num-hi' : 'num-lo';
-
-  // Stars
-  const stStr = p.st != null ? fmtNum(p.st) : '—';
-  const stClass = p.st > 500 ? 'num-hi' : 'num-lo';
-
-  // Sparkline
-  const sparkId = 'sp-' + Math.random().toString(36).slice(2);
-
-  tr.innerHTML = `
-    <td><div class="pkg-name">${nameHtml}${forkIcon}</div></td>
-    <td><div class="pkg-desc">${escHtml(p.d||'')}</div></td>
-    <td><span class="badge badge-${p.t}">${p.t}</span></td>
-    <td class="num"><span class="${dlClass}">${dlStr}</span></td>
-    <td class="num"><span class="${stClass}">${stStr}</span></td>
-    <td><span class="trend-badge trend-${p.tt}">${p.tt}</span></td>
-    <td><canvas id="${sparkId}" class="spark" width="80" height="28"></canvas></td>
-  `;
-
-  // Draw sparkline after insert
-  requestAnimationFrame(() => {
-    const c = document.getElementById(sparkId);
-    if (c && p.tr && p.tr.length > 1) drawSparkline(c, p.tr);
-  });
-
-  return tr;
-}
-
-function drawSparkline(canvas, data) {
-  const ctx = canvas.getContext('2d');
-  const w = canvas.width, h = canvas.height;
-  const max = Math.max(...data, 1);
-  ctx.clearRect(0,0,w,h);
-  ctx.beginPath();
-  data.forEach((v, i) => {
-    const x = (i / (data.length-1)) * w;
-    const y = h - (v/max) * (h-2) - 1;
-    i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
-  });
-  ctx.strokeStyle = '#6c8eff';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-}
-
-function fmtNum(n) {
-  if (n >= 1000) return (n/1000).toFixed(1) + 'k';
-  return n.toLocaleString();
-}
-
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-function openDrawer(name) {
-  const p = pkgMap[name];
-  if (!p) return;
-
-  document.getElementById('d-name').textContent = p.n;
-  document.getElementById('d-desc').textContent = p.d || 'No description';
-
-  // Meta grid
-  document.getElementById('d-meta').innerHTML = [
-    { label: 'Downloads/wk', value: p.dl != null ? p.dl.toLocaleString() : '—' },
-    { label: 'GitHub Stars', value: p.st != null ? p.st.toLocaleString() : '—' },
-    { label: 'Trend',        value: p.tt || '—' },
-    { label: 'Type',         value: p.t  || '—' },
-    { label: 'Version',      value: p.v  || '—' },
-    { label: 'Fork',         value: p.fk ? 'Yes ⑂' : 'No' },
-  ].map(m => `<div class="meta-item"><div class="label">${m.label}</div><div class="value">${m.value}</div></div>`).join('');
-
-  // Trend chart
-  const trendSection = document.getElementById('d-trend-section');
-  if (p.tr && p.tr.length > 1) {
-    trendSection.style.display = 'block';
-    requestAnimationFrame(() => {
-      const c = document.getElementById('d-trend-canvas');
-      c.width = c.offsetWidth;
-      drawSparkline(c, p.tr);
-    });
-  } else { trendSection.style.display = 'none'; }
-
-  // Similar
-  const simSection = document.getElementById('d-similar-section');
-  if (p.si && p.si.length) {
-    simSection.style.display = 'block';
-    document.getElementById('d-similar').innerHTML = p.si.map(s => {
-      const sp = pkgMap[s.name];
-      const dl = sp && sp.dl ? `${fmtNum(sp.dl)}/wk` : '';
-      return `<div class="similar-item" onclick="openDrawer('${escHtml(s.name)}')">
-        <span class="similar-name">${escHtml(s.name)}</span>
-        <span class="similar-score">${dl} · ${Math.round(s.score*100)}% similar</span>
-      </div>`;
-    }).join('');
-  } else { simSection.style.display = 'none'; }
-
-  // Keywords
-  const kwSection = document.getElementById('d-kw-section');
-  if (p.kw && p.kw.length) {
-    kwSection.style.display = 'block';
-    document.getElementById('d-kw').innerHTML = p.kw.map(k => `<span class="kw">${escHtml(k)}</span>`).join('');
-  } else { kwSection.style.display = 'none'; }
-
-  // Links
-  const links = [];
-  if (p.n) links.push(`<a class="link-btn" href="https://www.npmjs.com/package/${encodeURIComponent(p.n)}" target="_blank">npm ↗</a>`);
-  if (p.gh) {
-    const m = p.gh.match(/github\.com[:/]([^/]+\/[^/.]+)/);
-    if (m) links.push(`<a class="link-btn" href="https://github.com/${m[1].replace(/\.git$/,'')}" target="_blank">GitHub ↗</a>`);
+</article>`;
   }
-  links.push(`<a class="link-btn" href="https://pi.dev/packages?q=${encodeURIComponent(p.n)}" target="_blank">pi.dev ↗</a>`);
-  document.getElementById('d-links').innerHTML = links.join('');
 
-  document.getElementById('overlay').classList.add('open');
-  document.getElementById('drawer').classList.add('open');
-}
+  // ── Build a recent item ────────────────────────────────────────────────────
+  function buildRecentItem(pkg) {
+    const name = pkg.n;
+    const npmUrl = `https://www.npmjs.com/package/${encodeURIComponent(name)}`;
+    const desc = pkg.d ? pkg.d.substring(0, 80) + (pkg.d.length > 80 ? '…' : '') : '';
+    const ago = pkg.dt ? timeAgo(pkg.dt) : '';
+    return `<a href="${npmUrl}" class="packages-recent-item" target="_blank" rel="noopener">
+  <strong>${name}</strong>
+  <span>${desc.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
+  <small>${ago}</small>
+</a>`;
+  }
 
-function closeDrawer() {
-  document.getElementById('overlay').classList.remove('open');
-  document.getElementById('drawer').classList.remove('open');
-}
+  // ── Sorted intersection ────────────────────────────────────────────────────
+  function intersect(a, b) {
+    // both arrays are sorted ascending; return sorted intersection
+    const result = [];
+    let i = 0, j = 0;
+    while (i < a.length && j < b.length) {
+      if (a[i] === b[j]) { result.push(a[i]); i++; j++; }
+      else if (a[i] < b[j]) i++;
+      else j++;
+    }
+    return result;
+  }
 
-function switchTab(name, el) {
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-panel').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('tab-' + name).classList.add('active');
-}
+  // ── Tokenize ───────────────────────────────────────────────────────────────
+  function tokenize(q) {
+    return q.toLowerCase().replace(/[^a-z0-9@/-]/g, ' ').split(/\s+/).filter(s => s.length >= 2);
+  }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
-init();
-</script>
+  // ── Main state ─────────────────────────────────────────────────────────────
+  let DB = null;
+  let filteredIds = [];    // sorted array of record indices matching current filters
+  let page = 0;
+  const PAGE_SIZE = 50;
+
+  function applyFilters() {
+    const q = document.getElementById('search').value.trim();
+    const type = document.getElementById('f-type').value;
+    const sort = document.getElementById('f-sort').value;
+
+    const idx = DB.index;
+    const sortOrder = idx.sort[sort]; // array of record indices, sorted
+
+    // Start with the full sort order
+    let candidates = sortOrder;
+
+    // Filter by type
+    if (type) {
+      const byType = new Set(idx.byType[type] || []);
+      candidates = candidates.filter(i => byType.has(i));
+    }
+
+    // Filter by search tokens
+    if (q.length > 0) {
+      const tokens = tokenize(q);
+      if (tokens.length > 0) {
+        // For each token, get matching IDs from inverted index (sorted)
+        let searchIds = null;
+        for (const tok of tokens) {
+          // Find all keys in byToken that start with the token
+          const matching = Object.keys(idx.byToken).filter(k => k.startsWith(tok));
+          if (matching.length === 0) { searchIds = []; break; }
+          // Union all matching token arrays, then dedupe+sort
+          let union = [];
+          for (const k of matching) union = union.concat(idx.byToken[k]);
+          union = [...new Set(union)].sort((a,b) => a-b);
+          if (searchIds === null) searchIds = union;
+          else searchIds = intersect(searchIds, union);
+        }
+        const searchSet = new Set(searchIds);
+        candidates = candidates.filter(i => searchSet.has(i));
+      }
+    }
+
+    filteredIds = candidates;
+    page = 0;
+    renderGrid();
+    updateCount();
+  }
+
+  function renderGrid() {
+    const grid = document.getElementById('pkg-grid');
+    const slice = filteredIds.slice(0, (page + 1) * PAGE_SIZE);
+    grid.innerHTML = slice.map(i => buildCard(DB.records[i])).join('\n');
+    // Show/hide load more
+    const lmw = document.getElementById('load-more-wrap');
+    lmw.style.display = filteredIds.length > slice.length ? '' : 'none';
+    attachCopyHandlers(grid);
+  }
+
+  function updateCount() {
+    document.getElementById('packages-count').textContent =
+      `${filteredIds.length} / ${DB.records.length}`;
+  }
+
+  function attachCopyHandlers(root) {
+    root.querySelectorAll('button[data-copy]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const text = btn.dataset.copy;
+        navigator.clipboard.writeText(text).then(() => {
+          const orig = btn.textContent;
+          btn.textContent = 'Copied!';
+          setTimeout(() => { btn.textContent = orig; }, 1500);
+        }).catch(() => {});
+      });
+    });
+  }
+
+  function renderRecent() {
+    const idx = DB.index;
+    const recentIds = [...idx.sort.dt].reverse().slice(0, 8);
+    document.getElementById('recent-list').innerHTML =
+      recentIds.map(i => buildRecentItem(DB.records[i])).join('\n');
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  fetch('data/packages-db.json')
+    .then(r => r.json())
+    .then(db => {
+      DB = db;
+      renderRecent();
+      applyFilters();
+
+      // Event listeners
+      let searchTimer;
+      document.getElementById('search').addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(applyFilters, 200);
+      });
+      document.getElementById('f-type').addEventListener('change', applyFilters);
+      document.getElementById('f-sort').addEventListener('change', applyFilters);
+      document.getElementById('load-more').addEventListener('click', () => {
+        page++;
+        renderGrid();
+      });
+    })
+    .catch(err => {
+      console.error('Failed to load package DB:', err);
+      document.getElementById('pkg-grid').innerHTML =
+        '<p class="packages-empty" style="grid-column:1/-1;padding:2rem;color:var(--muted);">Failed to load packages.</p>';
+    });
+
+  // ── Theme toggle ───────────────────────────────────────────────────────────
+  function toggleTheme() {
+    const root = document.documentElement;
+    const current = root.dataset.theme;
+    const next = current === 'dark' ? 'light' : 'dark';
+    root.dataset.theme = next;
+    root.dataset.themeMode = next;
+    root.style.colorScheme = next;
+    localStorage.setItem('pi:theme', next);
+  }
+  </script>
 </body>
 </html>
