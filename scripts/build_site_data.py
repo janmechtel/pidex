@@ -22,6 +22,31 @@ records = [json.loads(f.read_text()) for f in (DATA / "enriched").glob("*.json")
 raw     = json.loads((DATA / "raw" / "packages.json").read_text())
 pub_map = {p["name"]: p.get("publisher") for p in raw}
 
+CI_BOTS = {'GitHub Actions', 'github-actions[bot]', 'semantic-release-bot', 'npm-publish'}
+
+def best_author(r):
+    """GitHub owner from repo URL → npm publisher (skip CI bots) → author.name"""
+    import re as _re
+    repo = r.get('repository') or {}
+    url  = repo.get('url','') if isinstance(repo, dict) else str(repo)
+    m = _re.search(r'github\.com[:/]([^/]+)/', url)
+    if m: return m.group(1)
+    pub = pub_map.get(r.get('name',''))
+    if pub and pub not in CI_BOTS: return pub
+    a = r.get('author')
+    if isinstance(a, dict): a = a.get('name')
+    return a if a and a not in CI_BOTS else None
+
+MULTI_KW   = {'claude-code','codex','opencode','gemini-cli','windsurf','copilot','cline','kiro','qoder'}
+MULTI_DESC = ['claude code','gemini cli','windsurf','opencode',' codex ','copilot cli','cursor ide']
+
+def is_multi_harness(r):
+    kws = set(r.get('keywords') or [])
+    if kws & MULTI_KW: return True
+    desc = (r.get('description') or '').lower()
+    top  = (r.get('readme') or '')[:400].lower()
+    hits = sum(1 for t in MULTI_DESC if t in desc or t in top)
+    return hits >= 2
 def extract_slug(repo_field):
     url = repo_field.get("url","") if isinstance(repo_field,dict) else str(repo_field or "")
     m = re.search(r'github\.com[:/]([^/]+)/([^/.]+)', url)
@@ -98,18 +123,20 @@ for r in records:
         "n":  name,
         "d":  (r.get("description") or "")[:200],
         "t":  infer_type(r.get("keywords")),
-        "p":  pub_map.get(name),
+        "p":  best_author(r),
         "dl": r.get("downloads_last_week"),
         "tr": trend_vals,
         "tt": classify_trend(trend),
         "st": gh.get("stars"),
         "fk": gh.get("is_fork", False),
+        "mh": is_multi_harness(r),
         "pa": gh.get("pushed_at"),
         "si": similar_map.get(name, []),
         "kw": [k for k in (r.get("keywords") or [])
                if k not in ("pi-package","pi-extension","pi-skill","pi-theme","pi-prompt")][:8],
         "v":  r.get("latest_version"),
         "dt": r.get("time", {}).get("modified"),
+        "dc": r.get("time", {}).get("created"),
         "gh": (r.get("repository") or {}).get("url","") if isinstance(r.get("repository"),dict) else "",
     })
 

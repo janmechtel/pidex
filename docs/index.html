@@ -32,13 +32,15 @@
   .nav-meta { color: var(--muted); font-size: 12px; }
   .btn-download { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; text-decoration: none; transition: border-color .15s; }
   .btn-download:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-icon { display: flex; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 30px; height: 30px; border-radius: 6px; text-decoration: none; transition: border-color .15s, color .15s; }
+  .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
 
   /* Tabs */
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
 
   /* Stats bar */
-  .stats-bar { display: flex; gap: 32px; padding: 16px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .stats-bar { display: flex; gap: 32px; padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--border); align-items: center; }
   .stat { display: flex; flex-direction: column; gap: 2px; }
   .stat-value { font-size: 20px; font-weight: 700; color: var(--text); }
   .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
@@ -55,24 +57,24 @@
 
   /* Table */
   .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   th { padding: 10px 16px; text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
   th:hover { color: var(--text); }
   th .sort-arrow { opacity: .4; margin-left: 4px; }
   th.sorted .sort-arrow { opacity: 1; color: var(--accent); }
-  td { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  td { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 13px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   tr:hover td { background: var(--surface); cursor: pointer; }
 
   /* Cells */
-  .pkg-name { font-weight: 500; color: var(--text); font-size: 13px; }
+  .pkg-name { font-weight: 500; color: var(--text); }
   .pkg-scope { color: var(--muted); font-weight: 400; }
-  .pkg-desc { color: var(--muted); font-size: 12px; max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pkg-desc { color: var(--muted); }
   .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
-  .badge-extension { background: rgba(108,142,255,.15); color: var(--accent); }
   .badge-skill     { background: rgba(167,139,250,.15); color: var(--purple); }
   .badge-theme     { background: rgba(251,191,36,.15);  color: var(--yellow); }
   .badge-prompt    { background: rgba(251,146,60,.15);  color: var(--orange); }
-  .badge-unknown   { background: rgba(107,114,128,.15); color: var(--muted); }
+  .badge-multi     { color: var(--muted); opacity: .65; margin-left: 2px; }
+  .type-cell       { max-width: 110px; overflow: hidden; white-space: nowrap; }
   .trend-badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; }
   .trend-growing  { background: rgba(52,211,153,.15); color: var(--green); }
   .trend-declining{ background: rgba(248,113,113,.15); color: var(--red); }
@@ -85,7 +87,9 @@
 
   /* Sparkline */
   canvas.spark { display: block; }
-
+  .dl-cell { white-space: nowrap; }
+  .dl-inner { display: inline-flex; align-items: center; gap: 8px; width: 100%; justify-content: flex-end; }
+  .dl-spark { flex: 1; max-width: 80px; display: block; }
   /* Drawer */
   .drawer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200; }
   .drawer-overlay.open { display: block; }
@@ -116,6 +120,36 @@
   /* Report tab */
   #report-frame { width: 100%; height: calc(100vh - 48px); border: none; background: white; }
 
+  [data-theme="light"] {
+    --bg: #f8f9fc;
+    --surface: #ffffff;
+    --border: #e2e5ec;
+    --text: #111318;
+    --muted: #6b7280;
+    --accent: #3d5afe;
+  }
+  /* Column filters */
+  .filter-row { background: var(--surface); }
+  .filter-row th { padding: 4px 8px; background: transparent; border-bottom: 1px solid var(--border); }
+  .col-filter { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 4px 7px; border-radius: 4px; font-size: 11px; outline: none; }
+  .col-filter:focus { border-color: var(--accent); }
+  /* Row actions */
+  .row-actions { white-space: nowrap; opacity: 0; transition: opacity .15s; }
+  tr:hover .row-actions { opacity: 1; }
+  .act-btn { display: inline-flex; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 24px; height: 24px; border-radius: 4px; cursor: pointer; text-decoration: none; margin-right: 2px; transition: border-color .15s, color .15s; flex-shrink: 0; }
+  .act-btn:hover { border-color: var(--accent); color: var(--accent); }
+  /* Fast CSS tooltip */
+  .act-btn { position: relative; }
+  .act-btn[data-tip]::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 5px); left: 50%; transform: translateX(-50%); background: #111; color: #eee; padding: 3px 7px; border-radius: 4px; font-size: 11px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .08s; z-index: 999; }
+  .act-btn[data-tip]:hover::after { opacity: 1; }
+  .pkg-author { color: var(--muted); cursor: pointer; }
+  .pkg-author:hover { color: var(--accent); text-decoration: underline; }
+  /* Databars */
+  .databar { width: 100%; height: 3px; background: var(--border); border-radius: 2px; margin-top: 3px; }
+  .databar-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width .2s; }
+  .databar-st { background: var(--yellow); }
+  .pub-date { color: var(--muted); white-space: nowrap; }
+
   /* Responsive */
   @media (max-width: 768px) {
     .drawer { width: 100%; }
@@ -131,8 +165,11 @@
   <div class="nav-tab active" onclick="switchTab('browse', this)">Browse</div>
   <div class="nav-tab" onclick="switchTab('report', this)">Analysis Report</div>
   <div class="nav-right">
-    <span class="nav-meta" id="nav-meta">Loading…</span>
-    <a class="btn-download" href="data/pidex-full.json.gz" download>⬇ Download dataset</a>
+    <a class="btn-icon" href="https://github.com/janmechtel/pidex" target="_blank" title="GitHub"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+    <a class="btn-icon" href="https://discord.gg/pi-dev" target="_blank" title="Discord #extensions"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg></a>
+    <button class="btn-icon" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark"><svg id="ti-dark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg id="ti-light" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
+    <a class="btn-download" href="https://github.com/janmechtel/pidex#methodology" target="_blank">Methodology</a>
+    <a class="btn-download" href="data/pidex-full.json.gz" download>⬇ Dataset</a>
   </div>
 </nav>
 
@@ -141,54 +178,38 @@
   <div class="stats-bar" id="stats-bar">
     <div class="stat"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Packages</div></div>
     <div class="stat"><div class="stat-value" id="stat-ext">—</div><div class="stat-label">Extensions</div></div>
-    <div class="stat"><div class="stat-value" id="stat-growing">—</div><div class="stat-label">Growing</div></div>
-    <div class="stat"><div class="stat-value" id="stat-declining">—</div><div class="stat-label">Declining</div></div>
-    <div class="stat"><div class="stat-value" id="stat-dupes">—</div><div class="stat-label">Near-duplicates</div></div>
+    <div class="stat"><div class="stat-value" id="stat-skills">—</div><div class="stat-label">Skills</div></div>
+    <div class="stat"><div class="stat-value" id="stat-themes">—</div><div class="stat-label">Themes</div></div>
+    <div class="stat"><div class="stat-value" id="stat-multi">—</div><div class="stat-label">Multi-harness</div></div>
+    <div class="stat"><div class="stat-value" id="stat-updated">—</div><div class="stat-label">Last updated</div></div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+      <input class="search-input" id="search" placeholder="Search packages…" oninput="render()">
+      <span class="count-badge" id="count-badge"></span>
+    </div>
   </div>
 
-  <div class="filters">
-    <input class="search-input" id="search" placeholder="Search packages…" oninput="render()">
-    <span class="filter-label">Type:</span>
-    <select id="f-type" onchange="render()">
-      <option value="">All</option>
-      <option value="extension">Extension</option>
-      <option value="skill">Skill</option>
-      <option value="theme">Theme</option>
-      <option value="prompt">Prompt</option>
-      <option value="unknown">Unknown</option>
-    </select>
-    <span class="filter-label">Trend:</span>
-    <select id="f-trend" onchange="render()">
-      <option value="">All</option>
-      <option value="growing">Growing</option>
-      <option value="stable">Stable</option>
-      <option value="declining">Declining</option>
-      <option value="new">New</option>
-    </select>
-    <span class="filter-label">Sort:</span>
-    <select id="f-sort" onchange="render()">
-      <option value="dl">Downloads</option>
-      <option value="st">Stars</option>
-      <option value="tt-g">Trending up</option>
-      <option value="dt">Recently updated</option>
-      <option value="n">Name</option>
-    </select>
-    <span class="count-badge" id="count-badge"></span>
-  </div>
 
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
-          <th style="width:280px">Package</th>
-          <th style="width:320px">Description</th>
-          <th style="width:70px">Type</th>
-          <th style="width:100px" class="num">Downloads/wk</th>
-          <th style="width:80px" class="num">Stars</th>
-          <th style="width:80px">Trend</th>
-          <th style="width:90px">Sparkline</th>
+  <th style="width:180px" onclick="sortBy('n')">Name <span class="sort-arrow" id="sa-n"></span></th>
+  <th style="width:100px" onclick="sortBy('p')">Author <span class="sort-arrow" id="sa-p"></span></th>
+  <th>Description</th>
+  <th style="width:80px" onclick="sortBy('t')">Type <span class="sort-arrow" id="sa-t"></span></th>
+  <th style="width:160px" class="num" onclick="sortBy('dl')">Downloads/wk <span class="sort-arrow" id="sa-dl">▼</span></th>
+  <th style="width:75px" onclick="sortBy('st')" class="num">Stars <span class="sort-arrow" id="sa-st"></span></th>
+  <th style="width:75px" onclick="sortBy('dc')">Created <span class="sort-arrow" id="sa-dc"></span></th>
+  <th style="width:75px" onclick="sortBy('dt')">Updated <span class="sort-arrow" id="sa-dt"></span></th>
+  <th style="width:72px"></th>
         </tr>
-      </thead>
+        <tr class="filter-row">
+  <th><input class="col-filter" placeholder="name…" oninput="render()" id="cf-n"></th>
+  <th><input class="col-filter" placeholder="author…" oninput="render()" id="cf-p"></th>
+  <th><input class="col-filter" placeholder="desc…" oninput="render()" id="cf-d"></th>
+  <th><select class="col-filter" onchange="render()" id="cf-t"><option value="">all</option><option>extension</option><option>skill</option><option>theme</option><option>prompt</option><option>unknown</option><option value="multi">multi-harness</option></select></th>
+  <th></th><th></th><th></th>
+        </tr>
       <tbody id="tbody"></tbody>
     </table>
     <div id="load-more" style="display:none; text-align:center; padding:16px;">
@@ -238,57 +259,78 @@
 <script>
 let ALL = [], filtered = [], pkgMap = {};
 let PAGE = 50, shown = 0;
+let GLOBAL_MAX = 1;
+let VIEW_MAX_ST = 1, VIEW_MAX_SPARK = 1;
+let SORT_COL = 'dl', SORT_DIR = 1;
 
 async function init() {
   const res = await fetch('data/packages.json');
   ALL = await res.json();
   ALL.forEach(p => pkgMap[p.n] = p);
 
+  // Global sparkline scale
+  GLOBAL_MAX = Math.max(1, ...ALL.flatMap(p => p.tr || []));
   // Stats
-  document.getElementById('stat-total').textContent = ALL.length.toLocaleString();
-  document.getElementById('stat-ext').textContent = ALL.filter(p=>p.t==='extension').length.toLocaleString();
-  document.getElementById('stat-growing').textContent = ALL.filter(p=>p.tt==='growing').length;
-  document.getElementById('stat-declining').textContent = ALL.filter(p=>p.tt==='declining').length;
+  document.getElementById('stat-total').textContent   = ALL.length.toLocaleString();
+  document.getElementById('stat-ext').textContent     = ALL.filter(p=>p.t==='extension').length.toLocaleString();
+  document.getElementById('stat-skills').textContent  = ALL.filter(p=>p.t==='skill').length.toLocaleString();
+  document.getElementById('stat-themes').textContent  = ALL.filter(p=>p.t==='theme').length.toLocaleString();
+  document.getElementById('stat-multi').textContent   = ALL.filter(p=>p.mh).length.toLocaleString();
 
-  // Near-dupes: count pairs with top similar score > 0.5
-  const dupes = ALL.filter(p => p.si && p.si.length && p.si[0].score > 0.5).length;
-  document.getElementById('stat-dupes').textContent = dupes.toLocaleString();
+  // Last updated: most recent dt across all packages
+  const dates = ALL.map(p=>p.dt).filter(Boolean).sort();
+  const lastDate = dates.length ? new Date(dates[dates.length-1]).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—';
+  document.getElementById('stat-updated').textContent = lastDate;
 
-  // Nav meta
-  const withDl = ALL.filter(p=>p.dl).length;
-  document.getElementById('nav-meta').textContent = `${ALL.length.toLocaleString()} packages · ${withDl.toLocaleString()} with download data`;
+  // Nav meta — removed per request
+  render();
+}
 
+function sortBy(col) {
+  if (SORT_COL === col) SORT_DIR *= -1;
+  else { SORT_COL = col; SORT_DIR = 1; }
+  // Update arrows
+  document.querySelectorAll('.sort-arrow').forEach(el => el.textContent = '');
+  const arrow = document.getElementById('sa-' + col);
+  if (arrow) arrow.textContent = SORT_DIR === 1 ? '▼' : '▲';
   render();
 }
 
 function render() {
-  const q     = document.getElementById('search').value.toLowerCase();
-  const fType = document.getElementById('f-type').value;
-  const fTrend= document.getElementById('f-trend').value;
-  const fSort = document.getElementById('f-sort').value;
+  const q    = document.getElementById('search').value.toLowerCase();
+  const cfN  = document.getElementById('cf-n').value.toLowerCase();
+  const cfP  = document.getElementById('cf-p').value.toLowerCase();
+  const cfD  = document.getElementById('cf-d').value.toLowerCase();
+  const cfT  = document.getElementById('cf-t').value;
 
   filtered = ALL.filter(p => {
-    if (fType  && p.t !== fType)  return false;
-    if (fTrend && p.tt !== fTrend) return false;
+    if (cfT === 'multi') { if (!p.mh) return false; }
+    else if (cfT)        { if (p.t !== cfT) return false; }
+    if (cfN && !(p.n||'').toLowerCase().includes(cfN)) return false;
+    if (cfP && !(p.p||'').toLowerCase().includes(cfP)) return false;
+    if (cfD && !(p.d||'').toLowerCase().includes(cfD)) return false;
     if (q) {
-      const hay = (p.n + ' ' + (p.d||'')).toLowerCase();
+      const hay = (p.n + ' ' + (p.d||'') + ' ' + (p.p||'')).toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
   });
 
   filtered.sort((a,b) => {
-    if (fSort === 'dl') return (b.dl||0) - (a.dl||0);
-    if (fSort === 'st') return (b.st||0) - (a.st||0);
-    if (fSort === 'tt-g') {
-      const order = {growing:0,stable:1,new:2,declining:3};
-      return (order[a.tt]??9) - (order[b.tt]??9);
-    }
-    if (fSort === 'dt') return (b.dt||'') > (a.dt||'') ? 1 : -1;
-    if (fSort === 'n') return a.n.localeCompare(b.n);
-    return 0;
+    let v = 0;
+    if (SORT_COL === 'dl') v = (b.dl||0) - (a.dl||0);
+    else if (SORT_COL === 'st') v = (b.st||0) - (a.st||0);
+    else if (SORT_COL === 'n')  v = a.n.localeCompare(b.n);
+    else if (SORT_COL === 'p')  v = (a.p||'').localeCompare(b.p||'');
+    else if (SORT_COL === 't')  v = (a.t||'').localeCompare(b.t||'');
+    else if (SORT_COL === 'dt') v = (b.dt||'') > (a.dt||'') ? 1 : -1;
+    else if (SORT_COL === 'dc') v = (b.dc||'') > (a.dc||'') ? 1 : -1;
+    return v * SORT_DIR;
   });
 
+  // View-relative scales for sparklines + stars databar
+  VIEW_MAX_ST    = Math.max(1, ...filtered.filter(p=>p.st).map(p=>p.st));
+  VIEW_MAX_SPARK = Math.max(1, ...filtered.flatMap(p => p.tr || []));
   document.getElementById('count-badge').textContent = `${filtered.length.toLocaleString()} packages`;
   shown = 0;
   document.getElementById('tbody').innerHTML = '';
@@ -305,49 +347,74 @@ function loadMore() {
 
 function makeRow(p) {
   const tr = document.createElement('tr');
-  tr.onclick = () => openDrawer(p.n);
 
-  // Name
-  const nameParts = p.n.startsWith('@') ? p.n.split('/') : [null, p.n];
-  const nameHtml = nameParts[0]
-    ? `<span class="pkg-scope">${nameParts[0]}/</span>${nameParts[1]}`
-    : nameParts[1];
-  const forkIcon = p.fk ? ' <span class="fork-icon">⑂</span>' : '';
+  const unscoped = p.n.includes('/') ? p.n.split('/').slice(1).join('/') : p.n;
+  const forkIcon = p.fk ? ' ⓡ' : '';
+  const author   = p.p || '';
 
-  // Downloads
-  const dlStr = p.dl ? fmtNum(p.dl) : '—';
-  const dlClass = p.dl > 5000 ? 'num-hi' : 'num-lo';
+  const dlStr   = p.dl != null ? fmtNum(p.dl) : '—';
+  const dlClass  = p.dl > 5000 ? 'num-hi' : 'num-lo';
+  const stStr   = p.st != null ? fmtNum(p.st) : '—';
+  const stClass  = p.st > 500 ? 'num-hi' : 'num-lo';
+  const stPct    = p.st ? Math.round((p.st / VIEW_MAX_ST) * 100) : 0;
 
-  // Stars
-  const stStr = p.st != null ? fmtNum(p.st) : '—';
-  const stClass = p.st > 500 ? 'num-hi' : 'num-lo';
-
-  // Sparkline
-  const sparkId = 'sp-' + Math.random().toString(36).slice(2);
+  // Date helpers
+  const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—';
+  const updAgo  = p.dt ? timeAgo(p.dt) : '—';
+  const creAgo  = p.dc ? timeAgo(p.dc) : '—';
+  const sparkId  = 'sp-' + Math.random().toString(36).slice(2);
+  const installCmd = `pi install npm:${p.n}`;
+  const npmUrl     = `https://www.npmjs.com/package/${encodeURIComponent(p.n)}`;
+  const ghMatch    = p.gh && p.gh.match(/github\.com[:/]([^/]+\/[^/.]+)/);
+  const ghUrl      = ghMatch ? `https://github.com/${ghMatch[1].replace(/\.git$/,'')}` : '';
 
   tr.innerHTML = `
-    <td><div class="pkg-name">${nameHtml}${forkIcon}</div></td>
-    <td><div class="pkg-desc">${escHtml(p.d||'')}</div></td>
-    <td><span class="badge badge-${p.t}">${p.t}</span></td>
-    <td class="num"><span class="${dlClass}">${dlStr}</span></td>
-    <td class="num"><span class="${stClass}">${stStr}</span></td>
-    <td><span class="trend-badge trend-${p.tt}">${p.tt}</span></td>
-    <td><canvas id="${sparkId}" class="spark" width="80" height="28"></canvas></td>
+    <td onclick="openDrawer('${escAttr(p.n)}')"><div class="pkg-name">${escHtml(unscoped)}${forkIcon}</div></td>
+    <td><span class="pkg-author" onclick="filterAuthor('${escAttr(author)}')">${escHtml(author)}</span></td>
+    <td onclick="openDrawer('${escAttr(p.n)}')"><div class="pkg-desc">${escHtml(p.d||'')}</div></td>
+    <td class="type-cell">
+      ${!['extension','unknown'].includes(p.t) ? `<span class="badge badge-${p.t}" onclick="filterType('${p.t}')" style="cursor:pointer">${p.t}</span>` : ''}
+      ${p.mh ? '<span class="badge badge-multi" title="Works with multiple AI agents">multi</span>' : ''}
+    </td>
+    <td onclick="openDrawer('${escAttr(p.n)}')" class="dl-cell">
+      <div class="dl-inner">
+        <span class="${dlClass}">${dlStr}</span>
+        <canvas id="${sparkId}" class="spark dl-spark" height="20"></canvas>
+      </div>
+    </td>
+    <td class="dl-cell" onclick="openDrawer('${escAttr(p.n)}')" >
+      <div class="dl-inner">
+        <span class="${stClass}">${stStr}</span>
+        <div class="databar dl-spark" style="align-self:center"><div class="databar-fill databar-st" style="width:${stPct}%"></div></div>
+      </div>
+    </td>
+    <td onclick="openDrawer('${escAttr(p.n)}')"><span class="pub-date" title="${escAttr(fmtDate(p.dc))}">${creAgo}</span></td>
+    <td onclick="openDrawer('${escAttr(p.n)}')"><span class="pub-date" title="${escAttr(fmtDate(p.dt))}">${updAgo}</span></td>
+    <td class="row-actions">
+      <button class="act-btn act-copy" data-tip="${escAttr(installCmd)}" onclick="copyCmd('${escAttr(installCmd)}',this)">
+        <svg class="ic-copy" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <svg class="ic-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
+      <a class="act-btn" href="${npmUrl}" target="_blank" data-tip="npm"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M0 0v24h24V0H0zm19.2 19.2H12v-9.6h-2.4v9.6H4.8V4.8h14.4v14.4z"/></svg></a>
+      ${ghUrl ? `<a class="act-btn" href="${ghUrl}" target="_blank" title="GitHub"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>` : ''}
+    </td>
   `;
 
-  // Draw sparkline after insert
   requestAnimationFrame(() => {
     const c = document.getElementById(sparkId);
-    if (c && p.tr && p.tr.length > 1) drawSparkline(c, p.tr);
+    if (c && p.tr && p.tr.length > 1) {
+      c.width = c.offsetWidth || 120;  // match CSS width
+      drawSparkline(c, p.tr, VIEW_MAX_SPARK);
+    }
   });
 
   return tr;
 }
 
-function drawSparkline(canvas, data) {
+function drawSparkline(canvas, data, globalMax) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
-  const max = Math.max(...data, 1);
+  const max = globalMax || Math.max(...data, 1);
   ctx.clearRect(0,0,w,h);
   ctx.beginPath();
   data.forEach((v, i) => {
@@ -365,8 +432,53 @@ function fmtNum(n) {
   return n.toLocaleString();
 }
 
+function timeAgo(iso) {
+  const sec = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (sec < 60)  return sec + 's';
+  const min = Math.floor(sec / 60);
+  if (min < 60)  return min + 'min';
+  const hr  = Math.floor(min / 60);
+  if (hr  < 24)  return hr  + 'h';
+  const day = Math.floor(hr  / 24);
+  if (day < 7)   return day + 'd';
+  const wk  = Math.floor(day / 7);
+  if (wk  < 5)   return wk  + 'w';
+  const mo  = Math.floor(day / 30);
+  if (mo  < 12)  return mo  + 'm';
+  const yr  = Math.floor(day / 365);
+  const rem = Math.floor((day % 365) / 30);
+  return rem > 0 ? yr + 'y' + rem + 'm' : yr + 'y';
+}
+
 function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function escAttr(s) {
+  return String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;');
+}
+
+function filterType(t) {
+  document.getElementById('cf-t').value = t;
+  render();
+}
+
+function filterAuthor(a) {
+  document.getElementById('cf-p').value = a.toLowerCase();
+  render();
+}
+
+function copyCmd(cmd, btn) {
+  navigator.clipboard.writeText(cmd).then(() => {
+    const copy  = btn.querySelector('.ic-copy');
+    const check = btn.querySelector('.ic-check');
+    copy.style.display  = 'none';
+    check.style.display = '';
+    setTimeout(() => {
+      copy.style.display  = '';
+      check.style.display = 'none';
+    }, 1200);
+  });
 }
 
 function openDrawer(name) {
@@ -445,6 +557,27 @@ function switchTab(name, el) {
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+function toggleTheme() {
+  const isLight = document.documentElement.dataset.theme === 'light';
+  document.documentElement.dataset.theme = isLight ? '' : 'light';
+  document.getElementById('ti-dark').style.display  = isLight ? '' : 'none';
+  document.getElementById('ti-light').style.display = isLight ? 'none' : '';
+  localStorage.setItem('pidex-theme', isLight ? 'dark' : 'light');
+}
+
+// Restore saved theme
+(function() {
+  const t = localStorage.getItem('pidex-theme');
+  if (t === 'light') {
+    document.documentElement.dataset.theme = 'light';
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('ti-dark').style.display = 'none';
+      document.getElementById('ti-light').style.display = '';
+    });
+  }
+})();
+
 init();
 </script>
 </body>
