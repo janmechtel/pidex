@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pidex — Package Map</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root {
+    --bg: #f8f9fc; --surface: #ffffff; --border: #e2e5ec;
+    --text: #111318; --muted: #6b7280; --accent: #3d5afe;
+  }
+  [data-theme="dark"] {
+    --bg: #0f1117; --surface: #1a1d27; --border: #2a2d3a;
+    --text: #e2e4ed; --muted: #6b7280; --accent: #6c8eff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; }
+  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 20px;
+    display: flex; align-items: center; gap: 0; height: 44px; flex-shrink: 0; }
+  .nav-brand { font-weight: 700; font-size: 15px; color: var(--accent); padding-right: 16px;
+    border-right: 1px solid var(--border); margin-right: 12px; white-space: nowrap; }
+  .nav-brand span { color: var(--muted); font-weight: 400; }
+  .nav-link { color: var(--muted); font-size: 12px; text-decoration: none; padding: 0 10px; }
+  .nav-link:hover { color: var(--text); }
+  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+  .toolbar { display: flex; gap: 8px; align-items: center; padding: 8px 16px;
+    background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; flex-shrink: 0; }
+  .search-input { background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 5px 10px; border-radius: 5px; font-size: 12px; width: 200px; outline: none; }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--muted); }
+  select { background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 5px 8px; border-radius: 5px; font-size: 12px; cursor: pointer; outline: none; }
+  select:focus { border-color: var(--accent); }
+  .pill { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500;
+    cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted);
+    transition: all .12s; user-select: none; white-space: nowrap; }
+  .pill:hover { border-color: var(--accent); color: var(--accent); }
+  .pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .sep { color: var(--border); user-select: none; }
+  .count-badge { color: var(--muted); font-size: 11px; margin-left: auto; }
+  .btn-icon { display: flex; align-items: center; justify-content: center;
+    background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+    width: 28px; height: 28px; border-radius: 5px; cursor: pointer; text-decoration: none;
+    transition: border-color .15s, color .15s; }
+  .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+
+  #plot { flex: 1; min-height: 0; }
+  .page { display: flex; flex-direction: column; height: 100%; }
+
+  .legend-size { display: flex; gap: 14px; align-items: center; font-size: 11px; color: var(--muted); }
+  .legend-size span { display: inline-flex; align-items: center; gap: 4px; }
+  .dot { border-radius: 50%; background: var(--muted); display: inline-block; opacity: .5; }
+</style>
+</head>
+<body>
+<div class="page">
+<nav>
+  <div class="nav-brand">Pidex <span>/ Package Map</span></div>
+  <a class="nav-link" href="index.html">← Browse</a>
+  <a class="nav-link" href="analysis.html">Analysis</a>
+  <div class="nav-right">
+    <button class="btn-icon" id="theme-btn" title="Toggle theme" onclick="toggleTheme()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/>
+        <line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    </button>
+  </div>
+</nav>
+
+<div class="toolbar">
+  <input class="search-input" id="search" placeholder="Highlight package…" oninput="applyFilters()">
+  <span class="sep">|</span>
+  <span style="color:var(--muted);font-size:11px">Type:</span>
+  <span class="pill active" data-type="" onclick="setType(this,'')">All</span>
+  <span class="pill" data-type="extension" onclick="setType(this,'extension')">Extensions</span>
+  <span class="pill" data-type="skill" onclick="setType(this,'skill')">Skills</span>
+  <span class="pill" data-type="theme" onclick="setType(this,'theme')">Themes</span>
+  <span class="sep">|</span>
+  <span style="color:var(--muted);font-size:11px">Colour:</span>
+  <select id="colour-by" onchange="applyFilters()">
+    <option value="cluster">Cluster</option>
+    <option value="type">Type</option>
+    <option value="trend">Trend</option>
+  </select>
+  <span class="sep">|</span>
+  <span style="color:var(--muted);font-size:11px">Min downloads:</span>
+  <select id="min-dl" onchange="applyFilters()">
+    <option value="0">All</option>
+    <option value="10">10+</option>
+    <option value="50">50+</option>
+    <option value="200" selected>200+</option>
+    <option value="1000">1k+</option>
+  </select>
+  <div class="legend-size">
+    <span><span class="dot" style="width:6px;height:6px"></span> small DL</span>
+    <span><span class="dot" style="width:12px;height:12px"></span> medium</span>
+    <span><span class="dot" style="width:20px;height:20px"></span> large</span>
+  </div>
+  <span class="count-badge" id="count-badge"></span>
+</div>
+
+<div id="plot"></div>
+</div>
+
+<script>
+let ALL = [], clusterMeta = [], pkgCluster = {};
+let activeType = '';
+
+const CLUSTER_COLORS = [
+  '#6c8eff','#34d399','#fbbf24','#a78bfa','#fb923c',
+  '#f472b6','#06b6d4','#84cc16','#f87171','#e879f9','#38bdf8','#4ade80',
+  '#c084fc','#fb7185','#a3e635','#67e8f9','#fcd34d','#86efac'
+];
+const TYPE_COLORS  = { extension:'#6c8eff', skill:'#34d399', theme:'#fbbf24', prompt:'#fb923c', unknown:'#9ca3af' };
+const TREND_COLORS = { growing:'#34d399', declining:'#f87171', stable:'#6b7280', new:'#fbbf24' };
+
+async function init() {
+  const [pkgs, meta, clusters] = await Promise.all([
+    fetch('data/packages.json').then(r=>r.json()),
+    fetch('data/cluster_meta.json').then(r=>r.json()).catch(()=>[]),
+    fetch('data/clusters.json').then(r=>r.json()).catch(()=>[]),
+  ]);
+  ALL = pkgs;
+  clusterMeta = meta;
+  clusters.forEach(c => { pkgCluster[c.name] = c; });
+  applyFilters();
+}
+
+function setType(el, t) {
+  document.querySelectorAll('.pill[data-type]').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  activeType = t;
+  applyFilters();
+}
+
+function dlToSize(dl) {
+  if (!dl || dl <= 0) return 5;
+  return Math.max(5, Math.min(50, 4 + Math.sqrt(dl) * 0.18));
+}
+
+function applyFilters() {
+  const q      = document.getElementById('search').value.toLowerCase().trim();
+  const minDl  = parseInt(document.getElementById('min-dl').value) || 0;
+  const colBy  = document.getElementById('colour-by').value;
+  const isDark = document.documentElement.dataset.theme === 'dark';
+
+  let pkgs = ALL.filter(p => {
+    if (activeType && p.t !== activeType) return false;
+    if ((p.dl || 0) < minDl) return false;
+    return true;
+  });
+
+  document.getElementById('count-badge').textContent = `${pkgs.length.toLocaleString()} packages`;
+
+  // Group by colour dimension
+  const groups = new Map();
+  pkgs.forEach(p => {
+    let key, color;
+    if (colBy === 'cluster') {
+      const pc = pkgCluster[p.n];
+      key   = pc ? pc.cluster_name : 'Unknown';
+      const cid = pc ? pc.cluster_id : -1;
+      color = cid >= 0 ? CLUSTER_COLORS[cid % CLUSTER_COLORS.length] : '#9ca3af';
+    } else if (colBy === 'type') {
+      key   = p.t || 'unknown';
+      color = TYPE_COLORS[key] || '#9ca3af';
+    } else {
+      key   = p.tt || 'unknown';
+      color = TREND_COLORS[key] || '#9ca3af';
+    }
+    if (!groups.has(key)) groups.set(key, { color, xs:[], ys:[], names:[], descs:[], dls:[], sizes:[], highlights:[] });
+    const g = groups.get(key);
+    const hl = q && (p.n.toLowerCase().includes(q) || (p.d||'').toLowerCase().includes(q));
+    g.xs.push(p.x); g.ys.push(p.y);
+    g.names.push(p.n);
+    g.descs.push(p.d || '');
+    g.dls.push(p.dl || 0);
+    g.sizes.push(dlToSize(p.dl));
+    g.highlights.push(hl);
+  });
+
+  const bg     = isDark ? '#0f1117' : '#f8f9fc';
+  const paper  = isDark ? '#1a1d27' : '#ffffff';
+  const grid   = isDark ? '#2a2d3a' : '#e2e5ec';
+  const textC  = isDark ? '#e2e4ed' : '#111318';
+  const mutedC = isDark ? '#6b7280' : '#9ca3af';
+
+  const traces = [];
+  // Sort groups: larger total DL first so big clusters render on top
+  const sorted = [...groups.entries()].sort((a,b) => {
+    const sa = a[1].dls.reduce((x,y)=>x+y,0);
+    const sb = b[1].dls.reduce((x,y)=>x+y,0);
+    return sa - sb; // ascending so high-DL renders last (on top)
+  });
+
+  sorted.forEach(([key, g]) => {
+    // If search active: dim non-matches
+    const opacities = q
+      ? g.highlights.map(h => h ? 0.95 : 0.12)
+      : g.xs.map(() => 0.75);
+
+    traces.push({
+      type: 'scatter',
+      mode: 'markers',
+      name: key,
+      x: g.xs, y: g.ys,
+      text: g.names,
+      customdata: g.xs.map((_,i) => [g.descs[i], g.dls[i]]),
+      hovertemplate:
+        '<b>%{text}</b><br>' +
+        '%{customdata[0]}<br>' +
+        '<span style="color:#6b7280">%{customdata[1]:,} DL/wk</span>' +
+        '<extra></extra>',
+      marker: {
+        color: g.xs.map((_,i) => g.color),
+        opacity: opacities,
+        size: g.sizes,
+        line: { width: 0 },
+      },
+    });
+  });
+
+  // Highlight ring for search matches
+  if (q) {
+    const hx=[], hy=[], hn=[];
+    pkgs.forEach(p => {
+      if (p.n.toLowerCase().includes(q) || (p.d||'').toLowerCase().includes(q)) {
+        hx.push(p.x); hy.push(p.y); hn.push(p.n);
+      }
+    });
+    if (hx.length) {
+      traces.push({
+        type:'scatter', mode:'markers', name:'Match',
+        x:hx, y:hy, text:hn,
+        hovertemplate:'<b>%{text}</b><extra></extra>',
+        marker:{ color:'rgba(0,0,0,0)', size:hx.map(()=>18),
+          line:{ color:'#f59e0b', width:2 } },
+        showlegend:false,
+      });
+    }
+  }
+
+  const layout = {
+    paper_bgcolor: paper,
+    plot_bgcolor:  bg,
+    margin: { t: 10, b: 40, l: 40, r: 20 },
+    xaxis: { showgrid:true, gridcolor:grid, zeroline:false, showticklabels:false,
+             title:{ text:'← text similarity →', font:{ size:11, color:mutedC } } },
+    yaxis: { showgrid:true, gridcolor:grid, zeroline:false, showticklabels:false,
+             title:{ text:'', font:{ size:11, color:mutedC } } },
+    legend: { bgcolor:'rgba(0,0,0,0)', font:{ size:10, color:textC },
+              itemsizing:'constant', tracegroupgap:2 },
+    font: { family:'-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif', color:textC },
+    hoverlabel: { bgcolor: paper, bordercolor: grid, font:{ size:12 } },
+    uirevision: 'map',
+  };
+
+  const config = { responsive:true, displayModeBar:true,
+    modeBarButtonsToRemove:['select2d','lasso2d','toImage'],
+    displaylogo:false };
+
+  const plotEl = document.getElementById('plot');
+  if (plotEl._hasPlot) {
+    Plotly.react('plot', traces, layout, config);
+  } else {
+    Plotly.newPlot('plot', traces, layout, config);
+    plotEl._hasPlot = true;
+    // Click → open browse filtered to that package
+    plotEl.on('plotly_click', ev => {
+      const pt = ev.points[0];
+      if (pt && pt.text) {
+        window.open(`index.html?q=${encodeURIComponent(pt.text)}`, '_blank');
+      }
+    });
+  }
+}
+
+function toggleTheme() {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  document.documentElement.dataset.theme = dark ? 'light' : 'dark';
+  localStorage.setItem('pidex-theme', dark ? 'light' : 'dark');
+  applyFilters();
+}
+
+(function() {
+  const t = localStorage.getItem('pidex-theme');
+  if (t) document.documentElement.dataset.theme = t;
+})();
+
+init();
+</script>
+</body>
+</html>

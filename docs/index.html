@@ -1,9 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pidex — Pi Package Index</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js"></script>
 <style>
   :root {
     --bg: #0f1117;
@@ -18,109 +20,6 @@
     --purple: #a78bfa;
     --orange: #fb923c;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; }
-
-  /* Nav */
-  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 0; position: sticky; top: 0; z-index: 100; }
-  .nav-brand { font-weight: 700; font-size: 16px; color: var(--accent); padding: 14px 24px 14px 0; border-right: 1px solid var(--border); margin-right: 8px; letter-spacing: -0.3px; }
-  .nav-brand span { color: var(--muted); font-weight: 400; }
-  .nav-tab { padding: 14px 16px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; transition: all .15s; font-size: 13px; }
-  .nav-tab:hover { color: var(--text); }
-  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-  .nav-meta { color: var(--muted); font-size: 12px; }
-  .btn-download { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; text-decoration: none; transition: border-color .15s; }
-  .btn-download:hover { border-color: var(--accent); color: var(--accent); }
-  .btn-icon { display: flex; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 30px; height: 30px; border-radius: 6px; text-decoration: none; transition: border-color .15s, color .15s; }
-  .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
-
-  /* Tabs */
-  .tab-panel { display: none; }
-  .tab-panel.active { display: block; }
-
-  /* Stats bar */
-  .stats-bar { display: flex; gap: 32px; padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--border); align-items: center; }
-  .stat { display: flex; flex-direction: column; gap: 2px; }
-  .stat-value { font-size: 20px; font-weight: 700; color: var(--text); }
-  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
-
-  /* Filters */
-  .filters { display: flex; gap: 10px; padding: 14px 24px; background: var(--bg); border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; }
-  .search-input { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: 6px; font-size: 13px; width: 260px; outline: none; }
-  .search-input:focus { border-color: var(--accent); }
-  .search-input::placeholder { color: var(--muted); }
-  select { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 7px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; outline: none; }
-  select:focus { border-color: var(--accent); }
-  .filter-label { color: var(--muted); font-size: 12px; }
-  .count-badge { margin-left: auto; color: var(--muted); font-size: 12px; }
-
-  /* Table */
-  .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  th { padding: 10px 16px; text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
-  th:hover { color: var(--text); }
-  th .sort-arrow { opacity: .4; margin-left: 4px; }
-  th.sorted .sort-arrow { opacity: 1; color: var(--accent); }
-  td { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 13px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  tr:hover td { background: var(--surface); cursor: pointer; }
-
-  /* Cells */
-  .pkg-name { font-weight: 500; color: var(--text); }
-  .pkg-scope { color: var(--muted); font-weight: 400; }
-  .pkg-desc { color: var(--muted); }
-  .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
-  .badge-skill     { background: rgba(167,139,250,.15); color: var(--purple); }
-  .badge-theme     { background: rgba(251,191,36,.15);  color: var(--yellow); }
-  .badge-prompt    { background: rgba(251,146,60,.15);  color: var(--orange); }
-  .badge-multi     { color: var(--muted); opacity: .65; margin-left: 2px; }
-  .type-cell       { max-width: 110px; overflow: hidden; white-space: nowrap; }
-  .trend-badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; }
-  .trend-growing  { background: rgba(52,211,153,.15); color: var(--green); }
-  .trend-declining{ background: rgba(248,113,113,.15); color: var(--red); }
-  .trend-stable   { background: rgba(107,114,128,.15); color: var(--muted); }
-  .trend-new      { background: rgba(251,191,36,.12);  color: var(--yellow); }
-  .num { font-variant-numeric: tabular-nums; text-align: right; }
-  .num-hi { color: var(--text); }
-  .num-lo { color: var(--muted); }
-  .fork-icon { color: var(--muted); font-size: 11px; }
-
-  /* Sparkline */
-  canvas.spark { display: block; }
-  .dl-cell { white-space: nowrap; }
-  .dl-inner { display: inline-flex; align-items: center; gap: 6px; width: 100%; }
-  .dl-spark { flex: 1; max-width: 80px; display: block; }
-  .st-num { min-width: 42px; text-align: right; flex-shrink: 0; }
-  /* Drawer */
-  .drawer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200; }
-  .drawer-overlay.open { display: block; }
-  .drawer { position: fixed; right: 0; top: 0; bottom: 0; width: 480px; background: var(--surface); border-left: 1px solid var(--border); z-index: 201; overflow-y: auto; padding: 24px; transform: translateX(100%); transition: transform .2s ease; }
-  .drawer.open { transform: translateX(0); }
-  .drawer-close { float: right; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 0; }
-  .drawer-close:hover { color: var(--text); }
-  .drawer h2 { font-size: 16px; font-weight: 600; margin-bottom: 4px; padding-right: 24px; word-break: break-all; }
-  .drawer-desc { color: var(--muted); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
-  .drawer-section { margin-bottom: 20px; }
-  .drawer-section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 10px; }
-  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .meta-item { background: var(--bg); border-radius: 6px; padding: 10px 12px; }
-  .meta-item .label { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin-bottom: 4px; }
-  .meta-item .value { font-size: 15px; font-weight: 600; }
-  .similar-list { display: flex; flex-direction: column; gap: 6px; }
-  .similar-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg); border-radius: 6px; padding: 8px 12px; cursor: pointer; }
-  .similar-item:hover { background: var(--border); }
-  .similar-name { font-size: 12px; font-weight: 500; }
-  .similar-score { font-size: 11px; color: var(--muted); }
-  .links { display: flex; gap: 8px; flex-wrap: wrap; }
-  .link-btn { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: 5px; font-size: 12px; text-decoration: none; }
-  .link-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .kw-list { display: flex; gap: 6px; flex-wrap: wrap; }
-  .kw { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; font-size: 11px; color: var(--muted); }
-  .trend-chart { width: 100%; height: 60px; }
-
-  /* Report tab */
-  #report-frame { width: 100%; height: calc(100vh - 48px); border: none; background: white; }
-
   [data-theme="light"] {
     --bg: #f8f9fc;
     --surface: #ffffff;
@@ -129,261 +28,552 @@
     --muted: #6b7280;
     --accent: #3d5afe;
   }
-  /* Column filters */
-  .filter-row { background: var(--surface); }
-  .filter-row th { padding: 4px 8px; background: transparent; border-bottom: 1px solid var(--border); }
-  .col-filter { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 4px 7px; border-radius: 4px; font-size: 11px; outline: none; }
-  .col-filter:focus { border-color: var(--accent); }
-  /* Row actions */
-  .row-actions { white-space: nowrap; opacity: 0.45; transition: opacity .15s; padding-left: 6px; padding-right: 6px; }
-  tr:hover .row-actions { opacity: 1; }
-  .act-btn { display: inline-flex; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 24px; height: 24px; border-radius: 4px; cursor: pointer; text-decoration: none; margin-right: 2px; transition: border-color .15s, color .15s; flex-shrink: 0; }
-  .act-btn:hover { border-color: var(--accent); color: var(--accent); }
-  /* Fast CSS tooltip */
-  .act-btn { position: relative; }
-  .act-btn[data-tip]::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 5px); left: 50%; transform: translateX(-50%); background: #111; color: #eee; padding: 3px 7px; border-radius: 4px; font-size: 11px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .08s; z-index: 999; }
-  .act-btn[data-tip]:hover::after { opacity: 1; }
-  .pkg-author { color: var(--muted); cursor: pointer; }
-  .pkg-author:hover { color: var(--accent); text-decoration: underline; }
-  /* Databars */
-  .databar { width: 100%; height: 3px; background: var(--border); border-radius: 2px; margin-top: 3px; }
-  .databar-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width .2s; }
-  .databar-st { background: var(--yellow); }
-  .pub-date { color: var(--muted); white-space: nowrap; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; display: flex; flex-direction: column; }
 
-  /* Responsive */
-  @media (max-width: 768px) {
-    .drawer { width: 100%; }
-    .pkg-desc { display: none; }
-    td:nth-child(5), th:nth-child(5) { display: none; }
-  }
+  /* ── Nav ── */
+  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 0; flex-shrink: 0; z-index: 100; }
+  .nav-brand { font-weight: 700; font-size: 16px; color: var(--accent); padding: 14px 24px 14px 0; border-right: 1px solid var(--border); margin-right: 8px; letter-spacing: -0.3px; }
+  .nav-brand span { color: var(--muted); font-weight: 400; }
+  .nav-link { padding: 14px 16px; color: var(--muted); font-size: 13px; text-decoration: none; transition: color .15s; }
+  .nav-link:hover { color: var(--text); }
+  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .btn-icon { display: flex; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 30px; height: 30px; border-radius: 6px; text-decoration: none; transition: border-color .15s, color .15s; }
+  .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; text-decoration: none; transition: border-color .15s; }
+  .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Split layout ── */
+  .split { display: flex; flex: 1; overflow: hidden; }
+  .left-panel { width: 40%; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .right-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ── Left panel ── */
+  .left-top { flex-shrink: 0; }
+  .stats-bar { display: flex; gap: 20px; padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--border); align-items: center; flex-wrap: wrap; }
+  .stat { display: flex; flex-direction: column; gap: 1px; }
+  .stat-value { font-size: 16px; font-weight: 700; }
+  .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .search-row { display: flex; gap: 8px; padding: 10px 12px; background: var(--bg); border-bottom: 1px solid var(--border); align-items: center; }
+  .search-wrap { position: relative; flex: 1; display: flex; align-items: center; }
+  .search-input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 7px 30px 7px 12px; border-radius: 6px; font-size: 13px; outline: none; }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--muted); }
+  .search-clear { position: absolute; right: 7px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0; line-height: 1; display: none; }
+  .search-clear:hover { color: var(--text); }
+  .count-badge { color: var(--muted); font-size: 11px; white-space: nowrap; }
+
+  .cdot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+
+  /* Active filter bar */
+  .active-filters { display: none; gap: 6px; padding: 6px 12px; background: rgba(108,142,255,.06); border-bottom: 1px solid rgba(108,142,255,.2); align-items: center; flex-wrap: wrap; font-size: 12px; }
+  .active-filters.show { display: flex; }
+  .filter-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; background: rgba(108,142,255,.15); color: var(--accent); font-size: 11px; }
+  .filter-chip .x { cursor: pointer; opacity: .7; }
+  .filter-chip .x:hover { opacity: 1; }
+
+  /* Table */
+  .table-wrap { overflow-y: auto; flex: 1; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th { padding: 8px 10px; text-align: left; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; background: var(--surface); position: sticky; top: 0; z-index: 2; }
+  th:hover { color: var(--text); }
+  th .sa { opacity: .4; margin-left: 3px; }
+  th.sorted .sa { opacity: 1; color: var(--accent); }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  td.row-actions { overflow: visible; text-overflow: clip; white-space: nowrap; width: 100px; min-width: 100px; padding: 4px 6px; }
+  tr:hover td { background: var(--surface); cursor: pointer; }
+  tr.row-selected > td { background: rgba(108,142,255,.10) !important; }
+  tr.row-selected > td:first-child { border-left: 3px solid var(--accent); }
+  tr.row-has-score > td { background: rgba(6,182,212,.06); }
+  tr.row-has-score:hover > td { background: rgba(6,182,212,.12) !important; }
+  .score-col { display: none; }
+  .selected-mode .score-col { display: table-cell; }
+  .score-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; background: rgba(6,182,212,.15); color: #0891b2; }
+  .selection-banner { display: flex; align-items: center; gap: 10px; padding: 8px 16px; background: rgba(6,182,212,.07); border-bottom: 1px solid rgba(6,182,212,.2); font-size: 12px; flex-shrink: 0; }
+  .banner-back { margin-left: auto; background: var(--surface); border: 1px solid var(--border); color: var(--muted); padding: 3px 10px; border-radius: 5px; cursor: pointer; font-size: 12px; font-family: inherit; }
+  .banner-back:hover { border-color: #06b6d4; color: #06b6d4; }
+  .pkg-name { font-weight: 500; }
+  .pkg-scope { color: var(--muted); font-weight: 400; }
+  .pkg-desc { color: var(--muted); font-size: 11px; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+  .badge-skill   { background: rgba(167,139,250,.15); color: var(--purple); }
+  .badge-theme   { background: rgba(251,191,36,.15);  color: var(--yellow); }
+  .badge-prompt  { background: rgba(251,146,60,.15);  color: var(--orange); }
+  .badge-multi   { color: var(--muted); opacity: .65; margin-left: 2px; font-size: 9px; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .num-hi { color: var(--text); }
+  .num-lo { color: var(--muted); }
+  .cluster-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: var(--muted); max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  canvas.spark { display: block; }
+
+  /* Row actions */
+  .row-actions { white-space: nowrap; padding: 4px 6px; width: 100px; min-width: 100px; overflow: visible; text-overflow: clip; }
+  .row-actions .act-btn { opacity: 0; transition: opacity .1s; }
+  tr:hover .row-actions .act-btn { opacity: 1; }
+  .act-btn { display: inline-flex; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 22px; height: 22px; border-radius: 4px; cursor: pointer; text-decoration: none; transition: border-color .12s, color .12s; }
+  .act-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .act-btn[data-tip] { position: relative; }
+  .act-btn[data-tip]::after { content: attr(data-tip); position: absolute; bottom: calc(100%+5px); left: 50%; transform: translateX(-50%); background: #111; color: #eee; padding: 3px 7px; border-radius: 4px; font-size: 10px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .08s; z-index: 999; }
+  .act-btn[data-tip]:hover::after { opacity: 1; }
+  .fork-icon { color: var(--muted); vertical-align: middle; margin-right: 2px; opacity: .6; }
+  .pkg-author { color: var(--muted); cursor: pointer; font-size: 11px; }
+  .pkg-author:hover { color: var(--accent); }
+  .load-more-row { text-align: center; padding: 12px; }
+  .load-more-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+
+  /* ── Resizable split ── */
+  .resizer { width: 6px; background: var(--border); cursor: col-resize; flex-shrink: 0; transition: background .15s; }
+  .resizer:hover, .resizer.dragging { background: var(--accent); }
+  .left-panel.collapsed { width: 0 !important; min-width: 0; overflow: hidden; }
+  .panel-toggle { background: var(--surface); border: 1px solid var(--border); color: var(--muted); padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 13px; line-height: 1; transition: color .15s, border-color .15s; }
+  .panel-toggle:hover { color: var(--accent); border-color: var(--accent); }
+  .right-scroll { flex: 1; overflow-y: auto; padding: 0; }
+  .cluster-nav { padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; flex-shrink: 0; }
+  .cluster-nav-label { font-size: 11px; color: var(--muted); margin-right: 4px; }
+  .cnav-pill { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); transition: all .12s; user-select: none; }
+  .cnav-pill:hover { border-color: var(--accent); color: var(--accent); }
+  .cnav-pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .right-section { padding: 16px; border-bottom: 1px solid var(--border); }
+  .right-section:last-child { border-bottom: none; }
+  .section-title { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
+  #chart-map  { width: 100%; height: 340px; }
+  #chart-trend { width: 100%; height: 260px; }
+  #wc-canvas { display: block; border-radius: 6px; background: var(--surface); }
+  .wc-wrap { position: relative; }
+  .wc-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; pointer-events: none; }
+
+  /* ── Detail panel ── */
+  .detail-panel { flex-shrink: 0; border-top: 1px solid var(--border); background: var(--surface); max-height: 42%; overflow-y: auto; display: none; }
+  .detail-panel.open { display: block; }
+  .detail-header { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px 8px; border-bottom: 1px solid var(--border); }
+  .detail-name { font-weight: 600; font-size: 13px; flex: 1; word-break: break-all; }
+  .detail-close { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; line-height: 1; padding: 0 2px; flex-shrink: 0; }
+  .detail-close:hover { color: var(--text); }
+  .detail-body { padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+  .detail-desc { color: var(--text); line-height: 1.5; }
+  .detail-readme { color: var(--muted); font-size: 11px; line-height: 1.5; border-left: 2px solid var(--border); padding-left: 8px; }
+  .detail-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 11px; }
+  .detail-meta b { color: var(--text); }
+  .detail-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .detail-btn { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 5px; font-size: 11px; border: 1px solid var(--border); background: var(--bg); color: var(--text); text-decoration: none; cursor: pointer; transition: border-color .12s; }
+  .detail-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .detail-kw { display: flex; flex-wrap: wrap; gap: 4px; }
+  .kw-tag { padding: 2px 7px; border-radius: 10px; background: rgba(108,142,255,.1); color: var(--accent); font-size: 10px; }
+  .similar-list { display: flex; flex-direction: column; gap: 3px; }
+  .sim-row { display: flex; align-items: center; gap: 6px; font-size: 11px; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+  .sim-row:hover { background: rgba(108,142,255,.08); }
+  .sim-score { color: var(--muted); font-size: 10px; min-width: 32px; text-align: right; }
+  .filter-row th { padding: 3px 6px; background: var(--surface); font-size: 10px; top: 30px; }
+  .col-filter { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 3px 6px; border-radius: 4px; font-size: 11px; outline: none; }
+  .col-filter:focus { border-color: var(--accent); }
+  select.col-filter { cursor: pointer; }
 </style>
 </head>
 <body>
 
 <nav>
   <div class="nav-brand">Pidex <span>/ Pi Package Index</span></div>
-  <div class="nav-tab active" onclick="switchTab('browse', this)">Browse</div>
-  <div class="nav-tab" onclick="switchTab('report', this)">Analysis Report</div>
+  <a class="nav-link" href="map.html" target="_blank">Package Map ↗</a>
+  <a class="nav-link" href="analysis.html" target="_blank">Full Analysis Report ↗</a>
   <div class="nav-right">
+    <span id="nav-updated" style="color:var(--muted);font-size:12px"></span>
     <a class="btn-icon" href="https://github.com/janmechtel/pidex" target="_blank" title="GitHub"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
-    <a class="btn-icon" href="https://discord.gg/pi-dev" target="_blank" title="Discord #extensions"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg></a>
-    <button class="btn-icon" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark"><svg id="ti-dark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg id="ti-light" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
-    <a class="btn-download" href="https://github.com/janmechtel/pidex#methodology" target="_blank">Methodology</a>
-    <a class="btn-download" href="data/pidex-full.json.gz" download>⬇ Dataset</a>
+    <a class="btn-icon" href="https://discord.gg/pi-dev" target="_blank" title="Discord"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg></a>
+    <button class="panel-toggle" id="panel-toggle" title="Hide list panel">&#8249;</button>
+    <button class="btn-icon" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme"><svg id="ti-dark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg id="ti-light" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
+    <a class="btn-sm" href="data/pidex-full.json.gz" download>⬇ Dataset</a>
   </div>
 </nav>
 
-<!-- Browse tab -->
-<div id="tab-browse" class="tab-panel active">
-  <div class="stats-bar" id="stats-bar">
-    <div class="stat"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Packages</div></div>
-    <div class="stat"><div class="stat-value" id="stat-ext">—</div><div class="stat-label">Extensions</div></div>
-    <div class="stat"><div class="stat-value" id="stat-skills">—</div><div class="stat-label">Skills</div></div>
-    <div class="stat"><div class="stat-value" id="stat-themes">—</div><div class="stat-label">Themes</div></div>
-    <div class="stat"><div class="stat-value" id="stat-multi">—</div><div class="stat-label">Multi-harness</div></div>
-    <div class="stat"><div class="stat-value" id="stat-updated">—</div><div class="stat-label">Last updated</div></div>
-    <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
-      <input class="search-input" id="search" placeholder="Search packages…" oninput="render()">
-      <span class="count-badge" id="count-badge"></span>
+<div class="split">
+
+  <!-- ══ LEFT PANEL ══ -->
+  <div class="left-panel">
+    <div class="left-top">
+      <div class="stats-bar">
+        <div class="stat"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Packages</div></div>
+        <div class="stat"><div class="stat-value" id="stat-ext">—</div><div class="stat-label">Extensions</div></div>
+        <div class="stat"><div class="stat-value" id="stat-skills">—</div><div class="stat-label">Skills</div></div>
+        <div class="stat"><div class="stat-value" id="stat-themes">—</div><div class="stat-label">Themes</div></div>
+        <div class="stat"><div class="stat-value" id="stat-multi">—</div><div class="stat-label">Multi</div></div>
+      </div>
+      <div class="search-row">
+        <div class="search-wrap">
+          <input class="search-input" id="search" placeholder="Search packages…" oninput="onSearchInput()">
+          <button class="search-clear" id="search-clear" onclick="clearSearch()" title="Clear search">×</button>
+        </div>
+        <span class="count-badge" id="count-badge"></span>
+      </div>
+
+      <div class="active-filters" id="active-filters">
+        <span style="color:var(--muted);font-size:11px">Filtered by:</span>
+        <span class="filter-chip" id="fc-cluster" style="display:none">
+          <span id="fc-cluster-text"></span>
+          <span class="x" onclick="selectCluster(null)">×</span>
+        </span>
+
+      </div>
+    </div>
+    <div class="table-wrap" id="table-wrap">
+      <div id="selection-banner" class="selection-banner" style="display:none">
+        <span style="color:var(--muted)">Sorted by similarity to</span>
+        <strong id="banner-name"></strong>
+        <span id="banner-count" style="color:var(--muted);font-size:11px"></span>
+        <button class="banner-back" onclick="toggleRow(SELECTED_NAME)">× clear</button>
+      </div>
+      <table id="main-table">
+        <thead>
+          <tr>
+            <th style="width:160px" onclick="sortBy('n')">Name <span class="sa" id="sa-n"></span></th>
+            <th style="width:64px" class="score-col num">Match</th>
+            <th style="width:85px" onclick="sortBy('p')">Author <span class="sa" id="sa-p"></span></th>
+            <th>Description</th>
+            <th style="width:75px" onclick="sortBy('t')">Type <span class="sa" id="sa-t"></span></th>
+            <th style="width:120px" onclick="sortBy('cl')">Cluster <span class="sa" id="sa-cl"></span></th>
+            <th style="width:120px" class="num" onclick="sortBy('dl')">DL/wk <span class="sa" id="sa-dl">▼</span></th>
+            <th style="width:60px" class="num" onclick="sortBy('st')">★ <span class="sa" id="sa-st"></span></th>
+            <th style="width:100px"></th>
+          </tr>
+          <tr class="filter-row">
+            <th><input class="col-filter" placeholder="name…" oninput="render()" id="cf-n"></th>
+            <th class="score-col"></th>
+            <th><input class="col-filter" placeholder="author…" oninput="render()" id="cf-p"></th>
+            <th><input class="col-filter" placeholder="desc…" oninput="render()" id="cf-d"></th>
+            <th><select class="col-filter" onchange="render()" id="cf-t"><option value="">all</option><option>extension</option><option>skill</option><option>theme</option><option>prompt</option><option>unknown</option><option value="multi">multi</option></select></th>
+            <th><select class="col-filter" id="cf-cl" onchange="selectCluster(this.value===''?null:parseInt(this.value))"><option value="">all</option></select></th>
+            <th><select class="col-filter" id="min-dl" onchange="render()">
+              <option value="0">any</option>
+              <option value="1" selected>&gt; 0</option>
+              <option value="10">≥ 10</option>
+              <option value="50">≥ 50</option>
+              <option value="200">≥ 200</option>
+              <option value="1000">≥ 1k</option>
+            </select></th><th></th><th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div id="load-more" style="display:none" class="load-more-row">
+        <button class="load-more-btn" onclick="loadMore()">Load more</button>
+      </div>
+    </div>
+    <!-- ══ DETAIL PANEL ══ -->
+    <div class="detail-panel" id="detail-panel"></div>
+  </div>
+  <div class="resizer" id="resizer"></div>
+
+  <!-- ══ RIGHT PANEL ══ -->
+  <div class="right-panel">
+    <div class="cluster-nav" id="cluster-nav">
+      <span class="cluster-nav-label">Cluster:</span>
+      <!-- filled by JS -->
+    </div>
+    <div class="right-scroll">
+      <div class="right-section" id="map-section">
+        <div class="section-title">Package Map <span id="map-count" style="font-weight:400;text-transform:none;letter-spacing:0"></span></div>
+        <div id="chart-map"></div>
+      </div>
+      <div class="right-section" id="wc-section">
+        <div class="section-title" id="wc-title">Word Cloud</div>
+        <div class="wc-wrap" id="wc-wrap">
+          <canvas id="wc-canvas"></canvas>
+          <div class="wc-loading" id="wc-loading">Search or select a cluster to see its word cloud</div>
+        </div>
+      </div>
     </div>
   </div>
 
-
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-  <th style="width:180px" onclick="sortBy('n')">Name <span class="sort-arrow" id="sa-n"></span></th>
-  <th style="width:100px" onclick="sortBy('p')">Author <span class="sort-arrow" id="sa-p"></span></th>
-  <th>Description</th>
-  <th style="width:80px" onclick="sortBy('t')">Type <span class="sort-arrow" id="sa-t"></span></th>
-  <th style="width:160px" class="num" onclick="sortBy('dl')">Downloads/wk <span class="sort-arrow" id="sa-dl">▼</span></th>
-  <th style="width:95px" onclick="sortBy('st')" class="num">Stars <span class="sort-arrow" id="sa-st"></span></th>
-  <th style="width:75px" onclick="sortBy('dc')">Created <span class="sort-arrow" id="sa-dc"></span></th>
-  <th style="width:75px" onclick="sortBy('dt')">Updated <span class="sort-arrow" id="sa-dt"></span></th>
-  <th style="width:96px"></th>
-        </tr>
-        <tr class="filter-row">
-  <th><input class="col-filter" placeholder="name…" oninput="render()" id="cf-n"></th>
-  <th><input class="col-filter" placeholder="author…" oninput="render()" id="cf-p"></th>
-  <th><input class="col-filter" placeholder="desc…" oninput="render()" id="cf-d"></th>
-  <th><select class="col-filter" onchange="render()" id="cf-t"><option value="">all</option><option>extension</option><option>skill</option><option>theme</option><option>prompt</option><option>unknown</option><option value="multi">multi-harness</option></select></th>
-  <th></th><th></th><th></th><th></th><th></th>
-        </tr>
-      <tbody id="tbody"></tbody>
-    </table>
-    <div id="load-more" style="display:none; text-align:center; padding:16px;">
-      <button onclick="loadMore()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 20px;border-radius:6px;cursor:pointer;">Load more</button>
-    </div>
-  </div>
-</div>
-
-<!-- Report tab -->
-<div id="tab-report" class="tab-panel">
-  <iframe id="report-frame" src="report.html"></iframe>
-</div>
-
-<!-- Drawer -->
-<div class="drawer-overlay" id="overlay" onclick="closeDrawer()"></div>
-<div class="drawer" id="drawer">
-  <button class="drawer-close" onclick="closeDrawer()">✕</button>
-  <h2 id="d-name"></h2>
-  <p class="drawer-desc" id="d-desc"></p>
-
-  <div class="drawer-section">
-    <h3>Stats</h3>
-    <div class="meta-grid" id="d-meta"></div>
-  </div>
-
-  <div class="drawer-section" id="d-trend-section" style="display:none">
-    <h3>Download trend (last 26 weeks)</h3>
-    <canvas class="trend-chart" id="d-trend-canvas"></canvas>
-  </div>
-
-  <div class="drawer-section" id="d-similar-section" style="display:none">
-    <h3>Similar packages</h3>
-    <div class="similar-list" id="d-similar"></div>
-  </div>
-
-  <div class="drawer-section" id="d-kw-section" style="display:none">
-    <h3>Keywords</h3>
-    <div class="kw-list" id="d-kw"></div>
-  </div>
-
-  <div class="drawer-section">
-    <h3>Links</h3>
-    <div class="links" id="d-links"></div>
-  </div>
 </div>
 
 <script>
-let ALL = [], filtered = [], pkgMap = {};
-let PAGE = 50, shown = 0;
-let GLOBAL_MAX = 1;
-let VIEW_MAX_ST = 1, VIEW_MAX_SPARK = 1;
+// ══ State ══════════════════════════════════════════════════════════════════
+let ALL_PKGS = [], CLUSTERS = [], CLUSTER_META = [], CLUSTER_WORDFREQS = {};
+let PKG_CLUSTER = {};   // name → cluster entry
+let activeCluster = null;  // cluster_id (int) or null
+let activeWord = null; // ponytail: kept as null permanently, word clicks go to search input
+let activeType = '';
 let SORT_COL = 'dl', SORT_DIR = 1;
+let PAGE = 50, shown = 0;
+let filtered = [], pkgMap = {};
+let GLOBAL_MAX_SPARK = 1;
 
+// Cluster pattern → colour
+const PATTERN_COLOR = {
+  blockbuster: '#f87171',
+  contested:   '#fb923c',
+  'long-tail': '#6c8eff',
+};
+
+// Stable colour palette per cluster id
+const CLUSTER_HUE = [210, 30, 160, 270, 120, 50, 330, 190, 0, 290, 85, 230];
+function clusterColor(id) {
+  const h = CLUSTER_HUE[id % CLUSTER_HUE.length];
+  return `hsl(${h},60%,55%)`;
+}
+
+// ══ Init ═══════════════════════════════════════════════════════════════════
 async function init() {
-  const res = await fetch('data/packages.json');
-  ALL = await res.json();
-  ALL.forEach(p => pkgMap[p.n] = p);
+  try {
+    [ALL_PKGS, CLUSTERS, CLUSTER_META, CLUSTER_WORDFREQS] = await Promise.all([
+      fetch('data/packages.json').then(r => r.json()),
+      fetch('data/clusters.json').then(r => r.json()),
+      fetch('data/cluster_meta.json').then(r => r.json()),
+      fetch('data/cluster_wordfreqs.json').then(r => r.json()),
+    ]);
+  } catch(e) {
+    console.error('Failed to load data:', e);
+  }
 
-  // Deduplicate: if two packages are 100% similar (same author+desc), keep the one with more data
+  // Build lookup: pkg name → cluster entry
+  CLUSTERS.forEach(c => PKG_CLUSTER[c.name] = c);
+  ALL_PKGS.forEach(p => pkgMap[p.n] = p);
+
+  // Deduplicate exact duplicates
   const dupeNames = new Set();
-  ALL.forEach(p => {
+  ALL_PKGS.forEach(p => {
     if (dupeNames.has(p.n)) return;
-    const twins = (p.si || []).filter(s => s.score === 1.0).map(s => pkgMap[s.name]).filter(Boolean);
-    twins.forEach(twin => {
-      if (twin.p === p.p && twin.d === p.d) {
-        // Keep whichever has more download data; drop the other
-        const dropName = (twin.dl || 0) > (p.dl || 0) ||
-          ((twin.tr||[]).some(v=>v>0) && !(p.tr||[]).some(v=>v>0))
-          ? p.n : twin.n;
+    (p.si || []).filter(s => s.score === 1.0).forEach(s => {
+      const twin = pkgMap[s.name];
+      if (twin && twin.p === p.p && twin.d === p.d) {
+        const dropName = (twin.dl||0) > (p.dl||0) ? p.n : twin.n;
         dupeNames.add(dropName);
       }
     });
   });
-  ALL = ALL.filter(p => !dupeNames.has(p.n));
+  ALL_PKGS = ALL_PKGS.filter(p => !dupeNames.has(p.n));
 
-  // Apply URL parameters to filters before rendering
-  (function() {
-    const params = new URLSearchParams(location.search);
-    if (params.has('q'))      document.getElementById('search').value = params.get('q');
-    if (params.has('name'))   document.getElementById('cf-n').value   = params.get('name');
-    if (params.has('author')) document.getElementById('cf-p').value   = params.get('author');
-    if (params.has('desc'))   document.getElementById('cf-d').value   = params.get('desc');
-    if (params.has('type'))   document.getElementById('cf-t').value   = params.get('type');
-  })();
+  GLOBAL_MAX_SPARK = Math.max(1, ...ALL_PKGS.flatMap(p => p.tr || []));
 
-  // Global sparkline scale
-  GLOBAL_MAX = Math.max(1, ...ALL.flatMap(p => p.tr || []));
   // Stats
-  document.getElementById('stat-total').textContent   = ALL.length.toLocaleString();
-  document.getElementById('stat-ext').textContent     = ALL.filter(p=>p.t==='extension').length.toLocaleString();
-  document.getElementById('stat-skills').textContent  = ALL.filter(p=>p.t==='skill').length.toLocaleString();
-  document.getElementById('stat-themes').textContent  = ALL.filter(p=>p.t==='theme').length.toLocaleString();
-  document.getElementById('stat-multi').textContent   = ALL.filter(p=>p.mh).length.toLocaleString();
+  document.getElementById('stat-total').textContent  = ALL_PKGS.length.toLocaleString();
+  document.getElementById('stat-ext').textContent    = ALL_PKGS.filter(p=>p.t==='extension').length.toLocaleString();
+  document.getElementById('stat-skills').textContent = ALL_PKGS.filter(p=>p.t==='skill').length.toLocaleString();
+  document.getElementById('stat-themes').textContent = ALL_PKGS.filter(p=>p.t==='theme').length.toLocaleString();
+  document.getElementById('stat-multi').textContent  = ALL_PKGS.filter(p=>p.mh).length.toLocaleString();
+  const dates = ALL_PKGS.map(p=>p.dt).filter(Boolean).sort();
+  if (dates.length) {
+    const d = new Date(dates[dates.length-1]);
+    document.getElementById('nav-updated').textContent = `Updated ${d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}`;
+  }
 
-  // Last updated: most recent dt across all packages
-  const dates = ALL.map(p=>p.dt).filter(Boolean).sort();
-  const lastDate = dates.length ? new Date(dates[dates.length-1]).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—';
-  document.getElementById('stat-updated').textContent = lastDate;
+  buildClusterDropdown();
+  buildClusterNav();
 
-  // Nav meta — removed per request
+  // Restore deeplink
+  const _params = new URLSearchParams(location.search);
+  const _pkg = _params.get('pkg');
+  const _cl  = _params.has('cluster') ? parseInt(_params.get('cluster')) : null;
+  if (_cl !== null) {
+    activeCluster = _cl;
+    const sel = document.getElementById('cf-cl');
+    if (sel) sel.value = String(_cl);
+    document.querySelectorAll('.cnav-pill').forEach(el =>
+      el.classList.toggle('active', parseInt(el.dataset.cid) === _cl));
+    updateActiveFilterBar();
+  }
+  if (_pkg && pkgMap[_pkg]) toggleRow(_pkg);
+  else { render(); renderWordCloud(); }
+
+  renderBarChart();
+}
+
+// ══ Cluster UI ════════════════════════════════════════════════════════════
+function buildClusterDropdown() {
+  const sel = document.getElementById('cf-cl');
+  if (!sel) return;
+  CLUSTER_META.forEach(cm => {
+    const opt = document.createElement('option');
+    opt.value = cm.id;
+    opt.textContent = cm.name;
+    sel.appendChild(opt);
+  });
+}
+
+function buildClusterNav() {
+  const nav = document.getElementById('cluster-nav');
+  nav.innerHTML = '<span class="cluster-nav-label">Cluster:</span>';
+  CLUSTER_META.forEach(cm => {
+    const el = document.createElement('span');
+    el.className = 'cnav-pill';
+    el.dataset.cid = cm.id;
+    const dot = `<span class="cdot" style="background:${MAP_COLORS[cm.id % MAP_COLORS.length]};margin-right:5px"></span>`;
+    el.innerHTML = dot + escHtml(cm.name.replace(/ & .*/,''));
+    el.title = cm.name + ` (${cm.pkgs} pkgs, ${fmtNum(cm.total_dl)} DL/wk)`;
+    el.onclick = () => selectCluster(activeCluster === cm.id ? null : cm.id);
+    el.onmouseenter = () => highlightMapCluster(cm.id);
+    el.onmouseleave = () => resetMapHighlight();
+    nav.appendChild(el);
+  });
+}
+
+function selectCluster(id) {
+  activeCluster = id;
+  // Sync dropdown
+  const sel = document.getElementById('cf-cl');
+  if (sel) sel.value = id !== null ? String(id) : '';
+  // Update right cluster nav pills
+  document.querySelectorAll('.cnav-pill').forEach(el => {
+    el.classList.toggle('active', parseInt(el.dataset.cid) === id);
+  });
+  updateActiveFilterBar();
+  // URL: push for cluster selection, replace for deselection
+  const u = new URL(location.href);
+  if (id !== null) { u.searchParams.set('cluster', id); history.pushState(null, '', u); }
+  else             { u.searchParams.delete('cluster'); history.replaceState(null, '', u); }
+  render();
+  renderWordCloud();
+}
+
+function setActiveWord(word) {
+  const s = document.getElementById('search');
+  const cur = s.value.trim();
+  s.value = cur ? cur + ' ' + word : word;
+  const btn = document.getElementById('search-clear');
+  if (btn) btn.style.display = s.value ? '' : 'none';
+  // Push to URL history so back button works
+  const u = new URL(location.href);
+  u.searchParams.set('q', s.value);
+  history.pushState(null, '', u);
   render();
 }
 
+function updateActiveFilterBar() {
+  const bar = document.getElementById('active-filters');
+  const fcC = document.getElementById('fc-cluster');
+  const fcW = document.getElementById('fc-word');
+  const hasCluster = activeCluster !== null;
+  if (hasCluster) {
+    const cm = CLUSTER_META.find(c => c.id === activeCluster);
+    document.getElementById('fc-cluster-text').textContent = cm ? cm.name : '';
+    fcC.style.display = '';
+  } else {
+    fcC.style.display = 'none';
+  }
+  bar.classList.toggle('show', hasCluster);
+}
+
+// ══ Type filter ═══════════════════════════════════════════════════════════
+function setType(t) { activeType = t; render(); }
+
+function onSearchInput() {
+  const val = document.getElementById('search').value;
+  const btn = document.getElementById('search-clear');
+  if (btn) btn.style.display = val ? '' : 'none';
+  // replaceState so typing doesn't spam history, but q stays in URL
+  const u = new URL(location.href);
+  val ? u.searchParams.set('q', val) : u.searchParams.delete('q');
+  history.replaceState(null, '', u);
+  render();
+}
+
+function clearSearch() {
+  document.getElementById('search').value = '';
+  const btn = document.getElementById('search-clear');
+  if (btn) btn.style.display = 'none';
+  render();
+}
+
+// ══ Sort ══════════════════════════════════════════════════════════════════
 function sortBy(col) {
   if (SORT_COL === col) SORT_DIR *= -1;
   else { SORT_COL = col; SORT_DIR = 1; }
-  // Update arrows
-  document.querySelectorAll('.sort-arrow').forEach(el => el.textContent = '');
+  document.querySelectorAll('.sa').forEach(el => el.textContent = '');
   const arrow = document.getElementById('sa-' + col);
   if (arrow) arrow.textContent = SORT_DIR === 1 ? '▼' : '▲';
+  document.getElementById('sa-dl').textContent = SORT_COL === 'dl' ? (SORT_DIR === 1 ? '▼' : '▲') : '';
   render();
 }
 
-let _urlUpdateTimer = null;
-function pushUrlState() {
-  clearTimeout(_urlUpdateTimer);
-  _urlUpdateTimer = setTimeout(() => {
-    const params = new URLSearchParams();
-    const q   = document.getElementById('search').value;
-    const cfN = document.getElementById('cf-n').value;
-    const cfP = document.getElementById('cf-p').value;
-    const cfD = document.getElementById('cf-d').value;
-    const cfT = document.getElementById('cf-t').value;
-    if (q)   params.set('q', q);
-    if (cfN) params.set('name', cfN);
-    if (cfP) params.set('author', cfP);
-    if (cfD) params.set('desc', cfD);
-    if (cfT) params.set('type', cfT);
-    const str = params.toString();
-    history.replaceState(null, '', str ? '?' + str : location.pathname);
-  }, 200);
-}
-
+// ══ Render ════════════════════════════════════════════════════════════════
 function render() {
-  pushUrlState();
-  const q    = document.getElementById('search').value.toLowerCase();
-  const cfN  = document.getElementById('cf-n').value.toLowerCase();
-  const cfP  = document.getElementById('cf-p').value.toLowerCase();
-  const cfD  = document.getElementById('cf-d').value.toLowerCase();
-  const cfT  = document.getElementById('cf-t').value;
+  const q   = document.getElementById('search').value.toLowerCase();
+  const cfN = document.getElementById('cf-n').value.toLowerCase();
+  const cfP = document.getElementById('cf-p').value.toLowerCase();
+  const cfD = document.getElementById('cf-d').value.toLowerCase();
+  const cfT = document.getElementById('cf-t').value;
 
-  filtered = ALL.filter(p => {
-    if (cfT === 'multi') { if (!p.mh) return false; }
-    else if (cfT)        { if (p.t !== cfT) return false; }
+  const minDl = parseInt(document.getElementById('min-dl')?.value || '1');
+
+  const passes = p => {
+    // Downloads filter
+    if ((p.dl || 0) < minDl) return false;
+    const t = activeType || cfT;
+    if (t === 'multi') { if (!p.mh) return false; }
+    else if (t) { if (p.t !== t) return false; }
+    // Cluster filter
+    if (activeCluster !== null) {
+      const pc = PKG_CLUSTER[p.n];
+      if (!pc || pc.cluster_id !== activeCluster) return false;
+    }
+    // Word filter handled by search input
+    // activeWord unused
+    // Column filters
     if (cfN && !(p.n||'').toLowerCase().includes(cfN)) return false;
     if (cfP && !(p.p||'').toLowerCase().includes(cfP)) return false;
     if (cfD && !(p.d||'').toLowerCase().includes(cfD)) return false;
+    // Global search
     if (q) {
-      const hay = (p.n + ' ' + (p.d||'') + ' ' + (p.p||'')).toLowerCase();
-      if (!hay.includes(q)) return false;
+      const hay = ((p.n||'') + ' ' + (p.d||'') + ' ' + (p.p||'')).toLowerCase();
+      if (!q.split(/\s+/).every(term => hay.includes(term))) return false;
     }
     return true;
-  });
+  };
 
-  filtered.sort((a,b) => {
+  filtered = ALL_PKGS.filter(passes);
+
+  // When a package is selected, ignore other filters — show selected + similar from all packages
+  if (SELECTED_NAME) {
+    ALL_PKGS.forEach(p => {
+      if (!SIMILAR_SCORES.has(p.n) && p.n !== SELECTED_NAME) {
+        const rev = (p.si || []).find(s => s.name === SELECTED_NAME);
+        if (rev) SIMILAR_SCORES.set(p.n, rev.score);
+      }
+    });
+    filtered = ALL_PKGS.filter(p => p.n === SELECTED_NAME || SIMILAR_SCORES.has(p.n));
+  }
+
+  filtered.sort((a, b) => {
+    if (SELECTED_NAME) {
+      if (a.n === SELECTED_NAME) return -1;
+      if (b.n === SELECTED_NAME) return  1;
+      const sa = SIMILAR_SCORES.get(a.n) || 0;
+      const sb = SIMILAR_SCORES.get(b.n) || 0;
+      if (sa !== sb) return sb - sa;
+    }
     let v = 0;
     if (SORT_COL === 'dl') v = (b.dl||0) - (a.dl||0);
     else if (SORT_COL === 'st') v = (b.st||0) - (a.st||0);
     else if (SORT_COL === 'n')  v = a.n.localeCompare(b.n);
     else if (SORT_COL === 'p')  v = (a.p||'').localeCompare(b.p||'');
     else if (SORT_COL === 't')  v = (a.t||'').localeCompare(b.t||'');
-    else if (SORT_COL === 'dt') v = (b.dt||'') > (a.dt||'') ? 1 : -1;
-    else if (SORT_COL === 'dc') v = (b.dc||'') > (a.dc||'') ? 1 : -1;
+    else if (SORT_COL === 'cl') {
+      const ca = (PKG_CLUSTER[a.n] || {}).cluster_name || '';
+      const cb = (PKG_CLUSTER[b.n] || {}).cluster_name || '';
+      v = ca.localeCompare(cb);
+    }
     return v * SORT_DIR;
   });
 
-  // View-relative scales for sparklines + stars databar
-  VIEW_MAX_ST    = Math.max(1, ...filtered.filter(p=>p.st).map(p=>p.st));
-  VIEW_MAX_SPARK = Math.max(1, ...filtered.flatMap(p => p.tr || []));
-  document.getElementById('count-badge').textContent = `${filtered.length.toLocaleString()} packages`;
+  // Update banner + selected-mode class
+  const tableEl = document.getElementById('tbody').closest('table');
+  const banner  = document.getElementById('selection-banner');
+  if (SELECTED_NAME) {
+    tableEl.classList.add('selected-mode');
+    banner.style.display = '';
+    document.getElementById('banner-name').textContent = SELECTED_NAME;
+    document.getElementById('banner-count').textContent = `${SIMILAR_SCORES.size} similar`;
+  } else {
+    tableEl.classList.remove('selected-mode');
+    banner.style.display = 'none';
+  }
+
+  document.getElementById('count-badge').textContent = `${filtered.length.toLocaleString()} pkgs`;
   shown = 0;
   document.getElementById('tbody').innerHTML = '';
   loadMore();
+  renderMap(filtered);
+  renderWordCloud();
 }
 
 function loadMore() {
@@ -391,127 +581,606 @@ function loadMore() {
   const chunk = filtered.slice(shown, shown + PAGE);
   chunk.forEach(p => tbody.appendChild(makeRow(p)));
   shown += chunk.length;
-  document.getElementById('load-more').style.display = shown < filtered.length ? 'block' : 'none';
+  document.getElementById('load-more').style.display = shown < filtered.length ? '' : 'none';
 }
 
 function makeRow(p) {
   const tr = document.createElement('tr');
-
+  tr.dataset.pkg = p.n;
+  tr.onmouseenter = () => highlightMapPkg(p.n);
+  tr.onmouseleave = () => resetMapHighlight();
   const hasScopePart = p.n.includes('/');
-  const scopePart  = hasScopePart ? p.n.split('/')[0] + '/' : '';
-  const unscoped   = hasScopePart ? p.n.split('/').slice(1).join('/') : p.n;
-  const forkIcon = p.fk ? ' ⓡ' : '';
-  const author   = p.p || '';
+  const scopePart = hasScopePart ? p.n.split('/')[0] + '/' : '';
+  const unscoped  = hasScopePart ? p.n.split('/').slice(1).join('/') : p.n;
+  const FORK_SVG = '<svg class="fork-icon" width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm0 2.122a2.25 2.25 0 1 0-1.5 0v.878A2.25 2.25 0 0 0 5.75 8.5h1.5v2.128a2.251 2.251 0 1 0 1.5 0V8.5h1.5a2.25 2.25 0 0 0 2.25-2.25v-.878a2.25 2.25 0 1 0-1.5 0v.878a.75.75 0 0 1-.75.75h-4.5A.75.75 0 0 1 5 6.25v-.878zm3.75 7.378a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm3-8.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0z"/></svg>';
+  if (p.n === SELECTED_NAME) tr.classList.add('row-selected');
+  if (SELECTED_NAME && SIMILAR_SCORES.has(p.n)) tr.classList.add('row-has-score');
+
+  let scoreHTML = '';
+  if (p.n === SELECTED_NAME) {
+    scoreHTML = '<span style="color:var(--accent)">▶</span>';
+  } else if (SIMILAR_SCORES.has(p.n)) {
+    scoreHTML = `<span class="score-badge">${Math.round(SIMILAR_SCORES.get(p.n)*100)}%</span>`;
+  } else if (SELECTED_NAME) {
+    scoreHTML = '<span style="color:var(--muted)">—</span>';
+  }
+
+  const forkPrefix = p.fk ? FORK_SVG : '';
 
   const dlStr   = p.dl != null ? fmtNum(p.dl) : '—';
-  const dlClass  = p.dl > 5000 ? 'num-hi' : 'num-lo';
+  const dlClass = p.dl > 5000 ? 'num-hi' : 'num-lo';
   const stStr   = p.st != null ? fmtNum(p.st) : '—';
-  const stClass  = p.st > 500 ? 'num-hi' : 'num-lo';
-  const stPct    = p.st ? Math.round((p.st / VIEW_MAX_ST) * 100) : 0;
+  const stClass = p.st > 500 ? 'num-hi' : 'num-lo';
 
-  // Date helpers
-  const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—';
-  const updAgo  = p.dt ? timeAgo(p.dt) : '—';
-  const creAgo  = p.dc ? timeAgo(p.dc) : '—';
-  const sparkId  = 'sp-' + Math.random().toString(36).slice(2);
+  const sparkId = 'sp-' + Math.random().toString(36).slice(2);
   const installCmd = `pi install npm:${p.n}`;
-  const npmUrl     = `https://www.npmjs.com/package/${encodeURIComponent(p.n)}`;
-  const ghMatch    = p.gh && p.gh.match(/github\.com[:/]([^/]+\/[^/.]+)/);
-  const ghUrl      = ghMatch ? `https://github.com/${ghMatch[1].replace(/\.git$/,'')}` : '';
+  const npmUrl = `https://www.npmjs.com/package/${encodeURIComponent(p.n)}`;
+  const ghMatch = p.gh && p.gh.match(/github\.com[:/]([^/]+\/[^/.]+)/);
+  const ghUrl = ghMatch ? `https://github.com/${ghMatch[1].replace(/\.git$/,'')}` : '';
+
+  const pc = PKG_CLUSTER[p.n];
+  const clusterHtml = (pc && pc.cluster_id >= 0 && pc.cluster_name)
+    ? `<span class="cluster-badge">
+        <span class="cdot" style="background:${MAP_COLORS[pc.cluster_id % MAP_COLORS.length]}"></span>
+        ${escHtml(pc.cluster_name.replace(/ & .*/,'').replace(/ \& .*/, ''))}
+       </span>`
+    : '<span style="color:var(--muted);font-size:10px">—</span>';
 
   tr.innerHTML = `
-    <td onclick="openDrawer('${escAttr(p.n)}')"><div class="pkg-name">${scopePart ? '<span class="pkg-scope">' + escHtml(scopePart) + '</span>' : ''}${escHtml(unscoped)}${forkIcon}</div></td>
-    <td><span class="pkg-author" onclick="filterAuthor('${escAttr(author)}')">${escHtml(author)}</span></td>
-    <td onclick="openDrawer('${escAttr(p.n)}')"><div class="pkg-desc">${escHtml(p.d||'')}</div></td>
-    <td class="type-cell">
-      ${!['extension','unknown'].includes(p.t) ? `<span class="badge badge-${p.t}" onclick="filterType('${p.t}')" style="cursor:pointer">${p.t}</span>` : ''}
-      ${p.mh ? '<span class="badge badge-multi" title="Works with multiple AI agents">multi</span>' : ''}
+    <td onclick="toggleRow('${escAttr(p.n)}')"
+        style="${p.n===SELECTED_NAME?'border-left:3px solid var(--accent)':''}">
+      <div class="pkg-name">${forkPrefix}${scopePart ? '<span class="pkg-scope">' + escHtml(scopePart) + '</span>' : ''}${escHtml(unscoped)}</div>
     </td>
-    <td onclick="openDrawer('${escAttr(p.n)}')" class="dl-cell">
-      <div class="dl-inner">
+    <td class="score-col num" style="white-space:nowrap">${scoreHTML}</td>
+    <td><span class="pkg-author" onclick="filterAuthor('${escAttr(p.p||'')}')">${escHtml(p.p||'')}</span></td>
+    <td onclick="toggleRow('${escAttr(p.n)}')"><div class="pkg-desc">${escHtml((p.d||'').slice(0,120))}</div></td>
+    <td>
+      ${!['extension','unknown'].includes(p.t) ? `<span class="badge badge-${p.t}">${p.t}</span>` : ''}
+      ${p.mh ? '<span class="badge badge-multi">multi</span>' : ''}
+    </td>
+    <td>${clusterHtml}</td>
+    <td class="num">
+      <div style="display:inline-flex;align-items:center;gap:5px">
+        <canvas id="${sparkId}" class="spark" height="18" style="width:60px"></canvas>
         <span class="${dlClass}">${dlStr}</span>
-        <canvas id="${sparkId}" class="spark dl-spark" height="20"></canvas>
       </div>
     </td>
-    <td class="dl-cell" onclick="openDrawer('${escAttr(p.n)}')">
-      <div class="dl-inner">
-        <span class="st-num ${stClass}">${stStr}</span>
-        <div class="databar dl-spark" style="align-self:center"><div class="databar-fill databar-st" style="width:${stPct}%"></div></div>
-      </div>
-    </td>
-    <td onclick="openDrawer('${escAttr(p.n)}')"><span class="pub-date" title="${escAttr(fmtDate(p.dc))}">${creAgo}</span></td>
-    <td onclick="openDrawer('${escAttr(p.n)}')"><span class="pub-date" title="${escAttr(fmtDate(p.dt))}">${updAgo}</span></td>
+    <td class="num"><span class="${stClass}">${stStr}</span></td>
     <td class="row-actions">
-      <button class="act-btn act-copy" data-tip="${escAttr(installCmd)}" onclick="copyCmd('${escAttr(installCmd)}',this)">
-        <svg class="ic-copy" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        <svg class="ic-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+      <button class="act-btn" data-tip="${escAttr(installCmd)}" onclick="copyCmd('${escAttr(installCmd)}',this)">
+        <svg class="ic-copy" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <svg class="ic-check" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
       </button>
-      <a class="act-btn" href="${npmUrl}" target="_blank" data-tip="npm"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M0 0v24h24V0H0zm19.2 19.2H12v-9.6h-2.4v9.6H4.8V4.8h14.4v14.4z"/></svg></a>
-      ${ghUrl ? `<a class="act-btn" href="${ghUrl}" target="_blank" title="GitHub"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>` : ''}
+      <a class="act-btn" href="${npmUrl}" target="_blank" data-tip="npm"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M0 0v24h24V0H0zm19.2 19.2H12v-9.6h-2.4v9.6H4.8V4.8h14.4v14.4z"/></svg></a>
+      ${ghUrl ? `<a class="act-btn" href="${ghUrl}" target="_blank" data-tip="GitHub"><svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.65 7.65 0 0 1 8 4.73c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>` : ''}
     </td>
   `;
 
   requestAnimationFrame(() => {
     const c = document.getElementById(sparkId);
     if (c && p.tr && p.tr.length > 1) {
-      c.width = c.offsetWidth || 120;  // match CSS width
-      drawSparkline(c, p.tr, VIEW_MAX_SPARK);
+      c.width = 60;
+      drawSparkline(c, p.tr, GLOBAL_MAX_SPARK);
     }
   });
 
   return tr;
 }
 
-function drawSparkline(canvas, data, globalMax) {
+// ══ Row interaction ════════════════════════════════════════════════════════
+let SELECTED_NAME = null;
+let SIMILAR_SCORES = new Map();
+
+function toggleRow(name) {
+  if (SELECTED_NAME === name) {
+    SELECTED_NAME = null;
+    SIMILAR_SCORES = new Map();
+    document.getElementById('detail-panel').classList.remove('open');
+    history.replaceState(null, '', location.pathname + location.search.replace(/[?&]pkg=[^&]*/g, '').replace(/^&/, '?') || location.pathname);
+  } else {
+    SELECTED_NAME = name;
+    SIMILAR_SCORES = new Map();
+    const p = pkgMap[name];
+    if (p && p.si) p.si.forEach(s => SIMILAR_SCORES.set(s.name, s.score));
+    renderDetailPanel(p);
+    const u = new URL(location.href);
+    u.searchParams.set('pkg', name);
+    history.pushState(null, '', u);
+  }
+  render();
+  renderWordCloud();
+}
+
+function renderDetailPanel(p) {
+  if (!p) return;
+  const panel = document.getElementById('detail-panel');
+  const ghMatch = p.gh && p.gh.match(/github\.com[:/]([^/]+\/[^/.]+)/);
+  const ghUrl   = ghMatch ? `https://github.com/${ghMatch[1].replace(/\.git$/,'')}` : '';
+  const npmUrl  = `https://www.npmjs.com/package/${encodeURIComponent(p.n)}`;
+  const installCmd = `pi install npm:${p.n}`;
+  const pc = PKG_CLUSTER[p.n];
+  const cm = pc ? CLUSTER_META.find(c => c.id === pc.cluster_id) : null;
+
+  const kws = (p.kw || []).map(k => `<span class="kw-tag">${escHtml(k)}</span>`).join('');
+
+  const top5similar = (p.si || []).slice(0, 5).map(s => {
+    const sp = pkgMap[s.name];
+    return `<div class="sim-row" onclick="toggleRow('${escAttr(s.name)}')">
+      <span class="sim-score">${Math.round(s.score*100)}%</span>
+      <span>${escHtml(s.name.replace(/^@[^/]+\//,''))}</span>
+      <span style="color:var(--muted);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml((sp&&sp.d||'').slice(0,60))}</span>
+    </div>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <div class="detail-header">
+      <div>
+        <div class="detail-name">${escHtml(p.n)}</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:2px">
+          ${p.p ? `by <span style="cursor:pointer;color:var(--accent)" onclick="document.getElementById('cf-p').value='${escAttr(p.p)}';render()">${escHtml(p.p)}</span>` : ''}
+          ${cm ? ` &middot; <span style="cursor:pointer" onclick="selectCluster(${cm.id})">${escHtml(cm.name)}</span>` : ''}
+        </div>
+      </div>
+      <button class="detail-close" onclick="toggleRow('${escAttr(p.n)}')">&#x2715;</button>
+    </div>
+    <div class="detail-body">
+      ${p.d ? `<div class="detail-desc">${escHtml(p.d)}</div>` : ''}
+      ${p.rm ? `<div class="detail-readme">${escHtml(p.rm.trim().slice(0,300))}</div>` : ''}
+      <div class="detail-meta">
+        ${p.dl != null ? `<span>Downloads/wk <b>${fmtNum(p.dl)}</b></span>` : ''}
+        ${p.st != null ? `<span>Stars <b>${fmtNum(p.st)}</b></span>` : ''}
+        ${p.t && p.t !== 'unknown' ? `<span>Type <b>${escHtml(p.t)}</b></span>` : ''}
+        ${p.v  ? `<span>Version <b>${escHtml(p.v)}</b></span>` : ''}
+        ${p.fk ? `<span style="color:var(--muted)">&#128441; Fork</span>` : ''}
+        ${p.mh ? `<span style="color:var(--orange)">Multi-harness</span>` : ''}
+      </div>
+      ${kws ? `<div class="detail-kw">${kws}</div>` : ''}
+      <div class="detail-actions">
+        <button class="detail-btn" onclick="navigator.clipboard.writeText('${escAttr(installCmd)}');this.textContent='Copied!';setTimeout(()=>this.textContent='Copy install cmd',1200)">&#x2398; Copy install cmd</button>
+        <a class="detail-btn" href="${npmUrl}" target="_blank">npm &#8599;</a>
+        ${ghUrl ? `<a class="detail-btn" href="${ghUrl}" target="_blank">GitHub &#8599;</a>` : ''}
+      </div>
+      ${top5similar ? `<div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Similar packages</div><div class="similar-list">${top5similar}</div></div>` : ''}
+    </div>
+  `;
+  panel.classList.add('open');
+}
+
+// ══ Sparkline ═════════════════════════════════════════════════════════════
+function drawSparkline(canvas, data, max) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
-  const max = globalMax || Math.max(...data, 1);
-  ctx.clearRect(0,0,w,h);
+  const vmax = max || Math.max(...data, 1);
+  ctx.clearRect(0, 0, w, h);
   ctx.beginPath();
   data.forEach((v, i) => {
-    const x = (i / (data.length-1)) * w;
-    const y = h - (v/max) * (h-2) - 1;
-    i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    const x = (i / (data.length - 1)) * w;
+    const y = h - (v / vmax) * (h - 2) - 1;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
   ctx.strokeStyle = '#6c8eff';
   ctx.lineWidth = 1.5;
   ctx.stroke();
 }
 
+const WC_COLORS = ['#6c8eff','#34d399','#fbbf24','#a78bfa','#fb923c','#f472b6','#06b6d4','#84cc16','#f87171','#e879f9','#38bdf8','#4ade80'];
+
+// ══ Package map ═════════════════════════════════════════════════════
+const MAP_COLORS = [
+  '#6c8eff','#34d399','#fbbf24','#a78bfa','#fb923c',
+  '#f472b6','#06b6d4','#84cc16','#f87171','#e879f9','#38bdf8','#4ade80',
+];
+let _mapInitialised = false;
+let _mapDataTraceCount = 0;  // how many cluster-data traces (before label traces)
+let _mapTraceKeys = [];       // cluster_id for each data trace, in order
+
+function highlightMapCluster(cid) {
+  if (!_mapInitialised || !_mapDataTraceCount) return;
+  const opacities = _mapTraceKeys.map(k => k === cid ? 0.85 : 0.07);
+  Plotly.restyle('chart-map', { 'marker.opacity': opacities },
+    Array.from({ length: _mapDataTraceCount }, (_, i) => i));
+}
+
+function highlightMapPkg(name) {
+  if (!_mapInitialised || !_mapDataTraceCount) return;
+  const p = pkgMap[name];
+  if (!p) return;
+  const pc  = PKG_CLUSTER[name];
+  const cid = pc && pc.cluster_id >= 0 ? pc.cluster_id : -1;
+  // Dim all data traces, slightly lift the matching cluster
+  const opacities = _mapTraceKeys.map(k => k === cid ? 0.55 : 0.05);
+  Plotly.restyle('chart-map', { 'marker.opacity': opacities },
+    Array.from({ length: _mapDataTraceCount }, (_, i) => i));
+  // Show highlight ring on the dedicated last trace
+  const hi = _mapDataTraceCount + (document.getElementById('chart-map')._labelTraceCount || 0);
+  Plotly.restyle('chart-map', { x: [[p.x]], y: [[p.y]], text: [[name]] }, [hi]);
+}
+
+function resetMapHighlight() {
+  if (!_mapInitialised || !_mapDataTraceCount) return;
+  Plotly.restyle('chart-map', { 'marker.opacity': 0.75 },
+    Array.from({ length: _mapDataTraceCount }, (_, i) => i));
+  // Clear highlight ring
+  const hi = _mapDataTraceCount + (document.getElementById('chart-map')._labelTraceCount || 0);
+  Plotly.restyle('chart-map', { x: [[]], y: [[]], text: [[]] }, [hi]);
+}
+
+function renderMap(pkgs) {
+  const el = document.getElementById('chart-map');
+  if (!el || !pkgs) return;
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  const bg     = isDark ? '#0f1117' : '#f8f9fc';
+  const paper  = isDark ? '#1a1d27' : '#ffffff';
+  const grid   = isDark ? '#2a2d3a' : '#e2e5ec';
+  const textC  = isDark ? '#e2e4ed' : '#111318';
+
+  // Group by cluster for colouring
+  const groups = new Map();
+  pkgs.forEach(p => {
+    const pc  = PKG_CLUSTER[p.n];
+    const cid = (pc && pc.cluster_id >= 0) ? pc.cluster_id : -1;
+    const key = (pc && pc.cluster_name) ? pc.cluster_name : 'Other';
+    if (!groups.has(cid)) groups.set(cid, { key, color: MAP_COLORS[cid % MAP_COLORS.length] || '#9ca3af', xs:[], ys:[], names:[], dls:[] });
+    const g = groups.get(cid);
+    g.xs.push(p.x); g.ys.push(p.y);
+    g.names.push(p.n);
+    g.dls.push(p.dl || 0);
+  });
+
+  const sortedGroups = [...groups.entries()].sort((a,b) => a[0] - b[0]);
+  const traces = sortedGroups.map(([cid, g]) => ({
+      type: 'scatter', mode: 'markers',
+      name: g.key,
+      x: g.xs, y: g.ys,
+      text: g.names,
+      customdata: g.dls,
+      hovertemplate: '<b>%{text}</b><br><span style="color:#6b7280">%{customdata:,} DL/wk</span><extra></extra>',
+      marker: {
+        color: g.color,
+        opacity: 0.75,
+        size: g.dls.map(d => Math.max(4, Math.min(24, 3 + Math.sqrt(d||0) * 0.15))),
+        line: { width: 0 },
+      },
+    }));
+  _mapTraceKeys = sortedGroups.map(([cid]) => cid);
+  _mapDataTraceCount = traces.length;
+
+  // Cluster label annotations — only when showing a large unfiltered set
+  const showLabels = pkgs.length > ALL_PKGS.length * 0.6;
+  if (showLabels) {
+    const centroids = new Map();
+    pkgs.forEach(p => {
+      const pc = PKG_CLUSTER[p.n];
+      if (!pc) return;
+      const cid = pc.cluster_id;
+      if (!centroids.has(cid)) centroids.set(cid, { name: pc.cluster_name || 'Other', cid, xs:[], ys:[], maxR:0 });
+      const c = centroids.get(cid);
+      c.xs.push(p.x); c.ys.push(p.y);
+    });
+
+    // Compute centroid, then push label outward from the global mean
+    const allCx = [], allCy = [];
+    centroids.forEach(c => {
+      c.cx = c.xs.reduce((a,b)=>a+b,0)/c.xs.length;
+      c.cy = c.ys.reduce((a,b)=>a+b,0)/c.ys.length;
+      allCx.push(c.cx); allCy.push(c.cy);
+    });
+    const globalCx = allCx.reduce((a,b)=>a+b,0)/allCx.length;
+    const globalCy = allCy.reduce((a,b)=>a+b,0)/allCy.length;
+
+    const lx=[], ly=[], lt=[], lcolors=[];
+    centroids.forEach(({ name, cid, cx, cy, xs, ys }) => {
+      // Direction from global centre to this centroid
+      const dx = cx - globalCx, dy = cy - globalCy;
+      const dist = Math.sqrt(dx*dx + dy*dy) || 0.01;
+      // Approximate cluster radius (mean distance of points from centroid)
+      const r = xs.reduce((s,x,i)=> s + Math.sqrt((x-cx)**2+(ys[i]-cy)**2),0)/xs.length;
+      // Place label one cluster-radius beyond the centroid, min 0.08 units
+      const push = Math.max(r * 1.1, 0.08);
+      lx.push(cx + (dx/dist)*push);
+      ly.push(cy + (dy/dist)*push);
+      lt.push(name.replace(/ [&\/] .*/,''));
+      lcolors.push(MAP_COLORS[cid % MAP_COLORS.length]);
+    });
+
+    // One trace per label so each can have its own colour
+    lx.forEach((x, i) => {
+      traces.push({
+        type:'scatter', mode:'text',
+        x:[x], y:[ly[i]], text:[lt[i]],
+        textfont:{ size:10, color:lcolors[i],
+          family:'-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif' },
+        textposition:'middle center',
+        hoverinfo:'skip', showlegend:false,
+      });
+    });
+  }
+
+  // Track label trace count, then add empty highlight-ring trace
+  const labelCount = traces.length - _mapDataTraceCount;
+  traces.push({
+    type:'scatter', mode:'markers', name:'_highlight',
+    x:[], y:[], text:[],
+    hovertemplate:'<b>%{text}</b><extra></extra>',
+    marker:{ color:'rgba(0,0,0,0)', size:18, line:{ color:'var(--accent)', width:2.5 } },
+    showlegend:false,
+  });
+
+  // Axis ranges: fit exactly to visible points with 5% padding
+  const allX = pkgs.map(p=>p.x), allY = pkgs.map(p=>p.y);
+  const xMin = Math.min(...allX), xMax = Math.max(...allX);
+  const yMin = Math.min(...allY), yMax = Math.max(...allY);
+  const xPad = (xMax - xMin) * 0.08 || 0.1;
+  const yPad = (yMax - yMin) * 0.08 || 0.1;
+
+  const layout = {
+    paper_bgcolor: paper, plot_bgcolor: bg,
+    margin: { t: 4, b: 4, l: 4, r: 4 },
+    xaxis: { range: [xMin-xPad, xMax+xPad], showgrid:true, gridcolor:grid,
+             zeroline:false, showticklabels:false },
+    yaxis: { range: [yMin-yPad, yMax+yPad], showgrid:true, gridcolor:grid,
+             zeroline:false, showticklabels:false },
+    showlegend: false,
+    hovermode: 'closest',
+    font: { family:'-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif', size:11, color:textC },
+    hoverlabel: { bgcolor:paper, bordercolor:grid, font:{ size:11 } },
+    uirevision: 'static',   // prevent Plotly resetting zoom on data update
+  };
+
+  const cfg = { responsive:true, displayModeBar:false };
+
+  if (!_mapInitialised) {
+    Plotly.newPlot('chart-map', traces, layout, cfg);
+    _mapInitialised = true;
+    el._labelTraceCount = labelCount;
+    el.on('plotly_click', ev => {
+      const pt = ev.points?.[0];
+      if (pt?.text && pt.text !== SELECTED_NAME) toggleRow(pt.text);
+      else if (pt?.text) toggleRow(pt.text); // re-click same = deselect
+    });
+  } else {
+    // update data + reset axis ranges to fit new filtered set
+    Plotly.react('chart-map', traces,
+      { ...layout, uirevision: Date.now() },
+      cfg);
+    el._labelTraceCount = labelCount;
+  }
+  document.getElementById('map-count').textContent =
+    `— ${pkgs.length.toLocaleString()} packages`;
+}
+
+// ══ Cluster bar chart ═════════════════════════════════════════════════════
+function renderBarChart() {
+  if (!CLUSTER_META.length) return;
+  const sorted = [...CLUSTER_META].sort((a,b) => a.total_dl - b.total_dl);
+  const colors = sorted.map(c => PATTERN_COLOR[c.pattern] || '#888');
+  const isDark = document.documentElement.dataset.theme !== 'light';
+  const textColor = isDark ? '#e2e4ed' : '#111318';
+  const gridColor = isDark ? '#2a2d3a' : '#e2e5ec';
+  const paperBg  = isDark ? '#1a1d27' : '#ffffff';
+
+  const data = [{
+    type: 'bar',
+    orientation: 'h',
+    x: sorted.map(c => c.total_dl),
+    y: sorted.map(c => c.name),
+    marker: { color: colors },
+    text: sorted.map(c => fmtNum(c.total_dl)),
+    textposition: 'outside',
+    hovertemplate: '<b>%{y}</b><br>DL/wk: %{x:,}<br>Packages: ' +
+      sorted.map(c => c.pkgs).join('<br>Packages: ').split('<br>').slice(0,1) + '<extra></extra>',
+    customdata: sorted.map(c => c.pkgs),
+    hovertemplate: '<b>%{y}</b><br>DL/wk: %{x:,}<br>Pkgs: %{customdata}<extra></extra>',
+  }];
+
+  const layout = {
+    paper_bgcolor: paperBg,
+    plot_bgcolor: paperBg,
+    margin: { l: 180, r: 60, t: 10, b: 30 },
+    height: 300,
+    xaxis: { color: textColor, gridcolor: gridColor, tickfont: { size: 10 } },
+    yaxis: { color: textColor, tickfont: { size: 10 } },
+    font: { color: textColor, size: 11 },
+    hoverlabel: { bgcolor: '#1a1d27', bordercolor: '#2a2d3a', font: { size: 12 } },
+  };
+
+  Plotly.newPlot('chart-bar', data, layout, {
+    responsive: true, displayModeBar: false
+  });
+
+  document.getElementById('chart-bar').on('plotly_click', ev => {
+    const pt = ev.points[0];
+    const cm = CLUSTER_META.find(c => c.name === pt.y);
+    if (cm) selectCluster(activeCluster === cm.id ? null : cm.id);
+  });
+}
+
+// ══ Word cloud ════════════════════════════════════════════════════════════
+let wcTimeout = null;
+function renderWordCloud() {
+  clearTimeout(wcTimeout);
+  const canvas = document.getElementById('wc-canvas');
+  const loading = document.getElementById('wc-loading');
+  const title = document.getElementById('wc-title');
+
+  // Build word list: selected pkg → cluster-mates, cluster selected → precomputed, else → all filtered
+  let wordFreqs, cloudTitle;
+  const q = document.getElementById('search').value.trim();
+
+  if (SELECTED_NAME && pkgMap[SELECTED_NAME]) {
+    const sel = pkgMap[SELECTED_NAME];
+    const pc  = PKG_CLUSTER[SELECTED_NAME];
+    // Use the selected package + all packages in its cluster (or similar packages)
+    const pool = pc
+      ? ALL_PKGS.filter(p => (PKG_CLUSTER[p.n]||{}).cluster_id === pc.cluster_id)
+      : (sel.si || []).map(s => pkgMap[s.name]).filter(Boolean).concat([sel]);
+    const STOPS = new Set(['this','that','with','from','have','will','your','their','they','been','also',
+      'which','more','some','into','such','than','just','each','about','over','then','when','where',
+      'there','these','those','what','would','could','should','other','after','while','being',
+      'using','used','uses','adds','make','makes','made','gets','lets','runs','take','takes',
+      'give','gives','help','helps','allow','allows','build','built','based','simple','simply',
+      'easy','small','tool','tools','work','works','support','provide','provides','include','includes',
+      'feature','features','package','packages','extension','extensions','coding','agent','install']);
+    const freq = {};
+    pool.forEach(p => {
+      new Set(((p.d||'') + ' ' + (p.n||'')).toLowerCase()
+        .split(/[^a-z]+/).filter(w => w.length > 3 && !STOPS.has(w)))
+        .forEach(w => { freq[w] = (freq[w]||0) + 1; });
+    });
+    wordFreqs  = Object.fromEntries(Object.entries(freq).filter(([,v]) => v >= 2));
+    cloudTitle = `Word Cloud — ${sel.n.replace(/^@[^/]+\//, '')}${(pc && pc.cluster_name) ? ' · ' + pc.cluster_name : ''}`;
+  } else if (activeCluster !== null) {
+    const cm = CLUSTER_META.find(c => c.id === activeCluster);
+    wordFreqs = CLUSTER_WORDFREQS[String(activeCluster)] || {};
+    cloudTitle = `Word Cloud — ${cm ? cm.name : 'Cluster ' + activeCluster}`;
+  } else {
+    const STOPS = new Set(['this','that','with','from','have','will','your','their','they','been','also',
+      'which','more','some','into','such','than','just','each','about','over','then','when','where',
+      'there','these','those','what','would','could','should','other','after','while','being',
+      'using','used','uses','adds','make','makes','made','gets','lets','runs','take','takes',
+      'give','gives','help','helps','allow','allows','build','built','based','simple','simply',
+      'easy','small','tool','tools','work','works','support','provide','provides','include','includes',
+      'feature','features','package','packages','extension','extensions','coding','agent','install']);
+    const freq = {};
+    (filtered.length ? filtered : ALL_PKGS).forEach(p => {
+      new Set(((p.d||'') + ' ' + (p.n||'')).toLowerCase()
+        .split(/[^a-z]+/).filter(w => w.length > 3 && !STOPS.has(w)))
+        .forEach(w => { freq[w] = (freq[w]||0) + 1; });
+    });
+    wordFreqs  = Object.fromEntries(Object.entries(freq).filter(([,v]) => v >= 2));
+    cloudTitle = q ? `Word Cloud — "${q}" (${filtered.length} pkgs)` : `Word Cloud — all ${(filtered.length||ALL_PKGS.length).toLocaleString()} packages`;
+  }
+
+  const words = Object.entries(wordFreqs);
+  if (!words.length) { loading.textContent = 'No word data'; loading.style.display = ''; return; }
+
+  title.textContent = cloudTitle;
+  loading.textContent = 'Rendering…';
+  loading.style.display = '';
+
+  const maxScore = Math.max(...words.map(([,v]) => v));
+  const list = words
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, 60)
+    .map(([w, v]) => [w, Math.max(10, Math.round((v / maxScore) * 56) + 8)]);
+
+  // Resize canvas to fit container
+  const wrap = document.getElementById('wc-wrap');
+  const W = wrap.offsetWidth || 550;
+  const H = 280;
+  canvas.width = W;
+  canvas.height = H;
+
+  wcTimeout = setTimeout(() => {
+    const isDark = document.documentElement.dataset.theme !== 'light';
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+
+    WordCloud(canvas, {
+      list,
+      gridSize: 6,
+      weightFactor: 1,
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      color: () => WC_COLORS[Math.floor(Math.random() * WC_COLORS.length)],
+      rotateRatio: 0.2,
+      backgroundColor: isDark ? '#1a1d27' : '#ffffff',
+      click: item => { setActiveWord(item[0]); },
+      hover: (item) => {
+        canvas.style.cursor = item ? 'pointer' : 'default';
+      },
+    });
+    loading.style.display = 'none';
+  }, 80);
+}
+
+// ══ Trend chart ═══════════════════════════════════════════════════════════
+function renderTrendChart() {
+  const el = document.getElementById('chart-trend');
+  const title = document.getElementById('trend-title');
+
+  if (activeCluster === null) {
+    Plotly.purge(el);
+    el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:260px;color:var(--muted);font-size:13px">Select a cluster to view trends</div>';
+    title.textContent = 'Download Trends — Top 10 Packages';
+    return;
+  }
+
+  const cm = CLUSTER_META.find(c => c.id === activeCluster);
+  title.textContent = `Download Trends — ${cm ? cm.name : 'Cluster ' + activeCluster} (Top 10)`;
+
+  // Get packages in this cluster, sorted by downloads
+  const clusterPkgs = ALL_PKGS
+    .filter(p => { const pc = PKG_CLUSTER[p.n]; return pc && pc.cluster_id === activeCluster; })
+    .filter(p => p.tr && p.tr.some(v => v > 0))
+    .sort((a, b) => (b.dl || 0) - (a.dl || 0))
+    .slice(0, 10);
+
+  if (!clusterPkgs.length) {
+    el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:260px;color:var(--muted);font-size:13px">No trend data for this cluster</div>';
+    return;
+  }
+
+  // Compute week dates: tr is last 26 weeks, most recent = today (2026-06-27)
+  const REF_DATE = new Date('2026-06-27');
+  const weekDates = [];
+  for (let i = 25; i >= 0; i--) {
+    const d = new Date(REF_DATE);
+    d.setDate(d.getDate() - i * 7);
+    weekDates.push(d.toISOString().split('T')[0]);
+  }
+
+  const isDark = document.documentElement.dataset.theme !== 'light';
+  const textColor = isDark ? '#e2e4ed' : '#111318';
+  const gridColor = isDark ? '#2a2d3a' : '#e2e5ec';
+  const paperBg  = isDark ? '#1a1d27' : '#ffffff';
+
+  const COLORS = ['#6c8eff','#f87171','#34d399','#fbbf24','#a78bfa','#fb923c',
+                  '#06b6d4','#f472b6','#84cc16','#e879f9'];
+
+  const traces = clusterPkgs.map((p, i) => {
+    const nWeeks = p.tr.length;
+    const dates = weekDates.slice(26 - nWeeks);
+    return {
+      type: 'scatter',
+      mode: 'lines',
+      name: p.n.replace(/^@[^/]+\//, ''),
+      x: dates,
+      y: p.tr,
+      line: { color: COLORS[i % COLORS.length], width: 1.5 },
+      hovertemplate: `<b>${escHtml(p.n)}</b><br>%{x}: %{y:,}<extra></extra>`,
+    };
+  });
+
+  const layout = {
+    paper_bgcolor: paperBg,
+    plot_bgcolor: paperBg,
+    margin: { l: 50, r: 10, t: 10, b: 40 },
+    height: 260,
+    xaxis: { color: textColor, gridcolor: gridColor, tickfont: { size: 10 } },
+    yaxis: { color: textColor, gridcolor: gridColor, tickfont: { size: 10 } },
+    legend: { font: { size: 10, color: textColor }, bgcolor: 'transparent', x: 0, y: 1.05, orientation: 'h' },
+    hovermode: 'x unified',
+    font: { color: textColor },
+    hoverlabel: { bgcolor: isDark ? '#1a1d27' : '#fff', bordercolor: gridColor, font: { size: 11 } },
+  };
+
+  Plotly.newPlot('chart-trend', traces, layout, {
+    responsive: true, displayModeBar: false
+  });
+}
+
+// ══ Helpers ════════════════════════════════════════════════════════════════
 function fmtNum(n) {
+  if (n == null) return '—';
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
   if (n >= 1000) return (n/1000).toFixed(1) + 'k';
   return n.toLocaleString();
 }
-
-function timeAgo(iso) {
-  const sec = Math.floor((Date.now() - new Date(iso)) / 1000);
-  if (sec < 60)  return sec + 's';
-  const min = Math.floor(sec / 60);
-  if (min < 60)  return min + 'min';
-  const hr  = Math.floor(min / 60);
-  if (hr  < 24)  return hr  + 'h';
-  const day = Math.floor(hr  / 24);
-  if (day < 7)   return day + 'd';
-  const wk  = Math.floor(day / 7);
-  if (wk  < 5)   return wk  + 'w';
-  const mo  = Math.floor(day / 30);
-  if (mo  < 12)  return mo  + 'm';
-  const yr  = Math.floor(day / 365);
-  const rem = Math.floor((day % 365) / 30);
-  return rem > 0 ? yr + 'y' + rem + 'm' : yr + 'y';
-}
-
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-
 function escAttr(s) {
   return String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;');
-}
-
-function filterType(t) {
-  document.getElementById('cf-t').value = t;
-  render();
 }
 
 function filterAuthor(a) {
@@ -525,107 +1194,137 @@ function copyCmd(cmd, btn) {
     const check = btn.querySelector('.ic-check');
     copy.style.display  = 'none';
     check.style.display = '';
-    setTimeout(() => {
-      copy.style.display  = '';
-      check.style.display = 'none';
-    }, 1200);
+    setTimeout(() => { copy.style.display = ''; check.style.display = 'none'; }, 1200);
   });
 }
 
-function openDrawer(name) {
-  const p = pkgMap[name];
-  if (!p) return;
-
-  document.getElementById('d-name').textContent = p.n;
-  document.getElementById('d-desc').textContent = p.d || 'No description';
-
-  // Meta grid
-  document.getElementById('d-meta').innerHTML = [
-    { label: 'Downloads/wk', value: p.dl != null ? p.dl.toLocaleString() : '—' },
-    { label: 'GitHub Stars', value: p.st != null ? p.st.toLocaleString() : '—' },
-    { label: 'Trend',        value: p.tt || '—' },
-    { label: 'Type',         value: p.t  || '—' },
-    { label: 'Version',      value: p.v  || '—' },
-    { label: 'Fork',         value: p.fk ? 'Yes ⑂' : 'No' },
-  ].map(m => `<div class="meta-item"><div class="label">${m.label}</div><div class="value">${m.value}</div></div>`).join('');
-
-  // Trend chart
-  const trendSection = document.getElementById('d-trend-section');
-  if (p.tr && p.tr.length > 1) {
-    trendSection.style.display = 'block';
-    requestAnimationFrame(() => {
-      const c = document.getElementById('d-trend-canvas');
-      c.width = c.offsetWidth;
-      drawSparkline(c, p.tr);
-    });
-  } else { trendSection.style.display = 'none'; }
-
-  // Similar
-  const simSection = document.getElementById('d-similar-section');
-  if (p.si && p.si.length) {
-    simSection.style.display = 'block';
-    document.getElementById('d-similar').innerHTML = p.si.map(s => {
-      const sp = pkgMap[s.name];
-      const dl = sp && sp.dl ? `${fmtNum(sp.dl)}/wk` : '';
-      return `<div class="similar-item" onclick="openDrawer('${escHtml(s.name)}')">
-        <span class="similar-name">${escHtml(s.name)}</span>
-        <span class="similar-score">${dl} · ${Math.round(s.score*100)}% similar</span>
-      </div>`;
-    }).join('');
-  } else { simSection.style.display = 'none'; }
-
-  // Keywords
-  const kwSection = document.getElementById('d-kw-section');
-  if (p.kw && p.kw.length) {
-    kwSection.style.display = 'block';
-    document.getElementById('d-kw').innerHTML = p.kw.map(k => `<span class="kw">${escHtml(k)}</span>`).join('');
-  } else { kwSection.style.display = 'none'; }
-
-  // Links
-  const links = [];
-  if (p.n) links.push(`<a class="link-btn" href="https://www.npmjs.com/package/${encodeURIComponent(p.n)}" target="_blank">npm ↗</a>`);
-  if (p.gh) {
-    const m = p.gh.match(/github\.com[:/]([^/]+\/[^/.]+)/);
-    if (m) links.push(`<a class="link-btn" href="https://github.com/${m[1].replace(/\.git$/,'')}" target="_blank">GitHub ↗</a>`);
-  }
-  links.push(`<a class="link-btn" href="https://pi.dev/packages?q=${encodeURIComponent(p.n)}" target="_blank">pi.dev ↗</a>`);
-  document.getElementById('d-links').innerHTML = links.join('');
-
-  document.getElementById('overlay').classList.add('open');
-  document.getElementById('drawer').classList.add('open');
-}
-
-function closeDrawer() {
-  document.getElementById('overlay').classList.remove('open');
-  document.getElementById('drawer').classList.remove('open');
-}
-
-function switchTab(name, el) {
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-panel').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('tab-' + name).classList.add('active');
-}
-
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
-
+// ══ Theme ══════════════════════════════════════════════════════════════════
 function toggleTheme() {
   const isLight = document.documentElement.dataset.theme === 'light';
   document.documentElement.dataset.theme = isLight ? '' : 'light';
   document.getElementById('ti-dark').style.display  = isLight ? '' : 'none';
   document.getElementById('ti-light').style.display = isLight ? 'none' : '';
   localStorage.setItem('pidex-theme', isLight ? 'dark' : 'light');
+  // Re-render charts for new theme
+  renderWordCloud();
+
 }
 
-// Restore saved theme
 (function() {
-  const t = localStorage.getItem('pidex-theme');
-  if (t === 'light') {
-    document.documentElement.dataset.theme = 'light';
-    document.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('ti-dark').style.display = 'none';
-      document.getElementById('ti-light').style.display = '';
-    });
+  const dark = localStorage.getItem('pidex-theme') === 'dark';
+  document.documentElement.dataset.theme = dark ? '' : 'light';
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('ti-dark').style.display  = dark ? '' : 'none';
+    document.getElementById('ti-light').style.display = dark ? 'none' : '';
+  });
+})();
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { selectCluster(null); document.getElementById('search').value = ''; render(); }
+});
+
+// Handle window resize for charts
+window.addEventListener('resize', () => {
+  Plotly.Plots.resize('chart-map');
+  renderWordCloud();
+});
+
+window.addEventListener('popstate', () => {
+  const params = new URLSearchParams(location.search);
+  const _pkg = params.get('pkg');
+  const _cl  = params.has('cluster') ? parseInt(params.get('cluster')) : null;
+  const _q   = params.get('q') || '';
+  // Restore search
+  const searchEl = document.getElementById('search');
+  if (searchEl && searchEl.value !== _q) {
+    searchEl.value = _q;
+    const btn = document.getElementById('search-clear');
+    if (btn) btn.style.display = _q ? '' : 'none';
+  }
+  // Restore cluster
+  if (_cl !== activeCluster) {
+    activeCluster = _cl;
+    const sel = document.getElementById('cf-cl');
+    if (sel) sel.value = _cl !== null ? String(_cl) : '';
+    document.querySelectorAll('.cnav-pill').forEach(el =>
+      el.classList.toggle('active', parseInt(el.dataset.cid) === _cl));
+    updateActiveFilterBar();
+  }
+  // Restore package selection
+  if (_pkg && pkgMap[_pkg] && _pkg !== SELECTED_NAME) {
+    SELECTED_NAME = _pkg;
+    SIMILAR_SCORES = new Map();
+    const p = pkgMap[_pkg];
+    if (p && p.si) p.si.forEach(s => SIMILAR_SCORES.set(s.name, s.score));
+    renderDetailPanel(p);
+  } else if (!_pkg && SELECTED_NAME) {
+    SELECTED_NAME = null;
+    SIMILAR_SCORES = new Map();
+    document.getElementById('detail-panel').classList.remove('open');
+  }
+  render();
+  renderWordCloud();
+});
+
+// ══════════════════════════════════════════════════
+(function() {
+  const resizer = document.getElementById('resizer');
+  const left    = document.querySelector('.left-panel');
+  const split   = document.querySelector('.split');
+  let dragging  = false, startX = 0, startW = 0;
+
+  resizer.addEventListener('mousedown', e => {
+    e.preventDefault();
+    dragging = true;
+    startX   = e.clientX;
+    startW   = left.getBoundingClientRect().width;
+    resizer.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const newW = Math.max(0, Math.min(startW + e.clientX - startX, split.getBoundingClientRect().width - 200));
+    if (newW < 40) {
+      left.classList.add('collapsed');
+      left.style.width = '';
+    } else {
+      left.classList.remove('collapsed');
+      left.style.width = newW + 'px';
+    }
+    updateToggleIcon();
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    resizer.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    Plotly.Plots.resize('chart-map');
+    renderWordCloud();
+  });
+
+  document.getElementById('panel-toggle').addEventListener('click', () => {
+    const collapsed = left.classList.contains('collapsed');
+    if (collapsed) {
+      left.classList.remove('collapsed');
+      left.style.width = left._lastW || '40%';
+    } else {
+      left._lastW = left.style.width || left.getBoundingClientRect().width + 'px';
+      left.classList.add('collapsed');
+      left.style.width = '';
+    }
+    updateToggleIcon();
+    setTimeout(() => { Plotly.Plots.resize('chart-map'); renderWordCloud(); }, 50);
+  });
+
+  function updateToggleIcon() {
+    const btn = document.getElementById('panel-toggle');
+    const collapsed = left.classList.contains('collapsed');
+    btn.innerHTML = collapsed ? '&#8250;' : '&#8249;';
+    btn.title     = collapsed ? 'Show list panel' : 'Hide list panel';
   }
 })();
 
