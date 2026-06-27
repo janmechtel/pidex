@@ -135,7 +135,7 @@
   .col-filter { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 4px 7px; border-radius: 4px; font-size: 11px; outline: none; }
   .col-filter:focus { border-color: var(--accent); }
   /* Row actions */
-  .row-actions { white-space: nowrap; opacity: 0.45; transition: opacity .15s; }
+  .row-actions { white-space: nowrap; opacity: 0.45; transition: opacity .15s; padding-left: 6px; padding-right: 6px; }
   tr:hover .row-actions { opacity: 1; }
   .act-btn { display: inline-flex; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 24px; height: 24px; border-radius: 4px; cursor: pointer; text-decoration: none; margin-right: 2px; transition: border-color .15s, color .15s; flex-shrink: 0; }
   .act-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -202,7 +202,7 @@
   <th style="width:95px" onclick="sortBy('st')" class="num">Stars <span class="sort-arrow" id="sa-st"></span></th>
   <th style="width:75px" onclick="sortBy('dc')">Created <span class="sort-arrow" id="sa-dc"></span></th>
   <th style="width:75px" onclick="sortBy('dt')">Updated <span class="sort-arrow" id="sa-dt"></span></th>
-  <th style="width:72px"></th>
+  <th style="width:96px"></th>
         </tr>
         <tr class="filter-row">
   <th><input class="col-filter" placeholder="name…" oninput="render()" id="cf-n"></th>
@@ -268,6 +268,23 @@ async function init() {
   const res = await fetch('data/packages.json');
   ALL = await res.json();
   ALL.forEach(p => pkgMap[p.n] = p);
+
+  // Deduplicate: if two packages are 100% similar (same author+desc), keep the one with more data
+  const dupeNames = new Set();
+  ALL.forEach(p => {
+    if (dupeNames.has(p.n)) return;
+    const twins = (p.si || []).filter(s => s.score === 1.0).map(s => pkgMap[s.name]).filter(Boolean);
+    twins.forEach(twin => {
+      if (twin.p === p.p && twin.d === p.d) {
+        // Keep whichever has more download data; drop the other
+        const dropName = (twin.dl || 0) > (p.dl || 0) ||
+          ((twin.tr||[]).some(v=>v>0) && !(p.tr||[]).some(v=>v>0))
+          ? p.n : twin.n;
+        dupeNames.add(dropName);
+      }
+    });
+  });
+  ALL = ALL.filter(p => !dupeNames.has(p.n));
 
   // Apply URL parameters to filters before rendering
   (function() {
