@@ -135,7 +135,7 @@
   .col-filter { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 4px 7px; border-radius: 4px; font-size: 11px; outline: none; }
   .col-filter:focus { border-color: var(--accent); }
   /* Row actions */
-  .row-actions { white-space: nowrap; opacity: 0; transition: opacity .15s; }
+  .row-actions { white-space: nowrap; opacity: 0.45; transition: opacity .15s; }
   tr:hover .row-actions { opacity: 1; }
   .act-btn { display: inline-flex; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 24px; height: 24px; border-radius: 4px; cursor: pointer; text-decoration: none; margin-right: 2px; transition: border-color .15s, color .15s; flex-shrink: 0; }
   .act-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -269,6 +269,16 @@ async function init() {
   ALL = await res.json();
   ALL.forEach(p => pkgMap[p.n] = p);
 
+  // Apply URL parameters to filters before rendering
+  (function() {
+    const params = new URLSearchParams(location.search);
+    if (params.has('q'))      document.getElementById('search').value = params.get('q');
+    if (params.has('name'))   document.getElementById('cf-n').value   = params.get('name');
+    if (params.has('author')) document.getElementById('cf-p').value   = params.get('author');
+    if (params.has('desc'))   document.getElementById('cf-d').value   = params.get('desc');
+    if (params.has('type'))   document.getElementById('cf-t').value   = params.get('type');
+  })();
+
   // Global sparkline scale
   GLOBAL_MAX = Math.max(1, ...ALL.flatMap(p => p.tr || []));
   // Stats
@@ -297,7 +307,28 @@ function sortBy(col) {
   render();
 }
 
+let _urlUpdateTimer = null;
+function pushUrlState() {
+  clearTimeout(_urlUpdateTimer);
+  _urlUpdateTimer = setTimeout(() => {
+    const params = new URLSearchParams();
+    const q   = document.getElementById('search').value;
+    const cfN = document.getElementById('cf-n').value;
+    const cfP = document.getElementById('cf-p').value;
+    const cfD = document.getElementById('cf-d').value;
+    const cfT = document.getElementById('cf-t').value;
+    if (q)   params.set('q', q);
+    if (cfN) params.set('name', cfN);
+    if (cfP) params.set('author', cfP);
+    if (cfD) params.set('desc', cfD);
+    if (cfT) params.set('type', cfT);
+    const str = params.toString();
+    history.replaceState(null, '', str ? '?' + str : location.pathname);
+  }, 200);
+}
+
 function render() {
+  pushUrlState();
   const q    = document.getElementById('search').value.toLowerCase();
   const cfN  = document.getElementById('cf-n').value.toLowerCase();
   const cfP  = document.getElementById('cf-p').value.toLowerCase();
@@ -349,7 +380,9 @@ function loadMore() {
 function makeRow(p) {
   const tr = document.createElement('tr');
 
-  const unscoped = p.n.includes('/') ? p.n.split('/').slice(1).join('/') : p.n;
+  const hasScopePart = p.n.includes('/');
+  const scopePart  = hasScopePart ? p.n.split('/')[0] + '/' : '';
+  const unscoped   = hasScopePart ? p.n.split('/').slice(1).join('/') : p.n;
   const forkIcon = p.fk ? ' ⓡ' : '';
   const author   = p.p || '';
 
@@ -370,7 +403,7 @@ function makeRow(p) {
   const ghUrl      = ghMatch ? `https://github.com/${ghMatch[1].replace(/\.git$/,'')}` : '';
 
   tr.innerHTML = `
-    <td onclick="openDrawer('${escAttr(p.n)}')"><div class="pkg-name">${escHtml(unscoped)}${forkIcon}</div></td>
+    <td onclick="openDrawer('${escAttr(p.n)}')"><div class="pkg-name">${scopePart ? '<span class="pkg-scope">' + escHtml(scopePart) + '</span>' : ''}${escHtml(unscoped)}${forkIcon}</div></td>
     <td><span class="pkg-author" onclick="filterAuthor('${escAttr(author)}')">${escHtml(author)}</span></td>
     <td onclick="openDrawer('${escAttr(p.n)}')"><div class="pkg-desc">${escHtml(p.d||'')}</div></td>
     <td class="type-cell">
